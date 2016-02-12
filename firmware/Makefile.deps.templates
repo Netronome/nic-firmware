@@ -1,0 +1,495 @@
+#a Copyright (C) 2015,  Netronome Systems.  All rights reserved.
+#
+# @file    firmware/deps/Makefile.templates
+# @brief   Templates for adding flowenv libraries, GRO, BLM or NFD
+#
+
+
+#f fwdep.plus
+#
+# Add two numbers
+#
+# @param $1 first operand
+# @param $2 second operand
+#
+define fwdep.plus
+$(shell echo "$1 + $2"|bc)
+endef
+
+
+#f fwdep.minus
+#
+# Subtract the second operand from the first 
+#
+# @param $1 first operand
+# @param $2 second operand
+#
+define fwdep.minus
+$(shell echo "$1 - $2"|bc)
+endef
+
+
+#
+##### GRO ######
+#
+
+#a Dependency templates
+#f fwdep.add_gro_block
+#
+# Add a single GRO ME to the build of a firmware
+#
+# @param $1 firmware name
+# @param $2 ME
+# @param $3 blocknum
+#
+define fwdep.add_gro_block
+
+$(eval $(call microcode.assemble.abspath,$1,gro$3,$(GRO_DIR)/me,gro_out.uc))
+$(eval $(call microcode.add_includes,$1,gro$3,$(GRO_DIR) $(GRO_DIR)/me))
+$(eval $(call microcode.add_defines,$1,gro$3,GRO_BLOCK_NUM=$3))
+$(eval $(call microcode.add_flags,$1,gro$3,-keep_unreachable_code))
+$(eval $(call nffw.add_obj,$1,gro$3,$2))
+
+endef
+
+#f fwdep.add_gro
+#
+# Add GRO MEs to the build for a firmware
+#
+# @param $1 firmware name
+# @param $2 ME list
+#
+define fwdep.add_gro
+
+$1.nffw: $(GRO_DIR)
+
+$(foreach blk,$(shell seq $(words $2)),\
+	$(call fwdep.add_gro_block,$1,$(word $(blk),$2),$(call fwdep.minus,$(blk),1)))
+
+$(eval $(call nffw.add_define,$1,GRO_NUM_BLOCKS=$(words $2)))
+$(eval $(call nffw.add_include,$(GRO_DIR)))
+
+endef
+
+
+#f fwdep.micro_c.add_gro_lib
+#
+# Add GRO includes and libraries to a micro_c .list compile
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+#
+define fwdep.micro_c.add_gro_lib
+
+$(eval $(call micro_c.add_include,$1,$2,$(GRO_DIR)))
+$(eval $(call micro_c.add_src_lib.abspath,$1,$2,$(GRO_DIR),libgro))
+
+endef
+
+
+#
+##### flowenv ######
+#
+
+#a Dependency templates
+#f fwdep.add_flowenv
+#
+# Add flowenv paths and libraries to the compilation process for a firmware
+# This does the following:
+#   * Adds micro-C includes for standard library paths
+#   * Adds libnfp.c to the compile for all MEs (since is is used everywhere)
+#
+# @param $1 firmware name
+#
+define fwdep.add_flowenv
+
+$1.nffw: $(FLOWENV_DIR)
+
+$(eval $(call micro_c.add_fw_includes,$1,	\
+	$(FLOWENV_DIR)/me/include 		\
+	$(FLOWENV_DIR)/me/lib			\
+	$(FLOWENV_DIR)/me/blocks		\
+	))
+
+$(eval $(call microcode.add_fw_includes,$1,	\
+	$(FLOWENV_DIR)/me/include		\
+	$(FLOWENV_DIR)/me/lib			\
+	$(FLOWENV_DIR)/me/blocks		\
+	))
+
+$(eval $(call micro_c.add_fw_clib,$1,$(FLOWENV_DIR)/me/lib/nfp/libnfp.c))
+
+endef
+
+
+#f fwdep.micro_c.add_flowenv_lib
+#
+# Adds a flowenv library to the library path fo a micro-C object compilation
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 lib
+#
+define fwdep.micro_c.add_flowenv_lib
+
+$1__$2__INC   +=
+$1__$2__CLIBS += $(FLOWENV_DIR)/me/lib/$3/lib$3.c
+
+endef
+
+
+#f fwdep.add_flowenv_nfp_init
+#
+# Adds a flowenv library to the library path fo a micro-C object compilation
+#
+# @param $1 firmware name
+#
+define fwdep.add_flowenv_nfp_init
+
+$(eval $(call microcode.assemble.codeless.abspath,$1,flowenv_nfp_init,\
+	$(FLOWENV_DIR)/me/blocks/init,init_main.uc))
+$(eval $(call nffw.add_obj_codeless,$1,flowenv_nfp_init))
+
+endef
+
+
+#
+##### BLM ######
+#
+
+#a Dependency templates
+#f fwdep.add_blm_block
+#
+# Add a single BLM ME to the build of a firmware
+#
+# @param $1 firmware name
+# @param $2 ME
+# @param $3 blocknum
+#
+define fwdep.add_blm_block
+
+$(eval $(call microcode.assemble.abspath,$1,blm$3,$(BLM_DIR),blm_main.uc))
+$(eval $(call microcode.add_includes,$1,blm$3,$(BLM_DIR)))
+$(eval $(call microcode.add_defines,$1,blm$3,\
+	BLM_INSTANCE_ID=$3			\
+	NBII=$(call fwdep.plus,$3,8)		\
+	SINGLE_NBI				\
+	TH_12713=NBI_READ			\
+	))
+$(eval $(call microcode.add_define,$1,blm$3,BLM_$3_ISLAND_ILA$(call fwdep.plus,$3,48)))
+$(if $(filter 0,$3),$(eval $(call microcode.add_defines,$1,blm$3,BLM_INIT_EMU_RINGS)))
+$(eval $(call nffw.add_obj,$1,blm$3,$2))
+
+endef
+
+#f fwdep.add_blm
+#
+# Add BLM MEs to the build for a firmware
+#
+# @param $1 firmware name
+# @param $2 ME list
+#
+define fwdep.add_blm
+
+$(eval $(call nffw.add_define,$1,BLM_CUSTOM_CONFIG))
+$(foreach blk,$(shell seq $(words $2)),\
+	$(call fwdep.add_blm_block,$1,$(word $(blk),$2),$(call fwdep.minus,$(blk),1)))
+
+
+endef
+
+
+#f fwdep.micro_c.add_blm_lib
+#
+# Add GRO MEs to the build for a firmware
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+#
+define fwdep.micro_c.add_blm_lib
+
+$(eval $(call micro_c.add_src_lib.abspath,$1,$2,$(BLM_DIR),libblm))
+
+endef
+
+#
+##### NFD ######
+#
+
+NFD_VNIC_DIR = $(NFD_DIR)/me/blocks/vnic
+
+#f fwdep.add_nfd
+#
+# Add NFD include paths globally in a firmware build.
+#
+# @param $1 firmware name
+#
+define fwdep.add_nfd
+
+$1.nffw: $(NFD_DIR)
+
+$(eval $(call nffw.add_includes,$1,	\
+	$(NFD_DIR)			\
+	$(NFD_DIR)/shared		\
+	$(NFD_DIR)/me/include		\
+	$(NFD_DIR)/me/blocks		\
+	$(NFD_DIR)/me/blocks/vnic	\
+	$(NFD_DIR)/me/blocks/shared	\
+	))
+endef
+
+
+#f fwdep.micro_c.add_nfd_lib
+#
+# Add GRO MEs to the build for a firmware
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+#
+define fwdep.micro_c.add_nfd_lib
+
+$(eval $(call micro_c.add_src_lib.abspath,$1,$2,$(NFD_VNIC_DIR),libnfd))
+
+endef
+
+
+#f fwdep.add_nfd_svc
+#
+# Add NFD service MEs to the build for a firmware
+#
+# @param $1 firmware name
+# @param $2 application master directory
+# @param $3 application master filename
+# @param $4 application master ME
+# @param $5 service ME
+#
+define fwdep.add_nfd_svc
+
+$(eval $(call micro_c.compile,$1,nfd_app_master,$2,$3))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_app_master,$(NFD_VNIC_DIR),libnfd))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_app_master,$(NFD_VNIC_DIR)/utils,libutils))
+$(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_app_master,std))
+$(eval $(call micro_c.add_includes,$1,nfd_app_master,		\
+	$(NFD_DIR)						\
+	$(NFD_DIR)/shared					\
+	$(NFD_DIR)/me/include					\
+	$(NFD_DIR)/me/blocks					\
+	$(NFD_DIR)/me/blocks/vnic				\
+	$(NFD_DIR)/me/blocks/shared				\
+	))
+$(eval $(call micro_c.add_defines,$1,nfd_app_master,		\
+	PCIE_ISL=0						\
+	))
+$(eval $(call nffw.add_obj,$1,nfd_app_master,$4))
+
+$(eval $(call micro_c.compile.abspath,$1,nfd_svc,$(NFD_VNIC_DIR),svc_me.c))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_svc,$(NFD_VNIC_DIR),libnfd))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_svc,$(NFD_VNIC_DIR)/utils,libutils))
+$(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_svc,std))
+$(eval $(call micro_c.add_includes,$1,nfd_svc,			\
+	$(NFD_DIR)						\
+	$(NFD_DIR)/shared					\
+	$(NFD_DIR)/me/include					\
+	$(NFD_DIR)/me/blocks					\
+	$(NFD_DIR)/me/blocks/vnic				\
+	$(NFD_DIR)/me/blocks/shared				\
+	))
+$(eval $(call micro_c.add_flags,$1,nfd_svc,-Qnn_mode=1))
+$(eval $(call micro_c.add_defines,$1,nfd_svc,			\
+	NFD_CFG_NEXT_ME0="__nfp_idstr2meid(\"$4\")" 		\
+	NFD_CFG_SIG_NEXT_ME0="nfd_cfg_sig_app_master0"		\
+	NFD_CFG_NEXT_ME1="__nfp_idstr2meid(\"$4\")" 		\
+	NFD_CFG_SIG_NEXT_ME1="nfd_cfg_sig_app_master1"		\
+	NFD_CFG_NEXT_ME2="__nfp_idstr2meid(\"$4\")" 		\
+	NFD_CFG_SIG_NEXT_ME2="nfd_cfg_sig_app_master2"		\
+	NFD_CFG_NEXT_ME3="__nfp_idstr2meid(\"$4\")" 		\
+	NFD_CFG_SIG_NEXT_ME3="nfd_cfg_sig_app_master3"		\
+	PCIE_ISL=0						\
+	))
+$(eval $(call nffw.add_obj,$1,nfd_svc,$5))
+
+$1__NFD_SVC_ME = $5
+
+endef
+#f fwdep.add_nfd_in
+#
+# Add NFD PCI.IN MEs to the build for a firmware
+#
+# @param $1 firmware name
+# @param $2 pcie num
+# @param $3 pci_in_notify ME
+#
+define fwdep.add_nfd_in
+
+# Gather ME
+$(eval $(call micro_c.compile.abspath,$1,nfd_pcie$2_gather,$(NFD_VNIC_DIR),pci_in_me0.c))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_gather,$(NFD_VNIC_DIR),libnfd))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_gather,$(NFD_VNIC_DIR)/utils,libutils))
+$(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_pcie$2_gather,std))
+$(eval $(call micro_c.add_includes,$1,nfd_pcie$2_gather,	\
+	$(NFD_DIR)						\
+	$(NFD_DIR)/shared					\
+	$(NFD_DIR)/me/include					\
+	$(NFD_DIR)/me/blocks					\
+	$(NFD_DIR)/me/blocks/vnic				\
+	$(NFD_DIR)/me/blocks/shared				\
+	))
+$(eval $(call micro_c.add_defines,$1,nfd_pcie$2_gather,		\
+	PCIE_ISL=$2						\
+	NFD_IN_DATA_DMA_ME0="__nfp_idstr2meid(\"pcie$2.me2\")"	\
+	NFD_IN_DATA_DMA_ME1="__nfp_idstr2meid(\"pcie$2.me3\")"	\
+	NFD_OUT_CACHE_ME="__nfp_idstr2meid(\"pcie$2.me0\")"	\
+	))
+$(eval $(call nffw.add_obj,$1,nfd_pcie$2_gather,pcie$2.me1))
+
+
+# Issue (Packet DMA) 0
+$(eval $(call micro_c.compile.abspath,$1,nfd_pcie$2_issue0,$(NFD_VNIC_DIR),pci_in_me1.c))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_issue0,$(NFD_VNIC_DIR),libnfd))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_issue0,$(NFD_VNIC_DIR)/utils,libutils))
+$(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_pcie$2_issue0,std))
+$(eval $(call micro_c.add_includes,$1,nfd_pcie$2_issue0,	\
+	$(NFD_DIR)						\
+	$(NFD_DIR)/shared					\
+	$(NFD_DIR)/me/include					\
+	$(NFD_DIR)/me/blocks					\
+	$(NFD_DIR)/me/blocks/vnic				\
+	$(NFD_DIR)/me/blocks/shared				\
+	))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_issue0,		\
+	-Qlmpt_reserve_option=0xc				\
+	))
+$(eval $(call micro_c.set_nctx,$1,nfd_pcie$2_issue0,4))
+$(eval $(call micro_c.add_defines,$1,nfd_pcie$2_issue0,		\
+	PCIE_ISL=$2						\
+	PCI_IN_ISSUE_DMA_IDX=0					\
+	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")" 		\
+	))
+$(eval $(call nffw.add_obj,$1,nfd_pcie$2_issue0,pcie$2.me2))
+
+
+# Issue (Packet DMA) 1
+$(eval $(call micro_c.compile.abspath,$1,nfd_pcie$2_issue1,$(NFD_VNIC_DIR),pci_in_me1.c))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_issue1,$(NFD_VNIC_DIR),libnfd))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_issue1,$(NFD_VNIC_DIR)/utils,libutils))
+$(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_pcie$2_issue1,std))
+$(eval $(call micro_c.add_includes,$1,nfd_pcie$2_issue1,	\
+	$(NFD_DIR)						\
+	$(NFD_DIR)/shared					\
+	$(NFD_DIR)/me/include					\
+	$(NFD_DIR)/me/blocks					\
+	$(NFD_DIR)/me/blocks/vnic				\
+	$(NFD_DIR)/me/blocks/shared				\
+	))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_issue1,		\
+	-Qlmpt_reserve_option=0xc				\
+	))
+$(eval $(call micro_c.set_nctx,$1,nfd_pcie$2_issue1,4))
+$(eval $(call micro_c.add_defines,$1,nfd_pcie$2_issue1,		\
+	PCIE_ISL=$2						\
+	PCI_IN_ISSUE_DMA_IDX=1					\
+	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")" 		\
+	))
+$(eval $(call nffw.add_obj,$1,nfd_pcie$2_issue1,pcie$2.me3))
+
+
+# Notify ME
+$(eval $(call micro_c.compile.abspath,$1,nfd_pcie$2_notify,$(NFD_VNIC_DIR)/pci_in,notify.c))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_notify,$(NFD_VNIC_DIR),libnfd))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_notify,$(NFD_VNIC_DIR)/utils,libutils))
+$(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_pcie$2_notify,std))
+$(eval $(call micro_c.add_includes,$1,nfd_pcie$2_notify,	\
+	$(NFD_DIR)						\
+	$(NFD_DIR)/shared					\
+	$(NFD_DIR)/me/include					\
+	$(NFD_DIR)/me/blocks					\
+	$(NFD_DIR)/me/blocks/vnic				\
+	$(NFD_DIR)/me/blocks/shared				\
+	))
+$(eval $(call micro_c.set_nctx,$1,nfd_pcie$2_notify,4))
+$(eval $(call micro_c.add_defines,$1,nfd_pcie$2_notify,\
+	PCIE_ISL=$2						\
+	NFD_IN_DATA_DMA_ME0="__nfp_idstr2meid(\"pcie$2.me2\")" \
+	NFD_IN_DATA_DMA_ME1="__nfp_idstr2meid(\"pcie$2.me3\")" \
+	))
+$(eval $(call nffw.add_obj,$1,nfd_pcie$2_notify,$3))
+
+
+endef
+
+
+
+#f fwdep.add_nfd_out
+#
+# Add NFD PCI.IN MEs to the build for a firmware
+#
+# @param $1 firmware name
+# @param $2 pcie num
+# @param $3 stage batch ME
+# @param $4 packet DMA ME list
+#
+define fwdep.add_nfd_out
+
+# Cache Desc
+$(eval $(call micro_c.compile.abspath,$1,nfd_pcie$2_cache,$(NFD_VNIC_DIR),pci_out_me0.c))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_cache,$(NFD_VNIC_DIR),libnfd))
+$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_cache,$(NFD_VNIC_DIR)/utils,libutils))
+$(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_pcie$2_cache,std))
+$(eval $(call micro_c.add_includes,$1,nfd_pcie$2_cache,		\
+	$(NFD_DIR)						\
+	$(NFD_DIR)/shared					\
+	$(NFD_DIR)/me/include					\
+	$(NFD_DIR)/me/blocks					\
+	$(NFD_DIR)/me/blocks/vnic				\
+	$(NFD_DIR)/me/blocks/shared				\
+	))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_cache,-Qlm_start=512))
+$(eval $(call micro_c.add_defines,$1,nfd_pcie$2_cache,		\
+	PCIE_ISL=$2						\
+	NFD_CFG_NEXT_ME="__nfp_idstr2meid(\"$3\")"		\
+	NFD_CFG_SIG_NEXT_ME="nfd_cfg_sig_sb"			\
+	))
+$(eval $(call nffw.add_obj,$1,nfd_pcie$2_cache,pcie$2.me0))
+
+
+# Stage Batch
+$(eval $(call microcode.assemble.abspath,$1,nfd_pcie$2_sb,$(NFD_VNIC_DIR),pci_out_sb.uc))
+$(eval $(call microcode.add_includes,$1,nfd_pcie$2_sb,		\
+	$(NFD_DIR)						\
+	$(NFD_DIR)/shared					\
+	$(NFD_DIR)/me/include					\
+	$(NFD_DIR)/me/blocks					\
+	$(NFD_DIR)/me/blocks/vnic				\
+	$(NFD_DIR)/me/blocks/shared				\
+	))
+$(eval $(call microcode.add_defines,$1,nfd_pcie$2_sb,		\
+	PCIE_ISL=$2						\
+	STAGE_BATCH_MANAGER_CTX=0				\
+	STAGE_BATCH_FIRST_WORKER=1				\
+	STAGE_BATCH_NUM_WORKERS=7				\
+	NFD_CFG_NEXT_ME="__nfp_idstr2meid(\"$$($1__NFD_SVC_ME)\")"\
+	NFD_CFG_SIG_NEXT_ME="_nfd_cfg_sig_svc_me0"		\
+	))
+$(eval $(call nffw.add_obj,$1,nfd_pcie$2_sb,$3))
+
+# Packet DMA
+$(eval $(call microcode.assemble.abspath,$1,nfd_pcie$2_pd,$(NFD_VNIC_DIR),pci_out_pd.uc))
+$(eval $(call microcode.add_includes,$1,nfd_pcie$2_pd,		\
+	$(NFD_DIR)						\
+	$(NFD_DIR)/shared					\
+	$(NFD_DIR)/me/include					\
+	$(NFD_DIR)/me/blocks					\
+	$(NFD_DIR)/me/blocks/vnic				\
+	$(NFD_DIR)/me/blocks/shared				\
+	$(FLOWENV_DIR)/me/blocks				\
+	))
+$(eval $(call microcode.add_defines,$1,nfd_pcie$2_pd,		\
+	PCIE_ISL=$2						\
+	NFD_OUT_STAGE_ME="__nfp_idstr2meid(\"$3\")"		\
+	STAGE_BATCH_MANAGER_CTX=0				\
+	))
+$(eval $(call nffw.add_obj,$1,nfd_pcie$2_pd,$4))
+
+endef
+
+

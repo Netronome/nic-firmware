@@ -1,0 +1,8 @@
+#a Copyright (C) 2015,  Gavin J Stark.  All rights reserved.
+#
+# @file        firmware/Makefile.apps
+# @brief       Makefile for the individual apps
+#
+
+#include $(FIRMWARE_DIR)/apps/sample_hello/Makefile
+#include $(FIRMWARE_DIR)/apps/sample_wire/Makefile
