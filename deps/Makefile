@@ -1,0 +1,96 @@
+#
+# Change these revisions to suit the project
+#
+FLOWENV_REV=tip
+GRO_REV=tip
+NFD_REV=tip
+
+#
+# Global variables
+#
+ALL_DEPS =
+ALL_REVS =
+
+#
+# Specific dependencies here
+#
+
+#
+# Flowenv
+#
+FLOWENV_DIR = $(DEPS_DIR)/flowenv.hg
+FLOWENV_INC = -I$(FLOWENV_DIR)/me/lib
+
+$(DEPS_DIR)/flowenv.hg:
+	hg clone -r $(FLOWENV_REV) \
+		ssh://hg//data/hg/repos/flowenv.hg $(FLOWENV_DIR)
+
+ALL_DEPS += $(FLOWENV_DIR)
+ALL_REVS += $(FLOWENV_REV)
+
+
+#
+# Flowenv
+#
+BLM_DIR = $(FLOWENV_DIR)/me/blocks/blm
+BLM_INC = -I$(BLM_DIR)/me/lib
+
+
+#
+# GRO
+#
+GRO_DIR = $(DEPS_DIR)/gro.hg
+GRO_INC = -I$(GRO_DIR)
+
+$(DEPS_DIR)/gro.hg:
+	hg clone -r $(GRO_REV) \
+		ssh://hg//data/hg/repos/gro.hg $(GRO_DIR)
+
+ALL_DEPS += $(GRO_DIR)
+ALL_REVS += $(GRO_REV)
+
+
+#
+# NFD
+#
+NFD_DIR = $(DEPS_DIR)/ng-nfd.hg
+NFD_INC = -I$(NFD_DIR)/shared \
+	  -I$(NFD_DIR)/me/blocks/vnic
+
+$(DEPS_DIR)/ng-nfd.hg:
+	hg clone -r $(NFD_REV) \
+	       	ssh://hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
+
+ALL_DEPS += $(NFD_DIR)
+ALL_REVS += $(NFD_REV)
+
+
+#
+# Processing for all dependencies
+#
+#
+
+FORCE:
+
+#
+# $1 - repo directory
+# $2 - revision
+#
+define update_dep_decl
+	
+	$(Q)(echo "Updating $1 to revision $2"; cd $1 ; hg pull ; hg up -r $2)
+endef
+
+firmware_fetch_deps: $(ALL_DEPS)
+
+firmware_update_deps: $(ALL_DEPS) FORCE
+	$(foreach d,$(shell seq $(words $(ALL_DEPS))),\
+		$(call update_dep_decl,$(word $d,$(ALL_DEPS)),$(word $d,$(ALL_REVS))))
+
+firmware_clean_deps:
+	@for dep in $(ALL_DEPS) ; do \
+		echo "Removing $$dep"; \
+		rm -rf $$dep; \
+	done
+
+

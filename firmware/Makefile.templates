@@ -1,0 +1,698 @@
+#a Copyright (C) 2015,  Gavin J Stark.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @file    firmware/Makefile.templates
+# @brief   Templates for assembling, compiling, linking firmware
+#
+
+#a nffw templates
+#f nffw.setup
+#
+# @param $1 firwmware name
+# @param $2 subdir
+# @param $3 config file (optional)
+#
+define nffw.setup
+
+$1__NFAS_INC = -I$(FIRMWARE_DIR)/$2
+$1__NFCC_INC = -I$(FIRMWARE_DIR)/$2
+$1__DEFS = 
+$1__NFAS_FLAGS = -include config.h
+$1__NFCC_FLAGS = -FI config.h
+$1__NFCC_CLIBS = 
+$1__CHIP = nfp-4xxx-b0
+
+$(if $3,$1__NFAS_FLAGS = -include $(FIRMWARE_DIR)/$2/$3)
+$(if $3,$1__NFCC_FLAGS = -FI $(FIRMWARE_DIR)/$2/$3)
+
+endef
+
+#f nffw.add_define
+#
+# Add a single define to a firmware builds
+#
+# @param $1 firmware name
+# @param $2 define (i.e. the bit after '-D')
+#
+define nffw.add_define
+
+$1__DEFS  += -D$(2)
+
+endef
+
+
+#f nffw.add_defines
+#
+# Add a list of defines to a firmware build
+#
+# @param $1 firmware name
+# @param $2 list of defines (i.e. the bit after '-D')
+#
+define nffw.add_defines
+
+$(foreach define,$2,$(eval $(call nffw.add_define,$1,$(define))))
+
+endef
+
+
+#f nffw.add_include
+#
+# Add a single include path to a microcode assembly
+#
+# @param $1 firmware name
+# @param $2 path
+#
+define nffw.add_include
+
+$(eval $(call microcode.add_fw_include,$1,$2))
+$(eval $(call micro_c.add_fw_include,$1,$2))
+
+endef
+
+
+#f nffw.add_includes
+#
+# Add a list of defines to a microcode assembly 
+#
+# @param $1 firmware name
+# @param $2 list of paths
+#
+define nffw.add_includes
+
+$(eval $(call microcode.add_fw_includes,$1,$2))
+$(eval $(call micro_c.add_fw_includes,$1,$2))
+
+endef
+
+
+#a nffw templates
+#f nffw.add_build_dir
+#
+# Assembler a microcode file into the firmware build directory
+#
+# @param $1 directory
+# 
+define nffw.add_build_dir
+FW_BUILD_DIRS = $(if $(filter $(FW_BUILD_DIRS),$1),$(FW_BUILD_DIRS),$(FW_BUILD_DIRS) $1)
+endef
+
+
+#f nffw.set_chip
+#
+# Add a single define to a firmware builds
+#
+# @param $1 firmware name
+# @param $2 chiprev
+#
+define nffw.set_chip
+
+$1__CHIP += $2
+
+endef
+
+
+#a Microcode templates
+#f microcode.assemble.abspath
+#
+# Assembler a microcode file into the firmware build directory
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 source directory as an absolute path
+# @param $4 source code
+# @param $5 assembly flags
+#
+define microcode.assemble.abspath
+
+$1__$2__INC   += $(NFAS_BASE_INC)
+$1__$2__INC   += $$($1__NFAS_INC)
+$1__$2__DEFS  += $(NFAS_BASE_DEFS)
+$1__$2__DEFS  += $$($1__DEFS)
+$1__$2__FLAGS += $(NFAS_BASE_FLAGS)
+$1__$2__FLAGS += $$($1__NFAS_FLAGS)
+$1__$2__FLAGS += -chip $$($1__CHIP)
+$1__$2__FLAGS += $5
+$1__$2__LIST  = $(FW_BUILD)/$1/$2.list
+
+$1_$2.list: $$($1__$2__LIST)
+FW_LIST_TARGETS += $1_$2.list
+
+$(eval $(call nffw.add_build_dir,$(FW_BUILD)/$1))
+
+$$($1__$2__LIST): $3/$4
+	@echo Building $$($1__$2__LIST) ...
+	$(Q)mkdir -p $(FW_BUILD)/$1
+	$(Q)$(NFAS) $$($1__$2__FLAGS) $$($1__$2__DEFS) $$($1__$2__INC) -o $$@ $$<
+
+endef
+
+
+#a Microcode templates
+#f microcode.assemble
+#
+# Assembler a microcode file into the firmware build directory
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 source directory as relative to FIRMWARE_DIR
+# @param $4 source code
+# @param $5 assembly flags
+#
+define microcode.assemble
+$(eval $(call microcode.assemble.abspath,$1,$2,$(FIRMWARE_DIR)/$3,$4,$5))
+endef
+
+
+#a Microcode templates
+#f microcode.assemble.codeless.abspath
+#
+# Assembler a microcode file into the firmware build directory
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 source directory as an absolute path
+# @param $4 source code
+# @param $5 assembly flags
+#
+define microcode.assemble.codeless.abspath
+
+$1__$2__INC   += $(NFAS_BASE_INC)
+$1__$2__INC   += $$($1__NFAS_INC)
+$1__$2__DEFS  += $(NFAS_BASE_DEFS)
+$1__$2__DEFS  += $$($1__DEFS)
+$1__$2__FLAGS += $(NFAS_CODELESS_FLAGS)
+$1__$2__FLAGS += $$($1__NFAS_FLAGS)
+$1__$2__FLAGS += -chip $$($1__CHIP)
+$1__$2__FLAGS += $5
+$1__$2__LIST  = $(FW_BUILD)/$1/$2.list
+
+$1_$2.list: $$($1__$2__LIST)
+FW_LIST_TARGETS += $1_$2.list
+
+$(eval $(call nffw.add_build_dir,$(FW_BUILD)/$1))
+
+$$($1__$2__LIST): $3/$4
+	@echo Building $$($1__$2__LIST) ...
+	$(Q)mkdir -p $(FW_BUILD)/$1
+	$(Q)$(NFAS) $$($1__$2__FLAGS) $$($1__$2__DEFS) $$($1__$2__INC) -o $$@ $$<
+
+endef
+
+
+#a Microcode templates
+#f microcode.assemble.codeless
+#
+# Assembler a microcode file into the firmware build directory
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 source directory as relative to FIRMWARE_DIR
+# @param $4 source code
+# @param $5 assembly flags
+#
+define microcode.assemble.codeless
+$(eval $(call microcode.assemble.codeless.abspath,$1,$2,$(FIRMWARE_DIR)/$3,$4,$5))
+endef
+
+
+#f microcode.add_define
+#
+# Add a single define to a microcode assembly
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 define (i.e. the bit after '-D')
+#
+define microcode.add_define
+
+$1__$2__DEFS  += -D$(3)
+
+endef
+
+
+#f microcode.add_defines
+#
+# Add a list of defines to a microcode assembly
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 list of defines (i.e. the bit after '-D')
+#
+define microcode.add_defines
+
+$(foreach define,$3,$(eval $(call microcode.add_define,$1,$2,$(define))))
+
+endef
+
+
+#f microcode.add_include
+#
+# Add a single include path to a microcode assembly
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 path
+#
+define microcode.add_include
+
+$1__$2__INC  += -I$(3)
+
+endef
+
+
+#f microcode.add_includes
+#
+# Add a list of include paths to a microcode assembly 
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 list of paths
+#
+define microcode.add_includes
+
+$(foreach path,$3,$(eval $(call microcode.add_include,$1,$2,$(path))))
+
+endef
+
+
+#f microcode.add_flags
+#
+# Add a string of flags to a compilation
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 flags
+#
+define microcode.add_flags
+
+$1__$2__FLAGS += $3
+
+endef
+
+
+#f microcode.add_fw_include
+#
+# Add a single include path to a microcode assembly
+#
+# @param $1 firmware name
+# @param $2 path
+#
+define microcode.add_fw_include
+
+$1__NFAS_INC  += -I$(2)
+
+endef
+
+
+#f microcode.add_fw_includes
+#
+# Add a list of defines to a microcode assembly 
+#
+# @param $1 firmware name
+# @param $2 list of paths
+#
+define microcode.add_fw_includes
+
+$(foreach path,$2,$(eval $(call microcode.add_fw_include,$1,$(path))))
+
+endef
+
+
+#a Micro-c templates
+#f micro_c.compile.abspath
+#
+# Compile a micro-c file into the firmware build directory
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 source directory as an absolute path
+# @param $4 source code
+#
+define micro_c.compile.abspath
+
+$1__$2__INC   += $(NFCC_BASE_INC)
+$1__$2__INC   += $$($1__NFCC_INC)
+$1__$2__DEFS  += $(NFCC_BASE_DEFS)
+$1__$2__DEFS  += $$($1__DEFS)
+$1__$2__FLAGS += $(NFCC_BASE_FLAGS)
+$1__$2__FLAGS += $$($1__NFCC_FLAGS)
+$1__$2__FLAGS += -chip $$($1__CHIP)
+$1__$2__CLIBS += $(NFCC_BASE_CLIBS)
+$1__$2__CLIBS += $$($1__NFCC_CLIBS)
+$1__$2__LIST  = $(FW_BUILD)/$1/$2.list
+$1__$2__NCTX  = 8
+
+$(eval $(call nffw.add_build_dir,$(FW_BUILD)/$1))
+
+$1_$2.list: $$($1__$2__LIST)
+FW_LIST_TARGETS += $1_$2.list
+
+$$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS)
+	@echo Building $$($1__$2__LIST) ...
+	$(Q)mkdir -p $(FW_BUILD)/$1
+	$(Q)$(NFCC) -Fo$(FW_BUILD)/$1/ -Fe$$@ $$($1__$2__FLAGS) \
+		-Qnctx_mode=$$($1__$2__NCTX) $$($1__$2__INC) $$($1__$2__DEFS) \
+		$$($1__$2__CLIBS) $$<
+
+endef
+
+
+#a Micro-c templates
+#f micro_c.compile
+#
+# Compile a micro-c file into the firmware build directory
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 source directory relative to FIRMWARE_DIR
+# @param $4 source code
+#
+define micro_c.compile
+$(eval $(call micro_c.compile.abspath,$1,$2,$(FIRMWARE_DIR)/$3,$4))
+endef
+
+
+#f micro_c.add_src_lib.abspath
+#
+# Add a single source library to a Micro-c compilation
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 source directory as an absolute path
+# @param $4 source code
+#
+define micro_c.add_src_lib.abspath
+
+$1__$2__CLIBS += $3/$4.c
+
+endef
+
+
+#f micro_c.add_src_lib
+#
+# Add a single source library to a Micro-c compilation
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 source directory
+# @param $4 source code
+#
+define micro_c.add_src_lib
+
+$(eval $(call micro_c.add_src_lib.abspath,$1,$2,$(FIRMWARE_DIR)/$3,$4))
+
+endef
+
+
+#f micro_c.add_fw_lib
+#
+# Add a single firmware library to a Micro-c compilation
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 library name
+#
+define micro_c.add_fw_lib
+
+$1__$2__INC   += 
+$1__$2__CLIBS += $(FIRMWARE_DIR)/lib/$3/lib$3.c
+
+endef
+
+
+#f micro_c.add_fw_libs
+#
+# Add a list of firmware libraries to a Micro-c compilation
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 list of library names
+#
+define micro_c.add_fw_libs
+
+$(foreach lib,$3,$(eval $(call micro_c.add_fw_lib,$1,$2,$(lib))))
+
+endef
+
+
+#f micro_c.add_define
+#
+# Add a single define to a Micro-c compilation
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $2 define (i.e. the bit after '-D')
+#
+define micro_c.add_define
+
+$1__$2__DEFS  += -D$(3)
+
+endef
+
+
+#f micro_c.add_defines
+#
+# Add a list of defines to a Micro-c compilation
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 list of defines (i.e. the bit after '-D')
+#
+define micro_c.add_defines
+
+$(foreach define,$3,$(eval $(call micro_c.add_define,$1,$2,$(define))))
+
+endef
+
+
+#f micro_c.add_include
+#
+# Add a single include path to a micro-C compile
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 path
+#
+define micro_c.add_include
+
+$1__$2__INC  += -I$(3)
+
+endef
+
+
+#f micro_c.add_includes
+#
+# Add a list of include paths to a micro-C compile
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 list of paths
+#
+define micro_c.add_includes
+
+$(foreach path,$3,$(eval $(call micro_c.add_include,$1,$2,$(path))))
+
+endef
+
+
+#f micro_c.add_flags
+#
+# Add a string of flags to a compilation
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 flags
+#
+define micro_c.add_flags
+
+$1__$2__FLAGS += $3
+
+endef
+
+
+#f micro_c.add_fw_include
+#
+# Add a single include path to all micro-C compiles for a firmware
+#
+# @param $1 firmware name
+# @param $2 path
+#
+define micro_c.add_fw_include
+
+$1__NFCC_INC  += -I$(2)
+
+endef
+
+
+#f micro_c.add_fw_includes
+#
+# Add a list of include paths to all micro-C compiles for a firmware
+#
+# @param $1 firmware name
+# @param $2 list of paths
+#
+define micro_c.add_fw_includes
+
+$(foreach path,$2,$(eval $(call micro_c.add_fw_include,$1,$(path))))
+
+endef
+
+
+#f micro_c.add_fw_clib
+#
+# Add a single micro-C library to all micro-C compiles for a firmware
+#
+# @param $1 firmware name
+# @param $2 path
+#
+define micro_c.add_fw_clib
+
+$1__NFCC_CLIBS  += $(2)
+
+endef
+
+
+#f micro_c.add_fw_clibs
+#
+# Add a list of micro-C libraries to all micro-C compiles for a firmware
+#
+# @param $1 firmware name
+# @param $2 list of paths
+#
+define micro_c.add_fw_clibs
+
+$(foreach path,$2,$(eval $(call micro_c.add_fw_clib,$1,$(path))))
+
+endef
+
+
+#f micro_c.set_nctx
+#
+# Add a list of micro-C libraries to all micro-C compiles for a firmware
+#
+# @param $1 firmware name
+# @param $2 component name
+# @param $3 number of contexts
+#
+define micro_c.set_nctx
+
+$1__$2__NCTX = $3
+
+endef
+
+
+#a NFFW templates
+#f nffw.link
+#
+# Create link targets to build an nffw
+#
+# @param $1 firmware name (for .nffw)
+#
+define nffw.link
+
+$1__NFFW = $(FW_NFFW)/$1.nffw
+$1__MAP  = $(FW_BUILD)/$1.map
+
+$$($1__NFFW): $$($1__LINK_DEPENDENCIES)
+	@echo Linking $$($1__NFFW) ...
+	$(Q)$(NFLD) $(NFLD_BASE_FLAGS) -chip $$($1__CHIP) $$($1__LINK_FLAGS) \
+		-o $$@ -map $$($1__MAP) $$($1__ME_LOADS)  $$($1__PPC_LOADS)
+
+$1.nffw: $$($1__NFFW)
+
+all_nffw: $1.nffw
+
+FW_BUILD_TARGETS += $1.nffw
+FW_LOAD_TARGETS += load_$1
+
+load_$1:
+	nfp-nffw $$($1__NFFW) load
+
+endef
+
+
+#f nffw.add_obj
+#
+# Add an object descriptor (list file) to an nffw for an ME
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 island.me
+#
+define nffw.add_obj
+
+$1__LINK_DEPENDENCIES += $$($1__$2__LIST)
+$1__ME_LOADS          += -u $3 $$($1__$2__LIST)
+
+endef
+
+
+#f nffw.add_obj_codeless
+#
+# Add a codeless object descriptor (list file) to an nffw
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+#
+define nffw.add_obj_codeless
+
+$1__LINK_DEPENDENCIES += $$($1__$2__LIST)
+$1__ME_LOADS          += -L $$($1__$2__LIST)
+
+endef
+
+
+#f nffw.add_obj_with_mes
+#
+# Add an object descriptor (list file) to an nffw for a list of MEs
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 list of island.me's
+#
+#
+define nffw.add_obj_with_mes
+
+$(foreach me,$3,$(eval $(call nffw.add_obj,$1,$2,$(me))))
+
+endef
+
+
+#f nffw.add_rtsyms
+##
+# Template for adding a run-time symbol table
+#
+# @param $1 firmware name
+#
+#
+define nffw.add_rtsyms
+
+$1__LINK_FLAGS += -mip -rtsyms
+
+endef
+
+
+#f nffw.add_ppc
+#
+# Add a PPC firmware object to an nffw
+#
+# @param $1 firmware name
+# @param $2 i8 or i9
+# @param $3 picocode firmware filename
+#
+define nffw.add_ppc
+
+$1__PPC_LOADS += -i $2 -e $3
+
+endef
