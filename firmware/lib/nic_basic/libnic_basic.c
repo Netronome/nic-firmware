@@ -29,7 +29,7 @@
 #include <nfp.h>
 #include <stdint.h>
 
-#include <infra/infra.h>
+#include <infra_basic/infra_basic.h>
 
 #include <lu/cam_hash.h>
 #include <net/eth.h>

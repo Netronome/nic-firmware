@@ -97,6 +97,7 @@
 #define PCIE_ISL                0
 #define PCI                     PCIE_ISL
 #define NIC_PCI                 PCIE_ISL
+#define NFD_OUT_SB_WQ_NUM       15
 
 /*
  * Application configuration
