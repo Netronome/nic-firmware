@@ -1,0 +1,568 @@
+#
+# Copyright (C) 2015,  Netronome Systems, Inc.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# @file         apps/nic/Makefile
+# @brief        Makefile for the ME NIC app
+#
+
+################################################################
+# Configuration
+################################################################
+
+BUILDINFRA_DIR ?= $(shell echo $(PWD) | sed 's/host-system.*//')
+NFP_SDK_DIR ?= /opt/netronome
+NFP_STD_LIB ?= $(NFP_SDK_DIR)/components/standardlibrary
+PICO_CODE ?= $(NFP_STD_LIB)/picocode/nfp6000/catamaran/catamaran.npfw
+FLOWENV_DIR ?= $(BUILDINFRA_DIR)/host-system/flowenv.hg
+GRO_DIR ?= $(BUILDINFRA_DIR)/host-system/gro.hg
+NFD_DIR := $(BUILDINFRA_DIR)/host-system/ng-nfd.hg
+Q ?= @
+CHIP ?= nfp-4xxx-b0
+NIC_FWNAME ?= "nic"
+
+BUILD_BASE_DIR ?= ./
+NIC_BUILD_DIR ?= $(BUILD_BASE_DIR)/apps/nic
+
+SCRIPT_DIR ?= ../../scripts
+
+NFAS ?= $(NFP_SDK_DIR)/bin/nfas
+NFCC ?= $(NFP_SDK_DIR)/bin/nfcc
+NFLD ?= $(NFP_SDK_DIR)/bin/nfld
+
+#base_dir := $(NFD_DIR)
+#me_blocks_dir := $(base_dir)/me/blocks
+#me_libs_dir := $(base_dir)/me/lib
+#me_inc_dir := $(base_dir)/me/include
+#shared_dir := $(base_dir)/shared
+#me_baseline_lib_dir := $(APP_DIR)/nic
+
+base_dir := $(NFD_DIR)
+me_blocks_dir := $(base_dir)/me/blocks
+## TODO we need to remove the lib in ng-nfd.hg to advoid confusion for now
+#me_libs_need_rm_dir := $(base_dir)/me/lib
+me_inc_dir := $(base_dir)/me/include
+shared_dir := $(base_dir)/shared
+me_baseline_lib_dir := $(APP_DIR)/nic
+me_libs_dir := $(VROUTER_BASE_DIR)/lib
+
+nic_fw := $(NIC_BUILD_DIR)/nic.fw
+
+## BLM configuration will use EMEM1 if available
+#ifneq ("$(ng-nfd_nic_CHIP)","nfp-4xxx-b0")
+#        NIC_USE_EMEM1 := -DUSE_EMEM1
+#else
+#        NIC_USE_EMEM1 :=
+#endif
+
+
+$(shell mkdir -p $(NIC_BUILD_DIR))
+## TODO we need to remove the lib in ng-nfd.hg to advoid confusion for now
+#$(shell rm -rf $(me_libs_need_rm_dir))
+
+#all: $(nic_fw)
+all: $(nic_fw)
+	@echo "--- Copying init scripts"
+	$(shell cp load_fw.sh $(NIC_BUILD_DIR))
+	$(shell cp sf1-2x40GE.json $(NIC_BUILD_DIR))
+	$(shell cp hy-1x40GE.json $(NIC_BUILD_DIR))
+
+
+#####
+# ME Layout
+
+nic_blm_me ?= ila0.me0
+nic_gro0_me := ila0.me1
+nic_app_master_me ?= ila0.me2
+nic_svc_me ?= ila0.me3
+
+
+nic_pcie0_sb_me ?= mei4.me0
+nic_pcie0_notify_me ?= mei4.me1
+nic_pcie0_pd0_me ?= mei4.me2
+nic_pcie0_pd1_me ?= mei4.me3
+nic_pcie0_pd2_me ?= mei4.me4
+nic_pcie0_pci_out_me0_me ?= pcie0.me0
+nic_pcie0_pci_in_gather_me ?= pcie0.me1
+nic_pcie0_pci_in_issue0_me ?= pcie0.me2
+nic_pcie0_pci_in_issue1_me ?= pcie0.me3
+
+################################################################
+# Common Flags and Options
+################################################################
+#nic_FLAGS += -DBLM_BLQ_ENABLE_MASK=0xff
+#nic_FLAGS += -DBLM_NBI8_BLQ0_BDSRAM_EMEM0_NUM_BUFS=1024
+
+
+nic_FLAGS += \
+	-I$(base_dir) \
+	-I$(me_baseline_lib_dir) \
+	-I$(GRO_DIR) \
+	-I$(FLOWENV_DIR)/me/include  \
+	-I$(FLOWENV_DIR)/me/lib  \
+	-I$(FLOWENV_DIR)/me/blocks  \
+	-I$(shared_dir)  \
+	-I$(me_blocks_dir)  \
+	-I$(me_blocks_dir)/vnic  \
+	-I$(me_blocks_dir)/vnic/shared  \
+	-I$(me_inc_dir)  \
+	-I$(me_libs_dir)  \
+	-I$(NFP_STD_LIB)/include  \
+	-I$(NFP_STD_LIB)/microc/include  \
+	-I$(NFP_STD_LIB)/microcode/include  \
+	-I$(NFP_STD_LIB)/microcode/src/
+
+#nic_FLAGS += $(NIC_USE_EMEM1)
+
+# Common NFAS flags
+nic_NFASFLAGS += -DNFP_LIB_ANY_NFAS_VERSION
+nic_NFASFLAGS += -t -W3 -R -lm 0 -C -chip $(CHIP)
+nic_NFASFLAGS +=  $(nic_APPDEFS)
+nic_NFASFLAGS += -include config.h
+nic_NFASFLAGS += \
+	$(nic_FLAGS) \
+
+# Common NFCC flags
+nic_NFCCFLAGS := -W3
+nic_NFCCFLAGS += -Ob2
+nic_NFCCFLAGS += -mIPOPT_expose_intrinsics
+nic_NFCCFLAGS += -Qnctx_mode=8
+nic_NFCCFLAGS += -Qspill=7
+nic_NFCCFLAGS += -Qperfinfo=0
+nic_NFCCFLAGS += -Qno_decl_volatile
+nic_NFCCFLAGS += -single_dram_signal
+nic_NFCCFLAGS += -chip $(CHIP)
+nic_NFCCFLAGS += -Fo$(NIC_BUILD_DIR)/
+
+nic_NFCCFLAGS += -FI config.h
+nic_NFCCFLAGS += $(nic_APPDEFS)
+nic_NFCCFLAGS += \
+	$(nic_FLAGS)
+
+# Additional MicroC source files (libraries)
+nic_NFCCSRCS := \
+	$(FLOWENV_DIR)/me/lib/nfp/libnfp.c \
+	$(FLOWENV_DIR)/me/lib/std/libstd.c \
+	$(FLOWENV_DIR)/me/lib/pkt/libpkt.c \
+	$(NFP_STD_LIB)/microc/src/rtl.c \
+	$(me_blocks_dir)/vnic/libnfd.c
+
+
+# Common NFLD flags
+nic_NFLDFLAGS += -rtsyms -mip -g -chip $(CHIP)
+nic_NFLDFLAGS += -i i8 -e $(PICO_CODE)
+nic_NFLDFLAGS += -L $(ME_INIT_LIST)
+
+nic_LIST_FILES :=
+
+################################################################
+# Non NFD Infrastructure blocks
+################################################################
+
+#####
+# BLM
+ME_BLM_SRC  := $(FLOWENV_DIR)/me/blocks/blm/blm_main.uc
+ME_BLM_LIST := $(NIC_BUILD_DIR)/blm.list
+ME_BLM_DEFS := $(nic_NFASFLAGS)
+$(ME_BLM_LIST): $(ME_BLM_SRC)
+	@echo "--- Building $@"
+	$(Q) $(NFAS) $(ME_BLM_DEFS) -o $@ $<
+nic_LIST_FILES += $(ME_BLM_LIST)
+
+######
+## PMS
+#ME_PMS_SRC  := $(APP_DIR)/nic/init_pms.uc
+#ME_PMS_LIST := $(NIC_BUILD_DIR)/me_init_pms.list
+#TM_PMS_LIST := $(NIC_BUILD_DIR)/tm_init_pms.list
+#ME_PMS_C := $(NIC_BUILD_DIR)/pms_decl.c
+#ME_PMS_DEFS := $(nic_NFASFLAGS) $(PMS_DEFS)
+#ME_PMS_DEFS += \
+#	-I.
+#$(ME_PMS_LIST): $(ME_PMS_SRC)
+#	@echo "--- Building $@"
+#	$(Q) $(NFAS) $(ME_PMS_DEFS) -codeless -DPMS_INIT_MEM=1 -o $@ $<
+#$(TM_PMS_LIST): $(ME_PMS_SRC)
+#	@echo "--- Building $@"
+#	$(Q) $(NFAS) $(ME_PMS_DEFS) -codeless -DPMS_INIT_TM=1 -o $@ $<
+#$(ME_PMS_C): $(ME_PMS_LIST)
+#	@echo "--- Building $@"
+#	$(Q) $(SCRIPT_DIR)/uclist2c.py $(ME_PMS_LIST) $(ME_PMS_C)
+#
+#nic_LIST_FILES += $(TM_PMS_LIST)
+#nic_NFLDFLAGS += -L $(TM_PMS_LIST)
+
+#####
+# GRO
+
+# GRO Common
+GRO_SRCS := $(GRO_DIR)/me/gro_out.uc
+GRO_DEFS := $(nic_NFASFLAGS) \
+	-I$(GRO_DIR)/me
+# GRO0
+ME_GRO0_SRCS := $(GRO_SRCS)
+ME_GRO0_DEFS := $(GRO_DEFS)
+ME_GRO0_DEFS += -DNFD_VERSION=0x03010000 -keep_unreachable_code
+ME_GRO0_LIST := $(NIC_BUILD_DIR)/gro0.list
+$(ME_GRO0_LIST): $(ME_GRO0_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFAS) $(ME_GRO0_DEFS) -o $@ $<
+nic_LIST_FILES += $(ME_GRO0_LIST)
+## GRO1
+#ME_GRO1_SRCS := $(GRO_SRCS)
+#ME_GRO1_DEFS := $(GRO_DEFS)
+#ME_GRO1_DEFS += -DGRO_BLOCK_NUM=1 -keep_unreachable_code
+#ME_GRO1_LIST := $(NIC_BUILD_DIR)/gro1.list
+#$(ME_GRO1_LIST): $(ME_GRO1_SRCS)
+#	@echo "--- Building $@"
+#	$(Q) $(NFAS) $(ME_GRO1_DEFS) -o $@ $<
+#nic_LIST_FILES += $(ME_GRO1_LIST)
+
+#####
+# INIT
+ME_INIT_SRCS := $(FLOWENV_DIR)/me/blocks/init/init_main.uc
+ME_INIT_LIST := $(NIC_BUILD_DIR)/init.list
+ME_INIT_DEFS := $(nic_NFASFLAGS) -codeless
+$(ME_INIT_LIST): $(ME_INIT_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFAS) $(ME_INIT_DEFS) -o $@ $<
+nic_LIST_FILES += $(ME_INIT_LIST)
+
+
+################################################################
+# NFD Infrastructure blocks
+################################################################
+
+####
+# NFD Definitions
+#NFD_PCIE0_DEFS += -DPCIE_ISL=0
+
+ME_NFD_PCIE0_SB_DEFS := $(nic_NFASFLAGS) $(NFD_PCIE0_DEFS)
+ME_NFD_PCIE0_SB_DEFS += -DSTAGE_BATCH_MANAGER_CTX=0
+ME_NFD_PCIE0_SB_DEFS += -DSTAGE_BATCH_FIRST_WORKER=1
+ME_NFD_PCIE0_SB_DEFS += -DSTAGE_BATCH_NUM_WORKERS=7
+ME_NFD_PCIE0_SB_DEFS += -DNFD_CFG_NEXT_ME="__nfp_idstr2meid(\"$(nic_svc_me)\")"
+ME_NFD_PCIE0_SB_DEFS += -DNFD_CFG_SIG_NEXT_ME="_nfd_cfg_sig_svc_me0"
+ME_NFD_PCIE0_SB_DEFS += -DNFD_OUT_SB_WQ_NUM=15
+
+ME_NFD_PCIE0_NOTIFY_DEFS := $(nic_NFCCFLAGS) $(NFD_PCIE0_DEFS)
+ME_NFD_PCIE0_NOTIFY_DEFS += -Qnctx_mode=4
+ME_NFD_PCIE0_NOTIFY_DEFS += -DNFD_IN_NOTIFY_DBG_CHKS
+ME_NFD_PCIE0_NOTIFY_DEFS += -DNFD_IN_DATA_DMA_ME0="__nfp_idstr2meid(\"$(nic_pcie0_pci_in_issue0_me)\")"
+ME_NFD_PCIE0_NOTIFY_DEFS += -DNFD_IN_DATA_DMA_ME1="__nfp_idstr2meid(\"$(nic_pcie0_pci_in_issue1_me)\")"
+
+ME_NFD_PCIE0_PD_DEFS := $(nic_NFASFLAGS) $(NFD_PCIE0_DEFS)
+ME_NFD_PCIE0_PD_DEFS += -DNFD_OUT_STAGE_ME="__nfp_idstr2meid(\"$(nic_pcie0_sb_me)\")"
+ME_NFD_PCIE0_PD_DEFS += -DSTAGE_BATCH_MANAGER_CTX=0
+ME_NFD_PCIE0_PD_DEFS += -DNFD_OUT_SB_WQ_NUM=15
+
+ME_NFD_PCIE0_OUT_DEFS := $(nic_NFCCFLAGS) $(NFD_PCIE0_DEFS)
+ME_NFD_PCIE0_OUT_DEFS += -DNFD_CFG_NEXT_ME="__nfp_idstr2meid(\"$(nic_pcie0_sb_me)\")"
+ME_NFD_PCIE0_OUT_DEFS += -DNFD_CFG_SIG_NEXT_ME="nfd_cfg_sig_sb"
+ME_NFD_PCIE0_OUT_DEFS += -Qlm_start=512
+
+ME_NFD_PCIE0_GATHER_DEFS := $(nic_NFCCFLAGS) $(NFD_PCIE0_DEFS)
+ME_NFD_PCIE0_GATHER_DEFS += -DNFD_IN_DATA_DMA_ME0="__nfp_idstr2meid(\"$(nic_pcie0_pci_in_issue0_me)\")"
+ME_NFD_PCIE0_GATHER_DEFS += -DNFD_IN_DATA_DMA_ME1="__nfp_idstr2meid(\"$(nic_pcie0_pci_in_issue1_me)\")"
+ME_NFD_PCIE0_GATHER_DEFS += -DNFD_OUT_CACHE_ME="__nfp_idstr2meid(\"$(nic_pcie0_pci_out_me0_me)\")"
+
+ME_NFD_PCIE0_ISSUE0_DEFS := $(nic_NFCCFLAGS) $(NFD_PCIE0_DEFS)
+ME_NFD_PCIE0_ISSUE0_DEFS += -DPCI_IN_ISSUE_DMA_IDX=0
+ME_NFD_PCIE0_ISSUE0_DEFS += -Qnctx_mode=4
+ME_NFD_PCIE0_ISSUE0_DEFS += -Qlmpt_reserve_option=0xc
+ME_NFD_PCIE0_ISSUE0_DEFS += -DNFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$(nic_pcie0_notify_me)\")"
+
+ME_NFD_PCIE0_ISSUE1_DEFS := $(nic_NFCCFLAGS) $(NFD_PCIE0_DEFS)
+ME_NFD_PCIE0_ISSUE1_DEFS += -DPCI_IN_ISSUE_DMA_IDX=1
+ME_NFD_PCIE0_ISSUE1_DEFS += -Qnctx_mode=4
+ME_NFD_PCIE0_ISSUE1_DEFS += -Qlmpt_reserve_option=0xc
+ME_NFD_PCIE0_ISSUE1_DEFS += -DNFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$(nic_pcie0_notify_me)\")"
+
+ME_NFD_SVC_DEFS := $(nic_NFCCFLAGS) $(NFD_PCIE0_DEFS)
+ME_NFD_SVC_DEFS += -Qnn_mode=1
+ME_NFD_SVC_DEFS += -DNFD_CFG_NEXT_ME0="__nfp_idstr2meid(\"$(nic_app_master_me)\")"
+ME_NFD_SVC_DEFS += -DNFD_CFG_SIG_NEXT_ME0="nfd_cfg_sig_app_master0"
+ME_NFD_SVC_DEFS += -DNFD_CFG_NEXT_ME1="__nfp_idstr2meid(\"$(nic_app_master_me)\")"
+ME_NFD_SVC_DEFS += -DNFD_CFG_SIG_NEXT_ME1="nfd_cfg_sig_app_master0"
+ME_NFD_SVC_DEFS += -DNFD_CFG_NEXT_ME2="__nfp_idstr2meid(\"$(nic_app_master_me)\")"
+ME_NFD_SVC_DEFS += -DNFD_CFG_SIG_NEXT_ME2="nfd_cfg_sig_app_master0"
+ME_NFD_SVC_DEFS += -DNFD_CFG_NEXT_ME3="__nfp_idstr2meid(\"$(nic_app_master_me)\")"
+ME_NFD_SVC_DEFS += -DNFD_CFG_SIG_NEXT_ME3="nfd_cfg_sig_app_master0"
+
+##
+# generate the global ME destination
+#
+# @param $1 island ID
+# @param $2 ME ID
+define NIC_ISL_ME_DEST
+((($(1) + 32) << 4) + ($(2) + 4))
+endef
+
+
+NIC_APP_MES := \
+        "$(call NIC_ISL_ME_DEST, 0, 0), \
+        $(call NIC_ISL_ME_DEST, 0, 1), \
+        $(call NIC_ISL_ME_DEST, 0, 2), \
+        $(call NIC_ISL_ME_DEST, 0, 3), \
+        $(call NIC_ISL_ME_DEST, 0, 4), \
+        $(call NIC_ISL_ME_DEST, 0, 5), \
+        $(call NIC_ISL_ME_DEST, 0, 6), \
+        $(call NIC_ISL_ME_DEST, 0, 7), \
+        \
+        $(call NIC_ISL_ME_DEST, 1, 0), \
+        $(call NIC_ISL_ME_DEST, 1, 1), \
+        $(call NIC_ISL_ME_DEST, 1, 2), \
+        $(call NIC_ISL_ME_DEST, 1, 3), \
+        $(call NIC_ISL_ME_DEST, 1, 4), \
+        $(call NIC_ISL_ME_DEST, 1, 5), \
+        $(call NIC_ISL_ME_DEST, 1, 6), \
+        $(call NIC_ISL_ME_DEST, 1, 7), \
+        \
+        $(call NIC_ISL_ME_DEST, 2, 0), \
+        $(call NIC_ISL_ME_DEST, 2, 1), \
+        $(call NIC_ISL_ME_DEST, 2, 2), \
+        $(call NIC_ISL_ME_DEST, 2, 3), \
+        $(call NIC_ISL_ME_DEST, 2, 4), \
+        $(call NIC_ISL_ME_DEST, 2, 5), \
+        $(call NIC_ISL_ME_DEST, 2, 6), \
+        $(call NIC_ISL_ME_DEST, 2, 7), \
+        \
+        $(call NIC_ISL_ME_DEST, 3, 0), \
+        $(call NIC_ISL_ME_DEST, 3, 1), \
+        $(call NIC_ISL_ME_DEST, 3, 2), \
+        $(call NIC_ISL_ME_DEST, 3, 3), \
+        $(call NIC_ISL_ME_DEST, 3, 4), \
+        $(call NIC_ISL_ME_DEST, 3, 5), \
+        $(call NIC_ISL_ME_DEST, 3, 6), \
+        $(call NIC_ISL_ME_DEST, 3, 7)"
+
+
+ME_NFD_APP_MASTER_DEFS := $(nic_NFCCFLAGS) $(NFD_PCIE0_DEFS)
+ME_NFD_APP_MASTER_DEFS += -Qspill=3
+ME_NFD_APP_MASTER_DEFS += -DAPP_MES_LIST=$(NIC_APP_MES)
+ME_NFD_APP_MASTER_DEFS += -DNFD_CFG_NEXT_ME0="__nfp_idstr2meid(\"$(nic_app_master_me)\")"
+ME_NFD_APP_MASTER_DEFS += -DNFD_CFG_SIG_NEXT_ME0="nfd_cfg_sig_app_master0"
+ME_NFD_APP_MASTER_DEFS += -DNFD_CFG_NEXT_ME1="__nfp_idstr2meid(\"$(nic_app_master_me)\")"
+ME_NFD_APP_MASTER_DEFS += -DNFD_CFG_SIG_NEXT_ME1="nfd_cfg_sig_app_master0"
+ME_NFD_APP_MASTER_DEFS += -DNFD_CFG_NEXT_ME2="__nfp_idstr2meid(\"$(nic_app_master_me)\")"
+ME_NFD_APP_MASTER_DEFS += -DNFD_CFG_SIG_NEXT_ME2="nfd_cfg_sig_app_master0"
+ME_NFD_APP_MASTER_DEFS += -DNFD_CFG_NEXT_ME3="__nfp_idstr2meid(\"$(nic_app_master_me)\")"
+ME_NFD_APP_MASTER_DEFS += -DNFD_CFG_SIG_NEXT_ME3="nfd_cfg_sig_app_master0"
+
+
+####
+# NFD Source and Build Recipes
+NFD_SRCS := $(nic_NFCCSRCS) \
+	$(me_blocks_dir)/vnic/utils/libutils.c
+
+ME_NFD_PCIE0_SB_SRCS := $(me_blocks_dir)/vnic/pci_out_sb.uc
+ME_NFD_PCIE0_SB_LIST := $(NIC_BUILD_DIR)/nfd_pcie0_sb.list
+$(ME_NFD_PCIE0_SB_LIST): $(ME_NFD_PCIE0_SB_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFAS) $(ME_NFD_PCIE0_SB_DEFS) -o $@ $<
+nic_LIST_FILES += $(ME_NFD_PCIE0_SB_LIST)
+
+ME_NFD_PCIE0_NOTIFY_SRCS := $(NFD_SRCS) $(me_blocks_dir)/vnic/pci_in/notify.c
+ME_NFD_PCIE0_NOTIFY_LIST := $(NIC_BUILD_DIR)/nfd_pcie0_notify.list
+$(ME_NFD_PCIE0_NOTIFY_LIST): $(ME_NFD_PCIE0_NOTIFY_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFCC) $(ME_NFD_PCIE0_NOTIFY_DEFS) -Fe$@ $(ME_NFD_PCIE0_NOTIFY_SRCS)
+nic_LIST_FILES += $(ME_NFD_PCIE0_NOTIFY_LIST)
+
+ME_NFD_PCIE0_PD_SRCS := $(me_blocks_dir)/vnic/pci_out_pd.uc
+ME_NFD_PCIE0_PD_LIST := $(NIC_BUILD_DIR)/nfd_pcie0_pd.list
+$(ME_NFD_PCIE0_PD_LIST): $(ME_NFD_PCIE0_PD_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFAS) $(ME_NFD_PCIE0_PD_DEFS) -o $@ $<
+nic_LIST_FILES += $(ME_NFD_PCIE0_PD_LIST)
+
+ME_NFD_PCIE0_OUT_SRCS := $(NFD_SRCS) $(me_blocks_dir)/vnic/pci_out_me0.c
+ME_NFD_PCIE0_OUT_LIST := $(NIC_BUILD_DIR)/nfd_pcie0_out.list
+$(ME_NFD_PCIE0_OUT_LIST): $(ME_NFD_PCIE0_OUT_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFCC) $(ME_NFD_PCIE0_OUT_DEFS) -Fe$@ $(ME_NFD_PCIE0_OUT_SRCS)
+nic_LIST_FILES += $(ME_NFD_PCIE0_OUT_LIST)
+
+ME_NFD_PCIE0_GATHER_SRCS := $(NFD_SRCS) $(me_blocks_dir)/vnic/pci_in_me0.c
+ME_NFD_PCIE0_GATHER_LIST := $(NIC_BUILD_DIR)/nfd_pcie0_gather.list
+$(ME_NFD_PCIE0_GATHER_LIST): $(ME_NFD_PCIE0_GATHER_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFCC) $(ME_NFD_PCIE0_GATHER_DEFS) -Fe$@ $(ME_NFD_PCIE0_GATHER_SRCS)
+nic_LIST_FILES += $(ME_NFD_PCIE0_GATHER_LIST)
+
+ME_NFD_PCIE0_ISSUE0_SRCS := $(NFD_SRCS) $(me_blocks_dir)/vnic/pci_in_me1.c $(FLOWENV_DIR)/me/blocks/blm/libblm.c
+ME_NFD_PCIE0_ISSUE0_LIST := $(NIC_BUILD_DIR)/nfd_pcie0_issue0.list
+$(ME_NFD_PCIE0_ISSUE0_LIST): $(ME_NFD_PCIE0_ISSUE0_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFCC) $(ME_NFD_PCIE0_ISSUE0_DEFS) -Fe$@ $(ME_NFD_PCIE0_ISSUE0_SRCS)
+nic_LIST_FILES += $(ME_NFD_PCIE0_ISSUE0_LIST)
+
+ME_NFD_PCIE0_ISSUE1_SRCS := $(NFD_SRCS) $(me_blocks_dir)/vnic/pci_in_me1.c $(FLOWENV_DIR)/me/blocks/blm/libblm.c
+ME_NFD_PCIE0_ISSUE1_LIST := $(NIC_BUILD_DIR)/nfd_pcie0_issue1.list
+$(ME_NFD_PCIE0_ISSUE1_LIST): $(ME_NFD_PCIE0_ISSUE1_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFCC) $(ME_NFD_PCIE0_ISSUE1_DEFS) -Fe$@ $(ME_NFD_PCIE0_ISSUE1_SRCS)
+nic_LIST_FILES += $(ME_NFD_PCIE0_ISSUE1_LIST)
+
+ME_NFD_SVC_SRCS := $(NFD_SRCS) $(me_blocks_dir)/vnic/svc_me.c
+ME_NFD_SVC_LIST := $(NIC_BUILD_DIR)/nfd_svc.list
+$(ME_NFD_SVC_LIST): $(ME_NFD_SVC_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFCC) $(ME_NFD_SVC_DEFS) -Fe$@ $(ME_NFD_SVC_SRCS)
+nic_LIST_FILES += $(ME_NFD_SVC_LIST)
+
+# XXX Can't decide if this should be under application or NFD
+ME_NFD_APP_MASTER_SRCS := $(nic_NFCCSRCS) $(me_baseline_lib_dir)/app_master_main.c
+ME_NFD_APP_MASTER_SRCS += $(me_blocks_dir)/vnic/svc/msix.c $(me_libs_dir)/nfp/_c/link_state.c $(me_libs_dir)/nic/libnic.c 
+ME_NFD_APP_MASTER_LIST := $(NIC_BUILD_DIR)/nfd_app_master.list
+$(ME_NFD_APP_MASTER_LIST): $(ME_NFD_APP_MASTER_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFCC) $(ME_NFD_APP_MASTER_DEFS) -Fe$@ $(ME_NFD_APP_MASTER_SRCS)
+nic_LIST_FILES += $(ME_NFD_APP_MASTER_LIST)
+
+
+################################################################
+# Application
+################################################################
+
+# we need to force include blm_custom because frustratingly blm_config.h
+# does a #include "blm_custom.h" not a #include <blm_custom.h> so it will
+# include the local blm_custom if exists regardless of the -I listing order
+NIC_DEFS := $(nic_NFCCFLAGS)
+#NIC_DEFS += -FI $(me_baseline_lib_dir)/blm_custom.h
+#NIC_DEFS += -DFWNAME='$(NIC_FWNAME)'
+NIC_DEFS += -Qspill=3
+NIC_DEFS += -Qnn_mode=1
+
+NIC_RX_SRCS := $(nic_NFCCSRCS) $(FLOWENV_DIR)/me/lib/net/libnet.c
+NIC_RX_SRCS += $(me_baseline_lib_dir)/nic_rx_main.c
+NIC_RX_SRCS += $(me_baseline_lib_dir)/pkt_hdrs_cache.c
+NIC_RX_SRCS += $(me_baseline_lib_dir)/rx_offload.c
+NIC_RX_SRCS += $(me_baseline_lib_dir)/tx_offload.c
+NIC_RX_SRCS += $(FLOWENV_DIR)/me/blocks/blm/libblm.c
+NIC_RX_SRCS += $(FLOWENV_DIR)/me/lib/lu/liblu.c
+NIC_RX_SRCS += $(GRO_DIR)/libgro.c
+NIC_RX_SRCS += $(me_libs_dir)/infra/libinfra.c
+NIC_RX_SRCS += $(me_libs_dir)/nic/libnic.c
+NIC_RX_LIST ?= $(NIC_BUILD_DIR)/nic_rx_main.list
+
+
+NIC_TX_SRCS := $(nic_NFCCSRCS) $(FLOWENV_DIR)/me/lib/net/libnet.c
+NIC_TX_SRCS += $(me_baseline_lib_dir)/nic_tx_main.c
+NIC_TX_SRCS += $(me_baseline_lib_dir)/pkt_hdrs_cache.c
+NIC_TX_SRCS += $(me_baseline_lib_dir)/tx_offload.c
+NIC_TX_SRCS += $(FLOWENV_DIR)/me/blocks/blm/libblm.c
+NIC_TX_SRCS += $(FLOWENV_DIR)/me/lib/lu/liblu.c
+NIC_TX_SRCS += $(GRO_DIR)/libgro.c
+NIC_TX_SRCS += $(me_libs_dir)/infra/libinfra.c
+NIC_TX_SRCS += $(me_libs_dir)/nic/libnic.c
+NIC_TX_LIST ?= $(NIC_BUILD_DIR)/nic_tx_main.list
+
+
+$(me_libs_dir)/infra/libinfra_nic.c: $(ME_PMS_C)
+
+$(NIC_RX_LIST): $(NIC_RX_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFCC) $(NIC_DEFS) -Fe$@ $^
+nic_LIST_FILES += $(NIC_RX_LIST)
+$(NIC_TX_LIST): $(NIC_TX_SRCS)
+	@echo "--- Building $@"
+	$(Q) $(NFCC) $(NIC_DEFS) -Fe$@ $^
+nic_LIST_FILES += $(NIC_TX_LIST)
+
+
+################################################################
+# Help
+################################################################
+.PHONY : help
+help:
+	@echo "Build Options:"
+	@echo "   Q                unset to print compiler output"
+	@echo ""
+	@echo "Path Settings:"
+	@echo "   NFP_SDK_DIR      SDK installation directory"
+	@echo "   FLOWENV_DIR      Path to flowenv"
+	@echo "   GRO_DIR          Path to GRO"
+	@echo ""
+	@echo "Targets:"
+	@echo "   help             this text"
+	@echo "   clean            removes compiled binaries"
+	@echo ""
+	@echo "   nic.fw application"
+	@echo ""
+
+################################################################
+# Build
+################################################################
+###
+# Release target
+$(NIC_BUILD_DIR)/nic.fw: $(nic_LIST_FILES)
+	@echo "--- Linking $@"
+	$(Q) $(NFLD) $(nic_NFLDFLAGS) \
+	-elf $@ \
+	-u $(nic_pcie0_sb_me) -l $(ME_NFD_PCIE0_SB_LIST) \
+	-u $(nic_pcie0_notify_me) -l $(ME_NFD_PCIE0_NOTIFY_LIST) \
+	-u $(nic_pcie0_pd0_me) -l $(ME_NFD_PCIE0_PD_LIST) \
+	-u $(nic_pcie0_pd1_me) -l $(ME_NFD_PCIE0_PD_LIST) \
+	-u $(nic_pcie0_pd2_me) -l $(ME_NFD_PCIE0_PD_LIST) \
+	-u $(nic_pcie0_pci_out_me0_me) -l $(ME_NFD_PCIE0_OUT_LIST) \
+	-u $(nic_pcie0_pci_in_gather_me) -l $(ME_NFD_PCIE0_GATHER_LIST) \
+	-u $(nic_pcie0_pci_in_issue0_me) -l $(ME_NFD_PCIE0_ISSUE0_LIST) \
+	-u $(nic_pcie0_pci_in_issue1_me) -l $(ME_NFD_PCIE0_ISSUE1_LIST) \
+	-u $(nic_gro0_me) -l $(ME_GRO0_LIST) \
+	-u $(nic_blm_me) -l $(ME_BLM_LIST) \
+	-u $(nic_app_master_me) -l $(ME_NFD_APP_MASTER_LIST) \
+	-u $(nic_svc_me) -l $(ME_NFD_SVC_LIST) \
+	-u mei0.me0 -l $(NIC_TX_LIST) \
+	-u mei0.me1 -l $(NIC_TX_LIST) \
+	-u mei0.me2 -l $(NIC_TX_LIST) \
+	-u mei0.me3 -l $(NIC_TX_LIST) \
+	-u mei0.me4 -l $(NIC_TX_LIST) \
+	-u mei0.me5 -l $(NIC_TX_LIST) \
+	-u mei0.me6 -l $(NIC_TX_LIST) \
+	-u mei0.me7 -l $(NIC_TX_LIST) \
+	-u mei1.me0 -l $(NIC_TX_LIST) \
+	-u mei1.me1 -l $(NIC_TX_LIST) \
+	-u mei1.me2 -l $(NIC_TX_LIST) \
+	-u mei1.me3 -l $(NIC_TX_LIST) \
+	-u mei1.me4 -l $(NIC_TX_LIST) \
+	-u mei1.me5 -l $(NIC_TX_LIST) \
+	-u mei1.me6 -l $(NIC_TX_LIST) \
+	-u mei1.me7 -l $(NIC_TX_LIST) \
+	-u mei2.me0 -l $(NIC_RX_LIST) \
+	-u mei2.me1 -l $(NIC_RX_LIST) \
+	-u mei2.me2 -l $(NIC_RX_LIST) \
+	-u mei2.me3 -l $(NIC_RX_LIST) \
+	-u mei2.me4 -l $(NIC_RX_LIST) \
+	-u mei2.me5 -l $(NIC_RX_LIST) \
+	-u mei2.me6 -l $(NIC_RX_LIST) \
+	-u mei2.me7 -l $(NIC_RX_LIST) \
+	-u mei3.me0 -l $(NIC_RX_LIST) \
+	-u mei3.me1 -l $(NIC_RX_LIST) \
+	-u mei3.me2 -l $(NIC_RX_LIST) \
+	-u mei3.me3 -l $(NIC_RX_LIST) \
+	-u mei3.me4 -l $(NIC_RX_LIST) \
+	-u mei3.me5 -l $(NIC_RX_LIST) \
+	-u mei3.me6 -l $(NIC_RX_LIST) \
+	-u mei3.me7 -l $(NIC_RX_LIST) 
+
+clean:
+	rm -f $(NIC_BUILD_DIR)/*.list
+	rm -f $(NIC_BUILD_DIR)/*.uci
+	rm -f $(NIC_BUILD_DIR)/*.ucp
+	rm -f $(NIC_BUILD_DIR)/*.obj
+
+really_clean: clean
+	rm -f nic.fw
+
+distclean: clean
