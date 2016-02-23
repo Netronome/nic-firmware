@@ -46,7 +46,7 @@ define fwdep.add_gro_block
 
 $(eval $(call microcode.assemble.abspath,$1,gro$3,$(GRO_DIR)/me,gro_out.uc))
 $(eval $(call microcode.add_includes,$1,gro$3,$(GRO_DIR) $(GRO_DIR)/me))
-$(eval $(call microcode.add_defines,$1,gro$3,GRO_BLOCK_NUM=$3))
+$(eval $(call microcode.add_defines,$1,gro$3,GRO_BLOCK_NUM=$3 NFD_VERSION=0x03010000))
 $(eval $(call microcode.add_flags,$1,gro$3,-keep_unreachable_code))
 $(eval $(call nffw.add_obj,$1,gro$3,$2))
 
@@ -234,7 +234,8 @@ $(eval $(call nffw.add_includes,$1,	\
 	$(NFD_DIR)/me/include		\
 	$(NFD_DIR)/me/blocks		\
 	$(NFD_DIR)/me/blocks/vnic	\
-	$(NFD_DIR)/me/blocks/shared	\
+	$(NFD_DIR)/me/blocks/vnic/shared\
+	$(NFD_DIR)/me/lib		\
 	))
 endef
 

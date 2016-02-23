@@ -4,5 +4,5 @@
 # @brief       Makefile for the individual apps
 #
 
-#include $(FIRMWARE_DIR)/apps/sample_hello/Makefile
-#include $(FIRMWARE_DIR)/apps/sample_wire/Makefile
+include $(FIRMWARE_DIR)/apps/nic/Makefile
+include $(FIRMWARE_DIR)/apps/vrouter/Makefile
