@@ -17,9 +17,9 @@
 #include <nfp/mem_bulk.h>
 #include <std/reg_utils.h>
 
-#include <infra/infra.h>
-#include <nic/nic.h>
-#include <nic/pcie_desc.h>
+#include <infra_basic/infra_basic.h>
+#include <nic_basic/nic_basic.h>
+#include <nic_basic/pcie_desc.h>
 
 #include <vnic/shared/nfd_cfg.h>
 #include <vnic/pci_in.h>

@@ -11,7 +11,7 @@
 #include <nfp.h>
 #include <stdint.h>
 
-#include <infra/infra.h>
+#include <infra_basic/infra_basic.h>
 
 #include "nic_ctrl.h"
 

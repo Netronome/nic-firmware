@@ -5,10 +5,10 @@
  * @brief         API implementations of task offloading for the tx path.
  */
 
-#include <infra/infra.h>
+#include <infra_basic/infra_basic.h>
 #include <net/csum.h>
-#include <nic/nic.h>
-#include <nic/pcie_desc.h>
+#include <nic_basic/nic_basic.h>
+#include <nic_basic/pcie_desc.h>
 #include <nfp/me.h>
 #include <std/reg_utils.h>
 #include <vnic/pci_in.h>
