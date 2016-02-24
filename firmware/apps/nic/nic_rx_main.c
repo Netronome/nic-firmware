@@ -111,8 +111,6 @@ proc_from_wire(int port,
     __gpr struct pkt_rx_desc rxd_tmp;
     __lmem uint16_t *vxlan_ports;
     __lmem void *sa, *da;
-    /*Forced qid to vf#*/
-    //qid = 1;
 
     reg_cp(&rxd_tmp, (void *) rxd, sizeof(struct pkt_rx_desc));
     app_meta = (void*)&(rxd_tmp.app0);
@@ -165,12 +163,8 @@ proc_from_wire(int port,
     pkt_hdrs_read(pkt_start, offset,
                   pkt_cache, offset + PKT_START_OFF, &hdrs, &encap, 0,
                   vxlan_ports);
-    //TODO: lookup-based l2-switch is needed.
-    //TODO: using DST_MAC with mask for now
-    qid = hdrs.o_eth.dst.a[5] & 63; 
-    local_csr_write(local_csr_mailbox1, qid);
     /* Perform checks & filtering */
-    err = nic_rx_l2_checks(port, &hdrs.o_eth.src, &hdrs.o_eth.dst, qid);
+    err = nic_rx_l2_checks(port, &hdrs.o_eth.src, &hdrs.o_eth.dst);
     if (err)
         goto err_out;
 
@@ -206,70 +200,67 @@ proc_from_wire(int port,
         }
     }
 
-    //if (hdrs.present & (HDR_E_NVGRE | HDR_E_VXLAN) &&
-    //    hdrs.present & HDR_I_ETH) {
-    //    sa = &hdrs.i_eth.src;
-    //    da = &hdrs.i_eth.dst;
-    //} else {
-    //    sa = &hdrs.o_eth.src;
-    //    da = &hdrs.o_eth.dst;
-    //}
-    //
-    //out_vport_mask = nic_switch(NIC_SWITCH_UPLINK, sa, da, vlan, &unused);
-    //
-    //if (!out_vport_mask) {
-    //    err = NIC_RX_DROP;
-    //    NIC_APP_CNTR(&nic_cnt_rx_sw_drop);
-    //    goto err_out;
-    //}
-    //
-    ///* XXX assume for now only one VPort is returned */
-    //vport = ffs64(out_vport_mask);
-    //
-    ///* RSS */
-    //rss_flags = 0;
-    //if (hdrs.present & HDR_O_IP4)
-    //    rss_flags |= NIC_RSS_IP4;
-    //if (hdrs.present & HDR_O_IP6)
-    //    rss_flags |= NIC_RSS_IP6;
-    //if (hdrs.present & HDR_O_TCP)
-    //    rss_flags |= NIC_RSS_TCP;
-    //if (hdrs.present & HDR_O_UDP)
-    //    rss_flags |= NIC_RSS_UDP;
-    //if (hdrs.present & HDR_E_NVGRE)
-    //    rss_flags |= NIC_RSS_NVGRE;
-    //if (hdrs.present & HDR_E_VXLAN)
-    //    rss_flags |= NIC_RSS_VXLAN;
-    //if ((hdrs.present & HDR_E_NVGRE) || (hdrs.present & HDR_E_VXLAN)) {
-    //    if (hdrs.present & HDR_I_IP4)
-    //        rss_flags |= NIC_RSS_I_IP4;
-    //    if (hdrs.present & HDR_I_IP6)
-    //        rss_flags |= NIC_RSS_I_IP6;
-    //    if (hdrs.present & HDR_I_TCP)
-    //        rss_flags |= NIC_RSS_I_TCP;
-    //    if (hdrs.present & HDR_I_UDP)
-    //        rss_flags |= NIC_RSS_I_UDP;
-    //}
-    //
-    ///* o_ip4/o_ip6 are at the same location so is o_udp, o_tcp */
-    //hash = nic_rx_rss(vport, &hdrs.o_ip4, &hdrs.o_tcp,
-    //                  &hdrs.i_ip4, &hdrs.i_tcp, rss_flags,
-    //                  &hash_type, app_meta, &qid);
-    //if (hash_type) {
-    //    /* Write Hash value in front of the packet */
-    //    offset -= sizeof(tmp);
-    //    plen += sizeof(tmp);
-    //    tmp[0] = hash_type;
-    //    tmp[1] = hash;
-    //    mem_write8(&tmp, (void *)(pkt_start + offset), sizeof(tmp));
-    //} else {
-    //    err = nic_switch_rx_defaultq(vport, &qid);
-    //    if (err != NIC_RX_OK)
-    //        goto err_out;
-    //}
-    //err = nic_switch_rx_defaultq(vport, &qid);
-    //if (err != NIC_RX_OK)
-    //    goto err_out;
+    if (hdrs.present & (HDR_E_NVGRE | HDR_E_VXLAN) &&
+        hdrs.present & HDR_I_ETH) {
+        sa = &hdrs.i_eth.src;
+        da = &hdrs.i_eth.dst;
+    } else {
+        sa = &hdrs.o_eth.src;
+        da = &hdrs.o_eth.dst;
+    }
+    
+    out_vport_mask = nic_switch(NIC_SWITCH_UPLINK, sa, da, vlan, &unused);
+    
+    if (!out_vport_mask) {
+        err = NIC_RX_DROP;
+        NIC_APP_CNTR(&nic_cnt_rx_sw_drop);
+        goto err_out;
+    }
+    
+    /* XXX assume for now only one VPort is returned */
+    vport = ffs64(out_vport_mask);
+    
+    /* RSS */
+    rss_flags = 0;
+    if (hdrs.present & HDR_O_IP4)
+        rss_flags |= NIC_RSS_IP4;
+    if (hdrs.present & HDR_O_IP6)
+        rss_flags |= NIC_RSS_IP6;
+    if (hdrs.present & HDR_O_TCP)
+        rss_flags |= NIC_RSS_TCP;
+    if (hdrs.present & HDR_O_UDP)
+        rss_flags |= NIC_RSS_UDP;
+    if (hdrs.present & HDR_E_NVGRE)
+        rss_flags |= NIC_RSS_NVGRE;
+    if (hdrs.present & HDR_E_VXLAN)
+        rss_flags |= NIC_RSS_VXLAN;
+    if ((hdrs.present & HDR_E_NVGRE) || (hdrs.present & HDR_E_VXLAN)) {
+        if (hdrs.present & HDR_I_IP4)
+            rss_flags |= NIC_RSS_I_IP4;
+        if (hdrs.present & HDR_I_IP6)
+            rss_flags |= NIC_RSS_I_IP6;
+        if (hdrs.present & HDR_I_TCP)
+            rss_flags |= NIC_RSS_I_TCP;
+        if (hdrs.present & HDR_I_UDP)
+            rss_flags |= NIC_RSS_I_UDP;
+    }
+    
+    /* o_ip4/o_ip6 are at the same location so is o_udp, o_tcp */
+    hash = nic_rx_rss(vport, &hdrs.o_ip4, &hdrs.o_tcp,
+                      &hdrs.i_ip4, &hdrs.i_tcp, rss_flags,
+                      &hash_type, app_meta, &qid);
+    if (hash_type) {
+        /* Write Hash value in front of the packet */
+        offset -= sizeof(tmp);
+        plen += sizeof(tmp);
+        tmp[0] = hash_type;
+        tmp[1] = hash;
+        mem_write8(&tmp, (void *)(pkt_start + offset), sizeof(tmp));
+    } else {
+        err = nic_switch_rx_defaultq(vport, &qid);
+        if (err != NIC_RX_OK)
+            goto err_out;
+    }
 
 pkt_out:
     /* Flush dirty header to buffer */

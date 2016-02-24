@@ -152,17 +152,12 @@ __export __dram uint64_t nic_cnt_tx_switch_int;
  */
 struct nic_local_state {
     uint32_t control;           /* 0x000: Cache of NFP_NET_CFG_CTRL */
-    uint32_t control_vf[NFD_MAX_VFS]; /*  NFP_NET_CFG_CTRL of VFs*/
 
     uint64_t tx_ring_en;        /* 0x004: Cache of NFP_NET_CFG_TXRS_ENABLE */
     uint64_t rx_ring_en;        /* 0x00c: Cache of NFP_NET_CFG_RXRS_ENABLE */
-    uint64_t tx_ring_en_vf[NFD_MAX_VFS]; /*Cache of NFP_NET_CFG_TXRS_ENABLE of VFs*/
-    uint64_t rx_ring_en_vf[NFD_MAX_VFS]; /*Cache of NFP_NET_CFG_RXRS_ENABLE of VFs*/
 
     uint32_t mtu;               /* 0x014: Configured MTU */
     uint32_t mac[2];            /* 0x018: Cache of NFP_NET_CFG_MACADDR */
-    uint32_t mtu_vf[NFD_MAX_VFS];    /*Configured MTU of VFs*/
-    uint32_t mac_vf[NFD_MAX_VFS][2]; /*Cache of NFP_NET_CFG_MACADDR of VFs*/
 
     /*TODO: per VF value in the following should be added later when needed*/
     uint32_t rss_ctrl;          /* 0x020: Cache of RSS control */
@@ -261,8 +256,6 @@ nic_local_reconfig(uint32_t *enable_changed)
     __xread uint16_t vxlan_ports[NFP_NET_N_VXLAN_PORTS];
     __gpr uint32_t update;
     __gpr uint32_t newctrl;
-    uint32_t vnic_id;
-    int i;
     __emem __addr40 uint8_t *bar_base;
 
     /* Code assumes certain arrangement and sizes */
@@ -277,7 +270,6 @@ nic_local_reconfig(uint32_t *enable_changed)
     /* Calculate the relevant configuration BAR base address */
     switch (cfg_bar_change_info.pci) {
     case 0:
-        vnic_id = cfg_bar_change_info.vnic;
         bar_base = NFD_CFG_BAR_ISL(0, cfg_bar_change_info.vnic);
         break;
     default:
@@ -295,11 +287,6 @@ nic_local_reconfig(uint32_t *enable_changed)
         if ((nic->control ^ newctrl) & NFP_NET_CFG_CTRL_ENABLE) {
             *enable_changed = 1;
         }
-        if ((vnic_id < NFD_MAX_VFS) & 
-            (nic->control_vf[vnic_id] ^ newctrl) & 
-            NFP_NET_CFG_CTRL_ENABLE) {
-            *enable_changed = 1;
-        } 
 
         if (!(newctrl & NFP_NET_CFG_CTRL_ENABLE)) {
             /* NIC got disabled, zero control and we are done */
@@ -312,25 +299,15 @@ nic_local_reconfig(uint32_t *enable_changed)
         mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
         nic->mtu = mtu;
-        if (vnic_id < NFD_MAX_VFS) {
-            nic->mtu_vf[vnic_id] = mtu;
-        } 
 
         /* MAC Address */
         mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
                    sizeof(nic_mac));
         nic->mac[0] = nic_mac[0];
         nic->mac[1] = nic_mac[1];
-        if (vnic_id < NFD_MAX_VFS) {
-            nic->mac_vf[vnic_id][0] = nic_mac[0];
-            nic->mac_vf[vnic_id][1] = nic_mac[1];
-        } 
 
         /* Stash away new control to activate */
         nic->control = newctrl;
-        if (vnic_id < NFD_MAX_VFS) {
-            nic->control_vf[vnic_id] = mtu;
-        } 
     }
 
     /* Handle Ring reconfiguration.
@@ -343,10 +320,6 @@ nic_local_reconfig(uint32_t *enable_changed)
                    sizeof(ring_en));
         nic->tx_ring_en = swapw64(ring_en[0]);
         nic->rx_ring_en = swapw64(ring_en[1]);
-        if (vnic_id < NFD_MAX_VFS) {
-            nic->tx_ring_en_vf[vnic_id] = swapw64(ring_en[0]);
-            nic->rx_ring_en_vf[vnic_id] = swapw64(ring_en[1]);
-        } 
     }
 
     /* Handle RSS re-config */
