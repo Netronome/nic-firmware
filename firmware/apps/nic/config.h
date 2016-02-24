@@ -77,10 +77,6 @@
  * BLM configuration
  */
 #include <infra/blm_custom.h>
-#define NBII                     8
-#define BLM_INSTANCE_ID          0
-#define BLM_INIT_EMU_RINGS
-#define BLM_0_ISLAND_ILA48
 
 /*
  * GRO configuration
