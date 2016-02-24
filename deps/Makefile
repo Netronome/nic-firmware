@@ -1,9 +1,9 @@
 #
 # Change these revisions to suit the project
 #
-FLOWENV_REV=tip
-GRO_REV=tip
-NFD_REV=tip
+FLOWENV_REV=172  # Tip as of Feb 24 2016
+GRO_REV=21       # Tip as of Feb 24 2016
+NFD_REV=1861     # Tip as of Feb 24 2016
 
 #
 # Global variables
