@@ -136,7 +136,7 @@ nic_rx_csum_checks(int port, uint32_t csum, void *meta)
 }
 
 __intrinsic int
-nic_rx_l2_checks(int port, void *sa, void *da, uint8_t qid)
+nic_rx_l2_checks(int port, void *sa, void *da)
 {
     __gpr int ret = NIC_RX_DROP;
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
@@ -173,28 +173,13 @@ nic_rx_l2_checks(int port, void *sa, void *da, uint8_t qid)
         NIC_LIB_CNTR(&nic_cnt_rx_eth_drop_mc);
     }
 
-    ///* Destination address matches our MAC? */
-    //if(REG_CMPS(3, da, (void*)nic->mac)) {
-    //    NIC_LIB_CNTR(&nic_cnt_rx_eth_local);
-    //    ret = NIC_RX_OK;
-    //    goto out;
-    //}
-
-    if (qid < NFD_MAX_VFS) {
-        //local_csr_write(local_csr_mailbox2, nic->mac_vf[qid][0]);
-        //local_csr_write(local_csr_mailbox3, nic->mac_vf[qid][1]);
-        if(REG_CMPS(3, da, (void*)nic->mac_vf[qid])) {
-            //local_csr_write(local_csr_mailbox0, 0xAA);
-            ret = NIC_RX_OK;
-            goto out;
-        }
-        //else local_csr_write(local_csr_mailbox0, 0xBB);
+    /* Destination address matches our MAC? */
+    if(REG_CMPS(3, da, (void*)nic->mac)) {
+        NIC_LIB_CNTR(&nic_cnt_rx_eth_local);
+        ret = NIC_RX_OK;
+        goto out;
     }
 
-    ///*TODO Destination address matches any one of VF MACs?*/
-    //NIC_LIB_CNTR(&nic_cnt_rx_eth_local);
-    //ret = NIC_RX_OK;
-    //goto out;
     NIC_LIB_CNTR(&nic_cnt_rx_eth_drop_da);
 
 out:

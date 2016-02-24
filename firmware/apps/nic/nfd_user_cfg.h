@@ -17,12 +17,12 @@
 #endif
 
 #ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       1
+#define NFD_MAX_PF_QUEUES       32
 #endif
 
 /* No VFs needed */
 #ifndef NFD_MAX_VFS
-#define NFD_MAX_VFS             8
+#define NFD_MAX_VFS             0
 #endif
 
 /* Configure VF expansion BARs to access the NFP, this seems to be required
@@ -51,7 +51,7 @@
      NFP_NET_CFG_CTRL_L2BC | NFP_NET_CFG_CTRL_L2MC |            \
      NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
      NFP_NET_CFG_CTRL_RXVLAN | NFP_NET_CFG_CTRL_TXVLAN |        \
-     NFP_NET_CFG_CTRL_MSIXAUTO |      \
+     NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
      NFP_NET_CFG_CTRL_L2SWITCH | NFP_NET_CFG_CTRL_GATHER |      \
      NFP_NET_CFG_CTRL_IRQMOD | NFP_NET_CFG_CTRL_LSO |           \
      NFP_NET_CFG_CTRL_VXLAN  | NFP_NET_CFG_CTRL_NVGRE)
@@ -61,7 +61,7 @@
      NFP_NET_CFG_CTRL_L2BC | NFP_NET_CFG_CTRL_L2MC |            \
      NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
      NFP_NET_CFG_CTRL_RXVLAN | NFP_NET_CFG_CTRL_TXVLAN |        \
-     NFP_NET_CFG_CTRL_MSIXAUTO |      \
+     NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
      NFP_NET_CFG_CTRL_L2SWITCH | NFP_NET_CFG_CTRL_GATHER |      \
      NFP_NET_CFG_CTRL_IRQMOD | NFP_NET_CFG_CTRL_LSO |           \
      NFP_NET_CFG_CTRL_VXLAN  | NFP_NET_CFG_CTRL_NVGRE)

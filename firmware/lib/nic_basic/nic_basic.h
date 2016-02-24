@@ -229,7 +229,7 @@ __intrinsic int nic_rx_csum_checks(int port, uint32_t csum, void *meta);
  *
  * @da must be in GPRs or LMEM and is assumed to be a struct eth_addr *.
  */
-__intrinsic int nic_rx_l2_checks(int port, void *sa, void *da, uint8_t qid);
+__intrinsic int nic_rx_l2_checks(int port, void *sa, void *da);
 
 
 /**
