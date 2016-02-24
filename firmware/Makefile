@@ -39,7 +39,6 @@ NFAS_BASE_FLAGS = 			\
         -permit_dram_unaligned		\
         -preproc64			\
         -indirect_ref_format_nfp6000	\
-        -keep_unreachable_code		\
         -W3				\
         -C				\
         -R				\
