@@ -1,0 +1,206 @@
+{
+    "chan_config":
+    {
+        "full_config": true,
+        "split_mem": true,
+        "egress_cmd_prepend_mask31_0": "0xf0f",
+        "egress_cmd_prepend_mask63_32": "0x0",
+        "egress_cmd_prepend_mask95_64": "0x0",
+        "egress_cmd_prepend_mask127_96": "0x0",
+        "pause_wm00_31": [
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74
+        ],
+        "pause_wm32_63": [
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74
+        ],
+        "pause_wm64_95": [
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74
+        ],
+        "pause_wm96_127": [
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74,
+            74, 74, 74, 74, 74, 74, 74, 74
+        ]
+    },
+    "enet_default":
+    {
+        "drop_delta": 10,
+        "highwater_mark": 298,
+        "ig_dq_dwrr_weight": 1024,
+        "egress_parser_skip_bytes": 0,
+        "ingress_parse_prepend_en": true,
+        "ingress_timestamp_prepend_en": true,
+        "lane_mode": "40G",
+        "link_timer": 100,
+        "num_channels": 0,
+        "frame_length": 10240,
+        "egress_port_rr": true,
+        "pause_pfc_comp": false,
+        "pause_quanta": [
+            1629, 750, 1586, 1496, 1522, 1797, 731, 1837
+        ],
+        "pause_thresh": [
+            431, 351, 745, 530, 707, 814, 259, 464
+        ],
+        "pcp_remap": [
+            0, 1, 2, 3, 3, 3, 3, 3
+        ],
+        "pcs_loopback": false,
+        "pfc_mode": false,
+        "promis_en": true,
+        "pad_en": true,
+        "sgmii_ena": false
+    },
+    "enet_ports": {
+        "0": {
+            "enabled": true,
+            "channel_base": 0,
+            "num_channels": 4,
+            "untagged_chan": 3
+        },
+        "1": {
+            "enabled": false,
+            "num_channels": 0,
+            "lane_mode": "OFF"
+        },
+        "2": {
+            "enabled": false,
+            "num_channels": 0,
+            "lane_mode": "OFF"
+        },
+        "3": {
+            "enabled": false,
+            "num_channels": 0,
+            "lane_mode": "OFF"
+        },
+        "4": {
+            "enabled": true,
+            "channel_base": 8,
+            "num_channels": 4,
+            "untagged_chan": 11
+        },
+        "5": {
+            "enabled": false,
+            "num_channels": 0,
+            "lane_mode": "OFF"
+        },
+        "6": {
+            "enabled": false,
+            "num_channels": 0,
+            "lane_mode": "OFF"
+        },
+        "7": {
+            "enabled": false,
+            "num_channels": 0,
+            "lane_mode": "OFF"
+        },
+        "8": {
+            "enabled": true,
+            "channel_base": 16,
+            "num_channels": 4,
+            "untagged_chan": 19
+        },
+        "9": {
+            "enabled": false,
+            "num_channels": 0,
+            "lane_mode": "OFF"
+        },
+        "10": {
+            "enabled": false,
+            "num_channels": 0,
+            "lane_mode": "OFF"
+        },
+        "11": {
+            "enabled": false,
+            "num_channels": 0,
+            "lane_mode": "OFF"
+        }
+    },
+    "ilk_config": {
+        "1": {
+            "channel_base": 0,
+            "egress_parser_skip_bytes": 7,
+            "enabled": false,
+            "ig_dq_dwrr_weight": 0,
+            "ig_dq_segmented": false,
+            "ingress_parse_prepend_en": false,
+            "ingress_timestamp_prepend_en": false,
+            "num_channels": 0,
+            "num_lanes": 0,
+            "outband": false,
+            "packet_mode": true,
+            "highwater_mark": 0,
+            "drop_delta": 0,
+            "rx": {
+                "burst_max": 384,
+                "burst_min": 192,
+                "burst_short": 64,
+                "inband": true,
+                "lane_disable": "0x0",
+                "metaframe_period": 2048,
+                "mult_ch": false,
+                "mult_ext": false,
+                "mult_fc": false,
+                "outband": false,
+                "scram_dis": false,
+                "skip_dis": false
+            },
+            "tx": {
+                "burst_max": 384,
+                "burst_min": 192,
+                "burst_short": 64,
+                "inband": true,
+                "lane_disable": "0x0",
+                "metaframe_period": 1024,
+                "mult_ch": false,
+                "mult_ext": false,
+                "mult_fc": false,
+                "outband": false,
+                "scram_dis": false,
+                "skip_dis": false
+            }
+        }
+    },
+    "serdes_config": {
+        "0": {
+            "bit_rate": "10p3125",
+            "clk_muxsel": 15,
+            "enabled": true
+        },
+        "1": {
+            "bit_rate": "10p3125",
+            "clk_muxsel": 15,
+            "enabled": false
+        },
+        "2": {
+            "bit_rate": "10p3125",
+            "clk_muxsel": 15,
+            "enabled": false
+        },
+        "3": {
+            "bit_rate": "10p3125",
+            "clk_muxsel": 31,
+            "enabled": false
+        },
+        "4": {
+            "bit_rate": "10p3125",
+            "clk_muxsel": 31,
+            "enabled": false
+        },
+        "5": {
+            "bit_rate": "10p3125",
+            "clk_muxsel": 15,
+            "enabled": false
+        }
+    }
+}
