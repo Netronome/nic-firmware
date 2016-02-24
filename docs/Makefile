@@ -6,4 +6,4 @@ ard.pdf: images/*.png
 	pandoc $< -o $@
 
 clean:
-	rm *.pdf
+	rm -f *.pdf

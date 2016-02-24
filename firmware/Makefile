@@ -55,18 +55,22 @@ NFAS_CODELESS_FLAGS = 			\
 	-g
 
 NFCC = $(NETRONOME)/bin/nfcc
-NFCC_BASE_INC = -I$(FIRMWARE_DIR)/lib
+NFCC_BASE_INC = \
+	-I$(NETRONOME)/components/standardlibrary/include \
+	-I$(NETRONOME)/components/standardlibrary/microc/include \
+	-I$(FIRMWARE_DIR)/lib
 NFCC_BASE_DEFS = 
 NFCC_BASE_FLAGS = 			\
 	-W3				\
 	-Ob2				\
 	-mIPOPT_expose_intrinsics	\
-	-Qspill=0			\
-	-Qperfinfo=0			\
+	-Qspill=5			\
 	-Qno_decl_volatile		\
 	-single_dram_signal
 
 NFCC_BASE_CLIBS = $(NETRONOME)/components/standardlibrary/microc/src/rtl.c
+
+PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp6000
 
 NFLD = $(NETRONOME)/bin/nfld
 NFLD_BASE_FLAGS =
@@ -115,6 +119,8 @@ firmware_clean:
 		rm -f $$d/*.ucp ;\
 		rm -f $$d/*.obj ;\
 		rm -f $$d/*.nffw ; \
+		rm -f $$d/*.dbg ; \
+		rm -f $$d/*.lri ; \
 	done
 	@rm -f $(FW_NFFW)/*.nffw
 
