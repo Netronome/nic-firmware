@@ -471,6 +471,7 @@ $(eval $(call microcode.add_defines,$1,nfd_pcie$2_sb,		\
 	NFD_CFG_NEXT_ME="__nfp_idstr2meid(\"$$($1__NFD_SVC_ME)\")"\
 	NFD_CFG_SIG_NEXT_ME="_nfd_cfg_sig_svc_me0"		\
 	))
+$(eval $(call microcode.add_flags,$1,nfd_pcie$2_sb,-keep_unreachable_code))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_sb,$3))
 
 # Packet DMA
@@ -489,6 +490,7 @@ $(eval $(call microcode.add_defines,$1,nfd_pcie$2_pd,		\
 	NFD_OUT_STAGE_ME="__nfp_idstr2meid(\"$3\")"		\
 	STAGE_BATCH_MANAGER_CTX=0				\
 	))
+$(eval $(call microcode.add_flags,$1,nfd_pcie$2_pd,-keep_unreachable_code))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_pd,$4))
 
 endef
