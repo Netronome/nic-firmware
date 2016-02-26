@@ -51,11 +51,6 @@ coverage.xml
 # SCons
 .sconsign.dblite
 
-# Sphinx documentation
-docs/_build/
-
-docs/*.pdf
-
 # PyBuilder
 target/
 
