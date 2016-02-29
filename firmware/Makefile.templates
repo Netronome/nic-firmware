@@ -351,26 +351,22 @@ $1__$2__FLAGS += -chip $$($1__CHIP)
 $1__$2__CLIBS += $(NFCC_BASE_CLIBS)
 $1__$2__CLIBS += $$($1__NFCC_CLIBS)
 $1__$2__LIST  = $(FW_BUILD)/$1/$2/$2.list
-$1__$2__MKDEP = $(FW_BUILD)/$1/$2.d
+$1__$2__MKDEP = $(FW_BUILD)/$1/$2/$2.d
 $1__$2__NCTX  = 8
 
 $(eval $(call nffw.add_build_dir,$(FW_BUILD)/$1))
 
 $1_$2.list: $$($1__$2__LIST)
 FW_LIST_TARGETS += $1_$2.list
-FW_MKDEP_TARGETS += $(FW_BUILD)/$1/$2.d
+FW_MKDEP_TARGETS += $(FW_BUILD)/$1/$2/$2.d
 
-$$($1__$2__MKDEP):
-	@echo Updating dependency file $$($1__$2__MKDEP) ...
-	$(Q)mkdir -p $(FW_BUILD)/$1/
-	$(Q)$(NFCC) -QM $$($1__$2__FLAGS) \
-		-Qnctx_mode=$$($1__$2__NCTX) $$($1__$2__INC) $$($1__$2__DEFS) \
-		$$($1__$2__CLIBS) $$< > $$@
-	$(Q)sed -ie 's|^.*\.o|$(FW_BUILD)/$1/$2/$2.list|' $$@
-
-$$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS) $$($1__$2__MKDEP)
+$$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS)
 	@echo Building $$($1__$2__LIST) ...
 	$(Q)mkdir -p $(FW_BUILD)/$1/$2
+	$(Q)$(NFCC) -QM $$($1__$2__FLAGS) \
+		-Qnctx_mode=$$($1__$2__NCTX) $$($1__$2__INC) $$($1__$2__DEFS) \
+		$$($1__$2__CLIBS) $$< > $$($1__$2__MKDEP)
+	$(Q)sed -ie 's|^.*\.o|$(FW_BUILD)/$1/$2/$2.list|' $$($1__$2__MKDEP)
 	$(Q)$(NFCC) -Fo$(FW_BUILD)/$1/$2/ -Fe$$@ $$($1__$2__FLAGS) \
 		-Qnctx_mode=$$($1__$2__NCTX) $$($1__$2__INC) $$($1__$2__DEFS) \
 		$$($1__$2__CLIBS) $$<
