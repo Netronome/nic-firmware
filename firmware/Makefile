@@ -33,7 +33,7 @@ NFAS = $(NETRONOME)/bin/nfas
 NFAS_BASE_INC = -I$(NETRONOME)/components/standardlibrary/include
 NFAS_BASE_INC += -I$(NETRONOME)/components/standardlibrary/microcode/include
 NFAS_BASE_INC += -I$(NETRONOME)/components/standardlibrary/microcode/src
-NFAS_BASE_DEFS = 
+NFAS_BASE_DEFS =
 NFAS_BASE_FLAGS = 			\
         -third_party_addressing_40_bit	\
         -permit_dram_unaligned		\
@@ -58,7 +58,7 @@ NFCC_BASE_INC = \
 	-I$(NETRONOME)/components/standardlibrary/include \
 	-I$(NETRONOME)/components/standardlibrary/microc/include \
 	-I$(FIRMWARE_DIR)/lib
-NFCC_BASE_DEFS = 
+NFCC_BASE_DEFS =
 NFCC_BASE_FLAGS = 			\
 	-W3				\
 	-Ob2				\
@@ -74,11 +74,12 @@ PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp6000
 NFLD = $(NETRONOME)/bin/nfld
 NFLD_BASE_FLAGS =
 
-FW_BUILD_DIRS = $(FW_BUILD)
+FW_BUILD_DIRS =
 
 FW_BUILD_TARGETS =
 FW_LOAD_TARGETS =
 FW_LIST_TARGETS =
+FW_MKDEP_TARGETS =
 
 include $(FIRMWARE_DIR)/Makefile.templates
 include $(FIRMWARE_DIR)/Makefile.deps.templates
@@ -112,15 +113,11 @@ firmware_show_listfiles:
 firmware_clean:
 	@for d in $(FW_BUILD_DIRS) ; do \
 		echo "Cleaining $$d" ; \
-		rm -f $$d/*.map ;\
-		rm -f $$d/*.list ;\
-		rm -f $$d/*.uci ;\
-		rm -f $$d/*.ucp ;\
-		rm -f $$d/*.obj ;\
-		rm -f $$d/*.nffw ; \
-		rm -f $$d/*.dbg ; \
-		rm -f $$d/*.lri ; \
+		rm -rf $$d; \
 	done
+	@rm -f $(FW_BUILD)/*.map
 	@rm -f $(FW_NFFW)/*.nffw
 
 firmware_veryclean: firmware_clean firmware_clean_deps
+
+$(foreach mkdep,$(FW_MKDEP_TARGETS),$(eval -include $(mkdep)))
