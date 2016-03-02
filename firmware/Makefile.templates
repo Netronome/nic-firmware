@@ -702,3 +702,61 @@ define nffw.add_ppc
 $1__PPC_LOADS += -i $2 -e $3
 
 endef
+
+#a NFFW templates with analysis
+#f nffw.link_w_analysis
+#
+# Create link targets to build an nffw
+# also run analysis on major list files
+# for reporting instruction storage and
+# memory activities.
+#
+# @param $1 firmware name (for .nffw)
+# @param $2 rx list file name for analysis
+# @param $3 tx list file name
+#
+define nffw.link_w_analysis
+
+$1__NFFW = $(FW_NFFW)/$1.nffw
+$1__MAP  = $(FW_BUILD)/$1.map
+$1__REPORT  = $(FW_BUILD)/$1/$1_analysis.txt
+
+$$($1__NFFW): $$($1__LINK_DEPENDENCIES)
+	@echo Linking $$($1__NFFW) ...
+	$(Q)$(NFLD) $(NFLD_BASE_FLAGS) -chip $$($1__CHIP) $$($1__LINK_FLAGS) \
+		-o $$@ -map $$($1__MAP) $$($1__ME_LOADS)  $$($1__PPC_LOADS)
+
+$1.nffw: $$($1__NFFW) analysis
+
+analysis:
+	@echo Analyzing $$($1__NFFW) ...
+	@echo Checking mem read8 in $2.list ... > $$($1__REPORT)
+	@echo There should be no captured line returned... >> $$($1__REPORT)
+	-cat $(FW_BUILD)/$1/$2/$2.list | grep 'mem\[read8'; true >> $$($1__REPORT)
+	@echo Checking mem read8 in $3.list ... >> $$($1__REPORT)
+	@echo There should be no captured line returned... >> $$($1__REPORT)
+	-cat $(FW_BUILD)/$1/$3/$3.list | grep 'mem\[read8'; true >> $$($1__REPORT)
+	@echo Analizing the instruction count in $2.list ... >> $$($1__REPORT)
+	@echo The format is: >> $$($1__REPORT)
+	@echo column 1: Count of instructions >> $$($1__REPORT)
+	@echo column 2: starting code store location >> $$($1__REPORT)
+	@echo column 3: File name and line number >> $$($1__REPORT)
+	-$(FIRMWARE_DIR)/scripts/nic-instr.py $(FW_BUILD)/$1/$2/$2.list | \
+		sort -nr >> $$($1__REPORT)
+	@echo Analizing the instruction count in $3.list ... >> $$($1__REPORT)
+	@echo The format is: >> $$($1__REPORT)
+	@echo column 1: Count of instructions >> $$($1__REPORT)
+	@echo column 2: starting code store location >> $$($1__REPORT)
+	@echo column 3: File name and line number >> $$($1__REPORT)
+	-$(FIRMWARE_DIR)/scripts/nic-instr.py $(FW_BUILD)/$1/$3/$3.list | \
+		sort -nr >> $$($1__REPORT)
+
+all_nffw: $1.nffw
+
+FW_BUILD_TARGETS += $1.nffw
+FW_LOAD_TARGETS += load_$1
+
+load_$1:
+	nfp-nffw $$($1__NFFW) load
+
+endef

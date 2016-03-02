@@ -118,5 +118,4 @@ $(eval $(call nffw.add_obj,basic_nic,nic_tx,\
 
 # Link
 $(eval $(call nffw.add_rtsyms,basic_nic))
-$(eval $(call nffw.link,basic_nic))
-
+$(eval $(call nffw.link_w_analysis,basic_nic,nic_rx,nic_tx))
