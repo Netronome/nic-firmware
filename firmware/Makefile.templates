@@ -749,6 +749,35 @@ $1__PPC_LOADS += -i $2 -e $3
 
 endef
 
+
+#f nffw.add_link_flag
+#
+# Add a flag to the firmware link
+#
+# @param $1 firmware name
+# @param $2 flag
+#
+define nffw.add_link_flag
+
+$1__LINK_FLAGS += $2
+
+endef
+
+
+#f nffw.add_link_flags
+#
+# Add flags to the firmware link
+#
+# @param $1 firmware name
+# @param $2 space separated list of flags
+#
+define nffw.add_link_flags
+
+$(foreach flag,$2,$(eval $(call nffw.add_link_flag,$1,$(flag))))
+
+endef
+
+
 #a NFFW templates with analysis
 #f nffw.link_w_analysis
 #
