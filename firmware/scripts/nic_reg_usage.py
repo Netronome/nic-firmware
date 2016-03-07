@@ -250,8 +250,11 @@ def main(argv):
         sort_key = argv[3][2:]
     sort_reg_func = sorted(reg_func, key=lambda reg: reg[0][sort_key],
                            reverse=True)
+    sort_reg_delta_func = sorted(reg_func, key=lambda reg: reg[1][sort_key],
+                           reverse=True)
 
     print('Analyzing register usage per function...')
+    print('Sorted by %s reg usage' % sort_key)
     print('input file:')
     print(argv[1])
     print(argv[2])
@@ -265,6 +268,29 @@ def main(argv):
     print('column 8: File name and line number ')
 
     for reg_usage in sort_reg_func:
+        reg_str=''
+        for rt in limit.keys():
+            reg_str+=' %4d(%3d)/%2d-%s' % (reg_usage[0][rt], reg_usage[1][rt],
+                                           limit[rt], rt)
+        print("%s -> %4d~%4d: %s:%d" % (reg_str, reg_usage[2], reg_usage[3],
+                                        reg_usage[4], reg_usage[5]))
+
+
+    print('Analyzing register usage per function...')
+    print('Sorted by %s reg usage increment' % sort_key)
+    print('input file:')
+    print(argv[1])
+    print(argv[2])
+    print('The format is:')
+    print('column 1~6: Register usage ')
+    print('            (actual_use/reg_use_increase/reg_limit/reg_name) ')
+    print('            Note: actual_use = Max usage during code location specified in column 7:')
+    print('            reg_use_increase = actual_use - usage at the end of the last function')
+    print('            It indicates reg usage increment per function.')
+    print('column 7: starting and ending code store location ')
+    print('column 8: File name and line number ')
+
+    for reg_usage in sort_reg_delta_func:
         reg_str=''
         for rt in limit.keys():
             reg_str+=' %4d(%3d)/%2d-%s' % (reg_usage[0][rt], reg_usage[1][rt],
