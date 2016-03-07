@@ -37,6 +37,7 @@ def print_list(d, key):
 def reg_check_in_func(start_inst, inst_cnt, cur_filen, cur_lineno, reg_res,
                       reg_func):
     max_cnt = {}
+    last_cnt = {}
     for rt in limit.keys():
         max_cnt[rt] = 0
     for i in range(0, inst_cnt):
@@ -44,8 +45,10 @@ def reg_check_in_func(start_inst, inst_cnt, cur_filen, cur_lineno, reg_res,
         for rt in limit.keys():
             if len(reg_res[cur_addr][rt]) > max_cnt[rt]:
                 max_cnt[rt] = len(reg_res[cur_addr][rt])
-    reg_func.append([max_cnt, start_inst, (start_inst + inst_cnt - 1),
-                     cur_filen, cur_lineno])
+    for rt in limit.keys():
+        last_cnt[rt] = len(reg_res[start_inst + inst_cnt - 1][rt])
+    reg_func.append([max_cnt, last_cnt, start_inst,
+                     (start_inst + inst_cnt - 1), cur_filen, cur_lineno])
 
 def main(argv):
     inf = open(argv[1], "r")
@@ -228,6 +231,19 @@ def main(argv):
         print("%4d -> %4d: %s:%d" % (func_usage[0], func_usage[1],
                                      func_usage[2], func_usage[3]))
 
+    calc_reg_func = []
+    for i in range(0, len(reg_func)):
+        delta_reg_usage = {}
+        if not i:
+            delta_reg_usage = reg_func[i][0]
+        else:
+            for rt in limit.keys():
+                delta_reg_usage[rt] = reg_func[i][0][rt] - reg_func[i-1][1][rt]
+                #delta_reg_usage[rt] = reg_func[i-1][1][rt]
+        calc_reg_func.append(delta_reg_usage)
+    for i in range(0, len(reg_func)):
+        reg_func[i][1] = calc_reg_func[i]
+
     if len(argv) < 4:
         sort_key = 'gpr'
     else:
@@ -240,16 +256,21 @@ def main(argv):
     print(argv[1])
     print(argv[2])
     print('The format is:')
-    print('column 1~6: Register usage (actual_use/reg_limit/reg_name) ')
+    print('column 1~6: Register usage ')
+    print('            (actual_use/reg_use_increase/reg_limit/reg_name) ')
+    print('            Note: actual_use = Max usage during code location specified in column 7:')
+    print('            reg_use_increase = actual_use - usage at the end of the last function')
+    print('            It indicates reg usage increment per function.')
     print('column 7: starting and ending code store location ')
     print('column 8: File name and line number ')
 
     for reg_usage in sort_reg_func:
         reg_str=''
         for rt in limit.keys():
-            reg_str+=' %4d/%2d-%s' % (reg_usage[0][rt], limit[rt], rt)
-        print("%s -> %4d~%4d: %s:%d" % (reg_str, reg_usage[1], reg_usage[2],
-                                        reg_usage[3], reg_usage[4]))
+            reg_str+=' %4d(%3d)/%2d-%s' % (reg_usage[0][rt], reg_usage[1][rt],
+                                           limit[rt], rt)
+        print("%s -> %4d~%4d: %s:%d" % (reg_str, reg_usage[2], reg_usage[3],
+                                        reg_usage[4], reg_usage[5]))
 
     print('Analyzing register usage per Instruction...')
     print('input file:')
