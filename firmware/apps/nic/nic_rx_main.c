@@ -168,13 +168,15 @@ proc_from_wire(int port,
     if (err)
         goto err_out;
 
-    err = rx_check_inner_csum(port, &hdrs, rxd, app_meta);
-    if (err == NIC_RX_DROP) {
+    ret = rx_check_inner_csum(port, &hdrs, &encap, rxd, app_meta, csum_prepend);
+    if (ret == NIC_RX_DROP) {
         if (nic_rx_promisc()) {
             err = NIC_RX_CSUM_BAD;
             goto pkt_out;
-        } else
+        } else {
+            err = NIC_RX_DROP;
             goto err_out;
+        }
     }
 
 
