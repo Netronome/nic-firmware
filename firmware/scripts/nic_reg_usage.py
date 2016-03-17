@@ -51,6 +51,84 @@ def reg_check_in_func(start_inst, inst_cnt, cur_filen, cur_lineno, reg_res,
                      (start_inst + inst_cnt - 1), cur_filen, cur_lineno])
 
 def main(argv):
+
+    NIC_SRCS = ['apps/nic', 'lib/nic']
+
+    # Analyzing the list file for code store
+    inst = -1
+    lineno = -1
+    filen = None
+
+    int_res = []
+
+    listf =  open(argv[2], "r")
+
+    list_lines = listf.readlines()
+
+    for line in list_lines:
+        elems = line.split()
+
+        # skip empty line
+        if not len(elems):
+            continue
+
+        if elems[0].startswith('.'):
+            if elems[0] == ".%line":
+                lineno = int(elems[1])
+                filen = elems[2][1:-1]
+            else:
+                try:
+                    inst = int(elems[0][1:])
+                except:
+                    inst = -1
+                lineno = -1
+                filen = None
+
+        if not inst == -1 and not lineno == -1:
+            # print "%4d: %s:%d" % (inst, filen, lineno)
+            int_res.append([inst, filen, lineno])
+            inst = -1
+            lineno = -1
+
+    # we now have a list of instructions and the filename and filenumber
+    # they are attributed with in the .list file
+
+    # go through the list an count instructions per line of NIC source code
+    cur_inst = int_res[0][0]
+    cur_filen = int_res[0][1]
+    cur_lineno = int_res[0][2]
+    inst_cnt = 0
+    inst_func = []
+
+    print('Analyzing the instruction count ...')
+    print('input file:')
+    print(argv[1])
+    print(argv[2])
+    print('The format is:')
+    print('column 1: Count of instructions ')
+    print('column 2: starting code store location ')
+    print('column 3: File name and line number ')
+    for inst, filen, lineno in int_res:
+        inst_cnt += 1
+
+        for src in NIC_SRCS:
+            if src in filen:
+                if cur_filen:
+                    inst_func.append([inst_cnt, cur_inst,cur_filen,
+                                     cur_lineno])
+                    #print "%4d -> %4d: %s:%d" % (inst_cnt, cur_inst,
+                    #                  cur_filen, cur_lineno)
+                cur_inst = inst
+                cur_filen = filen
+                cur_lineno = lineno
+                inst_cnt = 0
+    sort_inst_func = sorted(inst_func, key=lambda func: func[0], reverse=True)
+
+    for func_usage in sort_inst_func:
+        print("%4d -> %4d: %s:%d" % (func_usage[0], func_usage[1],
+                                     func_usage[2], func_usage[3]))
+
+    # Analyzing the liveinfo file for register usage
     inf = open(argv[1], "r")
 
     while True:
@@ -74,9 +152,13 @@ def main(argv):
     res[cur_addr]['nn'] = []
     res[cur_addr]['sig'] = []
     res[cur_addr]['src'] = ""
+    res[cur_addr]['c_file'] = None
+    res[cur_addr]['c_line'] = None
 
     curr_live = ''
+    pl = ''
     while True:
+        ppl = pl
         pl = l
         l = inf.readline()
         if not l:
@@ -99,9 +181,18 @@ def main(argv):
                     lnr, _, src = src.partition(':')
                     lnr = lnr.lstrip('(').lstrip('L').rstrip(')')
                     src = src.strip()
+                    res[cur_addr]['c_line'] = lnr
                     res[cur_addr]['src'] = "%s: %s" % (lnr, src)
                 else:
                     res[cur_addr]['src'] = ""
+                    res[cur_addr]['c_line'] = None
+                if ppl.startswith("#########"):
+                    _, _, c_src = ppl.partition(' ')
+                    res[cur_addr]['c_file'] = c_src
+                else:
+                    res[cur_addr]['c_file'] = None
+
+
         if l.startswith("Live set"):
             curr_live = 'Live set'
             _, _, regs = l.partition(':')
@@ -153,84 +244,55 @@ def main(argv):
     addrs = res.keys()
     addrs.sort()
 
-    NIC_SRCS = ['apps/nic', 'lib/nic']
-
-    inst = -1
-    lineno = -1
-    filen = None
-
-    int_res = []
-
-    listf =  open(argv[2], "r")
-
-    list_lines = listf.readlines()
-
-    for line in list_lines:
-        elems = line.split()
-
-        # skip empty line
-        if not len(elems):
-            continue
-
-        if elems[0].startswith('.'):
-            if elems[0] == ".%line":
-                lineno = int(elems[1])
-                filen = elems[2][1:-1]
-            else:
-                try:
-                    inst = int(elems[0][1:])
-                except:
-                    inst = -1
-                lineno = -1
-                filen = None
-
-        if not inst == -1 and not lineno == -1:
-            # print "%4d: %s:%d" % (inst, filen, lineno)
-            int_res.append([inst, filen, lineno])
-            inst = -1
-            lineno = -1
-
-    # we now have a list of instructions and the filename and filenumber
-    # they are attributed with in the .list file
-
-    # go through the list an count instructions per line of NIC source code
-    cur_inst = int_res[0][0]
-    cur_filen = int_res[0][1]
-    cur_lineno = int_res[0][2]
-    inst_cnt = 0
-    inst_func = []
-    reg_func = []
-
-    print('Analyzing the instruction count ...')
-    print('input file:')
-    print(argv[1])
-    print(argv[2])
-    print('The format is:')
-    print('column 1: Count of instructions ')
-    print('column 2: starting code store location ')
-    print('column 3: File name and line number ')
-    for inst, filen, lineno in int_res:
-        inst_cnt += 1
-
+    # Fill the empty c file name and c file line fields
+    # based on previous instruction
+    p_c_line = None
+    p_c_file = None
+    for addr in addrs:
+        if res[addr]['c_file']:
+            p_c_file = res[addr]['c_file']
+        else:
+            res[addr]['c_file'] = '%s' % p_c_file
+        if res[addr]['c_line']:
+            p_c_line = res[addr]['c_line']
+        else:
+            res[addr]['c_line'] = '%s' % p_c_line
+    # Filter out all non NIC_SRCS c file name and line fields
+    # replace with the last found NIC_SRCS c file name and line
+    # Also calculate the reg_usage based on the c file name
+    p_c_line = None
+    p_c_file = None
+    for addr in addrs:
+        key_found = False
         for src in NIC_SRCS:
-            if src in filen:
-                if cur_filen:
-                    reg_check_in_func(cur_inst, inst_cnt, cur_filen,
-                                      cur_lineno, res, reg_func)
-                    inst_func.append([inst_cnt, cur_inst,cur_filen,
-                                     cur_lineno])
-                    #print "%4d -> %4d: %s:%d" % (inst_cnt, cur_inst,
-                    #                  cur_filen, cur_lineno)
-                cur_inst = inst
-                cur_filen = filen
-                cur_lineno = lineno
-                inst_cnt = 0
-    sort_inst_func = sorted(inst_func, key=lambda func: func[0], reverse=True)
+            if src in res[addr]['c_file']:
+                key_found = True
 
-    for func_usage in sort_inst_func:
-        print("%4d -> %4d: %s:%d" % (func_usage[0], func_usage[1],
-                                     func_usage[2], func_usage[3]))
+        if key_found:
+            p_c_file = res[addr]['c_file']
+            p_c_line = res[addr]['c_line']
+        else:
+            res[addr]['c_file'] = p_c_file
+            res[addr]['c_line'] = p_c_line
+    # Also calculate the reg_usage based on the c file name
+    p_c_line = None
+    p_c_file = None
+    start_inst = 0
+    #cur_inst = 0
+    inst_cnt = 0
+    reg_func = []
+    for addr in addrs:
+        inst_cnt += 1
+        if p_c_line != res[addr]['c_line'] or p_c_file != res[addr]['c_file']:
+            reg_check_in_func(start_inst, inst_cnt, p_c_file, p_c_line, res,
+                              reg_func)
+            start_inst = int(addr)
+            inst_cnt = 0
+            p_c_file = res[addr]['c_file']
+            p_c_line = res[addr]['c_line']
+        #cur_inst += 1
 
+    # Sort the reg_usage
     calc_reg_func = []
     for i in range(0, len(reg_func)):
         delta_reg_usage = {}
@@ -253,6 +315,9 @@ def main(argv):
     sort_reg_delta_func = sorted(reg_func, key=lambda reg: reg[1][sort_key],
                            reverse=True)
 
+
+    # Simply print out register usage based on analysis on liveinfo file
+
     print('Analyzing register usage per function...')
     print('Sorted by %s reg usage' % sort_key)
     print('input file:')
@@ -272,9 +337,8 @@ def main(argv):
         for rt in limit.keys():
             reg_str+=' %4d(%3d)/%2d-%s' % (reg_usage[0][rt], reg_usage[1][rt],
                                            limit[rt], rt)
-        print("%s -> %4d~%4d: %s:%d" % (reg_str, reg_usage[2], reg_usage[3],
+        print("%s -> %4d~%4d: %s:%s" % (reg_str, reg_usage[2], reg_usage[3],
                                         reg_usage[4], reg_usage[5]))
-
 
     print('Analyzing register usage per function...')
     print('Sorted by %s reg usage increment' % sort_key)
@@ -295,9 +359,10 @@ def main(argv):
         for rt in limit.keys():
             reg_str+=' %4d(%3d)/%2d-%s' % (reg_usage[0][rt], reg_usage[1][rt],
                                            limit[rt], rt)
-        print("%s -> %4d~%4d: %s:%d" % (reg_str, reg_usage[2], reg_usage[3],
+        print("%s -> %4d~%4d: %s:%s" % (reg_str, reg_usage[2], reg_usage[3],
                                         reg_usage[4], reg_usage[5]))
 
+    # Simply print out register usage per Instruction based on liveinfo file
     print('Analyzing register usage per Instruction...')
     print('input file:')
     print(argv[1])
@@ -309,6 +374,8 @@ def main(argv):
         print("[%04d] %s%s" % (addr, res[addr]['inst'],
                                ("; %s" % res[addr]['src']
                                 if res[addr]['src'] else '')))
+        #print("%s" % (res[addr]['c_file'] if res[addr]['c_file'] else ''))
+        #print("line:%s" % (res[addr]['c_line'] if res[addr]['c_line'] else ''))
         tw = textwrap.TextWrapper(width=cols,
                                   subsequent_indent="                  ")
 
