@@ -56,3 +56,9 @@ target/
 
 # Vim
 *.swp
+
+# basic_nic unit test cfg files
+test/cfg/
+
+# basic_nic unit test rc files
+test/rc.zip
