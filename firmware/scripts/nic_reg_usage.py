@@ -52,7 +52,7 @@ def reg_check_in_func(start_inst, inst_cnt, cur_filen, cur_lineno, reg_res,
 
 def main(argv):
 
-    NIC_SRCS = ['apps/nic', 'lib/nic']
+    NIC_SRCS = ['firmware/apps', 'firmware/lib']
 
     # Analyzing the list file for code store
     inst = -1
