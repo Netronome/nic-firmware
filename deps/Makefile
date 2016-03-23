@@ -1,7 +1,7 @@
 #
 # Change these revisions to suit the project
 #
-FLOWENV_REV=172  # Tip as of Feb 24 2016
+FLOWENV_REV=175  # Tip as of Mar 23 2016
 GRO_REV=21       # Tip as of Feb 24 2016
 NFD_REV=1863
 
