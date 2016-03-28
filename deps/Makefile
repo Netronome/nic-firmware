@@ -5,6 +5,8 @@ FLOWENV_REV=652a705c55ac	# Tip as of Mar 23 2016
 GRO_REV=ee048d732f2d		# Tip as of Feb 24 2016
 NFD_REV=49947fd57c79
 
+NFP_VROUTER_REV=$(shell git rev-parse HEAD)
+
 #
 # Global variables
 #
