@@ -1,9 +1,9 @@
 #
 # Change these revisions to suit the project
 #
-# FLOWENV_REV - Tip as of Mar 23 2016
-FLOWENV_REV=652a705c55ac
-# GRO_REV  - Tip as of Feb 24 2014
+# FLOWENV_REV - Tip as of Mar 29 2016
+FLOWENV_REV=99e229221108
+# GRO_REV  - Tip as of Feb 24 2016
 GRO_REV=ee048d732f2d
 # NFD_REV - 
 NFD_REV=49947fd57c79
