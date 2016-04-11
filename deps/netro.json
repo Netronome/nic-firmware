@@ -1,5 +1,5 @@
 {
-"sdk": "/releases-intern/nfp-sdk/linux-x86_64/nfp-toolchain-5/dpkg/amd64/nfp-sdk_5-devel-5787-2_amd64.deb",
+"sdk": "/releases-intern/nfp-sdk/linux-x86_64/nfp-toolchain-5/dpkg/amd64/nfp-sdk_5-devel-5881-2_amd64.deb",
 "bsp_dkms": "/releases-intern/nfp-bsp/distros/nfp-bsp-release-2015.11/dpkg/nfp-bsp-release-2015.11-dkms_2016.3.9.1350-1_all.deb",
 "bsp": "/releases-intern/nfp-bsp/distros/nfp-bsp-release-2015.11/dpkg/nfp-bsp-release-2015.11_2016.3.9.1350-1_amd64.deb"
 }
