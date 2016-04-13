@@ -100,11 +100,12 @@
 #define NBI                 0
 #endif
 
-#define MAC_CHAN_PER_PORT   8
+#define MAC_CHAN_PER_PORT   16
 #define TMQ_PER_PORT        (MAC_CHAN_PER_PORT * 8)
 
 #define MAC_TO_PORT(x)      (x / MAC_CHAN_PER_PORT)
-#define PORT_TO_TMQ(x)      (x * TMQ_PER_PORT)
+//#define PORT_TO_TMQ(x)      (x * TMQ_PER_PORT)
+#define PORT_TO_TMQ(x)      (x * 64)
 
 /*
  * Global variables
@@ -293,8 +294,7 @@ send_to_host(__nnr struct pkt_tx_desc *txd)
     __gpr uint32_t credit;
     __xwrite struct gro_meta_nfd3 gro_meta;
 
-    nfd_q = nfd_out_map_queue(VNIC, txd->dest);
-
+    nfd_q = nfd_out_map_queue(txd->vnic, txd->dest);
     while (1) {
         credit = nfd_out_get_credit(PCI, nfd_q, 1);
         if (credit)

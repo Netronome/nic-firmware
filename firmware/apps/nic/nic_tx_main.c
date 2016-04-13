@@ -269,6 +269,7 @@ main()
      * */
 
     __gpr uint32_t ctxs;
+    __gpr uint32_t port;
     __nnr struct pkt_rx_desc rxd;
     __nnr struct pkt_tx_desc txd;
     uint32_t enable_changed;
@@ -333,8 +334,9 @@ main()
         /* Determine where be need to receive a packet from */
         pkt_rx(FROM_HOST, &rxd);
 
+        port = rxd.src / NFD_MAX_VF_QUEUES;
         /* Do TX processing on packet and populate the TX descriptor */
-        ret = proc_from_host(0, &rxd, &txd);
+        ret = proc_from_host(port, &rxd, &txd);
         if (ret) {
             NFD_IN_LSO_CNTR_INCR(nfd_in_lso_cntr_addr,
                           NFD_IN_LSO_CNTR_T_ME_FM_HOST_PROC_TO_WIRE_DROP);
