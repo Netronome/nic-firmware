@@ -13,16 +13,16 @@
 #endif
 
 #ifndef NFD_MAX_VF_QUEUES
-#define NFD_MAX_VF_QUEUES       1
+#define NFD_MAX_VF_QUEUES       8
 #endif
 
 #ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       32
+#define NFD_MAX_PF_QUEUES       0
 #endif
 
-/* No VFs needed */
+/* 2 ports then 2 'VFs' needed */
 #ifndef NFD_MAX_VFS
-#define NFD_MAX_VFS             0
+#define NFD_MAX_VFS             2
 #endif
 
 /* Configure VF expansion BARs to access the NFP, this seems to be required
@@ -83,6 +83,7 @@
 #define NFD_IN_BLM_REG_SIZE     (10 * 1024)
 #define NFD_IN_BLM_JUMBO_BLS    0
 #define NFD_IN_BLM_JUMBO_POOL   BLM_NBI8_BLQ0_EMU_QID
+#define NFD_IN_BLM_JUMBO_SIZE   (10 * 1024)
 #define NFD_IN_BLM_RADDR        __LoadTimeConstant("__addr_emem0")
 #define NFD_IN_HAS_ISSUE0       1
 #define NFD_IN_HAS_ISSUE1       1

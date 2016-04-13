@@ -26,10 +26,6 @@ nic_rx_l1_checks(int port)
     __gpr int ret = NIC_RX_OK;
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
 
-    /* Only support a single port for now. */
-    ctassert(__is_ct_const(port));
-    ctassert(port == 0);
-
    /* Drop if down */
     if (!(nic->control & NFP_NET_CFG_CTRL_ENABLE)) {
         NIC_LIB_CNTR(&nic_cnt_rx_drop_dev_down);
@@ -84,7 +80,6 @@ nic_rx_csum_checks(int port, uint32_t csum, void *meta)
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
     struct pcie_out_pkt_desc *out_desc = (struct pcie_out_pkt_desc *)meta;
 
-    /* Only support a single port for now. */
     ctassert(__is_in_reg_or_lmem(meta));
 
     if (NFP_MAC_RX_CSUM_L3_SUM_of(csum) == NFP_MAC_RX_CSUM_L3_IPV4_OK) {
@@ -141,9 +136,6 @@ nic_rx_l2_checks(int port, void *sa, void *da)
     __gpr int ret = NIC_RX_DROP;
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
 
-    /* Only support a single port for now. */
-    ctassert(__is_ct_const(port));
-    ctassert(port == 0);
     ctassert(__is_in_reg_or_lmem(da));
 
     /* Source address sanity checks */
@@ -333,7 +325,6 @@ nic_rx_rss(int vport, void *o_l3, void *o_l4,
 
     rss_ctrl = nic->rss_ctrl;
 
-    /* Only support a single port for now. */
     ctassert(__is_in_reg_or_lmem(o_l3));
     ctassert(__is_in_reg_or_lmem(o_l4));
     ctassert(__is_in_reg_or_lmem(i_l3));

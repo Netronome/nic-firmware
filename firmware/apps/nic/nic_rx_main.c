@@ -45,7 +45,7 @@ build_txd(__nnr const struct pkt_rx_desc *rxd,
           __nnr struct pkt_tx_desc *txd,
           __gpr uint16_t len,
           __gpr int16_t offset,
-          uint8_t qid)
+          uint8_t qid, unsigned int vnic)
 {
     /* Various fields from TX desc come directly from RX desc */
     txd->nbi = rxd->nbi;
@@ -65,6 +65,8 @@ build_txd(__nnr const struct pkt_rx_desc *rxd,
 
     /* Copy the RSS queue selected */
     txd->dest = qid;
+
+    txd->vnic = vnic;
 
     /* try send pkt once then give up*/
     txd->retry_count = 0;
@@ -265,7 +267,7 @@ err_out:
     nic_rx_finalise_meta(app_meta, plen);
     /* copy back to rxd */
     reg_cp((void *)rxd, &rxd_tmp, sizeof(struct pkt_rx_desc));
-    build_txd(rxd, txd, plen, offset, qid);
+    build_txd(rxd, txd, plen, offset, qid, port);
     return err;
 }
 
@@ -334,7 +336,7 @@ main()
         pkt_rx(FROM_WIRE, &rxd);
 
         /* Do RX processing on packet and populate the TX descriptor */
-        ret = proc_from_wire(0, &rxd, &txd);
+        ret = proc_from_wire(rxd.src, &rxd, &txd);
         if (ret == NIC_RX_DROP) {
             pkt_tx(TO_HOST_DROP, &txd);
             nic_rx_discard_cntr(NIC_INTF);

@@ -69,10 +69,11 @@
 #define APP_MASTER_CTX_MAC_STATS        1
 #define APP_MASTER_CTX_PERQ_STATS       2
 #define APP_MASTER_CTX_LINK_STATE       3
-#define APP_MASTER_CTX_FREE0            4
-#define APP_MASTER_CTX_FREE1            5
-#define APP_MASTER_CTX_FREE2            6
-#define APP_MASTER_CTX_FREE3            7
+#define APP_MASTER_CTX_LINK_STATE2      4
+#define APP_MASTER_CTX_FREE0            5
+#define APP_MASTER_CTX_FREE1            6
+#define APP_MASTER_CTX_FREE2            7
+
 
 
 /* Address of the PF Control BAR */
@@ -117,6 +118,10 @@ __intrinsic extern int msix_pf_send(unsigned int pcie_nr,
                                     unsigned int bar_nr,
                                     unsigned int entry_nr,
                                     unsigned int mask_en);
+
+__intrinsic extern int msix_vf_send(unsigned int pcie_nr,
+                                    unsigned int bar_nr, unsigned int vf_nr,
+                                    unsigned int entry_nr, unsigned int mask_en);
 
 /* Hard-code the port being monitored by the NIC link status monitoring
  * XXX This should be shared with the MAC stats, of course. */
@@ -319,9 +324,9 @@ perq_stats_loop(void)
 
 /* Send an LSC MSI-X. return 0 if done or 1 if pending */
 __inline static int
-lsc_send(void)
+lsc_send(int nic_intf)
 {
-    __mem char *nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, NIC_INTF);
+    __mem char *nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, nic_intf);
     unsigned int automask;
     __xread unsigned int tmp;
     __gpr unsigned int entry;
@@ -352,7 +357,8 @@ lsc_send(void)
         mem_write8_le(&mask_w, nic_ctrl_bar + NFP_NET_CFG_ICR(entry), 1);
     }
 
-    ret = msix_pf_send(NIC_PCI + 4, PCIE_CPP2PCIE_LSC, entry, automask);
+    ret = msix_vf_send(NIC_PCI + 4, PCIE_CPP2PCIE_LSC, nic_intf, entry,
+                       automask);
 
 out:
     return ret;
@@ -361,9 +367,9 @@ out:
 /* Check the Link state and try to generate an interrupt if it changed.
  * Return 0 if everything is fine, or 1 if there is pending interrupt. */
 __inline static int
-lsc_check(__gpr unsigned int *ls_current)
+lsc_check(__gpr unsigned int *ls_current, int nic_intf)
 {
-    __mem char *nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, NIC_INTF);
+    __mem char *nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, nic_intf);
     __gpr enum link_state ls;
     __gpr int changed = 0;
     __xwrite uint32_t sts = NFP_NET_CFG_STS_LINK;
@@ -377,7 +383,8 @@ lsc_check(__gpr unsigned int *ls_current)
 
     /* Read the current link state and if it changed set the bit in
      * the control BAR status */
-    ls = mac_eth_port_link_state(LSC_ACTIVE_LINK_MAC, LSC_ACTIVE_LINK_ETH_PORT);
+//    ls = mac_eth_port_link_state(LSC_ACTIVE_LINK_MAC, LSC_ACTIVE_LINK_ETH_PORT);
+    ls = 1;
 
     if (ls != *ls_current)
         changed = 1;
@@ -392,20 +399,20 @@ lsc_check(__gpr unsigned int *ls_current)
 
     /* If the link state changed, try to send in interrupt */
     if (changed)
-        ret = lsc_send();
+        ret = lsc_send(nic_intf);
 
 out:
     return ret;
 }
 
 static void
-lsc_loop(void)
+lsc_loop(int nic_intf)
 {
     __gpr unsigned int ls_current = LINK_DOWN;
     __gpr unsigned int pending;
     __gpr int lsc_count = 0;
 
-    pending = lsc_check(&ls_current);
+    pending = lsc_check(&ls_current, nic_intf);
 
     /* Need to handle pending interrupts more frequent than we need to
      * check for link state changes.  To keep it simple, have a single
@@ -416,11 +423,11 @@ lsc_loop(void)
         lsc_count++;
 
        if (pending)
-            pending = lsc_send();
+            pending = lsc_send(nic_intf);
 
         if (lsc_count > 19) {
             lsc_count = 0;
-            pending = lsc_check(&ls_current);
+            pending = lsc_check(&ls_current, nic_intf);
         }
     }
     /* NOTREACHED */
@@ -441,7 +448,10 @@ main(void)
         perq_stats_loop();
         break;
     case APP_MASTER_CTX_LINK_STATE:
-        lsc_loop();
+        lsc_loop(0);
+        break;
+    case APP_MASTER_CTX_LINK_STATE2:
+        lsc_loop(1);
         break;
     default:
         ctx_wait(kill);

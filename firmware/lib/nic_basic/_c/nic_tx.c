@@ -23,10 +23,6 @@ nic_tx_l1_checks(int port)
     __gpr int ret = NIC_TX_OK;
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
 
-    /* Only support a single port for now. */
-    ctassert(__is_ct_const(port));
-    ctassert(port == 0);
-
    /* Drop if down */
     if (!(nic->control & NFP_NET_CFG_CTRL_ENABLE)) {
         NIC_LIB_CNTR(&nic_cnt_tx_drop_down);
@@ -43,10 +39,6 @@ nic_tx_mtu_check(int port, int vlan, int frame_len)
     __gpr int ret = NIC_TX_OK;
     __gpr int max_frame_sz;
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
-
-    /* Only support a single port for now. */
-    ctassert(__is_ct_const(port));
-    ctassert(port == 0);
 
     /* Without VLANs the max frame size is MTU + Ethernet header */
     max_frame_sz = nic->mtu + NET_ETH_LEN;

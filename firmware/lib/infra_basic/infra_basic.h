@@ -77,7 +77,8 @@ struct pkt_tx_desc {
             unsigned dest:8;     /** VF queue to use when sending to host
                                      port to use when sending to the wire */
             unsigned retry_count:12; /** number of retries before giving up */
-            unsigned pad1:12;
+            unsigned vnic:2;    /* vnic on where to send the pkt to */
+            unsigned pad1:10;
 
             struct nbi_meta_pkt_info nbi;
 

@@ -50,7 +50,7 @@
 /* TM */
 #define NBI_TM_NUM_SEQUENCERS    1
 #define NBI_TM_ENABLE_SEQUENCER0 1
-#define NBI_TM_H_0_Q             16  /* 16 TM queues, 1024 entries per queue */
+#define NBI_TM_H_0_Q             128  /* 128 TM queues, 128 entries per queue */
 #define NBI_TM_H_1_Q             0
 
 /*
