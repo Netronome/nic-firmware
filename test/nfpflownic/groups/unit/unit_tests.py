@@ -7,7 +7,7 @@ Unit test group for the NFPFlowNIC Software Group.
 
 import collections
 from netro.tests.null import NullTest
-from ...nfpflownic_tests import _NFPFlowNIC
+from ...nfpflownic_tests import _NFPFlowNIC, _NFPFlowNIC_2port
 from unit import UnitIPv4, UnitIPv6, NFPFlowNICPing, UnitPing, JumboPacket, \
     RxVlan, Stats_rx_err_cnt, LinkState, RSStest_same_l4_tuple, \
     RSStest_diff_l4_tuple, Stats_per_queue_cntr, RxVlan_rx_byte, \
@@ -57,11 +57,12 @@ class Unit_dict(object):
     """
     dictionary class for sharing test dictionary in unit groups
     """
-    def __init__(self, group, dut_t_x, a_t, ping_dut, ping_a_t):
+    def __init__(self, group, dut_t_x, a_t, ping_dut, ping_a_t, prefix=''):
         """
         generating test dictionary for unit groups
         """
         self.tests = collections.OrderedDict()
+        self.prefix = prefix
 
         #######################################################################
         # Ping tests
@@ -70,7 +71,7 @@ class Unit_dict(object):
                   ("toA", ping_dut, ping_a_t))
 
         for postf, src, dst in combos:
-            tn = "ping_1_%s" % postf
+            tn = self.prefix + "ping_1_%s" % postf
             self.tests[tn] = NFPFlowNICPing(src, dst, clean=True, count=1,
                                              group=group, name=tn,
                                              summary="Send a single ping %s"
@@ -81,7 +82,7 @@ class Unit_dict(object):
         #######################################################################
 
         summary = 'Multicast ping test'
-        tn = 'mc_ping'
+        tn = self.prefix + 'mc_ping'
         self.tests[tn] = McPing(a_t, dut_t_x, ipv4=True, group=group,
                                 name=tn, summary=summary)
 
@@ -92,26 +93,26 @@ class Unit_dict(object):
         # Here are lso test from DUT to endpoint, which tests lso feature on
         # NFP NIC
         summary = 'LSO IPv4 test without tunneling'
-        tn = 'lso_toA_ipv4_tcp_no_tunnel'
+        tn = self.prefix + 'lso_toA_ipv4_tcp_no_tunnel'
         self.tests[tn] = LSO_iperf(dut_t_x, a_t, ipv4=True, l4_type='tcp',
                                    group=group, num_pkts=1,
                                    txcsum_offload=True, name=tn,
                                    summary=summary)
         summary = 'LSO IPv6 test without tunneling'
-        tn = 'lso_toA_ipv6_tcp_no_tunnel'
+        tn = self.prefix + 'lso_toA_ipv6_tcp_no_tunnel'
         self.tests[tn] = LSO_iperf(dut_t_x, a_t, ipv4=False, l4_type='tcp',
                                    group=group, num_pkts=1,
                                    txcsum_offload=True, name=tn,
                                    summary=summary)
 
         summary = 'LSO IPv4 test with vlan'
-        tn = 'lso_toA_ipv4_tcp_vlan'
+        tn = self.prefix + 'lso_toA_ipv4_tcp_vlan'
         self.tests[tn] = LSO_iperf(dut_t_x, a_t, ipv4=True, l4_type='tcp',
                                    group=group, num_pkts=1, vlan=True,
                                    txcsum_offload=True, name=tn,
                                    summary=summary)
         summary = 'LSO IPv6 test with vlan'
-        tn = 'lso_toA_ipv6_tcp_vlan'
+        tn = self.prefix + 'lso_toA_ipv6_tcp_vlan'
         self.tests[tn] = LSO_iperf(dut_t_x, a_t, ipv4=False, l4_type='tcp',
                                    group=group, num_pkts=1, vlan=True,
                                    txcsum_offload=True, name=tn,
@@ -120,7 +121,7 @@ class Unit_dict(object):
         for lso_mtu in [576, 1280, 2000, 3000, 4096, 4148, 5000, 6000, 7000, 8000, 9216]:
             if lso_mtu >= 576:
                 summary = 'LSO IPv4 MTU (%s) test without tunneling' % lso_mtu
-                tn = 'lso_toA_ipv4_tcp_mtu_%s_no_tunnel' % lso_mtu
+                tn = self.prefix + 'lso_toA_ipv4_tcp_mtu_%s_no_tunnel' % lso_mtu
                 self.tests[tn] = LSO_iperf(dut_t_x, a_t, ipv4=True,
                                            l4_type='tcp',
                                            src_mtu=lso_mtu, dst_mtu=lso_mtu,
@@ -128,7 +129,7 @@ class Unit_dict(object):
                                            txcsum_offload=True, name=tn,
                                            summary=summary)
                 summary = 'LSO IPv4 MTU (%s) test with VLAN' % lso_mtu
-                tn = 'lso_toA_ipv4_tcp_mtu_%s_vlan' % lso_mtu
+                tn = self.prefix + 'lso_toA_ipv4_tcp_mtu_%s_vlan' % lso_mtu
                 self.tests[tn] = LSO_iperf(dut_t_x, a_t, ipv4=True,
                                            l4_type='tcp',
                                            src_mtu=lso_mtu, dst_mtu=lso_mtu,
@@ -137,7 +138,7 @@ class Unit_dict(object):
                                            summary=summary)
             if lso_mtu >= 1280:
                 summary = 'LSO IPv6 MTU (%s) test without tunneling' % lso_mtu
-                tn = 'lso_toA_ipv6_tcp_mtu_%s_no_tunnel' % lso_mtu
+                tn = self.prefix + 'lso_toA_ipv6_tcp_mtu_%s_no_tunnel' % lso_mtu
                 self.tests[tn] = LSO_iperf(dut_t_x, a_t, ipv4=False,
                                            l4_type='tcp',
                                            src_mtu=lso_mtu, dst_mtu=lso_mtu,
@@ -145,7 +146,7 @@ class Unit_dict(object):
                                            txcsum_offload=True, name=tn,
                                            summary=summary)
                 summary = 'LSO IPv6 MTU (%s) test with VLAN' % lso_mtu
-                tn = 'lso_toA_ipv6_tcp_mtu_%s_vlan' % lso_mtu
+                tn = self.prefix + 'lso_toA_ipv6_tcp_mtu_%s_vlan' % lso_mtu
                 self.tests[tn] = LSO_iperf(dut_t_x, a_t, ipv4=False,
                                            l4_type='tcp',
                                            src_mtu=lso_mtu, dst_mtu=lso_mtu,
@@ -154,13 +155,13 @@ class Unit_dict(object):
                                            summary=summary)
 
         summary = 'LSO IPv4 content-check test without tunneling'
-        tn = 'lso_toA_ipv4_content_check_no_tunnel'
+        tn = self.prefix + 'lso_toA_ipv4_content_check_no_tunnel'
         self.tests[tn] = NFPFlowNICContentCheck(dut_t_x, a_t, ipv4=True,
                                                 l4_type='tcp', group=group,
                                                 name=tn, summary=summary)
 
         summary = 'LSO IPv6 content-check test without tunneling'
-        tn = 'lso_toA_ipv6_content_check_no_tunnel'
+        tn = self.prefix + 'lso_toA_ipv6_content_check_no_tunnel'
         self.tests[tn] = NFPFlowNICContentCheck(dut_t_x, a_t, ipv4=False,
                                                 l4_type='tcp', group=group,
                                                 name=tn, summary=summary)
@@ -168,7 +169,7 @@ class Unit_dict(object):
         for lso_mtu in [576, 1280, 2000, 3000, 4096, 4148, 5000, 6000, 7000, 8000, 9216]:
             if lso_mtu >= 576:
                 summary = 'LSO IPv4 MTU (%s) content-check test without tunneling' % lso_mtu
-                tn = 'lso_toA_ipv4_content_check_mtu_%s_no_tunnel' % lso_mtu
+                tn = self.prefix + 'lso_toA_ipv4_content_check_mtu_%s_no_tunnel' % lso_mtu
                 self.tests[tn] = NFPFlowNICContentCheck(dut_t_x, a_t, ipv4=True, l4_type='tcp',
                                                         src_mtu=lso_mtu, dst_mtu=lso_mtu,
                                                         group=group, name=tn, summary=summary)
@@ -181,7 +182,7 @@ class Unit_dict(object):
             #                               group=group, name=tn, summary=summary)
 
         summary = 'LSO iperf tests from DUT to endpoint via IPv4 vxlan tunnel'
-        tn = 'lso_toA_vxlan_ipv4_tcp'
+        tn = self.prefix + 'lso_toA_vxlan_ipv4_tcp'
         self.tests[tn] = LSO_tunnel(dut_t_x, a_t, ipv4=True, l4_type='tcp',
                                     tunnel_type='vxlan', num_pkts=1,
                                     src_mtu=1500, dst_mtu=1500,
@@ -190,7 +191,7 @@ class Unit_dict(object):
                                     summary=summary)
 
         summary = 'LSO iperf tests from DUT to endpoint via IPv6 vxlan tunnel'
-        tn = 'lso_toA_vxlan_ipv6_tcp'
+        tn = self.prefix + 'lso_toA_vxlan_ipv6_tcp'
         self.tests[tn] = LSO_tunnel(dut_t_x, a_t, ipv4=False, l4_type='tcp',
                                     tunnel_type='vxlan', num_pkts=1,
                                     src_mtu=1500, dst_mtu=1500,
@@ -201,7 +202,7 @@ class Unit_dict(object):
         for lso_mtu in [1500, 2000, 3000, 4096, 4148, 5000, 6000, 7000, 8000, 9216]:
             if lso_mtu >= 1500:
                 summary = 'LSO iperf tests TX IPv4 MTU (%s) vxlan tunnel' % lso_mtu
-                tn = 'lso_toA_vxlan_mtu_%s_ipv4_tcp' % lso_mtu
+                tn = self.prefix + 'lso_toA_vxlan_mtu_%s_ipv4_tcp' % lso_mtu
                 self.tests[tn] = LSO_tunnel(dut_t_x, a_t, ipv4=True, l4_type='tcp',
                                             tunnel_type='vxlan', num_pkts=1,
                                             src_mtu=lso_mtu, dst_mtu=lso_mtu,
@@ -211,7 +212,7 @@ class Unit_dict(object):
 
             if lso_mtu >= 1500:
                 summary = 'LSO iperf tests TX IPv6 MTU (%s) vxlan tunnel' % lso_mtu
-                tn = 'lso_toA_vxlan_mtu_%s_ipv6_tcp' % lso_mtu
+                tn = self.prefix + 'lso_toA_vxlan_mtu_%s_ipv6_tcp' % lso_mtu
                 self.tests[tn] = LSO_tunnel(dut_t_x, a_t, ipv4=False, l4_type='tcp',
                                             tunnel_type='vxlan', num_pkts=1,
                                             src_mtu=lso_mtu, dst_mtu=lso_mtu,
@@ -380,8 +381,7 @@ class Unit_dict(object):
         for ipv4 in [True, False]:
             for l4_type in ['tcp', 'udp']:
                 for tx_offload in [True, False]:
-                    tn = _tnl_csum_tx_hdr_tn(ipv4, l4_type, tx_offload,
-                                             tunnel_type)
+                    tn = self.prefix + _tnl_csum_tx_hdr_tn(ipv4, l4_type, tx_offload, tunnel_type)
                     summary = _tnl_csum_tx_hdr_sum(ipv4, l4_type, tx_offload,
                                                    tunnel_type, None)
                     self.tests[tn] = Csum_Tx_tunnel(dut_t_x, a_t, ipv4=ipv4,
@@ -460,7 +460,7 @@ class Unit_dict(object):
                 for ipv4 in [True, False]:
                     for inner_l4_type in ['udp', 'tcp']:
                         for vlan_tag in [True, False]:
-                            tn = _tnl_rss_hdr_tn(varies_src_addr,
+                            tn = self.prefix + _tnl_rss_hdr_tn(varies_src_addr,
                                                  varies_dst_addr,
                                                  varies_src_port,
                                                  varies_dst_port, ipv4,
@@ -499,7 +499,7 @@ class Unit_dict(object):
         # Multiple Tunnels vxlan RSS tests
         ######################################################################
         summary = 'RSS tests with multiple tunnel IP packets'
-        tn = 'rss_tnl_vxlan_multi_tunnel'
+        tn = self.prefix + 'rss_tnl_vxlan_multi_tunnel'
         self.tests[tn] = RSStest_diff_inner_tuple_multi_tunnels(a_t, dut_t_x,
                                                   outer_ipv4=True,
                                                   outer_l4_type='udp',
@@ -607,7 +607,7 @@ class Unit_dict(object):
                     varies_dst_byte_index = byte_index
                 for l4_type in ['tcp', 'udp']:
                     for vlan_tag in [True, False]:
-                        tn = _rss_byte_hdr_tn(varies_src_addr, varies_dst_addr,
+                        tn = self.prefix + _rss_byte_hdr_tn(varies_src_addr, varies_dst_addr,
                                               varies_src_byte_index,
                                               varies_dst_byte_index,
                                               l4_type, vlan_tag, None)
@@ -633,7 +633,7 @@ class Unit_dict(object):
         varies_src_port = True
         varies_dst_port = True
         modified_table = True
-        tn = _rss_hdr_tn(varies_src_addr, varies_dst_addr,
+        tn = self.prefix + _rss_hdr_tn(varies_src_addr, varies_dst_addr,
                          varies_src_port, varies_dst_port,
                          ipv4, l4_type, modified_table, None)
         summary = _rss_hdr_sum(varies_src_addr, varies_dst_addr,
@@ -655,7 +655,7 @@ class Unit_dict(object):
                         for ipv4 in [True, False]:
                             for l4_type in ['tcp', 'udp']:
                                 modified_table = False
-                                tn = _rss_hdr_tn(varies_src_addr,
+                                tn = self.prefix + _rss_hdr_tn(varies_src_addr,
                                                  varies_dst_addr,
                                                  varies_src_port,
                                                  varies_dst_port,
@@ -704,7 +704,7 @@ class Unit_dict(object):
                 for l4_type in ['tcp', 'udp']:
                     modified_table = False
                     vlan_tag = True
-                    tn = _rss_hdr_tn(varies_src_addr,
+                    tn = self.prefix + _rss_hdr_tn(varies_src_addr,
                                      varies_dst_addr,
                                      varies_src_port,
                                      varies_dst_port,
@@ -789,7 +789,7 @@ class Unit_dict(object):
                        if l4_type == 'udp' or l4_type == 'tcp':
                            for l4_err in [False, True]:
                                # An IPv4 test
-                               tn = _csum_rx_hdr_tn(ipv4, ipv4_opt, ipv6_rt,
+                               tn = self.prefix + _csum_rx_hdr_tn(ipv4, ipv4_opt, ipv6_rt,
                                                     ipv6_hbh, l4_type, ip_err,
                                                     l4_err, promisc, tail)
                                summary = _csum_rx_hdr_sum(UnitIPv4, ipv4_opt,
@@ -809,7 +809,7 @@ class Unit_dict(object):
                            # when neither udp nor tcp are used, there is no
                            # need to insert udp/tcp checksum error
                            l4_err = False
-                           tn = _csum_rx_hdr_tn(ipv4, ipv4_opt, ipv6_rt,
+                           tn = self.prefix + _csum_rx_hdr_tn(ipv4, ipv4_opt, ipv6_rt,
                                                 ipv6_hbh, l4_type, ip_err,
                                                 l4_err, promisc, tail)
                            summary = _csum_rx_hdr_sum(UnitIPv4, ipv4_opt,
@@ -833,7 +833,7 @@ class Unit_dict(object):
                    for l4_type in ['udp', 'tcp']:
                        for l4_err in [False, True]:
                            # An IPv6 test
-                           tn = _csum_rx_hdr_tn(ipv4, ipv4_opt, ipv6_rt,
+                           tn = self.prefix + _csum_rx_hdr_tn(ipv4, ipv4_opt, ipv6_rt,
                                                 ipv6_hbh, l4_type, ip_err,
                                                 l4_err, promisc, tail)
                            summary = _csum_rx_hdr_sum(UnitIPv6, ipv4_opt,
@@ -906,7 +906,7 @@ class Unit_dict(object):
                            if l4_type == 'udp' or l4_type == 'tcp':
                                for l4_err in [False, True]:
                                    # An IPv4 test
-                                   tn = _csum_rx_tnl_hdr_tn(tunnel, ipv4,
+                                   tn = self.prefix + _csum_rx_tnl_hdr_tn(tunnel, ipv4,
                                                             ipv4_opt, ipv6_rt,
                                                             ipv6_hbh, l4_type,
                                                             ip_err, l4_err,
@@ -935,7 +935,7 @@ class Unit_dict(object):
                                # when neither udp nor tcp are used, there is no
                                # need to insert udp/tcp checksum error
                                l4_err = False
-                               tn = _csum_rx_tnl_hdr_tn(tunnel, ipv4, ipv4_opt,
+                               tn = self.prefix + _csum_rx_tnl_hdr_tn(tunnel, ipv4, ipv4_opt,
                                                         ipv6_rt, ipv6_hbh,
                                                         l4_type, ip_err,
                                                         l4_err, promisc, tail)
@@ -967,7 +967,7 @@ class Unit_dict(object):
                        for l4_type in ['udp', 'tcp']:
                            for l4_err in [False, True]:
                                # An IPv6 test
-                               tn = _csum_rx_tnl_hdr_tn(tunnel, ipv4, ipv4_opt,
+                               tn = self.prefix + _csum_rx_tnl_hdr_tn(tunnel, ipv4, ipv4_opt,
                                                         ipv6_rt, ipv6_hbh,
                                                         l4_type, ip_err,
                                                         l4_err, promisc, tail)
@@ -1057,7 +1057,7 @@ class Unit_dict(object):
                     #                         (True, False),
                     #                         (False, True)]:
                     for (ip_err, l4_err) in [(False, False)]:
-                        tn = _promisc_hdr_tn(promisc, ipv4, l4_type,
+                        tn = self.prefix + _promisc_hdr_tn(promisc, ipv4, l4_type,
                                              dst_mac_type, src_mac_type,
                                              ip_err, l4_err, tail)
                         summary = _promisc_hdr_sum(UnitIPv4, promisc, ipv4,
@@ -1075,7 +1075,7 @@ class Unit_dict(object):
                 else:
                     ip_err = False
                     l4_err = False
-                    tn = _promisc_hdr_tn(promisc, ipv4, l4_type, dst_mac_type,
+                    tn = self.prefix + _promisc_hdr_tn(promisc, ipv4, l4_type, dst_mac_type,
                                          src_mac_type, ip_err, l4_err, tail)
                     summary = _promisc_hdr_sum(UnitIPv4, promisc, ipv4,
                                                l4_type, dst_mac_type,
@@ -1130,7 +1130,7 @@ class Unit_dict(object):
                 for (vlan_offload, vlan) in [(False, False), (False, True),
                                              (True, True)]:
                 #for (vlan_offload, vlan) in [(False, False)]:
-                    tn = _csum_tx_hdr_tn(ipv4, l4_type, vlan_offload, vlan)
+                    tn = self.prefix + _csum_tx_hdr_tn(ipv4, l4_type, vlan_offload, vlan)
                     summary = _csum_tx_hdr_sum(Csum_Tx, ipv4, l4_type,
                                                vlan_offload, vlan, None)
                     self.tests[tn] = Csum_Tx(src, dst, ipv4=ipv4,
@@ -1182,7 +1182,7 @@ class Unit_dict(object):
             for dst_mtu in [68, 600, 1500, 3000, 6000, 9000]:
                 ping_size = mtu_to_ping(src_mtu)
                 ping_drop = True if (src_mtu > dst_mtu) else False
-                tn = _mtu_ping_hdr_tn(src_mtu, dst_mtu, ping_size, ping_drop)
+                tn = self.prefix + _mtu_ping_hdr_tn(src_mtu, dst_mtu, ping_size, ping_drop)
                 summary = _mtu_ping__hdr_sum(UnitPing, src_mtu, dst_mtu,
                                              ping_size, ping_drop)
                 self.tests[tn] = UnitPing(src, dst,
@@ -1195,7 +1195,7 @@ class Unit_dict(object):
                 if src_mtu == dst_mtu:
                     ping_size = mtu_to_ping(src_mtu) + 1
                     ping_drop = True
-                    tn = _mtu_ping_hdr_tn(src_mtu, dst_mtu, ping_size,
+                    tn = self.prefix + _mtu_ping_hdr_tn(src_mtu, dst_mtu, ping_size,
                                           ping_drop)
                     summary = _mtu_ping__hdr_sum(UnitPing, src_mtu, dst_mtu,
                                                  ping_size, ping_drop)
@@ -1210,13 +1210,13 @@ class Unit_dict(object):
         #Jumbo_frame_test
         src_mtu = 9000
         dst_mtu = 9000
-        tn = 'mtu_jumbo_frame_cmp_toA'
+        tn = self.prefix + 'mtu_jumbo_frame_cmp_toA'
         summary = 'Send and compare Jumbo frame packets from Host A to DUT'
         self.tests[tn] = JumboPacket(dut_t_x, a_t, group=group,
                                       src_mtu=src_mtu, dst_mtu=dst_mtu,
                                       jumbo_frame=True, name=tn,
                                       summary=summary)
-        tn = 'mtu_jumbo_frame_cmp_fromA'
+        tn = self.prefix + 'mtu_jumbo_frame_cmp_fromA'
         summary = 'Send and compare Jumbo frame packets from DUT to Host A'
         self.tests[tn] = JumboPacket(a_t, dut_t_x, group=group,
                                       src_mtu=src_mtu, dst_mtu=dst_mtu,
@@ -1252,13 +1252,13 @@ class Unit_dict(object):
 
         for vlan_offload in [False, True]:
             for vlan in [False, True]:
-                tn = _rxvlan_hdr_tn(vlan_offload, vlan)
+                tn = self.prefix + _rxvlan_hdr_tn(vlan_offload, vlan)
                 summary = _rxvlan_hdr_sum(RxVlan, vlan_offload, vlan)
                 self.tests[tn] = RxVlan(a_t, dut_t_x, group=group,
                                          vlan_offload=vlan_offload, vlan=vlan,
                                          name=tn, summary=summary)
 
-        tn = 'rxvlan_offload_check_rx_byte'
+        tn = self.prefix + 'rxvlan_offload_check_rx_byte'
         summary = 'Send IP packets with and without RXVLAN offload, check ' \
                   'rx_byte counters'
         self.tests[tn] = RxVlan_rx_byte(a_t, dut_t_x, group=group,
@@ -1294,7 +1294,7 @@ class Unit_dict(object):
 
         for (src_mtu, dst_mtu, pck_size) in [(2000, 1500, 1500),
                                              (2000, 1500, 1501)]:
-            tn = _stats_cntr_rx_err_hdr_tn(src_mtu, dst_mtu, pck_size)
+            tn = self.prefix + _stats_cntr_rx_err_hdr_tn(src_mtu, dst_mtu, pck_size)
             summary = _stats_cntr_rx_err_hdr_sum(Stats_rx_err_cnt, src_mtu,
                                                  dst_mtu, pck_size)
             self.tests[tn] = Stats_rx_err_cnt(a_t, dut_t_x,
@@ -1305,7 +1305,7 @@ class Unit_dict(object):
                                                group=group, name=tn,
                                                summary=summary)
 
-        tn = 'stats_cntr_per_queue_cntr'
+        tn = self.prefix + 'stats_cntr_per_queue_cntr'
         summary = 'Stats tests: check per queue counters'
         self.tests[tn] = Stats_per_queue_cntr(a_t, dut_t_x, ipv4=True,
                                                l4_type='tcp',group=group,
@@ -1315,7 +1315,7 @@ class Unit_dict(object):
         # Link state monitoring test
         #######################################################################
 
-        tn = 'link_state_monitoring'
+        tn = self.prefix + 'link_state_monitoring'
         summary = 'Power down and up the PHY of the NIC and check the link ' \
                   'state'
 
@@ -1325,7 +1325,7 @@ class Unit_dict(object):
         #######################################################################
         # Driver and firmware loading performance test
         #######################################################################
-        tn = 'kmod_ld_perf'
+        tn = self.prefix + 'kmod_ld_perf'
         summary = 'Measuring the time to load driver and firmware in ' \
                   'kernel mode. '
         self.tests[tn] = Kmod_perf(dut_t_x, a_t, target_time=1.0, group=group,
@@ -1363,4 +1363,48 @@ class Unit_dict(object):
                                                       "DMA.")
 '''
 
+
+###########################################################################
+# Unit Tests
+###########################################################################
+class NFPFlowNICUnit_2_port(_NFPFlowNIC_2port):
+    """Unit tests for the NFPFlowNIC Software Group"""
+
+    summary = "Unit tests for the NFPFlowNIC project with kernel space " \
+              "firmware loading. "
+
+    def __init__(self, name, cfg=None,
+                 quick=False, dut_object=None):
+        """Initialise
+        @name:   A unique name for the group of tests
+        @cfg:    A Config parser object (optional)
+        @quick:  Omit some system info gathering to speed up running tests
+        """
+
+        _NFPFlowNIC_2port.__init__(self, name, cfg=cfg, quick=quick,
+                                   dut_object=dut_object)
+
+        ping_dut = (self.dut, self.eth_x)
+        ping_a_t = (self.host_a, self.eth_a)
+
+        dut_t_x = (self.dut, self.addr_x, self.eth_x, self.addr_v6_x,
+                   self.rss_key, self.rm_nc_bin)
+        a_t = (self.host_a, self.addr_a, self.eth_a, self.addr_v6_a, None,
+               self.rm_nc_bin)
+
+        self.unit_dict = Unit_dict(self, dut_t_x, a_t,
+                                   ping_dut, ping_a_t, prefix='port_a_')
+        self._tests = self.unit_dict.tests
+
+        ping_dut = (self.dut, self.eth_y)
+        ping_b_t = (self.host_b, self.eth_b)
+
+        dut_t_y = (self.dut, self.addr_y, self.eth_y, self.addr_v6_y,
+                   self.rss_key, self.rm_nc_bin)
+        b_t = (self.host_b, self.addr_b, self.eth_b, self.addr_v6_b, None,
+               self.rm_nc_bin)
+
+        self.unit_dict = Unit_dict(self, dut_t_y, b_t,
+                                   ping_dut, ping_b_t, prefix='port_b_')
+        self._tests.update(self.unit_dict.tests)
 

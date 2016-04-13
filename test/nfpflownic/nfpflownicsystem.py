@@ -26,7 +26,7 @@ class NFPFlowNICSystem(NFESystem, NrtSystem):
                  mefw=None, macinitjson=None, macinitjson_fn=None,
                  initscript=None, initscript_fn=None,
                  mkfirmware=None, mkfirmware_fn='mkfirmware-device.sh',
-                 load_mode='kernel', customized_kmod=False,
+                 load_mode='kernel', customized_kmod=False, expected_ports=1,
                  quick=False, _noendsec=False):
         """
         Initialise the system object.
@@ -58,6 +58,7 @@ class NFPFlowNICSystem(NFESystem, NrtSystem):
         self.mkfirmware_fn = mkfirmware_fn
         self.load_mode = load_mode
         self.customized_kmod = customized_kmod
+        self.expected_ports = expected_ports
 
         self.tmpdir = None
         self.eth_x = None
@@ -257,13 +258,14 @@ class NFPFlowNICSystem(NFESystem, NrtSystem):
             after_eth_dict = self.get_eth_dict()
             diff_eth_list = list(set(after_eth_dict.keys()) -
                                  set(before_eth_dict.keys()))
-            if len(diff_eth_list) > 1:
+            if len(diff_eth_list) > self.expected_ports:
                 # Multiple interfaces are generated, we do not support this yet.
-                raise NtiFatalError(msg="Two interfaces are created, new "
+                raise NtiFatalError(msg="More interfaces are created, new "
                                         "configuration code needs to be added!")
-            elif len(diff_eth_list) == 1:
+            elif len(diff_eth_list) == self.expected_ports:
                 # Expected one interface to be created, update the
                 # classes eth_list and return.
+                diff_eth_list.sort(key=lambda eth: after_eth_dict[eth])
                 self.eth_list = diff_eth_list
         except NtiTimeoutError:
             raise NtiFatalError(msg="The name of new interface has been changed"
@@ -274,11 +276,11 @@ class NFPFlowNICSystem(NFESystem, NrtSystem):
             self.rm_dir(self.tmpdir)
             LOG_endsec()  # Close out LOG_sec() from above.
 
-        # Bring the interface up to makes sure rss key is written to the
-        # BAR after driver commit 0203dee66dcb ("nfp_net: perform RSS init
-        # only during device initialization")
-        self.cmd('ifconfig %s up ; ifconfig %s down' % (self.eth_list[0],
-                                                        self.eth_list[0]))
+        for eth in self.eth_list:
+            # Bring the interface up to makes sure rss key is written to the
+            # BAR after driver commit 0203dee66dcb ("nfp_net: perform RSS init
+            # only during device initialization")
+            self.cmd('ifconfig %s up ; ifconfig %s down' % (eth, eth))
 
         # Checking the value of _pf0_net_bar0 to get the RSS key
         # To parse it, we need to use the info from
@@ -349,14 +351,13 @@ class NFPFlowNICSystem(NFESystem, NrtSystem):
         diff_eth_list = list(set(after_eth_dict.keys()) -
                              set(before_eth_dict.keys()))
 
-        if len(diff_eth_list) > 1:
+        if len(diff_eth_list) > self.expected_ports:
             # Multiple interfaces are generated, we do not support this yet.
-            raise NtiFatalError(msg="Two interfaces are created, new "
+            raise NtiFatalError(msg="More interfaces are created, new "
                                     "configuration code needs to be added!")
-        elif len(diff_eth_list) == 1:
+        elif len(diff_eth_list) == self.expected_ports:
             # Expected one interface to be created, update the
             # classes eth_list and return.
-            # self.eth_list = diff_eth_list
             return True
         else:
             return False
