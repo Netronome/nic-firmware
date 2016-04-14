@@ -79,9 +79,9 @@ nic_switch_rx_defaultq(int vport, uint8_t *qid)
     int ret = NIC_RX_DROP;
     int q;
 
-    if (!(nic->control & NFP_NET_CFG_CTRL_L2SWITCH)) {
-        if (nic->rx_ring_en) {
-            q = ffs64(nic->rx_ring_en);
+    if (!(nic->control[vport] & NFP_NET_CFG_CTRL_L2SWITCH)) {
+        if (nic->rx_ring_en[vport]) {
+            q = ffs64(nic->rx_ring_en[vport]);
             if (q != -1)
                 *qid = q&0xff;
             else
@@ -101,12 +101,12 @@ out:
 }
 
 __intrinsic int
-nic_switch_tx_vport(uint8_t qid)
+nic_switch_tx_vport(int vport, uint8_t qid)
 {
     int ret;
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
 
-    if (!(nic->control & NFP_NET_CFG_CTRL_L2SWITCH))
+    if (!(nic->control[vport] & NFP_NET_CFG_CTRL_L2SWITCH))
         ret = 0;
     else
         ret = nic->sw_txq_to_vport[qid];
@@ -196,7 +196,7 @@ nic_switch(int in_vport, void *sa, void *da, uint16_t vlan,
 
     /* If the switch is not enabled. Return VPort 0 if received from
      * uplink or set uplink when received from any other vport. */
-    if (!(nic->control & NFP_NET_CFG_CTRL_L2SWITCH)) {
+    if (!(nic->control[in_vport] & NFP_NET_CFG_CTRL_L2SWITCH)) {
         if (in_vport == NIC_SWITCH_UPLINK)
             out_mask = VPORT_MASK(0);
         else
@@ -220,7 +220,7 @@ nic_switch(int in_vport, void *sa, void *da, uint16_t vlan,
                 goto out;
         }
 
-        if (!(nic->control & NFP_NET_CFG_CTRL_L2SWITCH_LOCAL)) {
+        if (!(nic->control[in_vport] & NFP_NET_CFG_CTRL_L2SWITCH_LOCAL)) {
             *uplink = 1;
             goto out;
         }

@@ -24,7 +24,7 @@ nic_tx_l1_checks(int port)
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
 
    /* Drop if down */
-    if (!(nic->control & NFP_NET_CFG_CTRL_ENABLE)) {
+    if (!(nic->control[port] & NFP_NET_CFG_CTRL_ENABLE)) {
         NIC_LIB_CNTR(&nic_cnt_tx_drop_down);
         ret = NIC_TX_DROP;
     }
@@ -41,7 +41,7 @@ nic_tx_mtu_check(int port, int vlan, int frame_len)
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
 
     /* Without VLANs the max frame size is MTU + Ethernet header */
-    max_frame_sz = nic->mtu + NET_ETH_LEN;
+    max_frame_sz = nic->mtu[port] + NET_ETH_LEN;
 
     if (vlan)
         max_frame_sz += NET_8021Q_LEN;
@@ -64,7 +64,7 @@ nic_tx_vlan_add(int port, void *meta, void *tci)
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
 
     /* If VLAN adding is disabled, we are done */
-    if (!(nic->control & NFP_NET_CFG_CTRL_TXVLAN))
+    if (!(nic->control[port] & NFP_NET_CFG_CTRL_TXVLAN))
         goto out;
 
     /* If no VLAN in TX descriptor, we are done */

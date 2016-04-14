@@ -27,14 +27,15 @@ nic_rx_l1_checks(int port)
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
 
    /* Drop if down */
-    if (!(nic->control & NFP_NET_CFG_CTRL_ENABLE)) {
+    if (!(nic->control[port] & NFP_NET_CFG_CTRL_ENABLE)) {
+        /* TODO: have per port NIC LIB CNTRs */
         NIC_LIB_CNTR(&nic_cnt_rx_drop_dev_down);
         ret = NIC_RX_DROP;
         goto out;
     }
 
     /* Drop if no rings configured */
-    if (!nic->rx_ring_en) {
+    if (!nic->rx_ring_en[port]) {
         NIC_LIB_CNTR(&nic_cnt_rx_drop_ring_down);
         ret = NIC_RX_DROP;
         goto out;
@@ -53,7 +54,7 @@ nic_rx_mtu_check(int port, uint32_t csum, int frame_len)
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
 
     /* Without VLANs the max frame size is MTU + Ethernet header */
-    max_frame_sz = nic->mtu + NET_ETH_LEN;
+    max_frame_sz = nic->mtu[port] + NET_ETH_LEN;
 
     /* Add the number of present VLAN tags to the max allowed framesize */
     if (NFP_MAC_RX_CSUM_VLANS_of(csum))
@@ -121,7 +122,7 @@ nic_rx_csum_checks(int port, uint32_t csum, void *meta)
     /* In promiscuous mode we pass through even errored packets, but
      * we still do the tests above to update the counters. Indicate to
      * the caller that the checksum was bad, though. */
-    if (nic->control & NFP_NET_CFG_CTRL_PROMISC && ret == NIC_RX_DROP)
+    if (nic->control[port] & NFP_NET_CFG_CTRL_PROMISC && ret == NIC_RX_DROP)
         ret = NIC_RX_CSUM_BAD;
 
     if (ret != NIC_RX_DROP)
@@ -145,7 +146,7 @@ nic_rx_l2_checks(int port, void *sa, void *da)
     }
 
     /* Perform destination MAC address checks */
-    if (nic->control & NFP_NET_CFG_CTRL_PROMISC) {
+    if (nic->control[port] & NFP_NET_CFG_CTRL_PROMISC) {
         ret = NIC_RX_OK;
         goto out;
     }
@@ -153,12 +154,12 @@ nic_rx_l2_checks(int port, void *sa, void *da)
     if (NIC_IS_MC_ADDR(da)) {
 
         /* Broadcast addresses are Multicast address too */
-        if (NIC_IS_BC_ADDR(da) && (nic->control & NFP_NET_CFG_CTRL_L2BC)) {
+        if (NIC_IS_BC_ADDR(da) && (nic->control[port] & NFP_NET_CFG_CTRL_L2BC)) {
             ret = NIC_RX_OK;
             goto out;
         }
 
-        if (nic->control & NFP_NET_CFG_CTRL_L2MC) {
+        if (nic->control[port] & NFP_NET_CFG_CTRL_L2MC) {
             ret = NIC_RX_OK;
             goto out;
         }
@@ -176,7 +177,7 @@ nic_rx_l2_checks(int port, void *sa, void *da)
 
 out:
     if (ret == NIC_RX_DROP) {
-        if (nic->control & NFP_NET_CFG_CTRL_PROMISC) {
+        if (nic->control[port] & NFP_NET_CFG_CTRL_PROMISC) {
             ret = NIC_RX_OK;
         } else {
             NIC_LIB_CNTR(&nic_cnt_rx_eth_drop);
@@ -196,7 +197,7 @@ nic_rx_vlan_strip(int port, uint16_t tci, void *meta)
     ctassert(__is_in_reg(meta));
 
     /* If VLAN stripping is disabled, we are done */
-    if (!(nic->control & NFP_NET_CFG_CTRL_RXVLAN))
+    if (!(nic->control[port] & NFP_NET_CFG_CTRL_RXVLAN))
         goto out;
 
     out_desc->flags |= PCIE_DESC_RX_VLAN;
@@ -323,7 +324,7 @@ nic_rx_rss(int vport, void *o_l3, void *o_l4,
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
     struct pcie_out_pkt_desc *out_desc = (struct pcie_out_pkt_desc *)meta;
 
-    rss_ctrl = nic->rss_ctrl;
+    rss_ctrl = nic->rss_ctrl[vport];
 
     ctassert(__is_in_reg_or_lmem(o_l3));
     ctassert(__is_in_reg_or_lmem(o_l4));
@@ -331,11 +332,11 @@ nic_rx_rss(int vport, void *o_l3, void *o_l4,
     ctassert(__is_in_reg_or_lmem(i_l4));
     ctassert(__is_in_reg(meta));
 
-    if (!(nic->control & NFP_NET_CFG_CTRL_RSS))
+    if (!(nic->control[vport] & NFP_NET_CFG_CTRL_RSS))
         goto no_rss;
 
     /* If switch enabled and no RSS configured for VPort */
-    if ((nic->control & NFP_NET_CFG_CTRL_L2SWITCH) &&
+    if ((nic->control[vport] & NFP_NET_CFG_CTRL_L2SWITCH) &&
         !(nic->sw_vp_rss_en & VPORT_MASK(vport)))
         goto no_rss;
 
@@ -344,9 +345,9 @@ nic_rx_rss(int vport, void *o_l3, void *o_l4,
     if (!rss_ctrl)
         goto no_rss;
 
-    if (((nic->control & NFP_NET_CFG_CTRL_NVGRE) &&
+    if (((nic->control[vport] & NFP_NET_CFG_CTRL_NVGRE) &&
          (flags & NIC_RSS_NVGRE)) ||
-        ((nic->control & NFP_NET_CFG_CTRL_VXLAN) &&
+        ((nic->control[vport] & NFP_NET_CFG_CTRL_VXLAN) &&
          (flags & NIC_RSS_VXLAN))) {
         if ((flags & NIC_RSS_I_TCP) || (flags & NIC_RSS_I_UDP)) {
             if (flags & NIC_RSS_I_IP4) {
@@ -386,7 +387,7 @@ key_ready:
                       (void*)nic->rss_key, HASH_TOEPLITZ_SECRET_KEY_SZ);
     out_desc->flags |= PCIE_DESC_RX_RSS;
     out_desc->meta_len += PCIE_HOST_RX_RSS_PREPEND_SIZE;
-    *qid = nic->rss_tbl[h & NFP_NET_CFG_RSS_MASK_of(nic->rss_ctrl)];
+    *qid = nic->rss_tbl[vport][h & NFP_NET_CFG_RSS_MASK_of(rss_ctrl)];
     *(uint32_t *)hash_type = type;
     return h;
 
@@ -419,11 +420,11 @@ nic_rx_vxlan_ports()
 }
 
 __intrinsic int
-nic_rx_promisc()
+nic_rx_promisc(int port)
 {
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
 
-    return nic->control & NFP_NET_CFG_CTRL_PROMISC;
+    return nic->control[port] & NFP_NET_CFG_CTRL_PROMISC;
 }
 
 #endif /* _LIBNIC_NIC_RX_C_ */

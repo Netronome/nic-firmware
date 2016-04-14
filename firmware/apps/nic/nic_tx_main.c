@@ -205,7 +205,7 @@ proc_from_host(int port,
         NIC_APP_CNTR(&nic_cnt_tx_vlan);
     }
 
-    vport = nic_switch_tx_vport(rxd->src);
+    vport = nic_switch_tx_vport(port, rxd->src);
     vlan = (hdrs.present & HDR_O_VLAN) ?
         NET_ETH_TCI_VID_of(hdrs.o_vlan.tci) : 0;
 
