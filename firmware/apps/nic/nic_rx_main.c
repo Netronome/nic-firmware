@@ -172,7 +172,7 @@ proc_from_wire(int port,
 
     ret = rx_check_inner_csum(port, &hdrs, &encap, rxd, app_meta, csum_prepend);
     if (ret == NIC_RX_DROP) {
-        if (nic_rx_promisc()) {
+        if (nic_rx_promisc(port)) {
             err = NIC_RX_CSUM_BAD;
             goto pkt_out;
         } else {
@@ -250,7 +250,7 @@ proc_from_wire(int port,
     }
     
     /* o_ip4/o_ip6 are at the same location so is o_udp, o_tcp */
-    hash = nic_rx_rss(vport, &hdrs.o_ip4, &hdrs.o_tcp,
+    hash = nic_rx_rss(port, &hdrs.o_ip4, &hdrs.o_tcp,
                       &hdrs.i_ip4, &hdrs.i_tcp, rss_flags,
                       &hash_type, app_meta, &qid);
     if (hash_type) {

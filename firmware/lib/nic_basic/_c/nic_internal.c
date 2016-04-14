@@ -151,18 +151,19 @@ __export __dram uint64_t nic_cnt_tx_switch_int;
  * means.
  */
 struct nic_local_state {
-    uint32_t control;           /* 0x000: Cache of NFP_NET_CFG_CTRL */
+    uint32_t control[NFD_MAX_VFS];      /* 0x000: Cache of NFP_NET_CFG_CTRL */
 
-    uint64_t tx_ring_en;        /* 0x004: Cache of NFP_NET_CFG_TXRS_ENABLE */
-    uint64_t rx_ring_en;        /* 0x00c: Cache of NFP_NET_CFG_RXRS_ENABLE */
+    uint64_t tx_ring_en[NFD_MAX_VFS];  /* 0x004: Cache of NFP_NET_CFG_TXRS_ENABLE */
+    uint64_t rx_ring_en[NFD_MAX_VFS];        /* 0x00c: Cache of NFP_NET_CFG_RXRS_ENABLE */
 
-    uint32_t mtu;               /* 0x014: Configured MTU */
-    uint32_t mac[2];            /* 0x018: Cache of NFP_NET_CFG_MACADDR */
+    uint32_t mtu[NFD_MAX_VFS];        /* 0x014: Configured MTU */
+    uint32_t mac[NFD_MAX_VFS][2];     /* 0x018: Cache of NFP_NET_CFG_MACADDR */
 
     /*TODO: per VF value in the following should be added later when needed*/
-    uint32_t rss_ctrl;          /* 0x020: Cache of RSS control */
-    uint8_t  rss_key[NFP_NET_CFG_RSS_KEY_SZ];  /* 0x024: Cache of RSS key */
-    uint8_t  rss_tbl[NFP_NET_CFG_RSS_ITBL_SZ]; /* 0x04c: Cache of RSS ITBL */
+    uint32_t rss_ctrl[NFD_MAX_VFS];          /* 0x020: Cache of RSS control */
+/* 0x024: Cache of RSS key */
+    uint8_t  rss_key[NFD_MAX_VFS][NFP_NET_CFG_RSS_KEY_SZ];
+    uint8_t  rss_tbl[NFD_MAX_VFS][NFP_NET_CFG_RSS_ITBL_SZ]; /* 0x04c: Cache of RSS ITBL */
 
     /* Switch local state */
     uint32_t sw_default_rx_vp;  /* 0x0cc: Default VPort */
@@ -256,7 +257,9 @@ nic_local_reconfig(uint32_t *enable_changed)
     __xread uint16_t vxlan_ports[NFP_NET_N_VXLAN_PORTS];
     __gpr uint32_t update;
     __gpr uint32_t newctrl;
+    __gpr uint32_t vnic;
     __emem __addr40 uint8_t *bar_base;
+    __lmem uint32_t *ptr;
 
     /* Code assumes certain arrangement and sizes */
     ctassert(NFP_NET_CFG_RXRS_ENABLE == NFP_NET_CFG_TXRS_ENABLE + 8);
@@ -276,6 +279,8 @@ nic_local_reconfig(uint32_t *enable_changed)
         halt();
     }
 
+    vnic = cfg_bar_change_info.vnic;
+
     /* Read the ctrl(0) + update(1) words */
     mem_read64(&tmp2, (__mem void*)(bar_base + NFP_NET_CFG_CTRL), sizeof(tmp2));
     newctrl = tmp2[0];
@@ -284,30 +289,29 @@ nic_local_reconfig(uint32_t *enable_changed)
      /* Handle general updates */
     if (update & NFP_NET_CFG_UPDATE_GEN) {
         /* Check if link global enable changed */
-        if ((nic->control ^ newctrl) & NFP_NET_CFG_CTRL_ENABLE) {
+        if ((nic->control[vnic] ^ newctrl) & NFP_NET_CFG_CTRL_ENABLE) {
             *enable_changed = 1;
         }
-
         if (!(newctrl & NFP_NET_CFG_CTRL_ENABLE)) {
             /* NIC got disabled, zero control and we are done */
-            nic->control = 0;
-            nic->rss_ctrl = 0;
+            nic->control[vnic] = 0;
+            nic->rss_ctrl[vnic] = 0;
             goto reconfig_done;
         }
 
         /* MTU */
         mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
-        nic->mtu = mtu;
+        nic->mtu[vnic] = mtu;
 
         /* MAC Address */
         mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
                    sizeof(nic_mac));
-        nic->mac[0] = nic_mac[0];
-        nic->mac[1] = nic_mac[1];
+        nic->mac[vnic][0] = nic_mac[0];
+        nic->mac[vnic][1] = nic_mac[1];
 
         /* Stash away new control to activate */
-        nic->control = newctrl;
+        nic->control[vnic] = newctrl;
     }
 
     /* Handle Ring reconfiguration.
@@ -318,45 +322,48 @@ nic_local_reconfig(uint32_t *enable_changed)
         mem_read64(&ring_en,
                    (__mem void*)(bar_base + NFP_NET_CFG_TXRS_ENABLE),
                    sizeof(ring_en));
-        nic->tx_ring_en = swapw64(ring_en[0]);
-        nic->rx_ring_en = swapw64(ring_en[1]);
+        nic->tx_ring_en[vnic] = swapw64(ring_en[0]);
+        nic->rx_ring_en[vnic] = swapw64(ring_en[1]);
     }
 
     /* Handle RSS re-config */
     if (update & NFP_NET_CFG_UPDATE_RSS &&
-        nic->control & NFP_NET_CFG_CTRL_RSS) {
+        nic->control[vnic] & NFP_NET_CFG_CTRL_RSS) {
 
         mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
                    sizeof(rss_ctrl));
 
         /* Read RSS key and table. Table requires two reads*/
         mem_read64(rss_key, bar_base + NFP_NET_CFG_RSS_KEY,
-                   sizeof(rss_key));
-        reg_cp((void*)nic->rss_key, rss_key, sizeof(rss_key));
+                   NFP_NET_CFG_RSS_KEY_SZ);
+        ptr = &(nic->rss_key) + (vnic * NFP_NET_CFG_RSS_KEY_SZ);
+        reg_cp(ptr, rss_key, NFP_NET_CFG_RSS_KEY_SZ);
 
         mem_read64_swap(rss_tbl, bar_base + NFP_NET_CFG_RSS_ITBL,
-                        sizeof(rss_tbl));
-        reg_cp((void*)nic->rss_tbl, rss_tbl, sizeof(rss_tbl));
+            sizeof(rss_tbl));
+        ptr = &(nic->rss_tbl) + (vnic * NFP_NET_CFG_RSS_ITBL_SZ);
+        reg_cp(ptr, rss_tbl, sizeof(rss_tbl));
 
         mem_read64_swap(rss_tbl,
-                        bar_base + NFP_NET_CFG_RSS_ITBL + sizeof(rss_tbl),
+            bar_base + NFP_NET_CFG_RSS_ITBL + sizeof(rss_tbl),
                         sizeof(rss_tbl));
-        reg_cp((void*)(nic->rss_tbl + sizeof(rss_tbl)), rss_tbl,
-               sizeof(rss_tbl));
+        ptr = &(nic->rss_tbl) + (vnic * NFP_NET_CFG_RSS_ITBL_SZ) +
+            sizeof(rss_tbl);
+        reg_cp(ptr, rss_tbl, sizeof(rss_tbl));
 
         /* Write control word to activate */
-        nic->rss_ctrl = rss_ctrl[0];
+        nic->rss_ctrl[vnic] = rss_ctrl[0];
     }
 
     /* Switch reconfiguration */
     if (update & NFP_NET_CFG_UPDATE_L2SWITCH &&
-        nic->control & NFP_NET_CFG_CTRL_L2SWITCH) {
+        nic->control[vnic] & NFP_NET_CFG_CTRL_L2SWITCH) {
         nic_switch_reconfig();
     }
 
     /* VXLAN reconfig */
     if (update & NFP_NET_CFG_UPDATE_VXLAN &&
-        nic->control & NFP_NET_CFG_CTRL_VXLAN) {
+        nic->control[vnic] & NFP_NET_CFG_CTRL_VXLAN) {
 
         mem_read64(vxlan_ports, bar_base + NFP_NET_CFG_VXLAN_PORT,
                    sizeof(vxlan_ports));

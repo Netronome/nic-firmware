@@ -270,10 +270,12 @@ __intrinsic void * nic_rx_vxlan_ports();
 /**
  * Are we on promisc mode?
  *
+ * @param port          Input port (physical network interface)
+ *
  * Returns 0 if the NIC is not configured in promisc mode and 1 if it
  * is.
  */
-__intrinsic int nic_rx_promisc();
+__intrinsic int nic_rx_promisc(int port);
 
 
 /* RSS flags */
@@ -416,12 +418,13 @@ __intrinsic int nic_switch_rx_defaultq(int vport, uint8_t *qid);
 /**
  * Match TX Queue to VPort
  *
+ * @param vport         VPort to receive packet on
  * @param qid           TX queue pkt was received on
  *
  * Returns the VPort ID associated with the TX queue.  If the switch
  * is not configured, the default VPort ID of 0 is returned.
  */
-__intrinsic int nic_switch_tx_vport(uint8_t qid);
+__intrinsic int nic_switch_tx_vport(int vport, uint8_t qid);
 
 
 /**
