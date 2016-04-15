@@ -324,6 +324,9 @@ class NFPFlowNICSystem(NFESystem, NrtSystem):
         LOG_endsec()
         self.rss_key = rss_str
 
+        self.cmd("nfp -m mac set port ifup 0 0-4")
+
+
         return
 
     def get_assembly_model(self, fail=True):
