@@ -88,12 +88,11 @@
 #define NBI                 0
 #endif
 
-#define MAC_CHAN_PER_PORT   16
-#define TMQ_PER_PORT        (MAC_CHAN_PER_PORT * 8)
+#define MAC_CHAN_PER_PORT   8
+#define TMQ_PER_PORT        (MAC_CHAN_PER_PORT * 2 * 8)
 
-#define MAC_TO_PORT(x)      (x / MAC_CHAN_PER_PORT)
-//#define PORT_TO_TMQ(x)      (x * TMQ_PER_PORT)
-#define PORT_TO_TMQ(x)      (x * 64)
+#define MAC_TO_PORT(x)      (x / (MAC_CHAN_PER_PORT * 2))
+#define PORT_TO_TMQ(x)      (x * TMQ_PER_PORT)
 
 /*
  * Global variables
