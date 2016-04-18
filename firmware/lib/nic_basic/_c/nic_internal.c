@@ -307,8 +307,9 @@ nic_local_reconfig(uint32_t *enable_changed)
         /* MAC Address */
         mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
                    sizeof(nic_mac));
-        nic->mac[vnic][0] = nic_mac[0];
-        nic->mac[vnic][1] = nic_mac[1];
+
+        ptr = &(nic->mac[vnic]);
+        reg_cp(ptr, nic_mac, 8);
 
         /* Stash away new control to activate */
         nic->control[vnic] = newctrl;

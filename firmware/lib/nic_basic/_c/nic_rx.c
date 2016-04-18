@@ -179,7 +179,7 @@ nic_rx_l2_checks(int port, void *sa, void *da)
     }
 
     /* Destination address matches our MAC? */
-    if(REG_CMPS(3, da, (void*)nic->mac)) {
+    if(REG_CMPS(3, da, (void*)nic->mac[port])) {
         NIC_LIB_CNTR(&nic_cnt_rx_eth_local);
         ret = NIC_RX_OK;
         goto out;
