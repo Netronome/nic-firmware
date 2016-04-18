@@ -324,7 +324,7 @@ __intrinsic int nic_rx_promisc(int port);
  */
 __intrinsic uint32_t nic_rx_rss(int vport, void *o_l3, void *o_l4,
                                 void *i_l3, void *i_l4, int flags,
-                                void *hash_type, void *meta, uint8_t *qid);
+                                void *hash_type, void *meta, uint32_t *qid);
 
 
 /*
