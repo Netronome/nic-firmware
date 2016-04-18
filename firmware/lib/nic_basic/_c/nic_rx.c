@@ -314,7 +314,7 @@ __nic_rx_rss_build_key(void *l3, void *l4, int flags, uint32_t rss_ctrl,
 __intrinsic uint32_t
 nic_rx_rss(int vport, void *o_l3, void *o_l4,
            void *i_l3, void *i_l4, int flags,
-           void *hash_type, void *meta, uint8_t *qid)
+           void *hash_type, void *meta, uint32_t *qid)
 {
     __nnr uint32_t key[9];
     __gpr size_t size = 0;
@@ -323,6 +323,7 @@ nic_rx_rss(int vport, void *o_l3, void *o_l4,
     uint32_t rss_ctrl;
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
     struct pcie_out_pkt_desc *out_desc = (struct pcie_out_pkt_desc *)meta;
+    __gpr uint32_t qid_local;
 
     rss_ctrl = nic->rss_ctrl[vport];
 
@@ -387,7 +388,8 @@ key_ready:
                       (void*)nic->rss_key, HASH_TOEPLITZ_SECRET_KEY_SZ);
     out_desc->flags |= PCIE_DESC_RX_RSS;
     out_desc->meta_len += PCIE_HOST_RX_RSS_PREPEND_SIZE;
-    *qid = nic->rss_tbl[vport][h & NFP_NET_CFG_RSS_MASK_of(rss_ctrl)];
+    qid_local = nic->rss_tbl[vport][h & NFP_NET_CFG_RSS_MASK_of(rss_ctrl)];
+    *qid = qid_local;
     *(uint32_t *)hash_type = type;
     return h;
 

@@ -86,7 +86,7 @@ proc_from_wire(int port,
     __addr40 char *pkt_start;
     __xread uint32_t pkt_cache[16];
     __gpr int16_t offset, plen;
-    uint8_t qid;
+    uint32_t qid;
 
     __gpr uint32_t csum_prepend;
     __gpr uint8_t err, ret;

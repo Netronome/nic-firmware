@@ -247,7 +247,7 @@ nic_local_reconfig(uint32_t *enable_changed)
     __gpr uint32_t newctrl;
     __gpr uint32_t vnic;
     __emem __addr40 uint8_t *bar_base;
-    __lmem uint32_t *ptr;
+    __lmem void *ptr;
 
     /* Code assumes certain arrangement and sizes */
     ctassert(NFP_NET_CFG_RXRS_ENABLE == NFP_NET_CFG_TXRS_ENABLE + 8);
@@ -325,19 +325,18 @@ nic_local_reconfig(uint32_t *enable_changed)
         /* Read RSS key and table. Table requires two reads*/
         mem_read64(rss_key, bar_base + NFP_NET_CFG_RSS_KEY,
                    NFP_NET_CFG_RSS_KEY_SZ);
-        ptr = &(nic->rss_key) + (vnic * NFP_NET_CFG_RSS_KEY_SZ);
+        ptr = &(nic->rss_key[vnic]);
         reg_cp(ptr, rss_key, NFP_NET_CFG_RSS_KEY_SZ);
 
         mem_read64_swap(rss_tbl, bar_base + NFP_NET_CFG_RSS_ITBL,
             sizeof(rss_tbl));
-        ptr = &(nic->rss_tbl) + (vnic * NFP_NET_CFG_RSS_ITBL_SZ);
+        ptr = &(nic->rss_tbl[vnic]);
         reg_cp(ptr, rss_tbl, sizeof(rss_tbl));
 
         mem_read64_swap(rss_tbl,
             bar_base + NFP_NET_CFG_RSS_ITBL + sizeof(rss_tbl),
                         sizeof(rss_tbl));
-        ptr = &(nic->rss_tbl) + (vnic * NFP_NET_CFG_RSS_ITBL_SZ) +
-            sizeof(rss_tbl);
+        ptr = &(nic->rss_tbl[vnic][sizeof(rss_tbl)]);
         reg_cp(ptr, rss_tbl, sizeof(rss_tbl));
 
         /* Write control word to activate */
