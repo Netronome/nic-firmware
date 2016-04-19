@@ -398,10 +398,14 @@ key_ready:
 
     h = hash_toeplitz(key, size,
                       (void*)nic->rss_key, HASH_TOEPLITZ_SECRET_KEY_SZ);
+    NIC_LIB_DBG(libnic_dbg, 0x1234);
+    NIC_LIB_DBG(libnic_dbg, h);
     out_desc->flags |= PCIE_DESC_RX_RSS;
     out_desc->meta_len += PCIE_HOST_RX_RSS_PREPEND_SIZE;
+    NIC_LIB_DBG(libnic_dbg, h & NFP_NET_CFG_RSS_MASK_of(rss_ctrl));
     qid_local = nic->rss_tbl[vport][h & NFP_NET_CFG_RSS_MASK_of(rss_ctrl)];
     *qid = qid_local;
+    NIC_LIB_DBG(libnic_dbg, *qid);
     *(uint32_t *)hash_type = type;
     return h;
 
