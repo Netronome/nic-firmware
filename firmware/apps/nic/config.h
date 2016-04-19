@@ -87,6 +87,7 @@
  * Application configuration
  */
 #define CFG_NIC_LIB_DBG_CNTRS
+/* #define CFG_NIC_LIB_DBG_JOURNAL */
 /* #define CFG_NIC_APP_DBG_JOURNAL */
 #define NIC_INTF                0
 

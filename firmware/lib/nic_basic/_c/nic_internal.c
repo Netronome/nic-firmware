@@ -71,6 +71,43 @@ __export __dram uint64_t nic_cnt_tx_switch_int;
 #define NIC_LIB_CNTR(_me)
 #endif
 
+#define CREATE_JOURNAL(name)                                    \
+    EMEM0_QUEUE_ALLOC(name##_rnum, global);                     \
+    _NFP_CHIPRES_ASM(.alloc_mem name##_mem emem0 global         \
+                     SZ_2M SZ_2M);                              \
+    _NFP_CHIPRES_ASM(.init_mu_ring name##_rnum name##_mem);     \
+    __shared __gpr unsigned int dbg_##name##_rnum;              \
+    __shared __gpr mem_ring_addr_t dbg_##name##_mem;
+
+#define INIT_JOURNAL(name)                              \
+    do {                                                \
+        dbg_##name##_rnum = _link_sym(name##_rnum);     \
+            dbg_##name##_mem = mem_ring_get_addr(       \
+                (__dram void *)_link_sym(name##_mem));  \
+    } while(0)
+
+/* RX debugging */
+#if defined(CFG_NIC_LIB_DBG_JOURNAL)
+
+#define NIC_LIB_DBG(name, _x)                                 \
+    mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _x);
+#define NIC_LIB_DBG4(name, _a, _b, _c, _d)                           \
+    do {                                                                \
+        mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _a); \
+        mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _b); \
+        mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _c); \
+        mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _d); \
+    } while (0)
+#else
+#define NIC_LIB_DBG(name, _x)
+#define NIC_LIB_DBG4(name, _a, _b, _c, _d)
+#endif
+
+
+#if defined(CFG_NIC_LIB_DBG_JOURNAL)
+CREATE_JOURNAL(libnic_dbg);
+#endif
+
 
 /*
  * Create mask for VPort
@@ -221,6 +258,10 @@ nic_local_init(int sig_num, int reg_num)
 {
     __assign_relative_register((void *)&cfg_bar_change_sig, sig_num);
     __assign_relative_register((void *)&cfg_bar_change_info, reg_num);
+
+#if defined(CFG_NIC_LIB_DBG_JOURNAL)
+    INIT_JOURNAL(libnic_dbg);
+#endif
 }
 
 __intrinsic int
