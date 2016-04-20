@@ -351,7 +351,7 @@ main()
         ret = proc_from_wire(rxd.src, &rxd, &txd);
         if (ret == NIC_RX_DROP) {
             pkt_tx(TO_HOST_DROP, &txd);
-            nic_rx_discard_cntr(NIC_INTF);
+            nic_rx_discard_cntr(rxd.src);
             continue;
         }
 
@@ -359,7 +359,7 @@ main()
         ret = pkt_tx(TO_HOST, &txd);
         if (ret) {
             pkt_tx(TO_HOST_DROP, &txd);
-            nic_rx_discard_cntr(NIC_INTF);
+            nic_rx_discard_cntr(rxd.src);
             continue;
         }
     }
