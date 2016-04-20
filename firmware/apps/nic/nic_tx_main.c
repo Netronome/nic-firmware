@@ -329,7 +329,7 @@ main()
             NFD_IN_LSO_CNTR_INCR(nfd_in_lso_cntr_addr,
                           NFD_IN_LSO_CNTR_T_ME_FM_HOST_PROC_TO_WIRE_DROP);
             pkt_tx(TO_WIRE_DROP, &txd);
-            nic_tx_discard_cntr(NIC_INTF);
+            nic_tx_discard_cntr(port);
             continue;
         }
 
@@ -339,7 +339,7 @@ main()
             NFD_IN_LSO_CNTR_INCR(nfd_in_lso_cntr_addr,
                         NFD_IN_LSO_CNTR_T_ME_FM_HOST_PKT_TX_TO_WIRE_DROP);
             pkt_tx(TO_WIRE_DROP, &txd);
-            nic_tx_discard_cntr(NIC_INTF);
+            nic_tx_discard_cntr(port);
             continue;
         }
         NFD_IN_LSO_CNTR_INCR(nfd_in_lso_cntr_addr,
