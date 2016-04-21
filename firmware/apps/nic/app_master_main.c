@@ -395,8 +395,7 @@ lsc_check(__gpr unsigned int *ls_current, int nic_intf)
 
     /* Read the current link state and if it changed set the bit in
      * the control BAR status */
-//    ls = mac_eth_port_link_state(LSC_ACTIVE_LINK_MAC, LSC_ACTIVE_LINK_ETH_PORT);
-    ls = 1;
+    ls = mac_eth_port_link_state(LSC_ACTIVE_LINK_MAC, LSC_ACTIVE_LINK_ETH_PORT);
 
     if (ls != *ls_current)
         changed = 1;

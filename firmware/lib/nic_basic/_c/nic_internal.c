@@ -389,7 +389,7 @@ nic_local_reconfig(uint32_t *enable_changed)
         mem_read64_swap(rss_tbl,
             bar_base + NFP_NET_CFG_RSS_ITBL + sizeof(rss_tbl),
                         sizeof(rss_tbl));
-        ptr = &(nic->rss_tbl[vnic][sizeof(rss_tbl)]);
+        ptr = (void *) &(nic->rss_tbl[vnic][sizeof(rss_tbl)]);
         reg_cp(ptr, rss_tbl, sizeof(rss_tbl));
 
         /* Write control word to activate */
