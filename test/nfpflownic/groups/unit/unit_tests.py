@@ -1222,6 +1222,12 @@ class Unit_dict(object):
                                       src_mtu=src_mtu, dst_mtu=dst_mtu,
                                       jumbo_frame=True, name=tn,
                                       summary=summary)
+        tn = 'mtu_jumbo_frame_cmp_fromA_rss'
+        summary = 'Send and compare Jumbo UDP packet from DUT to Host A with RSS'
+        self.tests[tn] = JumboPacket(a_t, dut_t_x, group=group,
+                                     src_mtu=src_mtu, dst_mtu=dst_mtu,
+                                     force_rss=True, jumbo_frame=True, name=tn,
+                                     summary=summary)
 
         #######################################################################
         # rxvlan test
