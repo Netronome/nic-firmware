@@ -544,7 +544,7 @@ class UnitComparePacket(UnitIP, Pcap_Cmp_BaseTest):
                  l4err=False, promisc=False, group=None,
                  dst_mac_type="tgt", src_mac_type="src", num_pkts=1,
                  src_mtu=1500, dst_mtu=1500, vlan_offload=False, vlan=False,
-                 jumbo_frame=False, name="ip", summary=None):
+                 force_rss=False, jumbo_frame=False, name="ip", summary=None):
         UnitIP.__init__(self, src, dst, ipv4=ipv4, ipv4_opt=ipv4_opt,
                         ipv6_rt=ipv6_rt, ipv6_hbh=ipv6_hbh, l4_type=l4_type,
                         iperr=iperr, l4err=l4err, promisc=promisc,
@@ -558,6 +558,7 @@ class UnitComparePacket(UnitIP, Pcap_Cmp_BaseTest):
         self.src_mtu = src_mtu
         self.dst_mtu = dst_mtu
         self.vlan_offload = vlan_offload
+        self.force_rss = force_rss
         self.jumbo_frame = jumbo_frame
 
         self.expt_pkts = None
@@ -703,6 +704,13 @@ class UnitComparePacket(UnitIP, Pcap_Cmp_BaseTest):
         self.dst.cmd("ethtool -K %s rxvlan %s" % (self.dst_ifn,
                                                   vlan_offload_status))
 
+        # configure RSS
+        protocol = "%s%s" % (self.l4_type, "4" if self.ipv4 else "6")
+        if self.force_rss:
+            self.dst.cmd("ethtool -N %s rx-flow-hash %s sdfn"
+                         % (self.dst_ifn, protocol))
+
+
 
 ##############################################################################
 # Jumbo frame packet comparison test
@@ -719,15 +727,17 @@ class JumboPacket(UnitComparePacket):
     """ + UnitIP._gen_info
 
     def __init__(self, src, dst, group=None, src_mtu=9000, dst_mtu=9000,
-                 jumbo_frame=True, name="JumboPacket", summary=None):
+                 force_rss=False, jumbo_frame=True, name="JumboPacket",
+                 summary=None):
         UnitComparePacket.__init__(self, src, dst, ipv4=True, ipv4_opt=False,
                                    ipv6_rt=False, ipv6_hbh=False,
                                    l4_type='udp', iperr=False, l4err=False,
                                    promisc=False, group=group,
                                    dst_mac_type="tgt", src_mac_type="src",
                                    num_pkts=1, src_mtu=src_mtu,
-                                   dst_mtu=dst_mtu, jumbo_frame=jumbo_frame,
-                                   name=name, summary=summary)
+                                   dst_mtu=dst_mtu, force_rss=force_rss,
+                                   jumbo_frame=jumbo_frame, name=name,
+                                   summary=summary)
         self.mtu_cfg_obj = NFPFlowNICMTU()
 
     def get_intf_info(self):
