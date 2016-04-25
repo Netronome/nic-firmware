@@ -151,18 +151,24 @@ nic_tx_cntrs(int port, void *da, int len)
 }
 
 __intrinsic void
-nic_rx_ring_cntrs(void *meta, uint16_t len, uint8_t qid)
+nic_rx_ring_cntrs(void *meta, uint16_t len, uint32_t port, uint32_t qid)
 {
     SIGNAL sig;
+    uint32_t nfd_q;
 
-    __nfd_out_cnt_pkt(NIC_PCI, qid, len, ctx_swap, &sig);
+    nfd_q = nfd_out_map_queue(port, qid);
+
+    __nfd_out_cnt_pkt(NIC_PCI, nfd_q, len, ctx_swap, &sig);
 }
 
 __intrinsic void
-nic_tx_ring_cntrs(void *meta, uint8_t qid)
+nic_tx_ring_cntrs(void *meta, uint32_t port, uint32_t qid)
 {
     SIGNAL sig;
+    uint32_t nfd_q;
     struct pcie_in_nfp_desc *in_desc = (struct pcie_in_nfp_desc *)meta;
+
+    nfd_q = nfd_out_map_queue(port, qid);
 
     __nfd_in_cnt_pkt(NIC_PCI, qid, in_desc->data_len, ctx_swap, &sig);
 }
