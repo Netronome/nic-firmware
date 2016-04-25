@@ -260,7 +260,7 @@ pkt_out:
 
 err_out:
     if (err != NIC_RX_DROP) {
-        nic_rx_ring_cntrs(app_meta, plen, qid);
+        nic_rx_ring_cntrs(app_meta, plen, port, qid);
     }
     /* XXX do we need to cnt pkt and populate all metadata on drop path? */
     nic_rx_cntrs(port, &hdrs.o_eth.dst, plen);

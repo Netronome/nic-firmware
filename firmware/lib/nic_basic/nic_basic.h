@@ -104,17 +104,20 @@ __intrinsic void nic_tx_cntrs(int port, void *da, int frame_len);
  *
  * @param meta          Pointer to buffer/packet meta data
  * @param len           Frame length
+ * @param port          Input port (physical network interface)
  * @param qid           The queue to increment
  */
-__intrinsic void nic_rx_ring_cntrs(void *meta, uint16_t len, uint8_t qid);
+__intrinsic void nic_rx_ring_cntrs(void *meta, uint16_t len,
+                                   uint32_t port, uint32_t qid);
 
 /**
  * Update the per TX ring packet and byte counters
  *
  * @param meta          Pointer to buffer/packet meta data
+ * @param port          Output port (physical network interface)
  * @param qid           The queue to increment
  */
-__intrinsic void nic_tx_ring_cntrs(void *meta, uint8_t qid);
+__intrinsic void nic_tx_ring_cntrs(void *meta, uint32_t port, uint32_t qid);
 
 /**
  * Increment the RX/TX error and discard counters

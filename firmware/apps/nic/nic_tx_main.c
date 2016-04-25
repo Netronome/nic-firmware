@@ -135,7 +135,7 @@ proc_from_host(int port,
 #endif
 
     NIC_APP_CNTR(&nic_cnt_tx_from_host);
-    nic_tx_ring_cntrs(app_meta, rxd->src);
+    nic_tx_ring_cntrs(app_meta, port, rxd->src);
 
     /* No L1 checks as in RX */
 
