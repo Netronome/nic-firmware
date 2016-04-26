@@ -17,6 +17,7 @@
 #include <vnic/shared/nfd_cfg.h>
 #include <vnic/pci_out.h>
 
+
 /* generic register casting to trick the compiler */
 #define REGCST __xread
 
@@ -122,6 +123,7 @@ nic_rx_csum_checks(int port, uint32_t csum, void *meta)
     /* In promiscuous mode we pass through even errored packets, but
      * we still do the tests above to update the counters. Indicate to
      * the caller that the checksum was bad, though. */
+
     if (nic->control[port] & NFP_NET_CFG_CTRL_PROMISC && ret == NIC_RX_DROP)
         ret = NIC_RX_CSUM_BAD;
 
@@ -185,7 +187,6 @@ out:
     }
     return ret;
 }
-
 
 __intrinsic int
 nic_rx_vlan_strip(int port, uint16_t tci, void *meta)

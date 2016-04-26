@@ -27,6 +27,7 @@
 #include "nic_ctrl.h"
 #include "shared/nfp_net_ctrl.h"
 
+
 NFD_CFG_BASE_DECLARE(NIC_PCI);
 
 #ifdef CFG_NIC_LIB_DBG_CNTRS
@@ -168,6 +169,11 @@ CREATE_JOURNAL(libnic_dbg);
       (((__lmem struct eth_addr *)_a)->a[0] & NET_ETH_GROUP_ADDR) \
     : (((__gpr struct eth_addr *)_a)->a[0] & NET_ETH_GROUP_ADDR))
 
+#if NFD_MAX_VFS != 0
+    #define NVNICS NFD_MAX_VFS
+#else
+    #define NVNICS 2
+#endif
 /*
  * Struct describing the current state of the NIC endpoint.
  *
@@ -176,19 +182,19 @@ CREATE_JOURNAL(libnic_dbg);
  * means.
  */
 struct nic_local_state {
-    uint32_t control[NFD_MAX_VFS];      /* 0x000: Cache of NFP_NET_CFG_CTRL */
+    uint32_t control[NVNICS];      /* 0x000: Cache of NFP_NET_CFG_CTRL */
 
-    uint64_t tx_ring_en[NFD_MAX_VFS];  /* 0x004: Cache of NFP_NET_CFG_TXRS_ENABLE */
-    uint64_t rx_ring_en[NFD_MAX_VFS];        /* 0x00c: Cache of NFP_NET_CFG_RXRS_ENABLE */
+    uint64_t tx_ring_en[NVNICS];  /* 0x004: Cache of NFP_NET_CFG_TXRS_ENABLE */
+    uint64_t rx_ring_en[NVNICS];        /* 0x00c: Cache of NFP_NET_CFG_RXRS_ENABLE */
 
-    uint32_t mtu[NFD_MAX_VFS];        /* 0x014: Configured MTU */
-    uint32_t mac[NFD_MAX_VFS][2];     /* 0x018: Cache of NFP_NET_CFG_MACADDR */
+    uint32_t mtu[NVNICS];        /* 0x014: Configured MTU */
+    uint32_t mac[NVNICS][2];     /* 0x018: Cache of NFP_NET_CFG_MACADDR */
 
     /*TODO: per VF value in the following should be added later when needed*/
-    uint32_t rss_ctrl[NFD_MAX_VFS];          /* 0x020: Cache of RSS control */
+    uint32_t rss_ctrl[NVNICS];          /* 0x020: Cache of RSS control */
 /* 0x024: Cache of RSS key */
-    uint8_t  rss_key[NFD_MAX_VFS][NFP_NET_CFG_RSS_KEY_SZ];
-    uint8_t  rss_tbl[NFD_MAX_VFS][NFP_NET_CFG_RSS_ITBL_SZ]; /* 0x04c: Cache of RSS ITBL */
+    uint8_t  rss_key[NVNICS][NFP_NET_CFG_RSS_KEY_SZ];
+    uint8_t  rss_tbl[NVNICS][NFP_NET_CFG_RSS_ITBL_SZ]; /* 0x04c: Cache of RSS ITBL */
 
     /* Switch local state */
     uint32_t sw_default_rx_vp;  /* 0x0cc: Default VPort */
@@ -286,8 +292,8 @@ nic_local_reconfig(uint32_t *enable_changed)
     __xread uint16_t vxlan_ports[NFP_NET_N_VXLAN_PORTS];
     __gpr uint32_t update;
     __gpr uint32_t newctrl;
-    __gpr uint32_t vnic;
     __emem __addr40 uint8_t *bar_base;
+    __gpr uint32_t vnic;
     __lmem void *ptr;
 
     /* Code assumes certain arrangement and sizes */
@@ -397,7 +403,7 @@ nic_local_reconfig(uint32_t *enable_changed)
         mem_read64(vxlan_ports, bar_base + NFP_NET_CFG_VXLAN_PORT,
                    sizeof(vxlan_ports));
         reg_cp((void*)nic->vxlan_ports, vxlan_ports, sizeof(vxlan_ports));
-     }
+    }
 
 reconfig_done:
         return;

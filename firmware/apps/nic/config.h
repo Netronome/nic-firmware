@@ -8,6 +8,8 @@
 #ifndef __APP_CONFIG_H__
 #define __APP_CONFIG_H__
 
+#include <platform.h>
+
 /*
  * RX/TX configuration
  * - Set pkt offset the NBI uses
@@ -50,7 +52,13 @@
 /* TM */
 #define NBI_TM_NUM_SEQUENCERS    1
 #define NBI_TM_ENABLE_SEQUENCER0 1
+
+#ifdef LITHIUM_NFP_NIC
 #define NBI_TM_H_0_Q             256  /* 256 TM queues, 64 entries per queue */
+#endif
+#ifdef HYDROGEN_NFP_NIC
+#define NBI_TM_H_0_Q             16  /* 16 TM queues, 1024 entries per queue */
+#endif
 #define NBI_TM_H_1_Q             0
 
 /*

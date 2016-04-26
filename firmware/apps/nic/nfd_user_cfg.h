@@ -12,6 +12,9 @@
 #include <blm/blm.h>
 #endif
 
+#include <platform.h>
+
+#ifdef LITHIUM_NFP_NIC
 #ifndef NFD_MAX_VF_QUEUES
 #define NFD_MAX_VF_QUEUES       8
 #endif
@@ -24,6 +27,22 @@
 #ifndef NFD_MAX_VFS
 #define NFD_MAX_VFS             2
 #endif
+#endif /* LITHIUM_NFP_NIC */
+
+#ifdef HYDROGEN_NFP_NIC
+#ifndef NFD_MAX_VF_QUEUES
+#define NFD_MAX_VF_QUEUES       1
+#endif
+
+#ifndef NFD_MAX_PF_QUEUES
+#define NFD_MAX_PF_QUEUES       32
+#endif
+
+/* No VFs needed */
+#ifndef NFD_MAX_VFS
+#define NFD_MAX_VFS             0
+#endif
+#endif /* HYDROGEN_NFP_NIC */
 
 /* Configure VF expansion BARs to access the NFP, this seems to be required
  * even when just using the PF */

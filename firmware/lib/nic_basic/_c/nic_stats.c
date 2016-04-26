@@ -48,8 +48,14 @@ struct nic_port_stats_extra {
     unsigned long long tx_bc_pkts;
 };
 /* Export for debug visibility */
+#if NFD_MAX_VFS != 0
+    #define NVNICS NFD_MAX_VFS
+#else
+    #define NVNICS 2
+#endif
+
 __export __shared __imem
-struct nic_port_stats_extra nic_stats_extra[NFD_MAX_VFS];
+struct nic_port_stats_extra nic_stats_extra[NVNICS];
 
 
 /*
@@ -316,7 +322,7 @@ nic_stats_update_control_bar(void)
     /* TODO: optimize this loop with nic_stats_rx/tx_counters
      * reading more than one vnic/vf/port at once
      */
-    for (i = 0; i < NFD_MAX_VFS; i++) {
+    for (i = 0; i < NVNICS; i++) {
         vf_bar = NFD_CFG_BAR_ISL(NIC_PCI, i);
 
         nic_stats_rx_counters(i, &write_bar_cntrs);
