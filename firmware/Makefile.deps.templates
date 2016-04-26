@@ -64,6 +64,23 @@ $(eval $(call nffw.add_obj,$1,gro$3,$2))
 
 endef
 
+#f fwdep.add_gro_block_flag
+#
+# Add a single GRO ME to the build of a firmware
+#
+# @param $1 firmware name
+# @param $2 ME
+# @param $3 blocknum
+# @param $4 additional flag
+#
+define fwdep.add_gro_block_flag
+
+$(eval $(call microcode.add_flags,$1,gro$3,$4))
+$(eval $(call fwdep.add_gro_block,$1,$2,$3))
+
+endef
+
+
 #f fwdep.add_gro
 #
 # Add GRO MEs to the build for a firmware
@@ -77,6 +94,26 @@ $1.nffw: $(GRO_DIR)
 
 $(foreach blk,$(shell seq $(words $2)),\
 	$(call fwdep.add_gro_block,$1,$(word $(blk),$2),$(call fwdep.minus,$(blk),1)))
+
+$(eval $(call nffw.add_define,$1,GRO_NUM_BLOCKS=$(words $2)))
+$(eval $(call nffw.add_include,$(GRO_DIR)))
+
+endef
+
+#f fwdep.add_gro_flag
+#
+# Add GRO MEs to the build for a firmware
+#
+# @param $1 firmware name
+# @param $2 ME list
+# @param $3 additional flag
+#
+define fwdep.add_gro_flag
+
+$1.nffw: $(GRO_DIR)
+
+$(foreach blk,$(shell seq $(words $2)),\
+	$(call fwdep.add_gro_block_flag,$1,$(word $(blk),$2),$(call fwdep.minus,$(blk),1),$3))
 
 $(eval $(call nffw.add_define,$1,GRO_NUM_BLOCKS=$(words $2)))
 $(eval $(call nffw.add_include,$(GRO_DIR)))
@@ -164,6 +201,22 @@ $(eval $(call nffw.add_obj_codeless,$1,flowenv_nfp_init))
 
 endef
 
+#f fwdep.add_flowenv_nfp_init_flag
+#
+# Adds a flowenv library to the library path fo a micro-C object compilation
+#
+# @param $1 firmware name
+# @param $2 additional flag
+#
+define fwdep.add_flowenv_nfp_init_flag
+
+$(eval $(call microcode.assemble.codeless.abspath,$1,flowenv_nfp_init,\
+	$(FLOWENV_DIR)/me/blocks/init,init_main.uc,$2))
+$(eval $(call nffw.add_obj_codeless,$1,flowenv_nfp_init))
+
+endef
+
+
 
 #
 ##### BLM ######
@@ -194,6 +247,20 @@ $(eval $(call nffw.add_obj,$1,blm$3,$2))
 
 endef
 
+#f fwdep.add_blm_block_flag
+#
+# Add a single BLM ME to the build of a firmware
+#
+# @param $1 firmware name
+# @param $2 ME
+# @param $3 blocknum
+# @param $4 additional flag
+#
+define fwdep.add_blm_block_flag
+$(eval $(call microcode.add_flags,$1,blm$3,$4))
+$(eval $(call fwdep.add_blm_block,$1,$2,$3))
+endef
+
 #f fwdep.add_blm
 #
 # Add BLM MEs to the build for a firmware
@@ -206,6 +273,23 @@ define fwdep.add_blm
 $(eval $(call nffw.add_define,$1,BLM_CUSTOM_CONFIG))
 $(foreach blk,$(shell seq $(words $2)),\
 	$(call fwdep.add_blm_block,$1,$(word $(blk),$2),$(call fwdep.minus,$(blk),1)))
+
+
+endef
+
+#f fwdep.add_blm_flag
+#
+# Add BLM MEs to the build for a firmware
+#
+# @param $1 firmware name
+# @param $2 ME list
+# @param $3 additional flag
+#
+define fwdep.add_blm_flag
+
+$(eval $(call nffw.add_define,$1,BLM_CUSTOM_CONFIG))
+$(foreach blk,$(shell seq $(words $2)),\
+        $(call fwdep.add_blm_block_flag,$1,$(word $(blk),$2),$(call fwdep.minus,$(blk),1),$3))
 
 
 endef

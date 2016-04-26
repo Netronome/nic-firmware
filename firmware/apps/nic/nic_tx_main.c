@@ -334,7 +334,13 @@ main()
         /* Determine where be need to receive a packet from */
         pkt_rx(FROM_HOST, &rxd);
 
+#ifdef LITHIUM_NFP_NIC
         port = rxd.src / NFD_MAX_VF_QUEUES;
+#endif
+#ifdef HYDROGEN_NFP_NIC
+        port = 0;
+#endif
+
         /* Do TX processing on packet and populate the TX descriptor */
         ret = proc_from_host(port, &rxd, &txd);
         if (ret) {

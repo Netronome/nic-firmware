@@ -24,6 +24,7 @@
 #include <nfp_chipres.h>
 
 #include <nic/nic.h>
+#include <platform.h>
 
 #include <nfp/link_state.h>
 #include <nfp/me.h>
@@ -86,8 +87,6 @@
 #define APP_MASTER_CTX_FREE1            6
 #define APP_MASTER_CTX_FREE2            7
 
-
-
 /* Address of the PF Control BAR */
 
 
@@ -134,6 +133,7 @@ __intrinsic extern int msix_pf_send(unsigned int pcie_nr,
 __intrinsic extern int msix_vf_send(unsigned int pcie_nr,
                                     unsigned int bar_nr, unsigned int vf_nr,
                                     unsigned int entry_nr, unsigned int mask_en);
+
 
 /* Hard-code the port being monitored by the NIC link status monitoring
  * XXX This should be shared with the MAC stats, of course. */
@@ -444,7 +444,6 @@ lsc_loop(int nic_intf)
     /* NOTREACHED */
 }
 
-
 int
 main(void)
 {
@@ -461,9 +460,11 @@ main(void)
     case APP_MASTER_CTX_LINK_STATE:
         lsc_loop(0);
         break;
+#ifdef LITHIUM_NFP_NIC
     case APP_MASTER_CTX_LINK_STATE2:
         lsc_loop(1);
         break;
+#endif
     default:
         ctx_wait(kill);
     }

@@ -101,9 +101,14 @@
 #endif
 
 #define MAC_CHAN_PER_PORT   8
+#ifdef LITHIUM_NFP_NIC
 #define TMQ_PER_PORT        (MAC_CHAN_PER_PORT * 2 * 8)
-
 #define MAC_TO_PORT(x)      (x / (MAC_CHAN_PER_PORT * 2))
+#endif
+#ifdef HYDROGEN_NFP_NIC
+#define TMQ_PER_PORT        (MAC_CHAN_PER_PORT * 8)
+#define MAC_TO_PORT(x)      (x / MAC_CHAN_PER_PORT)
+#endif
 #define PORT_TO_TMQ(x)      (x * TMQ_PER_PORT)
 
 /*

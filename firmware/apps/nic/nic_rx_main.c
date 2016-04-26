@@ -98,8 +98,7 @@ proc_from_wire(int port,
     __addr40 char *pkt_start;
     __xread uint32_t pkt_cache[16];
     __gpr int16_t offset, plen;
-    uint32_t qid = 0;
-
+    uint32_t qid=0;
     __gpr uint32_t csum_prepend;
     __gpr uint8_t err, ret;
     __gpr uint16_t vlan;
@@ -180,7 +179,6 @@ proc_from_wire(int port,
             goto err_out;
         }
     }
-
 
     /* Strip VLAN if present and configured.
      * Copy the Ethernet Type, move the Ethernet header by
