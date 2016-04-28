@@ -5,8 +5,8 @@
 FLOWENV_REV=1dc3067b9afa
 # GRO_REV  - Tip as of Feb 24 2016
 GRO_REV=ee048d732f2d
-# NFD_REV - 
-NFD_REV=49947fd57c79
+# NFD_REV - Tip of ng-nfd-vrouter branch
+NFD_REV=8093e3272991
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
