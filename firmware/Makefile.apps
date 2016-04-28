@@ -16,5 +16,6 @@
 # @brief       Makefile for the individual apps
 #
 
-include $(FIRMWARE_DIR)/apps/nic/Makefile
+include $(FIRMWARE_DIR)/apps/nic/Makefile.h
+include $(FIRMWARE_DIR)/apps/nic/Makefile.li
 include $(FIRMWARE_DIR)/apps/vrouter/Makefile
