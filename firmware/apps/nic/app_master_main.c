@@ -131,10 +131,8 @@ __intrinsic extern int msix_vf_send(unsigned int pcie_nr,
 /* Amount of time between each link status check */
 #define LSC_POLL_PERIOD            100000
 
-/* Magic address retrieved from nfp-reg --cpp_info
- * xpb:Nbi0IsldXpbMap.NbiTopXpbMap.MacGlbAdrMap.MacEthernet0.
- * MacEthSeg0.EthCmdConfig.EthRxEna */
-#define MAC_CONF_ADDR               0x0008440008
+#define MAC_CONF_ADDR(_port)   (NFP_MAC_XPB_OFF(0) | NFP_MAC_ETH(0)\
+                                | NFP_MAC_ETH_SEG_CMD_CONFIG(_port))
 
 /* Addresses of the MAC enqueue inhibit registers */
 #define MAC_EQ_INH_ADDR                                     \
@@ -200,6 +198,7 @@ cfg_changes_loop(void)
     uint32_t mac_inhibit;
     uint32_t mac_inhibit_done;
     uint32_t mac_port_mask;
+    uint32_t port;
 
     /* Initialisation */
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
@@ -230,30 +229,34 @@ cfg_changes_loop(void)
             if ((nic_control_word ^ cfg_bar_data[0]) &
                     NFP_NET_CFG_CTRL_ENABLE) {
 
-                mac_conf = xpb_read(MAC_CONF_ADDR);
-                if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
-                    mac_conf |= NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
-                    xpb_write(MAC_CONF_ADDR, mac_conf);
-                } else {
-                    /* Inhibit packets from enqueueing in the MAC RX */
-                    mac_port_mask = 0xf << MAC0_PORTS;
+                /* Need to go through all ports */
+                for(port = 0; port <= 4; port += 4) {
+                    mac_conf = xpb_read(MAC_CONF_ADDR(port));
+                    if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
+                        mac_conf |= NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
+                        xpb_write(MAC_CONF_ADDR(port), mac_conf);
+                    } else {
+                        /* Inhibit packets from enqueueing in the MAC RX */
+                        mac_port_mask = 0xf << MAC0_PORTS;
 
-                    mac_inhibit = xpb_read(MAC_EQ_INH_ADDR);
-                    mac_inhibit |= mac_port_mask;
-                    xpb_write(MAC_EQ_INH_ADDR, mac_inhibit);
+                        mac_inhibit = xpb_read(MAC_EQ_INH_ADDR);
+                        mac_inhibit |= mac_port_mask;
+                        xpb_write(MAC_EQ_INH_ADDR, mac_inhibit);
 
-                    /* Polling to see that the inhibit took effect */
-                    do {
-                        mac_inhibit_done = xpb_read(MAC_EQ_INH_DONE_ADDR);
-                        mac_inhibit_done &= mac_port_mask;
-                    } while (mac_inhibit_done != mac_port_mask);
+                        /* Polling to see that the inhibit took effect */
+                        do {
+                            mac_inhibit_done = xpb_read(MAC_EQ_INH_DONE_ADDR);
+                            mac_inhibit_done &= mac_port_mask;
+                        } while (mac_inhibit_done != mac_port_mask);
 
-                    /* Disable the RX, and then disable the inhibit feature */
-                    mac_conf &= ~NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
-                    xpb_write(MAC_CONF_ADDR, mac_conf);
+                        /* Disable the RX, and then disable the
+                         * inhibit feature*/
+                        mac_conf &= ~NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
+                        xpb_write(MAC_CONF_ADDR(port), mac_conf);
 
-                    mac_inhibit &= ~mac_port_mask;
-                    xpb_write(MAC_EQ_INH_ADDR, mac_inhibit);
+                        mac_inhibit &= ~mac_port_mask;
+                        xpb_write(MAC_EQ_INH_ADDR, mac_inhibit);
+                    }
                 }
             }
 
