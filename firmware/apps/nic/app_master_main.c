@@ -138,7 +138,7 @@ __intrinsic extern int msix_vf_send(unsigned int pcie_nr,
 /* Hard-code the port being monitored by the NIC link status monitoring
  * XXX This should be shared with the MAC stats, of course. */
 #define LSC_ACTIVE_LINK_MAC        0
-#define LSC_ACTIVE_LINK_ETH_PORT   0
+#define LSC_ACTIVE_LINK_ETH_PORT(_intf) (_intf << 2)
 
 /* Amount of time between each link status check */
 #define LSC_POLL_PERIOD            100000
@@ -241,34 +241,35 @@ cfg_changes_loop(void)
             if ((nic_control_word ^ cfg_bar_data[0]) &
                     NFP_NET_CFG_CTRL_ENABLE) {
 
-                /* Need to go through all ports */
-                for(port = 0; port <= 4; port += 4) {
-                    mac_conf = xpb_read(MAC_CONF_ADDR(port));
-                    if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
-                        mac_conf |= NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
-                        xpb_write(MAC_CONF_ADDR(port), mac_conf);
-                    } else {
-                        /* Inhibit packets from enqueueing in the MAC RX */
-                        mac_port_mask = 0xf << MAC0_PORTS;
+#ifdef LITHIUM_NFP_NIC
+                port = cfg_msg.vnic << 2;
+#else
+                port = 0;
+#endif
+                mac_conf = xpb_read(MAC_CONF_ADDR(port));
+                if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
+                    mac_conf |= NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
+                    xpb_write(MAC_CONF_ADDR(port), mac_conf);
+                } else {
+                    /* Inhibit packets from enqueueing in the MAC RX */
+                    mac_port_mask = 0xf << port;
 
-                        mac_inhibit = xpb_read(MAC_EQ_INH_ADDR);
-                        mac_inhibit |= mac_port_mask;
-                        xpb_write(MAC_EQ_INH_ADDR, mac_inhibit);
+                    mac_inhibit = xpb_read(MAC_EQ_INH_ADDR);
+                    mac_inhibit |= mac_port_mask;
+                    xpb_write(MAC_EQ_INH_ADDR, mac_inhibit);
 
-                        /* Polling to see that the inhibit took effect */
-                        do {
-                            mac_inhibit_done = xpb_read(MAC_EQ_INH_DONE_ADDR);
-                            mac_inhibit_done &= mac_port_mask;
-                        } while (mac_inhibit_done != mac_port_mask);
+                    /* Polling to see that the inhibit took effect */
+                    do {
+                        mac_inhibit_done = xpb_read(MAC_EQ_INH_DONE_ADDR);
+                        mac_inhibit_done &= mac_port_mask;
+                    } while (mac_inhibit_done != mac_port_mask);
 
-                        /* Disable the RX, and then disable the
-                         * inhibit feature*/
-                        mac_conf &= ~NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
-                        xpb_write(MAC_CONF_ADDR(port), mac_conf);
+                    /* Disable the RX, and then disable the inhibit feature*/
+                    mac_conf &= ~NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
+                    xpb_write(MAC_CONF_ADDR(port), mac_conf);
 
-                        mac_inhibit &= ~mac_port_mask;
-                        xpb_write(MAC_EQ_INH_ADDR, mac_inhibit);
-                    }
+                    mac_inhibit &= ~mac_port_mask;
+                    xpb_write(MAC_EQ_INH_ADDR, mac_inhibit);
                 }
             }
 
@@ -372,8 +373,12 @@ lsc_send(int nic_intf)
         mem_write8_le(&mask_w, nic_ctrl_bar + NFP_NET_CFG_ICR(entry), 1);
     }
 
+#ifdef NFD_VROUTER_LITHIUM
     ret = msix_vf_send(NIC_PCI + 4, PCIE_CPP2PCIE_LSC, nic_intf, entry,
                        automask);
+#else
+    ret = msix_pf_send(NIC_PCI + 4, PCIE_CPP2PCIE_LSC, entry, automask);
+#endif
 
 out:
     return ret;
@@ -398,7 +403,8 @@ lsc_check(__gpr unsigned int *ls_current, int nic_intf)
 
     /* Read the current link state and if it changed set the bit in
      * the control BAR status */
-    ls = mac_eth_port_link_state(LSC_ACTIVE_LINK_MAC, LSC_ACTIVE_LINK_ETH_PORT);
+    ls = mac_eth_port_link_state(LSC_ACTIVE_LINK_MAC,
+                                 LSC_ACTIVE_LINK_ETH_PORT(nic_intf));
 
     if (ls != *ls_current)
         changed = 1;
