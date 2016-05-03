@@ -315,11 +315,8 @@ l4_csum_offsets(__addr40 char *mem_ptr, __addr40 char *ctm_ptr,
 {
     uint32_t ctm_sz = (256 << ctm_split()) - frame_off;
 
-    /* this is how the code should look like but somehow it generates
-     * unintended mem[read8's
-     */
-#if 0
     if (ctm_ptr) {
+        /* warning: untested code */
         *ctm_h_ptr = ctm_ptr + l4_off;
         if (ctm_sz >= pkt_len) {
             *ctm_l = pkt_len - l4_off;
@@ -328,7 +325,7 @@ l4_csum_offsets(__addr40 char *mem_ptr, __addr40 char *ctm_ptr,
         } else {
             *ctm_l = ctm_sz - l4_off;
             *mem_l = pkt_len - *ctm_l - l4_off;
-            *mem_h_ptr = *mem_ptr + l4_off + *ctm_l;
+            *mem_h_ptr = mem_ptr + l4_off + *ctm_l;
         }
     } else {
         *ctm_l = 0;
@@ -336,12 +333,6 @@ l4_csum_offsets(__addr40 char *mem_ptr, __addr40 char *ctm_ptr,
         *mem_l = pkt_len - l4_off;
         *mem_h_ptr = mem_ptr + l4_off;
     }
-#else
-    *ctm_l = 0;
-    *ctm_h_ptr = 0;
-    *mem_l = pkt_len - l4_off;
-    *mem_h_ptr = mem_ptr + l4_off;
-#endif
 }
 
 
@@ -476,10 +467,6 @@ tx_tsk_set_l4_csum(__lmem struct pkt_hdrs *hdrs,
 
     pkt_ptrs(rxd, &frame_off, &ctm_ptr, &mem_ptr);
 
-    /* don't support CTM yet, somehow l4_csum_offsets generates
-     * mem[read8's */
-    if (ctm_ptr)
-        halt();
     /*
      * If csum offload is enabled, then it only refers to inner
      * headers if the encapsulation flag is set. However, we always
