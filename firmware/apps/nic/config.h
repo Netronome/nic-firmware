@@ -66,7 +66,9 @@
 #define NBI_TM_ENABLE_SEQUENCER0 1
 
 #ifdef LITHIUM_NFP_NIC
-#define NBI_TM_H_0_Q             256  /* 256 TM queues, 64 entries per queue */
+    /* 2 ports, 32 queues each, 256 entries per queue */
+    #define NBI0_TM_Q_CFG_RANGE0 1,0,31,8
+    #define NBI0_TM_Q_CFG_RANGE1 1,128,159,8
 #endif
 #ifdef HYDROGEN_NFP_NIC
 #define NBI_TM_H_0_Q             16  /* 16 TM queues, 1024 entries per queue */
