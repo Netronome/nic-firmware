@@ -16,6 +16,7 @@
 # @brief       Makefile for the individual apps
 #
 
-include $(FIRMWARE_DIR)/apps/nic/Makefile.h
-include $(FIRMWARE_DIR)/apps/nic/Makefile.li
+PLATFORM_LIST = 0 1
+$(foreach PLATFORM,$(PLATFORM_LIST),$(eval \
+          include $(FIRMWARE_DIR)/apps/nic/Makefile))
 include $(FIRMWARE_DIR)/apps/vrouter/Makefile
