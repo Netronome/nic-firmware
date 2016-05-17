@@ -8,11 +8,11 @@
 #ifndef __PLATFORM_H__
 #define __PLATFORM_H__
 
-#ifndef PLATFORM
-#error "PLATFORM must be defined"
+#ifndef NS_PLATFORM_TYPE
+#error "NS_PLATFORM_TYPE must be defined"
 #endif
 
-#if PLATFORM == 1
+#if NS_PLATFORM_TYPE == 1
 #define LITHIUM_NFP_NIC
 #else
 #define HYDROGEN_NFP_NIC
