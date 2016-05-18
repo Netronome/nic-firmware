@@ -6,9 +6,9 @@ ifndef PLATFORM
 endif
 
 ifeq ($(PLATFORM),0)
-    PROJECT = basic_nic_h
+    PROJECT = ns_nic_cx40q_1
 else ifeq ($(PLATFORM),1)
-    PROJECT = basic_nic_li
+    PROJECT = ns_nic_cx10_2
 endif
 
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
