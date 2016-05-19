@@ -1,8 +1,8 @@
 /*
- * Copyright 2015 Netronome, Inc.
+ * Copyright 2016 Netronome, Inc.
  *
- * @file          apps/nic/platform.h
- * @brief         NFP platform configuration for the NIC application.
+ * @file          include/platform.h
+ * @brief         Platform-specific configuration information.
  */
 
 #ifndef __PLATFORM_H__
