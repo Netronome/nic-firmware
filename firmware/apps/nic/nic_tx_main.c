@@ -322,11 +322,12 @@ main()
         /* Determine where be need to receive a packet from */
         pkt_rx(FROM_HOST, &rxd);
 
-#ifdef LITHIUM_NFP_NIC
+#if NS_PLATFORM_TYPE == NS_PLATFORM_LITHIUM
         port = rxd.src / NFD_MAX_VF_QUEUES;
-#endif
-#ifdef HYDROGEN_NFP_NIC
+#elif NS_PLATFORM_TYPE == NS_PLATFORM_HYDROGEN
         port = 0;
+#else
+#error "nic_tx_main.c currently supports only Lithium and Hydrogen"
 #endif
 
         /* Do TX processing on packet and populate the TX descriptor */

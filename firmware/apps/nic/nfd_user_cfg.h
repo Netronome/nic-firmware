@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2015,  Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2015-2016,  Netronome Systems, Inc.  All rights reserved.
  *
  * @file          nfd_user_cfg.h
  * @brief         File for specifying user configuration parameters
@@ -14,7 +14,8 @@
 
 #include <platform.h>
 
-#ifdef LITHIUM_NFP_NIC
+#if NS_PLATFORM_TYPE == NS_PLATFORM_LITHIUM
+
 /* The lithium support is a temporary set of changes:
  * from the fw/NFD point of view there are 2 VF-style VNICs and
  * from the driver point of view there is a single PF that has two
@@ -38,9 +39,8 @@
 /* TEMP enable writing VF queue offsets into the BAR */
 #define NFD_NO_ISOLATION
 
-#endif /* LITHIUM_NFP_NIC */
+#elif NS_PLATFORM_TYPE == NS_PLATFORM_HYDROGEN
 
-#ifdef HYDROGEN_NFP_NIC
 #ifndef NFD_MAX_VF_QUEUES
 #define NFD_MAX_VF_QUEUES       1
 #endif
@@ -53,7 +53,12 @@
 #ifndef NFD_MAX_VFS
 #define NFD_MAX_VFS             0
 #endif
-#endif /* HYDROGEN_NFP_NIC */
+
+#else
+
+#error "nfd_user_cfg.h currently supports only Lithium and Hydrogen"
+
+#endif
 
 /* Configure VF expansion BARs to access the NFP, this seems to be required
  * even when just using the PF */

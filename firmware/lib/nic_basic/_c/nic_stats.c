@@ -67,19 +67,13 @@ struct nic_port_stats_extra nic_stats_extra[NVNICS];
 /* Divider for the TM queue drop counters accumulate */
 #define TMQ_CNTRS_ACCUM_RATE_DIV 4
 
-/* The list of used Ports per MAC. */
-#ifndef MAC0_PORTS_LIST
-#error "The list of MAC 0 ports used must be defined"
-#else
-__shared __lmem uint32_t mac0_ports[] = {MAC0_PORTS_LIST};
-#endif
-
 /* The MAC stats in the Control BAR are only a subset of the stats
  * maintained by the MACs.  We accumulate the whole stats in MU space. */
 __export __shared __imem struct macstats_port_accum nic_mac_cntrs_accum[24];
 
-/* TM Q drop counter. Currently only one TM Q is used */
-__export __shared __align8 __imem uint64_t nic_tmq_drop_cntr_accum = 0;
+/* TM Q drop counters. */
+__export __shared __align8 __imem uint64_t          \
+    nic_tmq_drop_cntr_accum[NS_PLATFORM_NUM_PORTS];
 
 /* The structure of the counters in the config BAR, used to push the
  * accumulated counters to the config BAR. */
@@ -214,9 +208,12 @@ mac_stats_accumulate(void)
 {
     __gpr uint32_t i;
 
-    for (i = 0; i < sizeof(mac0_ports) / 4; i++)
-        macstats_port_accum(0, mac0_ports[i],
-                            &nic_mac_cntrs_accum[mac0_ports[i]]);
+    /* Accumulate the port statistics for each port. */
+    for (i = 0; i < NS_PLATFORM_NUM_PORTS; ++i) {
+        macstats_port_accum(
+            NS_PLATFORM_MAC(i), NS_PLATFORM_MAC_SERDES_LO(i),
+            &nic_mac_cntrs_accum[NS_PLATFORM_MAC_SERDES_LO(i)]);
+    }
 }
 
 __forceinline static void
@@ -226,26 +223,23 @@ nic_stats_rx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
     __imem struct macstats_port_accum* port_stats;
     __xread uint64_t read_array[8];
     __xread uint64_t read_val;
-    __gpr uint32_t i;
 
-    /* TODO: add support for port 1 MAC and TM cntrs */
-    if (port == 0) {
-        for (i = 0; i < sizeof(mac0_ports) / 4; i++) {
-            port_stats = &nic_mac_cntrs_accum[mac0_ports[i]];
+    /* Retrieve the corresponding MAC port stats. */
+    if (port < NS_PLATFORM_NUM_PORTS) {
+        port_stats = &nic_mac_cntrs_accum[NS_PLATFORM_MAC_SERDES_LO(port)];
 
-            mem_read64(&read_val, &port_stats->RxPIfInErrors, sizeof(read_val));
-            bar_cntrs.errors += read_val;
-            mem_read64(&read_val, &port_stats->RxPIfInOctets, sizeof(read_val));
-            bar_cntrs.octets += read_val;
-            mem_read64(&read_val, &port_stats->RxPStatsPkts, sizeof(read_val));
-            bar_cntrs.frames += read_val;
-            mem_read64(&read_val, &port_stats->RxPIfInMultiCastPkts,
-                       sizeof(read_val));
-            bar_cntrs.mc_frames += read_val;
-            mem_read64(&read_val, &port_stats->RxPIfInBroadCastPkts,
-                       sizeof(read_val));
-            bar_cntrs.bc_frames += read_val;
-        }
+        mem_read64(&read_val, &port_stats->RxPIfInErrors, sizeof(read_val));
+        bar_cntrs.errors += read_val;
+        mem_read64(&read_val, &port_stats->RxPIfInOctets, sizeof(read_val));
+        bar_cntrs.octets += read_val;
+        mem_read64(&read_val, &port_stats->RxPStatsPkts, sizeof(read_val));
+        bar_cntrs.frames += read_val;
+        mem_read64(&read_val, &port_stats->RxPIfInMultiCastPkts,
+                   sizeof(read_val));
+        bar_cntrs.mc_frames += read_val;
+        mem_read64(&read_val, &port_stats->RxPIfInBroadCastPkts,
+                   sizeof(read_val));
+        bar_cntrs.bc_frames += read_val;
     }
 
     mem_read64(read_array, &nic_stats_extra[port].rx_discards,
@@ -272,27 +266,28 @@ nic_stats_tx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
     __imem struct macstats_port_accum* port_stats;
     __xread uint64_t read_array[8];
     __xread uint64_t read_val;
-    __gpr uint32_t i;
 
-    /* TODO: add support for port 1 MAC and TM cntrs */
-    if (port == 0) {
-        for (i = 0; i < sizeof(mac0_ports) / 4; i++) {
-            port_stats = &nic_mac_cntrs_accum[mac0_ports[i]];
+    /* Retrieve the corresponding MAC port stats. */
+    if (port < NS_PLATFORM_NUM_PORTS) {
+        port_stats = &nic_mac_cntrs_accum[NS_PLATFORM_MAC_SERDES_LO(port)];
 
-            mem_read64(&read_val, &port_stats->TxPIfOutErrors, sizeof(read_val));
-            bar_cntrs.errors += read_val;
-            mem_read64(&read_val, &port_stats->TxPIfOutOctets, sizeof(read_val));
-            bar_cntrs.octets += read_val;
-            mem_read64(&read_val, &port_stats->TxFramesTransmittedOK,
-                       sizeof(read_val));
-            bar_cntrs.frames += read_val;
-            mem_read64(&read_val, &port_stats->TxPIfOutMultiCastPkts,
-                       sizeof(read_val));
-            bar_cntrs.mc_frames += read_val;
-            mem_read64(&read_val, &port_stats->TxPIfOutBroadCastPkts,
-                       sizeof(read_val));
-            bar_cntrs.bc_frames += read_val;
-        }
+        mem_read64(&read_val, &port_stats->TxPIfOutErrors, sizeof(read_val));
+        bar_cntrs.errors += read_val;
+        mem_read64(&read_val, &port_stats->TxPIfOutOctets, sizeof(read_val));
+        bar_cntrs.octets += read_val;
+        mem_read64(&read_val, &port_stats->TxFramesTransmittedOK,
+                   sizeof(read_val));
+        bar_cntrs.frames += read_val;
+        mem_read64(&read_val, &port_stats->TxPIfOutMultiCastPkts,
+                   sizeof(read_val));
+        bar_cntrs.mc_frames += read_val;
+        mem_read64(&read_val, &port_stats->TxPIfOutBroadCastPkts,
+                   sizeof(read_val));
+        bar_cntrs.bc_frames += read_val;
+
+        /* Accumulate the TM Q drops */
+        mem_read64(&read_val, &nic_tmq_drop_cntr_accum[port], sizeof(uint64_t));
+        bar_cntrs.discards += read_val;
     }
 
     mem_read64(read_array, &nic_stats_extra[port].tx_discards,
@@ -344,15 +339,28 @@ nic_stats_update_control_bar(void)
  __forceinline static void
 nic_tmq_drops_accumulate(void)
 {
-    __gpr uint32_t tmq_cntr;
-    __xwrite uint64_t write_val;
+    __gpr uint32_t    port;
+    __gpr uint32_t    qid;
+    __gpr uint32_t    tmq_cnt;
+    __gpr uint64_t    tmq_port_drop_cnt;
+    __xwrite uint64_t cnt_xw;
 
-    /* Only one Q (#0) is currently used */
-    tmq_cnt_read(0, &tmq_cntr, 0, 1);
+    /* Accumulate the NBI TM queue drop counts for each port. */
+    for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+        /* Accumulate the NBI TM queue drop counts associated with the port. */
+        tmq_port_drop_cnt = 0;
 
-    /* Fix word ordering */
-    write_val = ((uint64_t)tmq_cntr << 32);
-    mem_add64(&write_val, &nic_tmq_drop_cntr_accum, sizeof(uint64_t));
+        for (qid = NS_PLATFORM_NBI_TM_QID_LO(port);
+             qid < NS_PLATFORM_NBI_TM_QID_HI(port);
+             ++qid) {
+            tmq_cnt_read(NS_PLATFORM_MAC(port), &tmq_cnt, qid, 1);
+            tmq_port_drop_cnt += (uint64_t)tmq_cnt;
+        }
+
+        /* Store the per-port NBI TM queue drop count. */
+        cnt_xw = tmq_port_drop_cnt;
+        mem_add64(&cnt_xw, &nic_tmq_drop_cntr_accum[port], sizeof(uint64_t));
+    }
 }
 
 void
