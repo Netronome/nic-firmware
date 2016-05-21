@@ -1,4 +1,4 @@
-#a Copyright (C) 2015,  Gavin J Stark.  All rights reserved.
+#a Copyright (C) 2015-2016,  Gavin J Stark.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 # @brief       Makefile for the individual apps
 #
 
-PLATFORM_LIST = 0 1
+PLATFORM_LIST = Hydrogen Lithium
 $(foreach PLATFORM,$(PLATFORM_LIST),$(eval \
           include $(FIRMWARE_DIR)/apps/nic/Makefile))
 include $(FIRMWARE_DIR)/apps/vrouter/Makefile

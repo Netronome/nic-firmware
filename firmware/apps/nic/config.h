@@ -65,23 +65,155 @@
 #define NBI_TM_NUM_SEQUENCERS    1
 #define NBI_TM_ENABLE_SEQUENCER0 1
 
-#ifdef LITHIUM_NFP_NIC
-    /* 2 ports, 32 queues each, 256 entries per queue */
-    #define NBI0_TM_Q_CFG_RANGE0 1,0,31,8
-    #define NBI0_TM_Q_CFG_RANGE1 1,128,159,8
+/* Determine the NBI TM queue depth based on port configuration. */
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_0 <= 1
+    /* 1-port Configuration. */
+    #define NS_PLATFORM_NBI_TM_0_QSIZE 9  /* 2^9 packet buffers per queue */
+#elif NS_PLATFORM_NUM_PORTS_PER_MAC_0 <= 2
+    /* 2-port Configuration. */
+    #define NS_PLATFORM_NBI_TM_0_QSIZE 8  /* 2^8 packet buffers per queue */
+#elif NS_PLATFORM_NUM_PORTS_PER_MAC_0 <= 4
+    /* 3- or 4-port Configuration. */
+    #define NS_PLATFORM_NBI_TM_0_QSIZE 7  /* 2^7 packet buffers per queue */
+#elif NS_PLATFORM_NUM_PORTS_PER_MAC_0 <= 8
+    /* 5- to 8-port Configuration. */
+    #define NS_PLATFORM_NBI_TM_0_QSIZE 6  /* 2^6 packet buffers per queue */
+#else
+    /* Unsupported configuration */
+    #error "No support for more than 8 ports per MAC/NBI island"
 #endif
-#ifdef HYDROGEN_NFP_NIC
-#define NBI_TM_H_0_Q             16  /* 16 TM queues, 1024 entries per queue */
-#endif
-#define NBI_TM_H_1_Q             0
 
-/*
- * MAC configuration
- */
-#define MAC0_PORTS               0
-#define MAC0_CHANNELS            3
-#define MAC0_PORTS_LIST          MAC0_PORTS
-#define MAC0_CHANNELS_LIST       MAC0_CHANNELS
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_1 <= 1
+    /* 1-port Configuration. */
+    #define NS_PLATFORM_NBI_TM_1_QSIZE 9  /* 2^9 packet buffers per queue */
+#elif NS_PLATFORM_NUM_PORTS_PER_MAC_1 <= 2
+    /* 2-port Configuration. */
+    #define NS_PLATFORM_NBI_TM_1_QSIZE 8  /* 2^8 packet buffers per queue */
+#elif NS_PLATFORM_NUM_PORTS_PER_MAC_1 <= 4
+    /* 3- or 4-port Configuration. */
+    #define NS_PLATFORM_NBI_TM_1_QSIZE 7  /* 2^7 packet buffers per queue */
+#elif NS_PLATFORM_NUM_PORTS_PER_MAC_1 <= 8
+    /* 5- to 8-port Configuration. */
+    #define NS_PLATFORM_NBI_TM_1_QSIZE 6  /* 2^6 packet buffers per queue */
+#else
+    /* Unsupported configuration */
+    #error "No support for more than 8 ports per MAC/NBI island"
+#endif
+
+/* Initialize the NBI TM queues associated with each port. */
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 0
+    #define NBI0_TM_Q_CFG_RANGE0      \
+        1,                            \
+        NS_PLATFORM_NBI_TM_QID_LO(0), \
+        NS_PLATFORM_NBI_TM_QID_HI(0), \
+        NS_PLATFORM_NBI_TM_0_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 1
+    #define NBI0_TM_Q_CFG_RANGE1      \
+        1,                            \
+        NS_PLATFORM_NBI_TM_QID_LO(1), \
+        NS_PLATFORM_NBI_TM_QID_HI(1), \
+        NS_PLATFORM_NBI_TM_0_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 2
+    #define NBI0_TM_Q_CFG_RANGE2      \
+        1,                            \
+        NS_PLATFORM_NBI_TM_QID_LO(2), \
+        NS_PLATFORM_NBI_TM_QID_HI(2), \
+        NS_PLATFORM_NBI_TM_0_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 3
+    #define NBI0_TM_Q_CFG_RANGE3      \
+        1,                            \
+        NS_PLATFORM_NBI_TM_QID_LO(3), \
+        NS_PLATFORM_NBI_TM_QID_HI(3), \
+        NS_PLATFORM_NBI_TM_0_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 4
+    #define NBI0_TM_Q_CFG_RANGE4      \
+        1,                            \
+        NS_PLATFORM_NBI_TM_QID_LO(4), \
+        NS_PLATFORM_NBI_TM_QID_HI(4), \
+        NS_PLATFORM_NBI_TM_0_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 5
+    #define NBI0_TM_Q_CFG_RANGE5      \
+        1,                            \
+        NS_PLATFORM_NBI_TM_QID_LO(5), \
+        NS_PLATFORM_NBI_TM_QID_HI(5), \
+        NS_PLATFORM_NBI_TM_0_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 6
+    #define NBI0_TM_Q_CFG_RANGE6      \
+        1,                            \
+        NS_PLATFORM_NBI_TM_QID_LO(6), \
+        NS_PLATFORM_NBI_TM_QID_HI(6), \
+        NS_PLATFORM_NBI_TM_0_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 7
+    #define NBI0_TM_Q_CFG_RANGE7      \
+        1,                            \
+        NS_PLATFORM_NBI_TM_QID_LO(7), \
+        NS_PLATFORM_NBI_TM_QID_HI(7), \
+        NS_PLATFORM_NBI_TM_0_QSIZE
+#endif
+
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 0
+    #define NBI1_TM_Q_CFG_RANGE0                                          \
+        1,                                                                \
+        (NS_PLATFORM_NBI_TM_QID_LO(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 0), \
+        (NS_PLATFORM_NBI_TM_QID_HI(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 0), \
+        NS_PLATFORM_NBI_TM_1_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 1
+    #define NBI1_TM_Q_CFG_RANGE1                                          \
+        1,                                                                \
+        (NS_PLATFORM_NBI_TM_QID_LO(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 1), \
+        (NS_PLATFORM_NBI_TM_QID_HI(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 1), \
+        NS_PLATFORM_NBI_TM_1_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 2
+    #define NBI1_TM_Q_CFG_RANGE2                                          \
+        1,                                                                \
+        (NS_PLATFORM_NBI_TM_QID_LO(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 2), \
+        (NS_PLATFORM_NBI_TM_QID_HI(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 2), \
+        NS_PLATFORM_NBI_TM_1_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 3
+    #define NBI1_TM_Q_CFG_RANGE3                                          \
+        1,                                                                \
+        (NS_PLATFORM_NBI_TM_QID_LO(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 3), \
+        (NS_PLATFORM_NBI_TM_QID_HI(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 3), \
+        NS_PLATFORM_NBI_TM_1_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 4
+    #define NBI1_TM_Q_CFG_RANGE4                                          \
+        1,                                                                \
+        (NS_PLATFORM_NBI_TM_QID_LO(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 4), \
+        (NS_PLATFORM_NBI_TM_QID_HI(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 4), \
+        NS_PLATFORM_NBI_TM_1_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 5
+    #define NBI1_TM_Q_CFG_RANGE5                                          \
+        1,                                                                \
+        (NS_PLATFORM_NBI_TM_QID_LO(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 5), \
+        (NS_PLATFORM_NBI_TM_QID_HI(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 5), \
+        NS_PLATFORM_NBI_TM_1_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 6
+    #define NBI1_TM_Q_CFG_RANGE6                                          \
+        1,                                                                \
+        (NS_PLATFORM_NBI_TM_QID_LO(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 6), \
+        (NS_PLATFORM_NBI_TM_QID_HI(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 6), \
+        NS_PLATFORM_NBI_TM_1_QSIZE
+#endif
+#if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 7
+    #define NBI1_TM_Q_CFG_RANGE7                                          \
+        1,                                                                \
+        (NS_PLATFORM_NBI_TM_QID_LO(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 7), \
+        (NS_PLATFORM_NBI_TM_QID_HI(NS_PLATFORM_NUM_PORTS_PER_MAC_0) + 7), \
+        NS_PLATFORM_NBI_TM_1_QSIZE
+#endif
 
 /*
  * BLM configuration

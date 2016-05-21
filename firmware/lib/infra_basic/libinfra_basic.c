@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Netronome, Inc.
+ * Copyright 2015-2016 Netronome, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@
 
 #include <assert.h>
 #include <nfp.h>
+#include <platform.h>
 #include <stdint.h>
 
 /* Library Includes */
@@ -101,15 +102,12 @@
 #endif
 
 #define MAC_CHAN_PER_PORT   8
-#ifdef LITHIUM_NFP_NIC
-#define TMQ_PER_PORT        (MAC_CHAN_PER_PORT * 2 * 8)
+#if NS_PLATFORM_TYPE == NS_PLATFORM_LITHIUM
 #define MAC_TO_PORT(x)      (x / (MAC_CHAN_PER_PORT * 2))
 #endif
-#ifdef HYDROGEN_NFP_NIC
-#define TMQ_PER_PORT        (MAC_CHAN_PER_PORT * 8)
+#if NS_PLATFORM_TYPE == NS_PLATFORM_HYDROGEN
 #define MAC_TO_PORT(x)      (x / MAC_CHAN_PER_PORT)
 #endif
-#define PORT_TO_TMQ(x)      (x * TMQ_PER_PORT)
 
 /*
  * Global variables
@@ -284,7 +282,8 @@ send_to_wire(__nnr struct pkt_tx_desc *txd)
 
     /* Send the packet (seqr and seq copied from the rxd in app) */
     pkt_nbi_send(pi->isl, pi->pnum, &msi, pi->len, NBI,
-                 PORT_TO_TMQ(txd->dest), txd->seqr, txd->seq, ctm_buf_size);
+                 NS_PLATFORM_NBI_TM_QID_LO(txd->dest), txd->seqr, txd->seq,
+                 ctm_buf_size);
 
     return 0;
 }
