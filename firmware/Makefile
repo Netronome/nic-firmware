@@ -100,7 +100,7 @@ firmware_show_listfiles:
 
 firmware_clean:
 	@for d in $(FW_BUILD_DIRS) ; do \
-		echo "Cleaining $$d" ; \
+		echo "Cleaning $$d" ; \
 		rm -rf $$d; \
 	done
 	@rm -f $(FW_BUILD)/*.map
