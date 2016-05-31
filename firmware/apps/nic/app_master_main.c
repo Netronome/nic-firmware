@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Netronome, Inc.
+ * Copyright 2014-2016 Netronome, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
  * @file          app_master_main.c
  * @brief         ME serving as the NFD NIC application master.
  *
- * This implementation only handles one 40G port and one PCIe island.
+ * This implementation only handles one PCIe island.
  */
 
 #include <assert.h>
@@ -82,10 +82,10 @@
 #define APP_MASTER_CTX_MAC_STATS        1
 #define APP_MASTER_CTX_PERQ_STATS       2
 #define APP_MASTER_CTX_LINK_STATE       3
-#define APP_MASTER_CTX_LINK_STATE2      4
-#define APP_MASTER_CTX_FREE0            5
-#define APP_MASTER_CTX_FREE1            6
-#define APP_MASTER_CTX_FREE2            7
+#define APP_MASTER_CTX_FREE0            4
+#define APP_MASTER_CTX_FREE1            5
+#define APP_MASTER_CTX_FREE2            6
+#define APP_MASTER_CTX_FREE3            7
 
 /* Address of the PF Control BAR */
 
@@ -135,25 +135,23 @@ __intrinsic extern int msix_vf_send(unsigned int pcie_nr,
                                     unsigned int entry_nr, unsigned int mask_en);
 
 
-/* Hard-code the port being monitored by the NIC link status monitoring
- * XXX This should be shared with the MAC stats, of course. */
-#define LSC_ACTIVE_LINK_MAC        0
-#define LSC_ACTIVE_LINK_ETH_PORT(_intf) (_intf << 2)
-
 /* Amount of time between each link status check */
 #define LSC_POLL_PERIOD            100000
 
-#define MAC_CONF_ADDR(_port)   (NFP_MAC_XPB_OFF(0) | NFP_MAC_ETH(0)\
-                                | NFP_MAC_ETH_SEG_CMD_CONFIG(_port))
+/* Address of the MAC Ethernet port configuration register */
+#define MAC_CONF_ADDR(_port)                                            \
+    (NFP_MAC_XPB_OFF(NS_PLATFORM_MAC(_port)) |                          \
+     NFP_MAC_ETH(NS_PLATFORM_MAC_CORE(_port)) |                         \
+     NFP_MAC_ETH_SEG_CMD_CONFIG(NS_PLATFORM_MAC_CORE_SERDES_LO(_port)))
 
 /* Addresses of the MAC enqueue inhibit registers */
-#define MAC_EQ_INH_ADDR                                     \
-    (NFP_MAC_XPB_OFF(0) | NFP_MAC_CSR | NFP_MAC_CSR_EQ_INH)
-#define MAC_EQ_INH_DONE_ADDR                                     \
-    (NFP_MAC_XPB_OFF(0) | NFP_MAC_CSR | NFP_MAC_CSR_EQ_INH_DONE)
+#define MAC_EQ_INH_ADDR(_port)                               \
+    (NFP_MAC_XPB_OFF(NS_PLATFORM_MAC(_port)) | NFP_MAC_CSR | \
+     NFP_MAC_CSR_EQ_INH)
+#define MAC_EQ_INH_DONE_ADDR(_port)                          \
+    (NFP_MAC_XPB_OFF(NS_PLATFORM_MAC(_port)) | NFP_MAC_CSR | \
+     NFP_MAC_CSR_EQ_INH_DONE)
 
-/* XXX - remove once nfp_mac.h has been incorporated into flow-env */
-#define NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE    (1 << 1)
 
 /*
  * Config change management.
@@ -241,26 +239,25 @@ cfg_changes_loop(void)
             if ((nic_control_word ^ cfg_bar_data[0]) &
                     NFP_NET_CFG_CTRL_ENABLE) {
 
-#ifdef LITHIUM_NFP_NIC
-                port = cfg_msg.vnic << 2;
-#else
-                port = 0;
-#endif
+                port = cfg_msg.vnic;
                 mac_conf = xpb_read(MAC_CONF_ADDR(port));
                 if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
                     mac_conf |= NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
                     xpb_write(MAC_CONF_ADDR(port), mac_conf);
                 } else {
                     /* Inhibit packets from enqueueing in the MAC RX */
-                    mac_port_mask = 0xf << port;
+                    mac_port_mask =
+                        (((1 << NS_PLATFORM_MAC_NUM_SERDES(port)) - 1) <<
+                         NS_PLATFORM_MAC_CORE_SERDES_LO(port));
 
-                    mac_inhibit = xpb_read(MAC_EQ_INH_ADDR);
+                    mac_inhibit = xpb_read(MAC_EQ_INH_ADDR(port));
                     mac_inhibit |= mac_port_mask;
-                    xpb_write(MAC_EQ_INH_ADDR, mac_inhibit);
+                    xpb_write(MAC_EQ_INH_ADDR(port), mac_inhibit);
 
                     /* Polling to see that the inhibit took effect */
                     do {
-                        mac_inhibit_done = xpb_read(MAC_EQ_INH_DONE_ADDR);
+                        mac_inhibit_done =
+                            xpb_read(MAC_EQ_INH_DONE_ADDR(port));
                         mac_inhibit_done &= mac_port_mask;
                     } while (mac_inhibit_done != mac_port_mask);
 
@@ -269,7 +266,7 @@ cfg_changes_loop(void)
                     xpb_write(MAC_CONF_ADDR(port), mac_conf);
 
                     mac_inhibit &= ~mac_port_mask;
-                    xpb_write(MAC_EQ_INH_ADDR, mac_inhibit);
+                    xpb_write(MAC_EQ_INH_ADDR(port), mac_inhibit);
                 }
             }
 
@@ -403,8 +400,8 @@ lsc_check(__gpr unsigned int *ls_current, int nic_intf)
 
     /* Read the current link state and if it changed set the bit in
      * the control BAR status */
-    ls = mac_eth_port_link_state(LSC_ACTIVE_LINK_MAC,
-                                 LSC_ACTIVE_LINK_ETH_PORT(nic_intf));
+    ls = mac_eth_port_link_state(NS_PLATFORM_MAC(nic_intf),
+                                 NS_PLATFORM_MAC_SERDES_LO(nic_intf));
 
     if (ls != *ls_current)
         changed = 1;
@@ -426,13 +423,21 @@ out:
 }
 
 static void
-lsc_loop(int nic_intf)
+lsc_loop(void)
 {
-    __gpr unsigned int ls_current = LINK_DOWN;
-    __gpr unsigned int pending;
+    __gpr int port;
+    __gpr unsigned int temp_ls;
+    /* This is the per-port state information. */
+    __lmem unsigned int ls_current[NS_PLATFORM_NUM_PORTS];
+    __lmem unsigned int pending[NS_PLATFORM_NUM_PORTS];
     __gpr int lsc_count = 0;
 
-    pending = lsc_check(&ls_current, nic_intf);
+    /* Set the initial port state. */
+    for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+        temp_ls = LINK_DOWN;
+        pending[port] = lsc_check(&temp_ls, port);
+        ls_current[port] = temp_ls;
+    }
 
     /* Need to handle pending interrupts more frequent than we need to
      * check for link state changes.  To keep it simple, have a single
@@ -440,14 +445,20 @@ lsc_loop(int nic_intf)
      * determine when to also check for linkstate. */
     for (;;) {
         sleep(LSC_POLL_PERIOD);
-        lsc_count++;
+        ++lsc_count;
 
-       if (pending)
-            pending = lsc_send(nic_intf);
+        for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+            if (pending[port])
+                pending[port] = lsc_send(port);
+        }
 
         if (lsc_count > 19) {
             lsc_count = 0;
-            pending = lsc_check(&ls_current, nic_intf);
+            for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+                temp_ls = ls_current[port];
+                pending[port] = lsc_check(&temp_ls, port);
+                ls_current[port] = temp_ls;
+            }
         }
     }
     /* NOTREACHED */
@@ -467,13 +478,8 @@ main(void)
         perq_stats_loop();
         break;
     case APP_MASTER_CTX_LINK_STATE:
-        lsc_loop(0);
+        lsc_loop();
         break;
-#ifdef LITHIUM_NFP_NIC
-    case APP_MASTER_CTX_LINK_STATE2:
-        lsc_loop(1);
-        break;
-#endif
     default:
         ctx_wait(kill);
     }
