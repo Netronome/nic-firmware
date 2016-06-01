@@ -31,6 +31,8 @@
 
 #include <shared/nfp_net_ctrl.h>
 
+#include <npfw/catamaran_app_utils.h>
+
 /*
  * The application master runs on a single ME and performs a number of
  * functions:
@@ -457,6 +459,7 @@ main(void)
 {
     switch (ctx()) {
     case APP_MASTER_CTX_CONFIG_CHANGES:
+        init_catamaran_chan2port_table();
         cfg_changes_loop();
         break;
     case APP_MASTER_CTX_MAC_STATS:

@@ -138,14 +138,6 @@ struct pkt_handle {
 #define NBI                 0
 #endif
 
-#define MAC_CHAN_PER_PORT   8
-#if NS_PLATFORM_TYPE == NS_PLATFORM_LITHIUM
-#define MAC_TO_PORT(x)      (x / (MAC_CHAN_PER_PORT * 2))
-#endif
-#if NS_PLATFORM_TYPE == NS_PLATFORM_HYDROGEN
-#define MAC_TO_PORT(x)      (x / MAC_CHAN_PER_PORT)
-#endif
-
 /*
  * Global variables
  */
@@ -276,7 +268,7 @@ pkt_rx_wire(void)
     Pkt.p_seq = nbi_rxd.seq;
     Pkt.p_offset = PKT_NBI_OFFSET;
     Pkt.p_nbi = nbi_rxd.pkt_info;
-    Pkt.p_src = PKT_WIRE_PORT(nbi_rxd.meta_type, MAC_TO_PORT(nbi_rxd.port));
+    Pkt.p_src = PKT_WIRE_PORT(nbi_rxd.meta_type, nbi_rxd.port);
     /* map NBI seqr's 1/2/3/4 to GRO 1/3/5/7 */
     pkt_status_read(0, Pkt.p_pnum, &status);
     Pkt.p_ctm_sz = status.size;

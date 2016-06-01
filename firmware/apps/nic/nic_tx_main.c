@@ -288,12 +288,10 @@ main()
             continue;
 
 
-#if NS_PLATFORM_TYPE == NS_PLATFORM_LITHIUM
-        port = PKT_PORT_QUEUE_of(Pkt.p_src) / NFD_MAX_VF_QUEUES;;
-#elif NS_PLATFORM_TYPE == NS_PLATFORM_HYDROGEN
-        port = 0;
+#if NS_PLATFORM_NUM_PORTS > 1
+        port = PKT_PORT_QUEUE_of(Pkt.p_src) / NFD_MAX_VF_QUEUES;
 #else
-#error "nic_tx_main.c currently supports only Lithium and Hydrogen"
+        port = 0;
 #endif
 
         /* Do TX processing on packet and populate the TX descriptor */

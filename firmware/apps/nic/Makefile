@@ -8,6 +8,9 @@ endif
 ifeq ($(PLATFORM),Hydrogen)
     NS_PLATFORM_TYPE = 1
     PROJECT = ns_nic_cx40q_1
+else ifeq ($(PLATFORM),Hydrogen_4x10)
+    NS_PLATFORM_TYPE = 2
+    PROJECT = ns_nic_cx40q_1_4x10
 else ifeq ($(PLATFORM),Lithium)
     NS_PLATFORM_TYPE = 3
     PROJECT = ns_nic_cx10_2
@@ -15,6 +18,7 @@ endif
 
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
 $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/include))
+$(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/deps/npfw))
 $(eval $(call nffw.add_ppc,$(PROJECT),i8,$(PICOCODE_DIR)/catamaran/catamaran.npfw))
 
 # Add flowenv to the project
@@ -77,6 +81,7 @@ $(eval $(call micro_c.add_flags,$(PROJECT),nfd_svc,-DNS_PLATFORM_TYPE=$(NS_PLATF
 $(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,ila0.me2,ila0.me3))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,nic_basic))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,link_state))
+$(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,npfw))
 $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(NFD_DIR)/me/blocks/vnic/svc,msix))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))

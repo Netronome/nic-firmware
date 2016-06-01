@@ -14,7 +14,7 @@
 
 #include <platform.h>
 
-#if NS_PLATFORM_TYPE == NS_PLATFORM_LITHIUM
+#if NS_PLATFORM_NUM_PORTS > 1
 
 /* The lithium support is a temporary set of changes:
  * from the fw/NFD point of view there are 2 VF-style VNICs and
@@ -29,9 +29,9 @@
 #define NFD_MAX_PF_QUEUES       0
 #endif
 
-/* 2 ports then 2 'VFs' needed */
+/* 1 VF per port */
 #ifndef NFD_MAX_VFS
-#define NFD_MAX_VFS             2
+#define NFD_MAX_VFS             NS_PLATFORM_NUM_PORTS
 #endif
 
 #define NFD_VROUTER_LITHIUM
@@ -39,7 +39,7 @@
 /* TEMP enable writing VF queue offsets into the BAR */
 #define NFD_NO_ISOLATION
 
-#elif NS_PLATFORM_TYPE == NS_PLATFORM_HYDROGEN
+#else /* NS_PLATFORM_NUM_PORTS <= 1 */
 
 #ifndef NFD_MAX_VF_QUEUES
 #define NFD_MAX_VF_QUEUES       1
@@ -53,10 +53,6 @@
 #ifndef NFD_MAX_VFS
 #define NFD_MAX_VFS             0
 #endif
-
-#else
-
-#error "nfd_user_cfg.h currently supports only Lithium and Hydrogen"
 
 #endif
 
