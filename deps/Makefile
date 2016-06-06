@@ -6,15 +6,20 @@ FLOWENV_REV=732cd6f98bf2
 # GRO_REV  - Tip as of Feb 24 2016
 GRO_REV=ee048d732f2d
 # NFD_REV - Tip of ng-nfd-vrouter branch
-NFD_REV=1efe45b9d22b
+NFD_REV=f3f79fa4fb71
+# DPDK_REV - 1.8.0 branch of DPDK-ns known to work w/ virtiorelayd
+DPDK_REV=8095531
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
 #
 # Global variables
 #
-ALL_DEPS =
-ALL_REVS =
+HG_DEPS =
+HG_REVS =
+
+GIT_DEPS =
+GIT_REVS =
 
 #
 # Specific dependencies here
@@ -30,8 +35,8 @@ $(DEPS_DIR)/flowenv.hg:
 	hg clone -r $(FLOWENV_REV) \
 		ssh://hg//data/hg/repos/flowenv.hg $(FLOWENV_DIR)
 
-ALL_DEPS += $(FLOWENV_DIR)
-ALL_REVS += $(FLOWENV_REV)
+HG_DEPS += $(FLOWENV_DIR)
+HG_REVS += $(FLOWENV_REV)
 
 
 #
@@ -51,8 +56,8 @@ $(DEPS_DIR)/gro.hg:
 	hg clone -r $(GRO_REV) \
 		ssh://hg//data/hg/repos/gro.hg $(GRO_DIR)
 
-ALL_DEPS += $(GRO_DIR)
-ALL_REVS += $(GRO_REV)
+HG_DEPS += $(GRO_DIR)
+HG_REVS += $(GRO_REV)
 
 
 #
@@ -66,9 +71,20 @@ $(DEPS_DIR)/ng-nfd.hg:
 	hg clone -r $(NFD_REV) \
 	       	ssh://hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
 
-ALL_DEPS += $(NFD_DIR)
-ALL_REVS += $(NFD_REV)
+HG_DEPS += $(NFD_DIR)
+HG_REVS += $(NFD_REV)
 
+
+#
+# DPDK
+#
+DPDK_DIR = $(DEPS_DIR)/dpdk-ns
+$(DPDK_DIR):
+	git clone ssh://hg//data/git/repos/dpdk-ns.git $(DPDK_DIR)
+	(cd $(DPDK_DIR); git checkout $(DPDK_REV))
+
+GIT_DEPS += $(DPDK_DIR)
+GIT_REVS += $(DPDK_REV)
 
 #
 # Processing for all dependencies
@@ -81,21 +97,31 @@ FORCE:
 # $1 - repo directory
 # $2 - revision
 #
-define update_dep_decl
+define update_hg_dep_decl
 	
 	$(Q)(echo "Updating $1 to revision $2"; cd $1 ; hg pull ; hg up -r $2)
 endef
 
-firmware_fetch_deps: $(ALL_DEPS)
+#
+# $1 - repo directory
+# $2 - revision
+#
+define update_git_dep_decl
+	
+	$(Q)(echo "Updating $1 to revision $2"; cd $1 ; git pull; git checkout $2)
+endef
 
-firmware_update_deps: $(ALL_DEPS) FORCE
-	$(foreach d,$(shell seq $(words $(ALL_DEPS))),\
-		$(call update_dep_decl,$(word $d,$(ALL_DEPS)),$(word $d,$(ALL_REVS))))
+firmware_fetch_deps: $(HG_DEPS) $(GIT_DEPS)
+
+firmware_update_deps: $(HG_DEPS) $(GIT_DEPS) FORCE
+	$(foreach d,$(shell seq $(words $(HG_DEPS))),\
+		$(call update_hg_dep_decl,$(word $d,$(HG_DEPS)),$(word $d,$(HG_REVS))))
+	$(foreach d,$(shell seq $(words $(GIT_DEPS))),\
+		$(call update_git_dep_decl,$(word $d,$(GIT_DEPS)),$(word $d,$(GIT_REVS))))
 
 firmware_clean_deps:
-	@for dep in $(ALL_DEPS) ; do \
+	@for dep in $(HG_DEPS) $(GIT_DEPS); do \
 		echo "Removing $$dep"; \
 		rm -rf $$dep; \
 	done
-
 
