@@ -403,7 +403,7 @@ __intrinsic int nic_tx_encap(void *meta);
  * Returns @NIC_RX_OK if a queue was set and @NIC_RX_DROP if no RX
  * queue could be found.
  */
-__intrinsic int nic_switch_rx_defaultq(int vport, uint8_t *qid);
+__intrinsic int nic_switch_rx_defaultq(int vport, uint32_t *qid);
 
 
 /**

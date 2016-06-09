@@ -1,7 +1,7 @@
 /*
  * Copyright 2015-2016 Netronome, Inc.
  *
- * @file          lib/infra_vr/libinfra_vr.c
+ * @file          lib/infra_basic/libinfra_basic.c
  * @brief         Functions to interface with the infrastructure blocks
  *
  * This file contains the interface to the infra structure blocks.  It
@@ -46,7 +46,7 @@
 
 #include <blm/blm.h>
 
-#include <infra_vr/infra_vr.h>
+#include <infra_basic/infra_basic.h>
 #include <shared/nfd_common.h>
 
 /* GRO can not run if we enable DMA drops */
@@ -230,15 +230,39 @@ __pkt_pms_write(__addr40 void *ctm_base, uint32_t pkt_offset,
 __intrinsic __addr40 void*
 pkt_ptr(const unsigned int offset)
 {
+    __addr40 void *pkt_ptr;
     unsigned abs_off = offset + Pkt.p_offset;
 
     /* Pkt has CTM component and within CTM offset return CTM, else MU ptr */
     if (abs_off < (256 << Pkt.p_ctm_sz))
-        return pkt_ctm_ptr40(Pkt.p_isl, Pkt.p_pnum, abs_off);
+        pkt_ptr = pkt_ctm_ptr40(Pkt.p_isl, Pkt.p_pnum, abs_off);
     else
-        return (__addr40 void *)(((uint64_t)Pkt.p_muptr << 11) + abs_off);
+        pkt_ptr = (__addr40 void *)(((uint64_t)Pkt.p_muptr << 11) + abs_off);
+
+    return pkt_ptr;
 }
 
+__intrinsic void
+pkt_ptrs(unsigned int *frame_off, __addr40 void **ctm_ptr,
+        __addr40 void **mem_ptr, const unsigned int offset)
+{
+    unsigned int abs_off = offset + Pkt.p_offset;
+    *frame_off = abs_off;
+
+    /* Pkt has CTM component and within CTM offset return CTM, else MU ptr */
+    if (abs_off < (256 << Pkt.p_ctm_sz))
+        *ctm_ptr = pkt_ctm_ptr40(Pkt.p_isl, Pkt.p_pnum, abs_off);
+    else
+        *ctm_ptr = 0;
+
+    *mem_ptr = (__addr40 void *)(((uint64_t)Pkt.p_muptr << 11) + abs_off);
+}
+
+__intrinsic uint32_t ctm_split()
+{
+    /* Find out how big this CTM buffer is.*/
+    return CTM_SPLIT_LEN;
+}
 
 __intrinsic int
 pkt_rx_wire(void)
@@ -310,19 +334,15 @@ pkt_rx_host(void)
     /* TODO: handle LSO here */
     /* TODO: handle VLAN here */
 
-<<<<<<< HEAD
-    /* Send the packet (seqr and seq copied from the rxd in app) */
-    pkt_nbi_send(pi->isl, pi->pnum, &msi, pi->len, NBI,
-                 NS_PLATFORM_NBI_TM_QID_LO(txd->dest), txd->seqr, txd->seq,
-                 ctm_buf_size);
-=======
     Pkt.p_ctm_sz = MIN_CTM_TYPE;
     Pkt.p_ro_ctx = NFD_IN_SEQR_NUM(nfd_rxd.q_num) << 1;
     Pkt.p_is_gro_sequenced = 1;
     Pkt.p_orig_len = Pkt.p_len;
->>>>>>> Replace old basic NIC infra_basic with copy of infra_vr
 
     Pkt.p_src = PKT_HOST_PORT_FROMQ(nfd_rxd.intf, NFD_BMQ2NATQ(nfd_rxd.q_num));
+
+    Pkt.app0 = nfd_rxd.__raw[2];
+    Pkt.app1 = nfd_rxd.__raw[3];
 
     cpy_start = NFD_IN_DATA_OFFSET & ~0x3F;
     if ((nfd_rxd.data_len + NFD_IN_DATA_OFFSET) > MIN_CTM_SIZE) {
@@ -435,7 +455,6 @@ pkt_tx(void)
         pmoff = offset;
         offset = __pkt_pms_write(p, offset, xpms, &pms_sig, &pms_readback,
                                  &pms_sig2);
-
         /* wait for all the I/O operations to complete */
         wait_for_all(&info_sig, &mac_sig, &pms_sig, &pms_sig2);
 
@@ -445,8 +464,10 @@ pkt_tx(void)
                                    Pkt.p_ctm_sz, offset,
                                    len + pmoff, ss, outq);
         } else {
-            msi.len_adj = pmoff;
-            msi.off_enc = (offset >> 3) - 1;
+            /* Write modification script to closest 8B aligned
+             * location at pkt_off */
+            msi = pkt_msd_write(p, pmoff);
+
             pkt_nbi_send(__ISLAND, Pkt.p_pnum, &msi, len, ss, outq,
                          Pkt.p_ro_ctx, Pkt.p_seq, Pkt.p_ctm_sz);
         }
@@ -466,7 +487,7 @@ pkt_tx(void)
             nfd_out_fill_desc(&noi, (void *)&Pkt.p_nbi, 0, Pkt.p_ctm_sz,
                               Pkt.p_offset, 0);
             nfd_out_check_ctm_only(&noi);
-
+#if 0
             /* populate RX offload flags if present */
             flags = PCIE_DESC_RX_EOP;
             if (Pkt.p_rx_l3_csum_present) {
@@ -487,7 +508,11 @@ pkt_tx(void)
 
             }
             nfd_out_dummy_vlan(&noi, 0, flags);
+#endif
             noi.rxd.dd = 1;     /* stupidity */
+
+            noi.rxd.__raw[0] = Pkt.app0;
+            noi.rxd.__raw[1] = Pkt.app1;
 
             if (Pkt.p_is_gro_sequenced)
                 gro_cli_nfd_desc2meta(&gmeta.nfd, &noi, ss, outq);
@@ -551,22 +576,6 @@ init_tx()
     INFRA_CNTRS_SET_BASE(infra_cntrs_base);
     nfd_out_send_init();
     gro_cli_init();
-}
-
-__intrinsic void
-pkt_ptrs(unsigned int *frame_off, __addr40 void **ctm_ptr,
-        __addr40 void **mem_ptr, const unsigned int offset)
-{
-    unsigned int abs_off = offset + Pkt.p_offset;
-    *frame_off = abs_off;
-
-    /* Pkt has CTM component and within CTM offset return CTM, else MU ptr */
-    if (abs_off < (256 << Pkt.p_ctm_sz))
-        *ctm_ptr = pkt_ctm_ptr40(Pkt.p_isl, Pkt.p_pnum, abs_off);
-    else
-        *ctm_ptr = 0;
-
-    *mem_ptr = (__addr40 void *)(((uint64_t)Pkt.p_muptr << 11) + abs_off);
 }
 
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*- */

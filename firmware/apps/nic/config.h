@@ -208,14 +208,33 @@
  */
 #include <infra/blm_custom.h>
 
+
 /*
  * GRO configuration
+ * Note: GRO_NUM_BLOCKS is expected to be passed in via a -D
+ *       GRO_CTX_PER_BLOCK is computed based on GRO_NUM_BLOCKS
  */
-#define GRO_NUM_BLOCKS           1
-#define GRO_CTX_PER_BLOCK        8
-#define GRO_REDUCED              0
-#define GRO_BLOCK_NUM            0
-#define GRO_ISL                  48
+#define GRO_ISL					36
+
+/* Ingress sequencer numbers (1/2/3/4) for packets from the wire will be
+   mapped to GRO CTX numbers 1/3/5/7; those for packets from NFD (0/1/2/3)
+   will be mapped to GRO CTX numbers 0/2/4/6.  So we need 8 GRO CTX's
+   total.  The number of GRO blocks is expected to be passed in from the
+   build via -D define, so we need to calculate GRO CTX's per block so
+   that we always have (at least) 8.
+*/
+#ifndef GRO_NUM_BLOCKS
+    #error "GRO_NUM_BLOCKS must be defined"
+#endif
+
+#if (GRO_NUM_BLOCKS > 8)
+    #define GRO_CTX_PER_BLOCK       1
+    #warning "Cannot properly configure GRO, GRO_NUM_BLOCKS is" GRO_NUM_BLOCKS "GRO_CTX_PER_BLOCK set to" GRO_CTX_PER_BLOCK
+#elseif (GRO_NUM_BLOCKS < 1)
+    #error "Cannot properly configure GRO, GRO_NUM_BLOCKS must be >0 but is set to" GRO_NUM_BLOCKS
+#else
+    #define GRO_CTX_PER_BLOCK (8/GRO_NUM_BLOCKS)
+#endif
 
 /*
  * NFD configuration

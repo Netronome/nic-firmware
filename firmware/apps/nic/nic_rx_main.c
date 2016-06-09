@@ -40,42 +40,8 @@
 __lmem struct pkt_hdrs hdrs;
 __lmem struct pkt_encap encap;
 
-__intrinsic void static
-build_txd(__nnr const struct pkt_rx_desc *rxd,
-          __nnr struct pkt_tx_desc *txd,
-          __gpr uint16_t len,
-          __gpr int16_t offset,
-          uint8_t qid, unsigned int vnic)
-{
-    /* Various fields from TX desc come directly from RX desc */
-    txd->nbi = rxd->nbi;
-    txd->seqr = rxd->seqr;
-    txd->seq = rxd->seq;
-
-    /* Update the start and length of the packet after all modifications */
-    txd->offset = offset;
-    txd->nbi.len = len;
-
-    /*
-     * Fields used when sending to host
-     */
-    /* Copy over application metadata, used when sending to host */
-    txd->app0 = rxd->app0;
-    txd->app1 = rxd->app1;
-
-    /* Copy the RSS queue selected */
-    txd->dest = qid;
-
-    txd->vnic = vnic;
-
-    /* try send pkt once then give up*/
-    txd->retry_count = 0;
-}
-
-__intrinsic static int8_t
-proc_from_wire(int port,
-               __nnr struct pkt_rx_desc *rxd,
-               __nnr struct pkt_tx_desc *txd)
+__intrinsic static uint32_t
+proc_from_wire(int port)
 {
     /*
      * pkt_start holds the CTM address that is the start of the packet
@@ -88,7 +54,7 @@ proc_from_wire(int port,
     __gpr int16_t offset, plen;
     uint32_t qid=0;
     __gpr uint32_t csum_prepend;
-    __gpr uint8_t err, ret;
+    __gpr uint32_t err, ret;
     __gpr uint16_t vlan;
     __gpr int rss_flags;
     __gpr uint32_t hash, hash_type;
@@ -96,17 +62,12 @@ proc_from_wire(int port,
     __xwrite uint32_t tmp[2];
     __gpr uint64_t out_vport_mask;
     void *app_meta;
-    /* use temporary rxd in __gpr for app_meta only */
-    __gpr struct pkt_rx_desc rxd_tmp;
     __lmem uint16_t *vxlan_ports;
     __lmem void *sa, *da;
 
-    reg_cp(&rxd_tmp, (void *) rxd, sizeof(struct pkt_rx_desc));
-    app_meta = (void*)&(rxd_tmp.app0);
+    app_meta = (void *)&(Pkt.app0);
 
-    /* Ensure local variables are zero before populating them */
-    reg_zero(txd, sizeof(struct pkt_tx_desc));
-    plen = pkt_len(rxd);
+    plen = Pkt.p_orig_len;
     offset = 0;
 
     /* Check if interface is up as well MTU */
@@ -117,7 +78,7 @@ proc_from_wire(int port,
     /* Read first batch of bytes from the start of packet. Align the
      * potential IP header in the packet to a word boundary by start
      * reading from the start of packet. */
-    pkt_start = pkt_ptr(rxd, offset);
+    pkt_start = pkt_ptr(0);
     mem_read64(pkt_cache, pkt_start - PKT_START_OFF, sizeof(pkt_cache));
 
     /* read the MAC parsing info for CSUM (first 4B are timestamp) */
@@ -157,7 +118,8 @@ proc_from_wire(int port,
     if (err)
         goto err_out;
 
-    ret = rx_check_inner_csum(port, &hdrs, &encap, rxd, app_meta, csum_prepend);
+    ret = rx_check_inner_csum(port, &hdrs, &encap, plen + MAC_PREPEND_BYTES,
+                              app_meta, csum_prepend);
     if (ret == NIC_RX_DROP) {
         if (nic_rx_promisc(port)) {
             err = NIC_RX_CSUM_BAD;
@@ -263,9 +225,12 @@ err_out:
     /* XXX do we need to cnt pkt and populate all metadata on drop path? */
     nic_rx_cntrs(port, &hdrs.o_eth.dst, plen);
     nic_rx_finalise_meta(app_meta, plen);
-    /* copy back to rxd */
-    reg_cp((void *)rxd, &rxd_tmp, sizeof(struct pkt_rx_desc));
-    build_txd(rxd, txd, plen, offset, qid, port);
+    Pkt.p_orig_len = plen;
+    Pkt.p_offset += offset;
+    Pkt.p_is_gro_sequenced = 1;
+    if (err != NIC_RX_DROP) {
+        Pkt.p_dst = PKT_HOST_PORT(0, port, qid);
+    }
     return err;
 }
 
@@ -277,8 +242,6 @@ main()
      * */
 
     __gpr uint32_t ctxs;
-    __nnr struct pkt_rx_desc rxd;
-    __nnr struct pkt_tx_desc txd;
     uint32_t enable_changed;
 
     __gpr int8_t ret;
@@ -290,15 +253,13 @@ main()
         ctxs &= ~NFP_MECSR_CTX_ENABLES_CONTEXTS(0xfe);
         local_csr_write(local_csr_ctx_enables, ctxs);
 
-        init_rx(FROM_WIRE);
-        init_tx(TO_HOST);
+        init_tx();
         nic_local_init(APP_ME_CONFIG_SIGNAL_NUM, APP_ME_CONFIG_XFER_NUM);
 
 #ifdef CFG_NIC_APP_DBG_JOURNAL
         /* XXX This is initialised by every app ME. Fixit! */
         INIT_JOURNAL(nic_app_dbg_journal);
 #endif
-        reinit_tx(TO_HOST);
 
         /* reenable all other contexts */
         ctxs = local_csr_read(local_csr_ctx_enables);
@@ -316,11 +277,12 @@ main()
         for (;;) {
             /* Check for BAR Configuration changes and reinit TX if needed */
             if (nic_local_cfg_changed()) {
-
                 nic_local_reconfig(&enable_changed);
+                /* TODO: do we need this?
                 if (enable_changed) {
                     reinit_tx(TO_HOST);
                 }
+                */
                 nic_local_reconfig_done();
             }
 
@@ -331,22 +293,20 @@ main()
     /* Work is performed by non CTX 0 threads */
     for (;;) {
         /* Receive a packet from the wire */
-        pkt_rx(FROM_WIRE, &rxd);
+        /* FIXME: process return value */
+        pkt_rx_wire();
 
         /* Do RX processing on packet and populate the TX descriptor */
-        ret = proc_from_wire(rxd.src, &rxd, &txd);
+        ret = proc_from_wire(PKT_PORT_QUEUE_of(Pkt.p_src));
         if (ret == NIC_RX_DROP) {
-            pkt_tx(TO_HOST_DROP, &txd);
-            nic_rx_discard_cntr(rxd.src);
-            continue;
+            Pkt.p_dst = PKT_DROP;
+            nic_rx_discard_cntr(PKT_PORT_QUEUE_of(Pkt.p_src));
         }
 
-        /* Attempt to send and drop if we encountered an error */
-        ret = pkt_tx(TO_HOST, &txd);
+        /* Attempt to send. Count the discard if we encountered an error */
+        ret = pkt_tx();
         if (ret) {
-            pkt_tx(TO_HOST_DROP, &txd);
-            nic_rx_discard_cntr(rxd.src);
-            continue;
+            nic_rx_discard_cntr(PKT_PORT_QUEUE_of(Pkt.p_src));
         }
     }
 }

@@ -279,7 +279,7 @@ l3_csum_offset(__addr40 char **l3_hdr, __addr40 char *mem_ptr,
     else
         *l3_hdr = mem_ptr;
 
-    *l3_hdr += l3_off;
+    *l3_hdr += l3_off + l3_h_len;
 }
 
 /**
@@ -287,7 +287,7 @@ l3_csum_offset(__addr40 char **l3_hdr, __addr40 char *mem_ptr,
  *
  * @param mem_ptr      Start of packet in emem
  * @param ctm_ptr      Start of packet in ctm
- * @param mem_h_ptr    Is set to start of mem L4 after ctm portion
+ * @param mem_h_ptr    Is set to start of remainder (after ctm) packet in emem
  * @param ctm_h_ptr    Is set to start of ctm L4
  * @param pkt_len      Length of entire frame, starting at L2 header
  * @param l4_off       Offset from start of frame to start of L4 header
@@ -301,7 +301,8 @@ l4_csum_offsets(__addr40 char *mem_ptr, __addr40 char *ctm_ptr,
                 uint32_t pkt_len, uint32_t l4_off, uint32_t frame_off,
                 uint32_t *mem_l, uint32_t *ctm_l)
 {
-    uint32_t ctm_sz = (256 << ctm_split()) - frame_off;
+    /* hack */
+    uint32_t ctm_sz = (256 << 0) - frame_off;
 
     if (ctm_ptr) {
         /* warning: untested code */
@@ -313,7 +314,8 @@ l4_csum_offsets(__addr40 char *mem_ptr, __addr40 char *ctm_ptr,
         } else {
             *ctm_l = ctm_sz - l4_off;
             *mem_l = pkt_len - *ctm_l - l4_off;
-            *mem_h_ptr = mem_ptr + l4_off + *ctm_l;
+            // hacks!
+            *mem_h_ptr = mem_ptr + (256 << 0) - 64;
         }
     } else {
         *ctm_l = 0;
@@ -401,16 +403,12 @@ error:
 }
 
 __intrinsic int
-tx_tsk_set_ipv4_csum(__lmem struct pkt_hdrs *hdrs,
-                     const __nnr struct pkt_rx_desc *rxd, void *meta)
+tx_tsk_set_ipv4_csum(__lmem struct pkt_hdrs *hdrs, void *meta)
 {
     struct pcie_in_nfp_desc *in_desc = (struct pcie_in_nfp_desc *)meta;
     __addr40 char *ctm_ptr;
     __addr40 char *mem_ptr;
-    unsigned int frame_off;
     __addr40 void *l3_hdr;
-
-    pkt_ptrs(rxd, &frame_off, &ctm_ptr, &mem_ptr);
 
     /*
      * If csum offload is enabled, then it only refers to inner headers if
@@ -420,6 +418,11 @@ tx_tsk_set_ipv4_csum(__lmem struct pkt_hdrs *hdrs,
         (in_desc->flags & PCIE_DESC_TX_CSUM &&
          in_desc->flags & PCIE_DESC_TX_ENCAP)) {
         if (hdrs->present & HDR_I_IP4) {
+            /* pkt_ptrs */
+            ctm_ptr = pkt_ctm_ptr40(Pkt.p_isl, Pkt.p_pnum, Pkt.p_offset);
+            mem_ptr = (__addr40 void *)(((uint64_t)Pkt.p_muptr << 11) +
+                                        Pkt.p_offset + (256 << Pkt.p_ctm_sz));
+
             l3_csum_offset(&l3_hdr, mem_ptr, ctm_ptr, in_desc->data_len,
                            hdrs->offsets[HDR_OFF_I_L3], hdrs->i_ip4.hl << 2);
 
@@ -433,17 +436,13 @@ tx_tsk_set_ipv4_csum(__lmem struct pkt_hdrs *hdrs,
     return 0;
 }
 
-int
-tx_tsk_set_l4_csum(__lmem struct pkt_hdrs *hdrs,
-                   __nnr const struct pkt_rx_desc *rxd,
-                   void *meta)
+__intrinsic int
+tx_tsk_set_l4_csum(__lmem struct pkt_hdrs *hdrs, void *meta)
 {
     __gpr struct pcie_in_nfp_desc *in_desc =
                                     (__gpr struct pcie_in_nfp_desc *)meta;
     __addr40 char *ctm_ptr;
     __addr40 char *mem_ptr;
-    unsigned int frame_off;
-
     __addr40 char *mem_h_ptr;
     __addr40 char *ctm_h_ptr;
     uint32_t mem_l;
@@ -453,8 +452,6 @@ tx_tsk_set_l4_csum(__lmem struct pkt_hdrs *hdrs,
 
     int ret = 0;
 
-    pkt_ptrs(rxd, &frame_off, &ctm_ptr, &mem_ptr);
-
     /*
      * If csum offload is enabled, then it only refers to inner
      * headers if the encapsulation flag is set. However, we always
@@ -463,17 +460,20 @@ tx_tsk_set_l4_csum(__lmem struct pkt_hdrs *hdrs,
     if ((hdrs->dirty & (HDR_I_TCP | HDR_I_UDP)) ||
         (in_desc->flags & PCIE_DESC_TX_CSUM &&
          in_desc->flags & PCIE_DESC_TX_ENCAP)) {
+
+        /* pkt_ptrs */
+        ctm_ptr = pkt_ctm_ptr40(Pkt.p_isl, Pkt.p_pnum, Pkt.p_offset);
+        mem_ptr = (__addr40 void *)(((uint64_t)Pkt.p_muptr << 11) +
+                                    Pkt.p_offset);
+
         if (hdrs->dirty & HDR_I_TCP || (hdrs->present & HDR_I_TCP &&
                 in_desc->flags & PCIE_DESC_TX_TCP_CSUM)) {
             /* do TCP csum if either inner TCP is dirty or both the fw
              * and the driver are aware there is inner TCP */
             l4_csum_offsets(mem_ptr, ctm_ptr, &mem_h_ptr, &ctm_h_ptr,
                             in_desc->data_len,
-                            hdrs->offsets[HDR_OFF_I_L4], frame_off,
+                            hdrs->offsets[HDR_OFF_I_L4], Pkt.p_offset,
                             &mem_l, &ctm_l);
-
-            NIC_APP_DBG_APP(nic_app_dbg_journal, 0xAB);
-            NIC_APP_DBG_APP(nic_app_dbg_journal, hdrs->i_tcp.sum);
 
             hdrs->i_tcp.sum = 0;
             if (hdrs->present & HDR_I_IP4) {
@@ -490,14 +490,12 @@ tx_tsk_set_l4_csum(__lmem struct pkt_hdrs *hdrs,
             hdrs->dirty |= HDR_I_TCP;
             hdrs->i_tcp.sum = hdrs->i_tcp.sum ? hdrs->i_tcp.sum : 0xFFFF;
 
-            NIC_APP_DBG_APP(nic_app_dbg_journal, 0xCD);
-            NIC_APP_DBG_APP(nic_app_dbg_journal, hdrs->i_tcp.sum);
 
         } else if (hdrs->dirty & HDR_I_UDP || (hdrs->present & HDR_I_UDP &&
                        in_desc->flags & PCIE_DESC_TX_UDP_CSUM)) {
             l4_csum_offsets(mem_ptr, ctm_ptr, &mem_h_ptr, &ctm_h_ptr,
                             in_desc->data_len,
-                            hdrs->offsets[HDR_OFF_I_L4], frame_off,
+                            hdrs->offsets[HDR_OFF_I_L4], Pkt.p_offset,
                             &mem_l, &ctm_l);
 
             hdrs->i_udp.sum = 0;

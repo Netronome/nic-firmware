@@ -11,6 +11,7 @@
 #include <nic_basic/pcie_desc.h>
 #include <net/csum.h>
 #include <nfp/me.h>
+#include <nfp/mem_bulk.h>
 #include <std/reg_utils.h>
 #include <vnic/pci_out.h>
 #include <vnic/shared/nfd_cfg.h>
@@ -21,7 +22,7 @@
 /**
  * Calculate L3 offsets required for checksum functions.
  *
- * @param l3_hdr       Is set to packet's start of L3 header
+ * @param l3_hdr       Set right after the L3 header
  * @param mem_ptr      Start of packet in emem
  * @param ctm_ptr      Start of packet in ctm
  * @param frame_off    Offset to start of L2
@@ -48,7 +49,7 @@ l3_csum_offset(__addr40 char **l3_hdr, __addr40 char *mem_ptr,
  *
  * @param mem_ptr      Start of packet in emem
  * @param ctm_ptr      Start of packet in ctm
- * @param mem_h_ptr    Is set to start of mem L4 after ctm portion
+ * @param mem_h_ptr    Is set to start of remainder (after ctm) packet in emem
  * @param ctm_h_ptr    Is set to start of ctm L4
  * @param pkt_len      Length of entire frame, starting at L2 header
  * @param l4_off       Offset from start of frame to start of L4 header
@@ -73,7 +74,7 @@ l4_csum_offsets(__addr40 char *mem_ptr, __addr40 char *ctm_ptr,
         } else {
             *ctm_l = ctm_sz - l4_off;
             *mem_l = pkt_len - *ctm_l - l4_off;
-            *mem_h_ptr = mem_ptr + l4_off + *ctm_l;
+            *mem_h_ptr = mem_ptr + (256 << ctm_split());
         }
     } else {
         *ctm_l = 0;
@@ -85,9 +86,8 @@ l4_csum_offsets(__addr40 char *mem_ptr, __addr40 char *ctm_ptr,
 
 __intrinsic int
 rx_check_inner_csum(int port, __lmem struct pkt_hdrs *hdrs,
-                    __lmem struct pkt_encap *encap,
-                    const __nnr struct pkt_rx_desc *rxd, void *meta,
-                    uint32_t csum)
+                    __lmem struct pkt_encap *encap,  int len,
+                    void *meta, uint32_t csum)
 {
     struct pcie_out_pkt_desc *out_desc = (struct pcie_out_pkt_desc *)meta;
     __addr40 char *ctm_ptr;
@@ -107,13 +107,20 @@ rx_check_inner_csum(int port, __lmem struct pkt_hdrs *hdrs,
     if (!(hdrs->present & (HDR_I_IP6 | HDR_I_IP4)))
         goto out;
 
-    pkt_ptrs(rxd, &frame_off, &ctm_ptr, &mem_ptr);
+    /* pkt_ptrs */
+    frame_off = Pkt.p_offset + MAC_PREPEND_BYTES;
+    ctm_ptr = pkt_ctm_ptr40(Pkt.p_isl, Pkt.p_pnum, frame_off);
+    mem_ptr = (__addr40 void *)(((uint64_t)Pkt.p_muptr << 11) +
+                                frame_off);
+    /* FIXME: pointers adjustments */
+    mem_ptr -= (MAC_PREPEND_BYTES + PKT_NBI_OFFSET);
+    ctm_ptr -= 8;
 
     if (hdrs->present & HDR_I_IP6)
         goto inner_l4;
 
-    l3_csum_offset(&l3_hdr, mem_ptr, ctm_ptr, rxd->nbi.len,
-                           hdrs->offsets[HDR_OFF_I_L3], hdrs->i_ip4.hl << 2);
+    l3_csum_offset(&l3_hdr, mem_ptr, ctm_ptr, frame_off,
+                   hdrs->offsets[HDR_OFF_I_L3], hdrs->i_ip4.hl << 2);
 
     ret = net_csum_ipv4(&hdrs->i_ip4, l3_hdr);
     out_desc->flags |= PCIE_DESC_RX_I_IP4_CSUM;
@@ -129,8 +136,11 @@ inner_l4:
         out_desc->flags |= PCIE_DESC_RX_I_UDP_CSUM;
     else
         goto out;
-
+#if 0
+    if (0) {
+#else
     if ((hdrs->present & HDR_E_VXLAN) && (hdrs->present & HDR_I_IP4)) {
+#endif
         /* VXLAN pkts got outer UDP and so our MAC provides the outer
          * UDP csum for us to use to verify the inner TCP/UDP csum
          * TODO: support IPv6
@@ -209,9 +219,11 @@ inner_l4:
     } else {
         /* no VXLAN so no csum from the MAC to optimize the calc */
         l4_csum_offsets(mem_ptr, ctm_ptr, &mem_h_ptr, &ctm_h_ptr,
-                        rxd->nbi.len,
+                        Pkt.p_len - MAC_PREPEND_BYTES,
                         hdrs->offsets[HDR_OFF_I_L4], frame_off,
                         &mem_l, &ctm_l);
+        /* FIXME: len adjustment */
+        ctm_l += MAC_PREPEND_BYTES;
 
         if (hdrs->present & HDR_I_TCP) {
             if (hdrs->present & HDR_I_IP4)

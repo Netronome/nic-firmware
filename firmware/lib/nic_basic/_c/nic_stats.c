@@ -158,7 +158,7 @@ nic_tx_ring_cntrs(void *meta, uint32_t port, uint32_t qid)
 
     nfd_q = nfd_out_map_queue(port, qid);
 
-    __nfd_in_cnt_pkt(NIC_PCI, qid, in_desc->data_len, ctx_swap, &sig);
+    __nfd_in_cnt_pkt(NIC_PCI, nfd_q, in_desc->data_len, ctx_swap, &sig);
 }
 
 __intrinsic
