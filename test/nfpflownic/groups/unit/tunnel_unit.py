@@ -1609,6 +1609,11 @@ class Csum_rx_tnl(UnitIP):
         self.src.cmd(cmd)
         cmd = 'ip -6 address flush dev %s' % self.dst_vxlan_intf
         self.dst.cmd(cmd)
+
+        # increase MTU to have pkts bigger than CTM size (2K)
+        # 3K - outer headers is probably 3022
+        self.src.cmd("ifconfig %s mtu 3022" % self.src_vxlan_intf)
+
         return
 
     def check_result(self, if_stat_diff):

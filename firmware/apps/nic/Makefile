@@ -23,7 +23,8 @@ $(eval $(call fwdep.add_flowenv,$(PROJECT)))
 $(eval $(call fwdep.add_flowenv_nfp_init_flag,$(PROJECT),-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add 1 GRO ME
-$(eval $(call fwdep.add_gro_flag,$(PROJECT),ila0.me1,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei4.me8,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+
 
 # Add 1 BLM ME
 $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))

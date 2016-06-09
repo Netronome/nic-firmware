@@ -56,43 +56,16 @@ __lmem struct pkt_encap encap;
 static unsigned int nfd_in_lso_cntr_addr = 0;
 #endif
 
-__intrinsic void static
-build_txd(__nnr const struct pkt_rx_desc *rxd,
-          __nnr struct pkt_tx_desc *txd,
-          __gpr uint16_t len,
-          __gpr int16_t offset,
-          uint8_t qid)
-{
-    /* Various fields from TX desc come directly from RX desc */
-    txd->nbi = rxd->nbi;
-    txd->seqr = rxd->seqr;
-    txd->seq = rxd->seq;
-
-    /* Update the start and length of the packet after all modifications */
-    txd->offset = offset;
-    txd->nbi.len = len;
-
-    /*
-     * Fields used when sending to host
-     */
-    /* Copy over application metadata, used when sending to host */
-    txd->app0 = rxd->app0;
-    txd->app1 = rxd->app1;
-
-    /* Copy the RSS queue selected */
-    txd->dest = qid;
-
-    /* try send pkt once then give up*/
-    txd->retry_count = 0;
-}
-
 /**
- * Generate the TX desc output and do any processing on packet (currently none)
+ * Transmit processing
+ *
+ * @param port   Port where the pkt is destined to
+ *
+ * Packet arrive from the Host and is going to the network.  Note that
+ * by using libinfra there is an implicit "struct pkt_meta Pkt"
  */
 __intrinsic static int8_t
-proc_from_host(int port,
-               __nnr struct pkt_rx_desc *rxd,
-               __nnr struct pkt_tx_desc *txd)
+proc_from_host(int port)
 {
     /* pkt_start holds the CTM address that is the start of the packet
      * including MAC_PREPEND_BYTES. To get the start of the pkt data, do
@@ -101,7 +74,7 @@ proc_from_host(int port,
      */
     __addr40 char *pkt_start;
     __xread uint32_t pkt_cache[16];
-    __gpr int16_t offset, plen;
+    __gpr int32_t offset, plen;
 
     __gpr uint8_t err, ret;
     unsigned int tx_l3_csum, tx_l4_csum, tunnel;
@@ -113,18 +86,14 @@ proc_from_host(int port,
     __gpr uint64_t out_vport_mask;
     __gpr int uplink;
     void *app_meta;
-    /* use temporary rxd in __gpr for app_meta only */
-    __gpr struct pkt_rx_desc rxd_tmp;
     __gpr struct tx_tsk_config offload_cfg;
     struct pcie_in_nfp_desc *in_desc;
     __lmem void *sa, *da;
 
-    reg_cp(&rxd_tmp, (void *) rxd, sizeof(struct pkt_rx_desc));
-    app_meta = (void*)&(rxd_tmp.app0);
+    app_meta = (void *)&(Pkt.app0);
 
-    reg_zero(txd, sizeof(struct pkt_tx_desc));
     reg_zero(&offload_cfg, sizeof(struct tx_tsk_config));
-    plen = pkt_len(rxd);
+    plen = Pkt.p_orig_len;
     offset = 0;
 
     NFD_IN_LSO_CNTR_INCR(nfd_in_lso_cntr_addr,
@@ -147,15 +116,15 @@ proc_from_host(int port,
 #endif
 
     NIC_APP_CNTR(&nic_cnt_tx_from_host);
-    nic_tx_ring_cntrs(app_meta, port, rxd->src);
+    nic_tx_ring_cntrs(app_meta, PKT_PORT_SUBSYS_of(Pkt.p_src),
+                      PKT_PORT_QUEUE_of(Pkt.p_src));
 
     /* No L1 checks as in RX */
 
     /* Read first batch of bytes from the start of packet. Align the
      * potential IP header in the packet to a word boundary by start
      * reading from the start of packet. */
-    /* TODO: do we want pbuf to live in the RXD?, and offset? */
-    pkt_start = pkt_ptr(rxd, 0);
+    pkt_start = pkt_ptr(0);
     mem_read64(pkt_cache, pkt_start - PKT_START_OFF, sizeof(pkt_cache));
 
     tunnel = nic_tx_encap(app_meta);
@@ -179,17 +148,17 @@ proc_from_host(int port,
         goto err_out;
 
     if (hdrs.dirty & HDR_O_IP4)
-        txd->tx_l3_csum = 1;
+        Pkt.p_tx_l3_csum = 1;
     if (hdrs.dirty & HDR_O_TCP && hdrs.o_tcp.sum)
-        txd->tx_l4_csum = 1;
+        Pkt.p_tx_l4_csum = 1;
     if (hdrs.dirty & HDR_O_UDP && hdrs.o_udp.sum)
-        txd->tx_l4_csum = 1;
+        Pkt.p_tx_l4_csum = 1;
 
-    err = tx_tsk_set_ipv4_csum(&hdrs, rxd, app_meta);
+    err = tx_tsk_set_ipv4_csum(&hdrs, app_meta);
     if (err == NIC_TX_DROP)
         goto err_out;
 
-    err = tx_tsk_set_l4_csum(&hdrs, rxd, app_meta);
+    err = tx_tsk_set_l4_csum(&hdrs, app_meta);
     if (err == NIC_TX_DROP)
         goto err_out;
 
@@ -217,7 +186,7 @@ proc_from_host(int port,
         NIC_APP_CNTR(&nic_cnt_tx_vlan);
     }
 
-    vport = nic_switch_tx_vport(port, rxd->src);
+    vport = nic_switch_tx_vport(port, PKT_PORT_QUEUE_of(Pkt.p_src));
     vlan = (hdrs.present & HDR_O_VLAN) ?
         NET_ETH_TCI_VID_of(hdrs.o_vlan.tci) : 0;
 
@@ -245,17 +214,17 @@ proc_from_host(int port,
     /* Checksum offload */
     nic_tx_csum_offload(port, app_meta, &tx_l3_csum, &tx_l4_csum);
     if (tx_l3_csum)
-        txd->tx_l3_csum = 1;
+        Pkt.p_tx_l3_csum = 1;
     if (tx_l4_csum)
-        txd->tx_l4_csum = 1;
+        Pkt.p_tx_l4_csum = 1;
 
 pkt_out:
     pkt_hdrs_write_back(pkt_start, &hdrs, &encap);
-    /* copy back to rxd */
-    reg_cp((void *)rxd, &rxd_tmp, sizeof(struct pkt_rx_desc));
-    build_txd(rxd, txd, plen, offset, port);
-
 err_out:
+    Pkt.p_len = plen;
+    Pkt.p_offset += offset;
+    Pkt.p_dst = PKT_WIRE_PORT(0, port);
+    Pkt.p_is_gro_sequenced = 0;
     nic_tx_cntrs(port, &hdrs.o_eth.dst, plen);
 
     return err;
@@ -270,8 +239,6 @@ main()
 
     __gpr uint32_t ctxs;
     __gpr uint32_t port;
-    __nnr struct pkt_rx_desc rxd;
-    __nnr struct pkt_tx_desc txd;
     uint32_t enable_changed;
 
     __gpr int8_t ret;
@@ -283,16 +250,13 @@ main()
         ctxs &= ~NFP_MECSR_CTX_ENABLES_CONTEXTS(0xfe);
         local_csr_write(local_csr_ctx_enables, ctxs);
 
-        init_rx(FROM_HOST);
-        init_tx(TO_WIRE);
+        init_rx();
         nic_local_init(APP_ME_CONFIG_SIGNAL_NUM, APP_ME_CONFIG_XFER_NUM);
 
 #ifdef CFG_NIC_APP_DBG_JOURNAL
         /* XXX This is initialised by every app ME. Fixit! */
         INIT_JOURNAL(nic_app_dbg_journal);
 #endif
-
-        reinit_tx(TO_WIRE);
 
         /* reenable all other contexts */
         ctxs = local_csr_read(local_csr_ctx_enables);
@@ -317,11 +281,12 @@ main()
         for (;;) {
             /* Check for BAR Configuration changes and reinit TX if needed */
             if (nic_local_cfg_changed()) {
-
                 nic_local_reconfig(&enable_changed);
+                /* TODO: do we need this?
                 if (enable_changed) {
                     reinit_tx(TO_WIRE);
                 }
+                */
                 nic_local_reconfig_done();
             }
 
@@ -331,11 +296,12 @@ main()
 
     /* Work is performed by non CTX 0 threads */
     for (;;) {
-        /* Determine where be need to receive a packet from */
-        pkt_rx(FROM_HOST, &rxd);
+        if (pkt_rx_host() < 0)
+            continue;
+
 
 #if NS_PLATFORM_TYPE == NS_PLATFORM_LITHIUM
-        port = rxd.src / NFD_MAX_VF_QUEUES;
+        port = PKT_PORT_QUEUE_of(Pkt.p_src) / NFD_MAX_VF_QUEUES;;
 #elif NS_PLATFORM_TYPE == NS_PLATFORM_HYDROGEN
         port = 0;
 #else
@@ -343,24 +309,16 @@ main()
 #endif
 
         /* Do TX processing on packet and populate the TX descriptor */
-        ret = proc_from_host(port, &rxd, &txd);
+        ret = proc_from_host(port);
         if (ret) {
             NFD_IN_LSO_CNTR_INCR(nfd_in_lso_cntr_addr,
                           NFD_IN_LSO_CNTR_T_ME_FM_HOST_PROC_TO_WIRE_DROP);
-            pkt_tx(TO_WIRE_DROP, &txd);
+            Pkt.p_dst = PKT_DROP;
             nic_tx_discard_cntr(port);
-            continue;
         }
 
         /* Send the packet to wire */
-        ret = pkt_tx(TO_WIRE, &txd);
-        if (ret) {
-            NFD_IN_LSO_CNTR_INCR(nfd_in_lso_cntr_addr,
-                        NFD_IN_LSO_CNTR_T_ME_FM_HOST_PKT_TX_TO_WIRE_DROP);
-            pkt_tx(TO_WIRE_DROP, &txd);
-            nic_tx_discard_cntr(port);
-            continue;
-        }
+        pkt_tx();
         NFD_IN_LSO_CNTR_INCR(nfd_in_lso_cntr_addr,
                              NFD_IN_LSO_CNTR_T_ME_FM_HOST_PKT_TX_TO_WIRE);
     }

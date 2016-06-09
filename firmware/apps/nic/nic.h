@@ -226,13 +226,13 @@ __intrinsic void pkt_hdrs_write_back(__addr40 char * buf_addr,
  * @param hdrs      Header cache containing the IPv4 header
  *                  to modify.
  * @param encap     Encap header cache
+ * @param len       Packet length
  * @param meta      Metadata for NIC app.
  * @param csum      Checksum prepend word
  *
  */
 __intrinsic int rx_check_inner_csum(int port, __lmem struct pkt_hdrs *hdrs,
-                                    __lmem struct pkt_encap *encap,
-                                     const __nnr struct pkt_rx_desc *rxd,
+                                    __lmem struct pkt_encap *encap, int len,
                                     void *meta, uint32_t csum);
 
 /*
@@ -282,12 +282,8 @@ __intrinsic int tx_tsk_fixup(__lmem struct pkt_hdrs *hdrs, __gpr void *meta,
  * @return          Returns 0 on success.
  *
  */
-__intrinsic int tx_tsk_set_ipv4_csum(__lmem struct pkt_hdrs *hdrs,
-                                     const __nnr struct pkt_rx_desc *rxd,
-                                     void *meta);
+__intrinsic int tx_tsk_set_ipv4_csum(__lmem struct pkt_hdrs *hdrs, void *meta);
 
-__intrinsic int tx_tsk_set_l4_csum(__lmem struct pkt_hdrs *hdrs,
-                                   __nnr const struct pkt_rx_desc *rxd,
-                                   void *meta);
+__intrinsic int tx_tsk_set_l4_csum(__lmem struct pkt_hdrs *hdrs, void *meta);
 
 #endif /* _APP_NIC_H_ */

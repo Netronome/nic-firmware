@@ -782,7 +782,7 @@ class Unit_dict(object):
         ipv6_rt = False
         ipv6_hbh = False
         tail = None
-        for promisc in [False, True]:
+        for promisc in [True]:
            for ipv4_opt in [False, True]:
                for l4_type in ['icmp', 'udp', 'tcp']:
                    for ip_err in [False, True]:
@@ -827,7 +827,7 @@ class Unit_dict(object):
         ipv4 = False
         ipv4_opt = False
         ip_err = False
-        for promisc in [False, True]:
+        for promisc in [True]:
            for ipv6_rt in [False, True]:
                for ipv6_hbh in [False, True]:
                    for l4_type in ['udp', 'tcp']:
@@ -899,7 +899,7 @@ class Unit_dict(object):
         tail = None
         for tunnel in ['vxlan']:
             # add nvgre later
-            for promisc in [False, True]:
+            for promisc in [True]:
                for ipv4_opt in [False, True]:
                    for l4_type in ['icmp', 'udp', 'tcp']:
                        for ip_err in [False, True]:
@@ -961,7 +961,7 @@ class Unit_dict(object):
             ipv4_opt = False
             ip_err = False
             # no support for IPV6 RT/HBH over tunnels
-            for promisc in [False, True]:
+            for promisc in [True]:
                for ipv6_rt in [False]:
                    for ipv6_hbh in [False]:
                        for l4_type in ['udp', 'tcp']:

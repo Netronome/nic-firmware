@@ -85,7 +85,7 @@ nic_switch_reconfig()
 
 
 __intrinsic int
-nic_switch_rx_defaultq(int vport, uint8_t *qid)
+nic_switch_rx_defaultq(int vport, uint32_t *qid)
 {
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
     int ret = NIC_RX_DROP;

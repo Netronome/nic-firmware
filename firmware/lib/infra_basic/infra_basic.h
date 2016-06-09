@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * @file          lib/infra_vr/infra_vr.h
+ * @file          lib/infra_basic/infra_basic.h
  * @brief         Interface to the infrastructure blocks
  *
  */
@@ -48,7 +48,7 @@
 
 /* XXX - These defines are likely redefining existing information, fix */
 #define NBI_BUF_META_SZ             2
-#define META_LW_CNT                 (NBI_BUF_META_SZ + 3)
+#define META_LW_CNT                 (NBI_BUF_META_SZ + 5)
 
 enum {
     PKT_PTYPE_DROP     = 0,
@@ -119,6 +119,10 @@ struct pkt_meta {
 
             unsigned p_src:16;
             unsigned p_dst:16;
+
+            /* application specific opaque metadata */
+            uint32_t app0;
+            uint32_t app1;
         };
         uint32_t __raw[META_LW_CNT];
     };
@@ -145,6 +149,26 @@ INFRA_STATE_TYPE extern struct pkt_meta Pkt;
  * multiple of 64B.
  */
 __intrinsic __addr40 void* pkt_ptr(const unsigned int offset);
+
+/**
+ * Return pointers to the start of the frame (L2 header) in each component.
+ *
+ * @param frame_off     Set to start of L2
+ * @param ctm_ptr       Output pointer to CTM component of packet (can be 0)
+ * @param mem_ptr       Output pointer to mem component of packet (can be 0)
+ * @param offset       The required offset from the start of the packet
+ *
+ * If the packet has no CTM component, the CTM pointer will be set to 0.
+ */
+__intrinsic void pkt_ptrs(unsigned int *frame_off, __addr40 void **ctm_ptr,
+                          __addr40 void **mem_ptr, const unsigned int offset);
+
+/**
+ * Return CTM split.
+ *
+ * @return The CTM split. 256 << CTM_SPLIT_LEN gives CTM buffer length in bytes
+ */
+__intrinsic uint32_t ctm_split();
 
 /**
  * Get a packet from the wire and populate a RX descriptor
