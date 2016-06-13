@@ -5,6 +5,7 @@
 |Date        |Revision |Author          |Description                           |
 |------------|:-------:|----------------|--------------------------------------|
 | 2016-03-17 |   0.1   | J.Li           |Initial commit of the document        |
+| 2016-06-13 |   0.2   | M.Bridger      |Installation updates                  |
 |            |         |                |                                      |
 
 # Installing BSP and SDK
@@ -25,11 +26,11 @@ dpkg -r nfp-bsp-release-2015.11
 
 	#Install the required version of BSP and SDK
 
-dpkg -i /releases-intern/nfp-sdk/linux-x86_64/nfp-toolchain-5/dpkg/amd64/nfp-sdk_5-devel-5612-2_amd64.deb
+dpkg -i /releases-intern/nfp-sdk/linux-x86_64/nfp-toolchain-5/dpkg/amd64/nfp-sdk_5-devel-5881-2_amd64.deb
 
-dpkg -i /releases-intern/nfp-bsp/distros/nfp-bsp-release-2015.11/dpkg/nfp-bsp-release-2015.11-dkms_2016.3.7.209-1_all.deb
+dpkg -i /releases-intern/nfp-bsp/distros/nfp-bsp-6000-b0/dpkg/nfp-bsp-6000-b0-dkms_2016.5.25.1605-1_all.deb
 
-dpkg -i /releases-intern/nfp-bsp/distros/nfp-bsp-release-2015.11/dpkg/nfp-bsp-release-2015.11_2016.3.7.209-1_amd64.deb
+dpkg -i /releases-intern/nfp-bsp/distros/nfp-bsp-6000-b0/dpkg/nfp-bsp-6000-b0_2016.5.25.1605-1_amd64.deb
 
 	#Make sure nfp module is loaded
 
@@ -66,12 +67,16 @@ git clone ssh://hg.netronome.com//data/git/repos/nfp-vrouter.git
 
 cd nfp-vrouter
 
-scons -c
+make clean
 
-scons firmware/basic_nic.nffw
+make
 
 	# After the firmware is built, it should be
-	# in nfp-vrouter/firmware/nffw/basic_nic.nffw
+	# in nfp-vrouter/firmware/nffw/
+
+ns_nic_cx40q_1.nffw: for hydrogen NFP
+
+ns_nic_cx10_2.nffw: for lithium NFP
 
 Note:
 
@@ -109,15 +114,15 @@ rm -rf /lib/firmware/netronome
 
 mkdir -p /lib/firmware/netronome
 
-	# transform the NIC firmware format for kernel loading
+	# transform the NIC firmware format for kernel loading (hydrogen fw as example; for lithium fw, use --amda=AMDA0096-0001 in nfp-nffw2ca)
 
 mkdir /tmp/nic_fw
 
 cd /tmp/nic_fw
 
-cp /YOUR_PATH_GIT/nfp-vrouter/firmware/nffw/basic_nic.nffw /tmp/nic_fw/
+cp /YOUR_PATH_GIT/nfp-vrouter/firmware/nffw/ns_nic_cx40q_1.nffw /tmp/nic_fw/
 
-nfp-nffw2ca -z /tmp/nic_fw/basic_nic.nffw /tmp/nic_fw/nfp6000_net.cat
+nfp-nffw2ca -z --amda=AMDA0081-0001 /tmp/nic_fw/ns_nic_cx40q_1.nffw /tmp/nic_fw/nfp6000_net.cat
 
 cp /tmp/nic_fw/nfp6000_net.cat /lib/firmware/netronome/nfp6000_net.cat
 
@@ -129,7 +134,7 @@ ifconfig -a | grep HWaddr
 
 	# Loading the nfp_net driver, which will automatically load the firmware
 
-modprobe nfp_net nfp_reset=1  fw_noload=0 num_rings=32
+modprobe nfp_net nfp_reset=1 fw_noload=0 num_rings=32
 
 	# check if there is a new interface brought up after kernel loading
 
@@ -159,11 +164,11 @@ mkdir /tmp/nic_fw
 
 cd /tmp/nic_fw
 
-cp /YOUR_PATH_GIT/nfp-vrouter/firmware/nffw/basic_nic.nffw /tmp/nic_fw/
+cp /YOUR_PATH_GIT/nfp-vrouter/firmware/nffw/ns_nic_cx40q_1.nffw /tmp/nic_fw/
 
 nfp-nffw unload
 
-nfp-nffw load /tmp/nic_fw/basic_nic.nffw
+nfp-nffw load /tmp/nic_fw/ns_nic_cx40q_1.nffw
 
 	# Unload nfp module, check the list of interfaces before loading nfp_net driver
 
