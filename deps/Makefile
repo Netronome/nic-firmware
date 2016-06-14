@@ -7,8 +7,10 @@ FLOWENV_REV=732cd6f98bf2
 GRO_REV=ee048d732f2d
 # NFD_REV - Tip of ng-nfd-vrouter branch
 NFD_REV=f3f79fa4fb71
-# DPDK_REV - 1.8.0 branch of DPDK-ns known to work w/ virtiorelayd
-DPDK_REV=8095531
+# DPDK_REV - 2.2-last branch of DPDK-ns known to work w/ virtiorelayd
+DPDK_REV=c8d8531
+# Virtiorelayd - known good version as of June 14, 2016
+VIRTIOD_REV=997cdd9
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
@@ -85,6 +87,17 @@ $(DPDK_DIR):
 
 GIT_DEPS += $(DPDK_DIR)
 GIT_REVS += $(DPDK_REV)
+
+#
+# Virtio Relay Daemon
+#
+VIRTIOD_DIR = $(DEPS_DIR)/virtio_relay
+$(VIRTIOD_DIR):
+	git clone ssh://hg//data/git/repos/virtio_relay.git $(VIRTIOD_DIR)
+	(cd $(VIRTIOD_DIR); git checkout $(VIRTIOD_REV))
+
+GIT_DEPS += $(VIRTIOD_DIR)
+GIT_REVS += $(VIRTIOD_REV)
 
 #
 # Processing for all dependencies
