@@ -225,7 +225,7 @@ err_out:
     /* XXX do we need to cnt pkt and populate all metadata on drop path? */
     nic_rx_cntrs(port, &hdrs.o_eth.dst, plen);
     nic_rx_finalise_meta(app_meta, plen);
-    Pkt.p_orig_len = plen;
+    Pkt.p_len = plen;
     Pkt.p_offset += offset;
     Pkt.p_is_gro_sequenced = 1;
     if (err != NIC_RX_DROP) {
