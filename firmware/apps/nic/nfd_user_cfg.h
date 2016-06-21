@@ -34,7 +34,7 @@
 #define NFD_MAX_VFS             NS_PLATFORM_NUM_PORTS
 #endif
 
-#define NFD_VROUTER_LITHIUM
+#define NFD_VROUTER_MULTINETDEV_PF
 
 /* TEMP enable writing VF queue offsets into the BAR */
 #define NFD_NO_ISOLATION
