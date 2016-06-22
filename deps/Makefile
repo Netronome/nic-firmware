@@ -6,7 +6,7 @@ FLOWENV_REV=732cd6f98bf2
 # GRO_REV  - Tip as of Feb 24 2016
 GRO_REV=ee048d732f2d
 # NFD_REV - Tip of ng-nfd-vrouter branch
-NFD_REV=f3f79fa4fb71
+NFD_REV=f73b2401a115
 # DPDK_REV - 2.2-last branch of DPDK-ns known to work w/ virtiorelayd
 DPDK_REV=c8d8531
 # Virtiorelayd - known good version as of June 14, 2016
