@@ -76,6 +76,8 @@ make
 
 ns_nic_cx40q_1.nffw: for hydrogen NFP
 
+ns_nic_cx40q_1_4x10.nffw: for hydrogen NFP with 1x40 breakout cable
+
 ns_nic_cx10_2.nffw: for lithium NFP
 
 Note:
@@ -88,6 +90,13 @@ The location of the report is:
 
 
 # Loading the NIC driver and NIC firmware
+
+There is a temporary limitation in the NIC for lithium and hydrogen
+with 1x40 breakout cable. As stated they can not be run with IOMMU
+enabled. To disable it change/add:
+GRUB_CMDLINE_LINUX_DEFAULT="intel_iommu=off intremap=off" on file
+/etc/default/grub and run "update-grub" before rebooting
+
 There are two ways to load the NIC driver and NIC firmware:
 
  * Kernel space loading (should be the preferred way)

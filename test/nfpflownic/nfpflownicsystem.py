@@ -185,7 +185,7 @@ class NFPFlowNICSystem(NFESystem, NrtSystem):
                 try:
                     # Create the firmware image.
                     self.cp_to(self.mefw, self.tmpdir)
-                    cmd = ('nfp-nffw2ca -a `nfp-hwinfo | grep -o "AMDA.*$"` -z %s %s' %
+                    cmd = ('LD_LIBRARY_PATH=/opt/netronome/lib nfp-nffw2ca -a `nfp-hwinfo | grep -o "AMDA.*$"` -z %s %s' %
                            (os.path.join(self.tmpdir, self.mefw_fn),
                             os.path.join(self.tmpdir, 'nfp6000_net.cat')))
                     self.cmd(cmd)
