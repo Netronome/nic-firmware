@@ -81,8 +81,7 @@
 
 
 /* Current value of NFP_NET_CFG_CTRL (shared between all contexts) */
-__shared __gpr volatile uint32_t nic_control_word;
-
+__shared __lmem volatile uint32_t nic_control_word[NS_PLATFORM_NUM_PORTS];
 
 /*
  * Global declarations for configuration change management
@@ -208,12 +207,13 @@ cfg_changes_loop(void)
 
         if (cfg_msg.msg_valid) {
 
+            port = cfg_msg.vnic;
             /* read in the first 64bit of the Control BAR */
-            mem_read64(cfg_bar_data, NFD_CFG_BAR_ISL(NIC_PCI, cfg_msg.vnic),
+            mem_read64(cfg_bar_data, NFD_CFG_BAR_ISL(NIC_PCI, port),
                        sizeof cfg_bar_data);
 
             /* Reflect the pci island and the vnic number to remote MEs */
-            cfg_pci_vnic = (NIC_PCI << 16) | cfg_msg.vnic;
+            cfg_pci_vnic = (NIC_PCI << 16) | port;
             /* Reset the configuration ack counter */
             synch_cnt_dram_reset(&nic_cfg_synch,
                                  sizeof(app_mes_ids)/sizeof(uint32_t));
@@ -226,10 +226,9 @@ cfg_changes_loop(void)
             }
 
             /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
-            if ((nic_control_word ^ cfg_bar_data[0]) &
+            if ((nic_control_word[port] ^ cfg_bar_data[0]) &
                     NFP_NET_CFG_CTRL_ENABLE) {
 
-                port = cfg_msg.vnic;
                 mac_conf = xpb_read(MAC_CONF_ADDR(port));
                 if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
                     mac_conf |= NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
@@ -261,7 +260,7 @@ cfg_changes_loop(void)
             }
 
             /* Save the control word */
-            nic_control_word = cfg_bar_data[0];
+            nic_control_word[port] = cfg_bar_data[0];
 
             /* Wait for all APP MEs to ack the config change */
             synch_cnt_dram_wait(&nic_cfg_synch);
@@ -346,7 +345,7 @@ lsc_send(int nic_intf)
         goto out;
 
     /* Work out which masking mode we should use */
-    automask = nic_control_word & NFP_NET_CFG_CTRL_MSIXAUTO;
+    automask = nic_control_word[nic_intf] & NFP_NET_CFG_CTRL_MSIXAUTO;
 
     /* If we don't auto-mask, check the ICR */
     if (!automask) {
@@ -385,7 +384,7 @@ lsc_check(__gpr unsigned int *ls_current, int nic_intf)
     /* XXX Only check link state once the device is up.  This is
      * temporary to avoid a system crash when the MAC gets reset after
      * FW has been loaded. */
-    if (!(nic_control_word & NFP_NET_CFG_CTRL_ENABLE))
+    if (!(nic_control_word[nic_intf] & NFP_NET_CFG_CTRL_ENABLE))
         goto out;
 
     /* Read the current link state and if it changed set the bit in
