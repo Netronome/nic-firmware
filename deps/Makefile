@@ -9,8 +9,8 @@ GRO_REV=ee048d732f2d
 NFD_REV=f73b2401a115
 # DPDK_REV - 2.2-last branch of DPDK-ns known to work w/ virtiorelayd
 DPDK_REV=c8d8531
-# Virtiorelayd - known good version as of June 14, 2016
-VIRTIOD_REV=997cdd9
+# Virtiorelayd - NFP vRouter development branch
+VIRTIOD_REV=vrouter
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
