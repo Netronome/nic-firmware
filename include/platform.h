@@ -44,13 +44,13 @@
  *
  *         - NS_PLATFORM_MAC_CORE(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  MAC core number that a given port belongs to; an
  *                       integer from 0 to 1, inclusive
  *
  *         - NS_PLATFORM_MAC_CORE_SERDES_HI(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  Highest MAC core SerDes number used by a given port;
  *                       an integer from  0 to 11, inclusive
  *             - note: The MAC core SerDes number is a relative index from the
@@ -60,7 +60,7 @@
  *
  *         - NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  Lowest MAC core SerDes number used by a given port; an
  *                       integer from  0 to 11, inclusive
  *             - note: The MAC core SerDes number is a relative index from the
@@ -68,9 +68,22 @@
  *                     would be the first MAC SerDes belonging to a particular
  *                     MAC core
  *
+ *         - NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes)
+ *             - param _mac     MAC island number that a given port belongs to;
+ *                              an integer from 0 to 1, inclusive
+ *             - param _core    MAC core number that a given port belongs to;
+ *                              an integer from 0 to 1, inclusive
+ *             - param _serdes  Lowest MAC core SerDes number used by a given
+ *                              port; an integer from  0 to 11, inclusive
+ *             - return  Platform physical port number; an integer from 0 to
+ *                       (NS_PLATFORM_NUM_PORTS - 1), inclusive
+ *             - note: This macro does not validate that the MAC island number,
+ *                     the MAC core number, nor the MAC core SerDes number are
+ *                     legitimate for the given platform
+ *
  *         - NS_PLATFORM_MAC_CHANNEL_HI(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  Highest channel number assigned to a given port; an
  *                       integer from 0 to 127, inclusive
  *             - note:  The MAC channel number is a relative index from the
@@ -80,7 +93,7 @@
  *
  *         - NS_PLATFORM_MAC_CHANNEL_LO(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  Lowest channel number assigned to a given port; an
  *                       integer from 0 to 127, inclusive
  *             - note:  The MAC channel number is a relative index from the
@@ -114,7 +127,7 @@
  *
  *         - NS_PLATFORM_PORT_SPEED(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  The speed of the port, in Gbps; a non-negative integer
  *
  *
@@ -122,13 +135,13 @@
  *
  *         - NS_PLATFORM_MAC(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  MAC island number that a given port belongs to; an
  *                       integer from 0 to 1, inclusive
  *
  *         - NS_PLATFORM_MAC_CHANNEL(_port, _pcp)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - param _pcp   IEEE 802.1p Priority Code Point (PCP); an integer
  *                            from 0 to 7, inclusive
  *             - return  MAC channel number for frames with a given PCP and
@@ -137,19 +150,19 @@
  *
  *         - NS_PLATFORM_MAC_CHANNEL_UNTAGGED(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  MAC channel number for untagged frames egressing a
  *                       given port; an integer from 0 to 127, inclusive
  *
  *         - NS_PLATFORM_MAC_NUM_SERDES(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  Number of SerDes used by a given port; an integer from
  *                       0 to 11, inclusive
  *
  *         - NS_PLATFORM_MAC_SERDES_HI(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  Highest MAC SerDes number used by a given port; an
  *                       integer from 0 to 23, inclusive
  *             - note: The MAC SerDes number is a relative index from the
@@ -159,7 +172,7 @@
  *
  *         - NS_PLATFORM_MAC_SERDES_LO(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  Lowest MAC SerDes number used by a given port; an
  *                       integer from 0 to 23, inclusive
  *             - note: The MAC SerDes number is a relative index from the
@@ -167,9 +180,20 @@
  *                     be the twelth MAC SerDes belonging to a particular MAC
  *                     island
  *
+ *         - NS_PLATFORM_MAC_SERDES_TO_PORT(_mac, _serdes)
+ *             - param _mac     MAC island number that a given port belongs to;
+ *                              an integer from 0 to 1, inclusive
+ *             - param _serdes  Lowest MAC SerDes number used by a given port;
+ *                              an integer from  0 to 23, inclusive
+ *             - return  Platform physical port number; an integer from 0 to
+ *                       (NS_PLATFORM_NUM_PORTS - 1), inclusive
+ *             - note: This macro does not validate that the MAC island number
+ *                     nor the MAC SerDes number are legitimate for the given
+ *                     platform
+ *
  *         - NS_PLATFORM_NBI_TM_QID(_port, _pcp, _l2q)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - param _pcp   IEEE 802.1p Priority Code Point (PCP); an integer
  *                            from 0 to 7, inclusive
  *             - param _l2q   NBI TM level-2 scheduler input queue number
@@ -200,19 +224,19 @@
  *
  *         - NS_PLATFORM_NBI_TM_QID_HI(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  Highest NBI TM queue ID assigned to a given port; an
  *                       integer from 0 to 1023, inclusive
  *
  *         - NS_PLATFORM_NBI_TM_QID_LO(_port)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  Lowest NBI TM queue ID assigned to a given port; an
  *                       integer from 0 to 1023, inclusive
  *
  *         - NS_PLATFORM_NBI_TM_QID_UNTAGGED(_port, _l2q)
  *             - param _port  Platform physical port number; an integer from 0
- *                            to NS_PLATFORM_NUM_PORTS, inclusive
+ *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - param _l2q   NBI TM level-2 scheduler input queue number for
  *                            untagged frames egressing a given port; an
  *                            integer from 0 to 63, inclusive
@@ -248,6 +272,8 @@
     #define NS_PLATFORM_MAC_CORE(_port)           0
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) 3
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) 0
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        0
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)     3
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     0
     #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
@@ -262,6 +288,8 @@
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) (_port)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
         NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        (_serdes)
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 2)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
@@ -277,6 +305,8 @@
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
         NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        ((_serdes) >> 2)
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
@@ -292,6 +322,8 @@
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
         NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        ((_serdes) >> 2)
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
@@ -307,6 +339,8 @@
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
         NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        ((_serdes) >> 2)
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
@@ -322,6 +356,8 @@
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
         NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        ((_serdes) >> 2)
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
@@ -336,6 +372,8 @@
     #define NS_PLATFORM_MAC_CORE(_port)           0
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) 7
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) 4
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        0
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)     19
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     16
     #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
@@ -350,6 +388,8 @@
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port)   \
         (NS_PLATFORM_MAC_CORE_SERDES_LO(_port) + 3)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        ((_serdes) >> 2)
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
@@ -365,6 +405,8 @@
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) + 4)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
         NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        ((_serdes) - 4)
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     (((_port) << 2) + 16)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
@@ -380,6 +422,8 @@
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) (_port)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port)                       \
         (NS_PLATFORM_MAC_CORE_SERDES_LO(_port) + ((_port < 4) ? 0 : 3))
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        (_serdes)
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 2)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
@@ -395,6 +439,8 @@
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) (_port)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
         NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        (_serdes)
     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 2)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
@@ -423,6 +469,10 @@
     #define NS_PLATFORM_MAC_SERDES_LO(_port) \
         (NS_PLATFORM_MAC_CORE(_port) * 12 +  \
          NS_PLATFORM_MAC_CORE_SERDES_LO(_port))
+    #define NS_PLATFORM_MAC_SERDES_TO_PORT(_mac, _serdes)              \
+        ((_serdes < 12)                                        ?       \
+         NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, 0, _serdes) :       \
+         NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, 1, (_serdes) - 12))
     #define NS_PLATFORM_NBI_TM_QID(_port, _pcp, _l2q)          \
         ((NS_PLATFORM_MAC_CHANNEL(_port, _pcp) << 3) + (_l2q))
     #define NS_PLATFORM_NBI_TM_QID_HI(_port)           \
