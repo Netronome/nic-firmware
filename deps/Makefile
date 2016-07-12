@@ -8,7 +8,7 @@ GRO_REV=ee048d732f2d
 # NFD_REV - Tip of ng-nfd-vrouter branch
 NFD_REV=f73b2401a115
 # DPDK_REV - 2.2-last branch of DPDK-ns known to work w/ virtiorelayd
-DPDK_REV=c8d8531
+DPDK_REV=bb7a02554220b1cf8679814440382609655e1a5d
 # Virtiorelayd - NFP vRouter development branch
 VIRTIOD_REV=vrouter
 
