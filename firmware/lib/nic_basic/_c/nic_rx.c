@@ -92,7 +92,7 @@ nic_rx_csum_checks(int port, uint32_t csum, void *meta)
         /* L3 checksum is wrong */
         out_desc->flags |= PCIE_DESC_RX_IP4_CSUM;
         NIC_LIB_CNTR(&nic_cnt_rx_csum_err_l3);
-        ret = NIC_RX_DROP;
+        ret = NIC_RX_CSUM_BAD;
     }
 
     if (NFP_MAC_RX_CSUM_L4_SUM_of(csum) == NFP_MAC_RX_CSUM_L4_TCP_OK) {
@@ -103,7 +103,7 @@ nic_rx_csum_checks(int port, uint32_t csum, void *meta)
     if (NFP_MAC_RX_CSUM_L4_SUM_of(csum) == NFP_MAC_RX_CSUM_L4_TCP_FAIL) {
         out_desc->flags |= PCIE_DESC_RX_TCP_CSUM;
         NIC_LIB_CNTR(&nic_cnt_rx_csum_err_l4_tcp);
-        ret = NIC_RX_DROP;
+        ret = NIC_RX_CSUM_BAD;
     }
 
     if (NFP_MAC_RX_CSUM_L4_SUM_of(csum) == NFP_MAC_RX_CSUM_L4_UDP_OK) {
@@ -114,21 +114,13 @@ nic_rx_csum_checks(int port, uint32_t csum, void *meta)
     if (NFP_MAC_RX_CSUM_L4_SUM_of(csum) == NFP_MAC_RX_CSUM_L4_UDP_FAIL) {
         out_desc->flags |= PCIE_DESC_RX_UDP_CSUM;
         NIC_LIB_CNTR(&nic_cnt_rx_csum_err_l4_udp);
-        ret = NIC_RX_DROP;
+        ret = NIC_RX_CSUM_BAD;
     }
 
-    if (ret == NIC_RX_DROP)
+    if (ret == NIC_RX_CSUM_BAD)
         nic_rx_error_cntr(port);
 
-    /* In promiscuous mode we pass through even errored packets, but
-     * we still do the tests above to update the counters. Indicate to
-     * the caller that the checksum was bad, though. */
-
-    if (nic->control[port] & NFP_NET_CFG_CTRL_PROMISC && ret == NIC_RX_DROP)
-        ret = NIC_RX_CSUM_BAD;
-
-    if (ret != NIC_RX_DROP)
-        NIC_LIB_CNTR(&nic_cnt_rx_pkts);
+    NIC_LIB_CNTR(&nic_cnt_rx_pkts);
 
     return ret;
 }

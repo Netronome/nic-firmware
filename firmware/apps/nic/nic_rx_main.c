@@ -94,18 +94,14 @@ proc_from_wire(int port)
 
     /* Checksum checks. */
     err = nic_rx_csum_checks(port, csum_prepend, app_meta);
-    if (err == NIC_RX_DROP)
+    /* If there was a checksum error don't parse
+     * the packet.  It might be garbage. */
+    if (err == NIC_RX_CSUM_BAD)
         goto err_out;
 
     /* Strip the CSUM and timestamp prepend, this is not transferred to host */
     offset += MAC_PREPEND_BYTES;
     plen -= MAC_PREPEND_BYTES;
-
-    /* If there was a checksum error but we are in promisc mode, ie
-     * nic_rx_csum_checks() returned NIC_RX_CSUM_BAD, don't parse
-     * the packet.  It might be garbage. */
-    if (err == NIC_RX_CSUM_BAD)
-        goto pkt_out;
 
     vxlan_ports = nic_rx_vxlan_ports();
 
