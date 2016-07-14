@@ -217,13 +217,11 @@ __intrinsic int nic_rx_mtu_check(int port, uint32_t csum, int frame_len);
  * @param csum          Checksum prepend word
  * @param meta          Pointer to buffer/packet meta data
  *
- * Returns @NIC_RX_OK on success and @NIC_RX_DROP when checks failed
- * and the NIC is not in promiscuous mode.  If the checks fail and the
- * NIC is in promiscuous mode, this function returns @NIC_RX_CSUM_BAD.
+ * Returns @NIC_RX_OK on success and @NIC_RX_CSUM_BAD when checks fail.
  *
  * This function only applies to the outermost header
  *
- * The function also maintains counters in case a packet is dropped.
+ * The function also maintains counters in case a packet is marked as bad csum.
  *
  * @meta must be in GPRs or LMEM and is assumed to be a struct pkt_meta *.
  */

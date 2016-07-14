@@ -215,37 +215,18 @@ class UnitIP(Test):
 
         # There are counters that we expect to have an exact increment after
         # the test.
-        if self.promisc:
-            # checksum related counters
-            if self.iperr or self.l4err:
-                # any checksum error in promisc mode
-                self.expect_et_cntr["hw_rx_csum_err"] = self.num_pkts
-                self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
-            else:
-                if self.l4_type == 'udp' or self.l4_type == 'tcp':
-                    # w/o any error, csum_ok only increases when receiving TCP/UDP
-                    self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
-                if self.dst_mac_type == 'mc' and self.src_mac_type == 'src':
-                    self.expect_et_cntr["dev_rx_mc_pkts"] = self.num_pkts
-                if self.dst_mac_type == 'bc' and self.src_mac_type == 'src':
-                    self.expect_et_cntr["dev_rx_bc_pkts"] = self.num_pkts
+        if self.iperr or self.l4err:
+            # any checksum error in promisc mode
+            self.expect_et_cntr["hw_rx_csum_err"] = self.num_pkts
+            self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
         else:
-            if self.dst_mac_type == 'tgt' and self.src_mac_type == 'src':
-                if self.iperr or self.l4err:
-                    # any checksum error in non-promisc mode
-                    self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
-                elif self.l4_type == 'udp' or self.l4_type == 'tcp':
-                    # w/o any error, csum_ok only increases when receiving
-                    # TCP/UDP
-                    self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
-            if self.dst_mac_type == 'diff' or self.src_mac_type != 'src':
-                self.expect_et_cntr["dev_rx_discards"] = self.num_pkts
+            if self.l4_type == 'udp' or self.l4_type == 'tcp':
+                # w/o any error, csum_ok only increases when receiving TCP/UDP
+                self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
             if self.dst_mac_type == 'mc' and self.src_mac_type == 'src':
                 self.expect_et_cntr["dev_rx_mc_pkts"] = self.num_pkts
-                self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
             if self.dst_mac_type == 'bc' and self.src_mac_type == 'src':
                 self.expect_et_cntr["dev_rx_bc_pkts"] = self.num_pkts
-                self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
 
         return
 
@@ -506,7 +487,7 @@ class UnitIPv4(UnitIP):
                  name="ipv4", summary=None):
         UnitIP.__init__(self, src, dst, ipv4=True, ipv4_opt=ipv4_opt,
                         l4_type=l4_type, iperr=iperr,
-                        l4err=l4err, promisc=promisc, group=group,
+                        l4err=l4err, group=group,
                         dst_mac_type=dst_mac_type, src_mac_type=src_mac_type,
                         name=name, summary=summary)
 
@@ -529,7 +510,7 @@ class UnitIPv6(UnitIP):
                  name="ipv6", summary=None):
         UnitIP.__init__(self, src, dst, ipv4=False, ipv6_rt=ipv6_rt,
                         ipv6_hbh=ipv6_hbh, l4_type=l4_type,
-                        l4err=l4err, promisc=promisc, group=group,
+                        l4err=l4err, group=group,
                         dst_mac_type=dst_mac_type, src_mac_type=src_mac_type,
                         name=name, summary=summary)
 
