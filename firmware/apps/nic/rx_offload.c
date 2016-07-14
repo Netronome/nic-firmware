@@ -137,7 +137,7 @@ rx_check_inner_csum(int port, __lmem struct pkt_hdrs *hdrs,
     ret = net_csum_ipv4(&hdrs->i_ip4, l3_hdr);
     out_desc->flags |= PCIE_DESC_RX_I_IP4_CSUM;
     if (ret)
-        ret2 = NIC_RX_DROP;
+        ret2 = NIC_RX_CSUM_BAD;
     else
         out_desc->flags |= PCIE_DESC_RX_I_IP4_CSUM_OK;
 
@@ -269,9 +269,9 @@ inner_l4:
     }
 out:
 
-    if (ret2 == NIC_RX_DROP || ret) {
+    if (ret2 == NIC_RX_CSUM_BAD || ret) {
         nic_rx_error_cntr(port);
-        ret2 = NIC_RX_DROP;
+        ret2 = NIC_RX_CSUM_BAD;
     }
 
     return ret2;

@@ -848,11 +848,11 @@ class Unit_dict(object):
         ## RX checksum tunnel test
         ########################################################################
         def _csum_rx_tnl_hdr_tn(tunnel, ipv4, ipv4_opt, ipv6_rt, ipv6_hbh,
-                                l4_type, ip_err, l4_err, promisc, tail):
+                                l4_type, ip_err, l4_err, tail):
            """generate the csum_rx test name"""
            l4_str = '_%s' % l4_type
            l4err_str = '_%serr' % l4_type
-           return "csum_rx%s%s%s%s%s%s%s%s%s%s" % ("_%s" % tunnel,
+           return "csum_rx%s%s%s%s%s%s%s%s%s" % ("_%s" % tunnel,
                                                  "_ipv4" if ipv4 else "_ipv6",
                                                  "_opt" if ipv4_opt else "",
                                                  "_rt" if ipv6_rt else "",
@@ -860,11 +860,10 @@ class Unit_dict(object):
                                                  l4_str,
                                                  "_iperr" if ip_err else "",
                                                  l4err_str if l4_err else "",
-                                                 "_promisc" if promisc else "",
                                                  "_" + tail if tail else "")
 
         def _csum_rx_tnl_hdr_sum(tst_cls, tunnel, ipv4_opt, ipv6_rt, ipv6_hbh,
-                                 l4_type, ip_err, l4_err, promisc, tail):
+                                 l4_type, ip_err, l4_err, tail):
            """generate the csum_rx test summary"""
            l4_str = ', %s payload ' % l4_type.upper()
            if ip_err and l4_err:
@@ -875,14 +874,13 @@ class Unit_dict(object):
                err_str = " with %s csum err" % l4_type.upper()
            else:
                err_str = ""
-           return "%s%s%s%s%s%s%s%s" % (tst_cls.summary,
+           return "%s%s%s%s%s%s%s" % (tst_cls.summary,
                                       " + IP option" if ipv4_opt else "",
                                       " + IPv6 RT extension hdr"
                                       if ipv6_rt else "",
                                       " + IPv6 HOPOPT extension hdr"
                                       if ipv6_hbh else "",
                                       err_str,
-                                      " in promisc mode " if promisc else "",
                                       tail if tail else "",
                                       " in %s tunnel" % tunnel)
 
@@ -894,97 +892,93 @@ class Unit_dict(object):
         tail = None
         for tunnel in ['vxlan']:
             # add nvgre later
-            for promisc in [True]:
-               for ipv4_opt in [False, True]:
-                   for l4_type in ['icmp', 'udp', 'tcp']:
-                       for ip_err in [False, True]:
-                           if l4_type == 'udp' or l4_type == 'tcp':
-                               for l4_err in [False, True]:
-                                   # An IPv4 test
-                                   tn = self.prefix + _csum_rx_tnl_hdr_tn(tunnel, ipv4,
-                                                            ipv4_opt, ipv6_rt,
-                                                            ipv6_hbh, l4_type,
-                                                            ip_err, l4_err,
-                                                            promisc, tail)
-                                   summary = _csum_rx_tnl_hdr_sum(UnitIPv4,
-                                                                  tunnel,
-                                                                  ipv4_opt,
-                                                                  ipv6_rt,
-                                                                  ipv6_hbh,
-                                                                  l4_type,
-                                                                  ip_err,
-                                                                  l4_err,
-                                                                  promisc, tail)
-                                   self.tests[tn] = Csum_rx_tnl(src, dst,
+            for ipv4_opt in [False, True]:
+                for l4_type in ['icmp', 'udp', 'tcp']:
+                    for ip_err in [False, True]:
+                        if l4_type == 'udp' or l4_type == 'tcp':
+                            for l4_err in [False, True]:
+                                # An IPv4 test
+                                tn = self.prefix + \
+                                     _csum_rx_tnl_hdr_tn(tunnel, ipv4,
+                                                         ipv4_opt, ipv6_rt,
+                                                         ipv6_hbh, l4_type,
+                                                         ip_err, l4_err,
+                                                         tail)
+                                summary = _csum_rx_tnl_hdr_sum(UnitIPv4,
+                                                               tunnel,
+                                                               ipv4_opt,
+                                                               ipv6_rt,
+                                                               ipv6_hbh,
+                                                               l4_type,
+                                                               ip_err,
+                                                               l4_err,
+                                                               tail)
+                                self.tests[tn] = Csum_rx_tnl(src, dst,
                                                              tunnel_type=tunnel,
                                                              ipv4_opt=ipv4_opt,
                                                              l4_type=l4_type,
                                                              iperr=ip_err,
                                                              l4err=l4_err,
-                                                             promisc=promisc,
                                                              group=group,
                                                              name=tn,
                                                              summary=summary)
 
-                           else:
-                               # when neither udp nor tcp are used, there is no
-                               # need to insert udp/tcp checksum error
-                               l4_err = False
-                               tn = self.prefix + _csum_rx_tnl_hdr_tn(tunnel, ipv4, ipv4_opt,
-                                                        ipv6_rt, ipv6_hbh,
-                                                        l4_type, ip_err,
-                                                        l4_err, promisc, tail)
-                               summary = _csum_rx_tnl_hdr_sum(UnitIPv4,
-                                                              tunnel,
-                                                              ipv4_opt,
-                                                              ipv6_rt, ipv6_hbh,
-                                                              l4_type, ip_err,
-                                                              l4_err, promisc,
-                                                              tail)
-                               self.tests[tn] = Csum_rx_tnl(src, dst,
-                                                            tunnel_type=tunnel,
-                                                            ipv4=True,
-                                                            ipv4_opt=ipv4_opt,
-                                                            l4_type=l4_type,
-                                                            iperr=ip_err,
-                                                            l4err=l4_err,
-                                                            promisc=promisc,
-                                                            group=group,
-                                                            name=tn,
-                                                            summary=summary)
+                        else:
+                            # when neither udp nor tcp are used, there is no
+                            # need to insert udp/tcp checksum error
+                            l4_err = False
+                            tn = self.prefix + \
+                                 _csum_rx_tnl_hdr_tn(tunnel, ipv4, ipv4_opt,
+                                                     ipv6_rt, ipv6_hbh,
+                                                     l4_type, ip_err,
+                                                     l4_err, tail)
+                            summary = _csum_rx_tnl_hdr_sum(UnitIPv4,
+                                                           tunnel,
+                                                           ipv4_opt,
+                                                           ipv6_rt, ipv6_hbh,
+                                                           l4_type, ip_err,
+                                                           l4_err, tail)
+                            self.tests[tn] = Csum_rx_tnl(src, dst,
+                                                         tunnel_type=tunnel,
+                                                         ipv4=True,
+                                                         ipv4_opt=ipv4_opt,
+                                                         l4_type=l4_type,
+                                                         iperr=ip_err,
+                                                         l4err=l4_err,
+                                                         group=group,
+                                                         name=tn,
+                                                         summary=summary)
             ipv4 = False
             ipv4_opt = False
             ip_err = False
             # no support for IPV6 RT/HBH over tunnels
-            for promisc in [True]:
-               for ipv6_rt in [False]:
-                   for ipv6_hbh in [False]:
-                       for l4_type in ['udp', 'tcp']:
-                           for l4_err in [False, True]:
-                               # An IPv6 test
-                               tn = self.prefix + _csum_rx_tnl_hdr_tn(tunnel, ipv4, ipv4_opt,
-                                                        ipv6_rt, ipv6_hbh,
-                                                        l4_type, ip_err,
-                                                        l4_err, promisc, tail)
-                               summary = _csum_rx_tnl_hdr_sum(UnitIPv6,
-                                                              tunnel,
-                                                              ipv4_opt,
-                                                              ipv6_rt,
-                                                              ipv6_hbh,
-                                                              l4_type, ip_err,
-                                                              l4_err, promisc,
-                                                              tail)
-                               self.tests[tn] = Csum_rx_tnl(src, dst,
-                                                            tunnel_type=tunnel,
-                                                            ipv4=False,
-                                                            ipv6_rt=ipv6_rt,
-                                                            ipv6_hbh=ipv6_hbh,
-                                                            l4_type=l4_type,
-                                                            l4err=l4_err,
-                                                            promisc=promisc,
-                                                            group=group,
-                                                            name=tn,
-                                                            summary=summary)
+            for ipv6_rt in [False]:
+                for ipv6_hbh in [False]:
+                    for l4_type in ['udp', 'tcp']:
+                        for l4_err in [False, True]:
+                            # An IPv6 test
+                            tn = self.prefix + \
+                                 _csum_rx_tnl_hdr_tn(tunnel, ipv4, ipv4_opt,
+                                                     ipv6_rt, ipv6_hbh,
+                                                     l4_type, ip_err,
+                                                     l4_err, tail)
+                            summary = _csum_rx_tnl_hdr_sum(UnitIPv6,
+                                                           tunnel,
+                                                           ipv4_opt,
+                                                           ipv6_rt,
+                                                           ipv6_hbh,
+                                                           l4_type, ip_err,
+                                                           l4_err, tail)
+                            self.tests[tn] = Csum_rx_tnl(src, dst,
+                                                         tunnel_type=tunnel,
+                                                         ipv4=False,
+                                                         ipv6_rt=ipv6_rt,
+                                                         ipv6_hbh=ipv6_hbh,
+                                                         l4_type=l4_type,
+                                                         l4err=l4_err,
+                                                         group=group,
+                                                         name=tn,
+                                                         summary=summary)
 
 
         #######################################################################

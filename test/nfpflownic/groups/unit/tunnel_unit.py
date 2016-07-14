@@ -1429,7 +1429,7 @@ class Csum_rx_tnl(UnitIP):
         UnitIP.__init__(self, src, dst, ipv4=ipv4, ipv4_opt=ipv4_opt,
                         l4_type=l4_type, iperr=iperr,
                         ipv6_rt=ipv6_rt, ipv6_hbh=ipv6_hbh,
-                        l4err=l4err, promisc=promisc, group=group,
+                        l4err=l4err, group=group,
                         dst_mac_type=dst_mac_type, src_mac_type=src_mac_type,
                         vlan=vlan, vlan_id=vlan_id,
                         name=name, summary=summary)
@@ -1454,34 +1454,15 @@ class Csum_rx_tnl(UnitIP):
         self.src_outer_mac = None
         self.dst_outer_mac = None
 
+        # tunnel checksum related counters
         if self.tunnel_type == 'vxlan':
-            if self.promisc:
-                # tunnel checksum related counters
-                if (not self.iperr) and (not self.l4err):
-                    # no checksum error in promisc mode
-                    if self.l4_type == 'udp' or self.l4_type == 'tcp':
-                        # w/o any error, inner csum_ok only increases when
-                        # receiving TCP/UDP
-                        self.expect_et_cntr["hw_rx_csum_inner_ok"] = \
-                            self.num_pkts
-                    # on vxlan tunnel check that all outer (IP and UDP) is ok
-                    self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
-            else:
-                if self.dst_mac_type == 'tgt' and self.src_mac_type == 'src':
-                    if self.iperr or self.l4err:
-                        self.expect_et_cntr["dev_rx_discards"] = self.num_pkts
-                    else:
-                        if self.l4_type == 'udp' or self.l4_type == 'tcp':
-                            # w/o any error, inner csum_ok only increases
-                            # when receiving TCP/UDP
-                            self.expect_et_cntr["hw_rx_csum_inner_ok"] = \
-                                self.num_pkts
-                        # on vxlan tunnel check that all outer (IP and UDP) is ok
-                        self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
-                if self.dst_mac_type == 'mc' and self.src_mac_type == 'src':
+            if (not self.iperr) and (not self.l4err):
+                if self.l4_type == 'udp' or self.l4_type == 'tcp':
+                    # w/o any error, inner csum_ok only increases when
+                    # receiving TCP/UDP
                     self.expect_et_cntr["hw_rx_csum_inner_ok"] = self.num_pkts
-                if self.dst_mac_type == 'bc' and self.src_mac_type == 'src':
-                    self.expect_et_cntr["hw_rx_csum_inner_ok"] = self.num_pkts
+                # on vxlan tunnel check that all outer (IP and UDP) is ok
+                self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
 
     def send_pckts_and_check_result(self, src_if, dst_if, send_pcap, tmpdir):
         """
