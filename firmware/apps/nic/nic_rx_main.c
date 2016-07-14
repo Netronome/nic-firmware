@@ -116,14 +116,8 @@ proc_from_wire(int port)
 
     ret = rx_check_inner_csum(port, &hdrs, &encap, plen + MAC_PREPEND_BYTES,
                               app_meta, csum_prepend);
-    if (ret == NIC_RX_DROP) {
-        if (nic_rx_promisc(port)) {
-            err = NIC_RX_CSUM_BAD;
-            goto pkt_out;
-        } else {
-            err = NIC_RX_DROP;
-            goto err_out;
-        }
+    if (ret == NIC_RX_CSUM_BAD) {
+        goto err_out;
     }
 
     /* Strip VLAN if present and configured.
