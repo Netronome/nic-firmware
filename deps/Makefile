@@ -77,15 +77,13 @@ HG_REVS += $(NFD_REV)
 #
 #
 
-FORCE:
-
 #
 # $1 - repo directory
 # $2 - revision
 #
 define update_hg_dep_decl
 	
-	$(Q)(echo "Updating $1 to revision $2"; cd $1 ; hg pull ; hg up -r $2)
+	$(Q)(echo Checking $1; cd $1 ; if [ `hg id -i` != "$2" ] ; then echo "Updating $1 to revision $2"; hg pull ; hg up -r $2; fi)
 endef
 
 #
@@ -94,12 +92,14 @@ endef
 #
 define update_git_dep_decl
 	
-	$(Q)(echo "Updating $1 to revision $2"; cd $1 ; git pull; git checkout $2)
+	$(Q)(echo Checking $1; cd $1 ; if ! git rev-parse HEAD | grep -q "$2" ; then echo "Updating $1 to revision $2"; git pull; git checkout $2; fi)
 endef
 
 firmware_fetch_deps: $(HG_DEPS) $(GIT_DEPS)
 
-firmware_update_deps: $(HG_DEPS) $(GIT_DEPS) FORCE
+$(DEPS_DIR)/Makefile: firmware_update_deps
+
+firmware_update_deps: $(HG_DEPS) $(GIT_DEPS)
 	$(foreach d,$(shell seq $(words $(HG_DEPS))),\
 		$(call update_hg_dep_decl,$(word $d,$(HG_DEPS)),$(word $d,$(HG_REVS))))
 	$(foreach d,$(shell seq $(words $(GIT_DEPS))),\
