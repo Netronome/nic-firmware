@@ -49,6 +49,7 @@ $(eval $(call microcode.add_includes,$1,gro$3,$(GRO_DIR) $(GRO_DIR)/me))
 $(eval $(call microcode.add_defines,$1,gro$3,GRO_BLOCK_NUM=$3 NFD_VERSION=0x03010000))
 $(eval $(call microcode.add_flags,$1,gro$3,-keep_unreachable_code))
 $(eval $(call nffw.add_obj,$1,gro$3,$2))
+$$($1__gro$3__LIST): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -85,6 +86,7 @@ $(foreach blk,$(shell seq $(words $2)),\
 
 $(eval $(call nffw.add_define,$1,GRO_NUM_BLOCKS=$(words $2)))
 $(eval $(call nffw.add_include,$(GRO_DIR)))
+$$($1__NFFW): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -120,6 +122,7 @@ define fwdep.micro_c.add_gro_lib
 
 $(eval $(call micro_c.add_include,$1,$2,$(GRO_DIR)))
 $(eval $(call micro_c.add_src_lib.abspath,$1,$2,$(GRO_DIR),libgro))
+$$($1__$2__LIST): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -155,6 +158,7 @@ $(eval $(call microcode.add_fw_includes,$1,	\
 	))
 
 $(eval $(call micro_c.add_fw_clib,$1,$(FLOWENV_DIR)/me/lib/nfp/libnfp.c))
+$$($1__NFFW): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -171,6 +175,7 @@ define fwdep.micro_c.add_flowenv_lib
 
 $1__$2__INC   +=
 $1__$2__CLIBS += $(FLOWENV_DIR)/me/lib/$3/lib$3.c
+$$($1__$2__LIST): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -186,6 +191,7 @@ define fwdep.add_flowenv_nfp_init
 $(eval $(call microcode.assemble.codeless.abspath,$1,flowenv_nfp_init,\
 	$(FLOWENV_DIR)/me/blocks/init,init_main.uc))
 $(eval $(call nffw.add_obj_codeless,$1,flowenv_nfp_init))
+$$($1__flowenv_nfp_init__LIST): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -201,6 +207,7 @@ define fwdep.add_flowenv_nfp_init_flag
 $(eval $(call microcode.assemble.codeless.abspath,$1,flowenv_nfp_init,\
 	$(FLOWENV_DIR)/me/blocks/init,init_main.uc,$2))
 $(eval $(call nffw.add_obj_codeless,$1,flowenv_nfp_init))
+$$($1__flowenv_nfp_init__LIST): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -232,6 +239,7 @@ $(eval $(call microcode.add_defines,$1,blm$3,\
 $(eval $(call microcode.add_define,$1,blm$3,BLM_$3_ISLAND_ILA$(call fwdep.plus,$3,48)))
 $(if $(filter 0,$3),$(eval $(call microcode.add_defines,$1,blm$3,BLM_INIT_EMU_RINGS)))
 $(eval $(call nffw.add_obj,$1,blm$3,$2))
+$$($1__blm$3__LIST): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -293,6 +301,7 @@ endef
 define fwdep.micro_c.add_blm_lib
 
 $(eval $(call micro_c.add_src_lib.abspath,$1,$2,$(BLM_DIR),libblm))
+$$($1__$2__LIST): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -321,6 +330,9 @@ $(eval $(call nffw.add_includes,$1,	\
 	$(NFD_DIR)/me/blocks/vnic/shared\
 	$(NFD_DIR)/me/lib		\
 	))
+
+$$($1__NFFW): $(DEPS_DIR)/Makefile
+
 endef
 
 
@@ -334,6 +346,7 @@ endef
 define fwdep.micro_c.add_nfd_lib
 
 $(eval $(call micro_c.add_src_lib.abspath,$1,$2,$(NFD_VNIC_DIR),libnfd))
+$$($1__$2__LIST): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -395,6 +408,9 @@ $(eval $(call nffw.add_obj,$1,nfd_svc,$5))
 
 $1__NFD_SVC_ME = $5
 
+$$($1__nfd_app_master__LIST): $(DEPS_DIR)/Makefile
+$$($1__nfd_svc__LIST): $(DEPS_DIR)/Makefile
+
 endef
 #f fwdep.add_nfd_in
 #
@@ -426,6 +442,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_gather,		\
 	NFD_OUT_CACHE_ME="__nfp_idstr2meid(\"pcie$2.me0\")"	\
 	))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_gather,pcie$2.me1))
+$$($1__nfd_pcie$2_gather__LIST): $(DEPS_DIR)/Makefile
 
 
 # Issue (Packet DMA) 0
@@ -451,6 +468,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_issue0,		\
 	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")" 		\
 	))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_issue0,pcie$2.me2))
+$$($1__nfd_pcie$2_issue0__LIST): $(DEPS_DIR)/Makefile
 
 
 # Issue (Packet DMA) 1
@@ -476,7 +494,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_issue1,		\
 	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")" 		\
 	))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_issue1,pcie$2.me3))
-
+$$($1__nfd_pcie$2_issue1__LIST): $(DEPS_DIR)/Makefile
 
 # Notify ME
 $(eval $(call micro_c.compile.abspath,$1,nfd_pcie$2_notify,$(NFD_VNIC_DIR)/pci_in,notify.c))
@@ -498,7 +516,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_notify,\
 	NFD_IN_DATA_DMA_ME1="__nfp_idstr2meid(\"pcie$2.me3\")" \
 	))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_notify,$3))
-
+$$($1__nfd_pcie$2_notify__LIST): $(DEPS_DIR)/Makefile
 
 endef
 
@@ -535,7 +553,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_cache,		\
 	NFD_CFG_SIG_NEXT_ME="nfd_cfg_sig_sb"			\
 	))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_cache,pcie$2.me0))
-
+$$($1__nfd_pcie$2_cache__LIST): $(DEPS_DIR)/Makefile
 
 # Stage Batch
 $(eval $(call microcode.assemble.abspath,$1,nfd_pcie$2_sb,$(NFD_VNIC_DIR),pci_out_sb.uc))
@@ -557,6 +575,7 @@ $(eval $(call microcode.add_defines,$1,nfd_pcie$2_sb,		\
 	))
 $(eval $(call microcode.add_flags,$1,nfd_pcie$2_sb,-keep_unreachable_code))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_sb,$3))
+$$($1__nfd_pcie$2_sb__LIST): $(DEPS_DIR)/Makefile
 
 # Packet DMA
 $(eval $(call microcode.assemble.abspath,$1,nfd_pcie$2_pd,$(NFD_VNIC_DIR),pci_out_pd.uc))
@@ -576,6 +595,7 @@ $(eval $(call microcode.add_defines,$1,nfd_pcie$2_pd,		\
 	))
 $(eval $(call microcode.add_flags,$1,nfd_pcie$2_pd,-keep_unreachable_code))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_pd,$4))
+$$($1__nfd_pcie$2_pd__LIST): $(DEPS_DIR)/Makefile
 
 endef
 
