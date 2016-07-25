@@ -140,7 +140,7 @@ $(eval $(call fwdep.add_nfd_out,$(PROJECT),0,mei4.me1,mei4.me2 mei4.me3)) # Stag
 
 # Add a microcoengine named 'nic_rx' written in microC
 # Make sure it gets linked with flownenv and GRO.
-$(eval $(call micro_c.compile_liveinfo,$(PROJECT),nic_rx,apps/nic,nic_rx_main.c))
+$(eval $(call micro_c.compile,$(PROJECT),nic_rx,apps/nic,nic_rx_main.c))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nic_rx,apps/nic,pkt_hdrs_cache))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nic_rx,apps/nic,rx_offload))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nic_rx,apps/nic,tx_offload))
@@ -165,7 +165,7 @@ $(eval $(call nffw.add_obj,$(PROJECT),nic_rx,\
 
 # Add a microcoengine named 'nic_tx' written in microC
 # Make sure it gets linked with flownenv.
-$(eval $(call micro_c.compile_liveinfo,$(PROJECT),nic_tx,apps/nic,nic_tx_main.c))
+$(eval $(call micro_c.compile,$(PROJECT),nic_tx,apps/nic,nic_tx_main.c))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nic_tx,apps/nic,pkt_hdrs_cache))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nic_tx,apps/nic,tx_offload))
 $(eval $(call fwdep.micro_c.add_flowenv_lib,$(PROJECT),nic_tx,pkt))
