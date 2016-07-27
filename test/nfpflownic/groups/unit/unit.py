@@ -11,7 +11,6 @@ import random
 import hashlib
 import ntpath
 import socket
-import string
 from binascii import hexlify
 from netro.testinfra import Test, LOG_sec, LOG, LOG_endsec
 from scapy.all import TCP, UDP, IP, Ether, wrpcap, IPv6, ICMP, \
@@ -234,17 +233,12 @@ class UnitIP(Test):
         """
         Generate packets in scapy format for replay
         """
-        # add a pseudo random payload of 256B so that pkt does not fit
-        # in CTM and make CSUM calculation more than 1 ME code path
-        random.seed(1)
-        payload = ''.join(random.choice(string.ascii_uppercase + string.digits)
-                          for _ in range(2048))
         if self.l4_type == 'udp':
-            pkt = UDP(sport=3000, dport=4000)/payload
+            pkt = UDP(sport=3000, dport=4000)/self.name
         elif self.l4_type == 'tcp':
-            pkt = TCP(sport=3000, dport=4000)/payload
+            pkt = TCP(sport=3000, dport=4000)/self.name
         else:
-            pkt = ICMP(type="echo-reply")/payload
+            pkt = ICMP(type="echo-reply")/self.name
         if self.ipv4:
             if self.ipv4_opt:
                 pkt = IP(src=self.src_ip, dst=self.dst_ip,
@@ -418,10 +412,6 @@ class UnitIP(Test):
         self.dst.cmd("ip link show %s" % self.dst_ifn)
         self.dst.cmd("ifconfig %s" % self.dst_ifn)
         self.dst.cmd("ifconfig %s allmulti" % self.dst_ifn)
-
-        # increase MTU to have pkts bigger than CTM size (2K)
-        self.src.cmd("ifconfig %s mtu 3072" % self.src_ifn)
-        self.dst.cmd("ifconfig %s mtu 3072" % self.dst_ifn)
 
     def get_intf_info(self):
         """
