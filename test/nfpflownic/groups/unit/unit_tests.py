@@ -920,6 +920,8 @@ class Unit_dict(object):
                                                              iperr=ip_err,
                                                              l4err=l4_err,
                                                              group=group,
+                                                             src_mtu=3072,
+                                                             dst_mtu=3072,
                                                              name=tn,
                                                              summary=summary)
 
@@ -945,6 +947,8 @@ class Unit_dict(object):
                                                          l4_type=l4_type,
                                                          iperr=ip_err,
                                                          l4err=l4_err,
+                                                         src_mtu=3072,
+                                                         dst_mtu=3072,
                                                          group=group,
                                                          name=tn,
                                                          summary=summary)
@@ -976,6 +980,8 @@ class Unit_dict(object):
                                                          ipv6_hbh=ipv6_hbh,
                                                          l4_type=l4_type,
                                                          l4err=l4_err,
+                                                         src_mtu=3072,
+                                                         dst_mtu=3072,
                                                          group=group,
                                                          name=tn,
                                                          summary=summary)

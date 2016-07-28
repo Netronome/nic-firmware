@@ -8,6 +8,7 @@ Iperf test classes for the NFPFlowNIC Software Group.
 import os
 import re
 import random
+import string
 from netro.testinfra import Test, LOG_sec, LOG, LOG_endsec
 from scapy.all import TCP, UDP, IP, Ether, wrpcap, IPv6, ICMP, \
     IPOption_NOP, IPv6ExtHdrRouting, IPv6ExtHdrHopByHop, Dot1Q, Raw, rdpcap, \
@@ -19,7 +20,9 @@ from netro.testinfra.nrt_result import NrtResult
 from netro.testinfra.nti_exceptions import NtiGeneralError
 from iperf_unit import Csum_Tx, LSO_iperf
 from unit import RSStest_same_l4_tuple, RSStest_diff_l4_tuple, \
-    RSStest_diff_l4_tuple_modify_table, RSStest_diff_part_l4_tuple, UnitIP
+    RSStest_diff_l4_tuple_modify_table, RSStest_diff_part_l4_tuple, UnitIP, \
+    NFPFlowNICMTU
+
 from netro.testinfra.nti_exceptions import NtiTimeoutError, NtiGeneralError
 from netro.tests.tcpreplay import TCPReplay
 from expect_cntr_list import RingSize_ethtool_tx_cntr, RingSize_ethtool_rx_cntr
@@ -1423,7 +1426,7 @@ class Csum_rx_tnl(UnitIP):
                  ipv4=True, ipv4_opt=False,
                  ipv6_rt=False, ipv6_hbh=False, l4_type='udp', iperr=False,
                  l4err=False, dst_mac_type="tgt", src_mac_type="src",
-                 vlan=False, vlan_id=100,
+                 vlan=False, vlan_id=100, src_mtu=1500, dst_mtu=1500,
                  group=None, name="", summary=None):
 
         UnitIP.__init__(self, src, dst, ipv4=ipv4, ipv4_opt=ipv4_opt,
@@ -1453,6 +1456,9 @@ class Csum_rx_tnl(UnitIP):
         self.dst_pcap_file = None
         self.src_outer_mac = None
         self.dst_outer_mac = None
+        self.mtu_cfg_obj = NFPFlowNICMTU()
+        self.src_mtu = src_mtu
+        self.dst_mtu = dst_mtu
 
         # tunnel checksum related counters
         if self.tunnel_type == 'vxlan':
@@ -1463,6 +1469,48 @@ class Csum_rx_tnl(UnitIP):
                     self.expect_et_cntr["hw_rx_csum_inner_ok"] = self.num_pkts
                 # on vxlan tunnel check that all outer (IP and UDP) is ok
                 self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
+
+    def gen_pkts(self):
+        """Generate packets based in UnitIP's gen_pkts()
+        """
+
+        pkt = UnitIP.gen_pkts(self)
+
+        if self.src_mtu > (2048 + 200):
+            # add a pseudo random payload of 2048B so that pkt does
+            # not fit in CTM and make CSUM calculation use more than 1
+            # ME code path (200B is a rough estimate of how long the
+            # outer and inner headers can be)
+            random.seed(1)
+            payload = ''.join(random.choice(string.ascii_uppercase +\
+                                            string.digits)
+                              for _ in range(2048))
+            pkt[Raw].load = payload
+
+        return pkt
+
+    def cfg_mtu(self):
+        """
+        Get the current MTU settings, and change them to the given values.
+
+        """
+        src_cur_mtu = self.mtu_cfg_obj.get_mtu(self.src, self.src_ifn)
+        dst_cur_mtu = self.mtu_cfg_obj.get_mtu(self.dst, self.dst_ifn)
+
+        if dst_cur_mtu != self.dst_mtu:
+            self.mtu_cfg_obj.set_mtu(self.dst, self.dst_ifn, self.dst_mtu)
+
+        if src_cur_mtu != self.src_mtu:
+            self.mtu_cfg_obj.set_mtu(self.src, self.src_ifn, self.src_mtu)
+
+    def clean_up(self):
+        """
+        Remove temporary directory and files, and reset mtu on interfaces
+        """
+        default_reset_mtu = 1500
+        self.mtu_cfg_obj.set_mtu(self.dst, self.dst_ifn, default_reset_mtu)
+        self.mtu_cfg_obj.set_mtu(self.src, self.src_ifn, default_reset_mtu)
+
 
     def send_pckts_and_check_result(self, src_if, dst_if, send_pcap, tmpdir):
         """
@@ -1529,6 +1577,7 @@ class Csum_rx_tnl(UnitIP):
         """
         Configure interfaces, including offload parameters
         """
+        self.cfg_mtu()
         UnitIP.interface_cfg(self)
 
         # tunnel setup
