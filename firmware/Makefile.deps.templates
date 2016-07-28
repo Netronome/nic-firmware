@@ -447,6 +447,7 @@ $$($1__nfd_pcie$2_gather__LIST): $(DEPS_DIR)/Makefile
 
 # Issue (Packet DMA) 0
 $(eval $(call micro_c.compile.abspath,$1,nfd_pcie$2_issue0,$(NFD_VNIC_DIR),pci_in_me1.c))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_issue0,-O2))
 $(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_issue0,$(NFD_VNIC_DIR),libnfd))
 $(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_issue0,$(NFD_VNIC_DIR)/utils,libutils))
 $(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_pcie$2_issue0,std))
@@ -473,6 +474,7 @@ $$($1__nfd_pcie$2_issue0__LIST): $(DEPS_DIR)/Makefile
 
 # Issue (Packet DMA) 1
 $(eval $(call micro_c.compile.abspath,$1,nfd_pcie$2_issue1,$(NFD_VNIC_DIR),pci_in_me1.c))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_issue1,-O2))
 $(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_issue1,$(NFD_VNIC_DIR),libnfd))
 $(eval $(call micro_c.add_src_lib.abspath,$1,nfd_pcie$2_issue1,$(NFD_VNIC_DIR)/utils,libutils))
 $(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_pcie$2_issue1,std))
