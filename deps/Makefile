@@ -1,8 +1,8 @@
 #
 # Change these revisions to suit the project
 #
-# FLOWENV_REV - Tip as of July 12 2016
-FLOWENV_REV=462c3fd8a1e8
+# FLOWENV_REV - Tip as of August 1 2016
+FLOWENV_REV=006e06720748
 # GRO_REV  - Tip as of July 12 2016
 GRO_REV=25c868a8c724
 # NFD_REV - Tip of ng-nfd-vrouter branch
