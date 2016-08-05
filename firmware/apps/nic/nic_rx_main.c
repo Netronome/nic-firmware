@@ -213,7 +213,7 @@ err_out:
         nic_rx_ring_cntrs(app_meta, plen, port, qid);
     }
     /* XXX do we need to cnt pkt and populate all metadata on drop path? */
-    nic_rx_cntrs(port, &hdrs.o_eth.dst, plen);
+    nic_rx_cntrs(port, &hdrs.o_eth.dst, Pkt.p_orig_len - MAC_PREPEND_BYTES);
     nic_rx_finalise_meta(app_meta, plen);
     Pkt.p_len = plen;
     Pkt.p_offset += offset;
