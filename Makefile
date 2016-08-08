@@ -31,7 +31,7 @@ Q ?= @
 
 ALL: firmware_all
 
-clean: firmware_clean srcpkg_clean
+clean: firmware_clean
 
 veryclean: firmware_veryclean
 
