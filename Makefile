@@ -14,7 +14,6 @@ HOST_DIR      = $(NFP_COMMON)/src
 KERN_DIR      = $(NFP_COMMON)/kernel
 DOC_DIR       = $(NFP_COMMON)/docs
 TEST_DIR      = $(NFP_COMMON)/test
-SRCPKG_DIR    = $(NFP_COMMON)/srcpkg
 
 Q ?= @
 
@@ -34,4 +33,3 @@ include $(KERN_DIR)/Makefile
 include $(SCRIPTS_DIR)/Makefile
 include $(DOC_DIR)/Makefile
 include $(TEST_DIR)/Makefile
-include $(SRCPKG_DIR)/Makefile
