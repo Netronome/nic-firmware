@@ -283,8 +283,13 @@ main()
     /* Work is performed by non CTX 0 threads */
     for (;;) {
         /* Receive a packet from the wire */
-        /* FIXME: process return value */
-        pkt_rx_wire();
+        ret = pkt_rx_wire();
+        if (ret < 0) {
+            Pkt.p_dst = PKT_DROP;
+            goto send_packet;
+        } else {
+            __critical_path();
+        }
 
         /* Do RX processing on packet and populate the TX descriptor */
         ret = proc_from_wire(PKT_PORT_QUEUE_of(Pkt.p_src));
@@ -293,6 +298,7 @@ main()
             nic_rx_discard_cntr(PKT_PORT_QUEUE_of(Pkt.p_src));
         }
 
+    send_packet:
         /* Attempt to send. Count the discard if we encountered an error */
         ret = pkt_tx();
         if (ret) {

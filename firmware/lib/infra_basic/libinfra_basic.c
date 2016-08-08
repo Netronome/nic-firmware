@@ -277,12 +277,12 @@ pkt_rx_wire(void)
     Pkt.p_is_gro_sequenced = 1;
     Pkt.p_orig_len = Pkt.p_len;
 
-    if (!nbi_rxd.pe && !nbi_rxd.ie) {
-        INFRA_CNTR_INC(INFRA_CNTR_RX_FROM_WIRE);
-        ret = 0;
-    } else {
+    if (nbi_rxd.ie) {
         INFRA_CNTR_INC(INFRA_CNTR_ERR_FROM_WIRE);
         ret = -1;
+    } else {
+        INFRA_CNTR_INC(INFRA_CNTR_RX_FROM_WIRE);
+        __critical_path();
     }
 
     return ret;
@@ -299,6 +299,7 @@ pkt_rx_host(void)
     uint16_t i, cpy_end, cpy_start;
     __addr40 void *ctm_ptr;
     __addr40 void *mu_ptr;
+    int ret = 0;
 
     /* First allocate a CTM, this is where TM looks for the buffer
      * metadata and beginning of the packet.  To minimise the amount
@@ -323,6 +324,14 @@ pkt_rx_host(void)
     Pkt.p_pnum = ctm_pnum;
     Pkt.p_seq = nfd_in_get_seqn((__xread struct nfd_in_pkt_desc *)&nfd_rxd);
     Pkt.p_offset = NFD_IN_DATA_OFFSET;
+
+    if (nfd_rxd.invalid) {
+        INFRA_CNTR_INC(INFRA_CNTR_ERR_FROM_HOST);
+        ret = -1;
+        goto out;
+    } else {
+        __critical_path();
+    }
 
     /* TODO: handle LSO here */
     /* TODO: handle VLAN here */
@@ -368,7 +377,8 @@ pkt_rx_host(void)
     }
 
     INFRA_CNTR_INC(INFRA_CNTR_RX_FROM_HOST);
-    return 0;
+out:
+    return ret;
 }
 
 

@@ -284,9 +284,13 @@ main()
 
     /* Work is performed by non CTX 0 threads */
     for (;;) {
-        if (pkt_rx_host() < 0)
-            continue;
-
+        ret = pkt_rx_host();
+        if (ret < 0) {
+            Pkt.p_dst = PKT_DROP;
+            goto send_packet;
+        } else {
+            __critical_path();
+        }
 
 #if NS_PLATFORM_NUM_PORTS > 1
         port = PKT_PORT_QUEUE_of(Pkt.p_src) / NFD_MAX_VF_QUEUES;
@@ -303,6 +307,7 @@ main()
             nic_tx_discard_cntr(port);
         }
 
+    send_packet:
         /* Send the packet to wire */
         pkt_tx();
         NFD_IN_LSO_CNTR_INCR(nfd_in_lso_cntr_addr,
