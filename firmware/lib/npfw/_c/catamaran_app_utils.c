@@ -43,7 +43,9 @@ generate_mac_match_info(uint8_t port_en_mask, __lmem mac_match_info_t *info,
 
             if (port < NS_PLATFORM_NUM_PORTS_PER_MAC_0) {
                 info[port].port_mask0 = 1 << port;
+                info[port].port_mask1 = 0;
             } else {
+                info[port].port_mask0 = 0;
                 info[port].port_mask1 = 1 << port;
             }
 
