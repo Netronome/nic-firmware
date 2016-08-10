@@ -289,7 +289,7 @@ main()
         /* Do RX processing on packet and populate the TX descriptor */
         ret = proc_from_wire(PKT_PORT_QUEUE_of(Pkt.p_src));
         if (ret == NIC_RX_DROP) {
-            Pkt.p_dst = PKT_DROP;
+            Pkt.p_dst = PKT_DROP_HOST;
             nic_rx_discard_cntr(PKT_PORT_QUEUE_of(Pkt.p_src));
         }
 
