@@ -146,6 +146,10 @@ $(eval $(call nffw.add_obj,$(PROJECT),nic_tx,\
 	mei1.me6 mei1.me7 \
 	))
 
+# Add TM PM initialization (codeless)
+$(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,lib/infra_basic,init_pms.uc,-DPMS_INIT_TM=1 -DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
+
 # Link
 $(eval $(call nffw.add_rtsyms,$(PROJECT)))
 # TODO get link_w_analysis to work without adding a warning
