@@ -456,10 +456,8 @@ pkt_tx(void)
                                    Pkt.p_ctm_sz, offset,
                                    len + pmoff, ss, outq);
         } else {
-            /* Write modification script to closest 8B aligned
-             * location at pkt_off */
-            msi = pkt_msd_write(p, pmoff);
-
+            msi.len_adj = pmoff;
+            msi.off_enc = (offset >> 3) - 1;
             pkt_nbi_send(__ISLAND, Pkt.p_pnum, &msi, len, ss, outq,
                          Pkt.p_ro_ctx, Pkt.p_seq, Pkt.p_ctm_sz);
         }
