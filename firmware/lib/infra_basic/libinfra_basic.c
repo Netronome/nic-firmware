@@ -75,10 +75,11 @@
 #define INFRA_CNTR_ERR_FROM_WIRE        1
 #define INFRA_CNTR_RX_FROM_HOST         2
 #define INFRA_CNTR_ERR_FROM_HOST        3
-#define INFRA_CNTR_TX_DROP              4
+#define INFRA_CNTR_TX_TO_WIRE_DROP      4
 #define INFRA_CNTR_TX_TO_WIRE           5
 #define INFRA_CNTR_TX_TO_HOST           6
-#define INFRA_CNTR_ERR_TO_HOST          7
+#define INFRA_CNTR_TX_TO_HOST_DROP      7
+#define INFRA_CNTR_ERR_TO_HOST          8
 
 __shared __gpr uint32_t infra_cntrs_base;
 
@@ -402,14 +403,20 @@ pkt_rx_wq(int ring_num, mem_ring_addr_t ring_addr)
 __intrinsic void
 drop_packet(__xwrite struct gro_meta_drop *gmeta)
 {
-    blm_buf_free(Pkt.p_muptr, Pkt.p_bls);
+    __addr40 void *mu_ptr;
+
+    mu_ptr = (__addr40 void *)((uint64_t)Pkt.p_muptr << 11);
+    blm_buf_free(blm_buf_ptr2handle(mu_ptr), Pkt.p_bls);
+
+    if (!Pkt.p_is_gro_sequenced)
 #ifdef INFRA_HANDLE_REMOTE_PACKETS
     pkt_ctm_free(Pkt.p_isl, Pkt.p_pnum);
 #else /* INFRA_HANDLE_REMOTE_PACKETS */
     pkt_ctm_free(0, Pkt.p_pnum);
 #endif /* INFRA_HANDLE_REMOTE_PACKETS */
+
     if (Pkt.p_is_gro_sequenced)
-        gro_cli_build_drop_seq_meta(gmeta);
+        gro_cli_build_drop_ctm_buf_meta(gmeta, Pkt.p_isl, Pkt.p_pnum);
 }
 
 
@@ -426,7 +433,8 @@ pkt_tx(void)
     SIGNAL pms_sig;
     __xread uint32_t pms_readback;
     SIGNAL pms_sig2;
-    __gpr struct pkt_ms_info msi;
+    __gpr struct pkt_ms_info msi = {0,0}; /* dummy msi for wire RX failures */
+
     int ss;
     int outq;
     uint16_t flags;
@@ -551,10 +559,24 @@ pkt_tx(void)
         gro_cli_build_drop_seq_meta(&gmeta.drop);
         break;
 
-    case PKT_PTYPE_DROP:
-    default:
+        INFRA_CNTR_INC(INFRA_CNTR_TX_TO_WIRE_DROP);
+        break;
+
+    case PKT_PTYPE_DROP_HOST:
         drop_packet(&gmeta.drop);
-        INFRA_CNTR_INC(INFRA_CNTR_TX_DROP);
+        INFRA_CNTR_INC(INFRA_CNTR_TX_TO_HOST_DROP);
+
+    case PKT_PTYPE_DROP_WIRE:
+/* Notify the NBI to ignore the packets sequence number */
+        pkt_nbi_drop_seq(Pkt.p_isl, Pkt.p_pnum, &msi, Pkt.p_len, 0, 0,
+                         Pkt.p_ro_ctx, Pkt.p_seq, Pkt.p_ctm_sz);
+
+        drop_packet(&gmeta.drop);
+        INFRA_CNTR_INC(INFRA_CNTR_TX_TO_HOST_DROP);
+        break;
+
+    default:
+        halt();
         break;
     }
 

@@ -311,7 +311,7 @@ main()
         if (ret) {
             NFD_IN_LSO_CNTR_INCR(nfd_in_lso_cntr_addr,
                           NFD_IN_LSO_CNTR_T_ME_FM_HOST_PROC_TO_WIRE_DROP);
-            Pkt.p_dst = PKT_DROP;
+            Pkt.p_dst = PKT_DROP_WIRE;
             nic_tx_discard_cntr(port);
         }
 
