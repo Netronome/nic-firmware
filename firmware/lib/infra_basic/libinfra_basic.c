@@ -273,8 +273,16 @@ pkt_rx_wire(void)
     /* map NBI seqr's 1/2/3/4 to GRO 1/3/5/7 */
     pkt_status_read(0, Pkt.p_pnum, &status);
     Pkt.p_ctm_sz = status.size;
-    Pkt.p_ro_ctx = (nbi_rxd.seqr << 1) - 1;
-    Pkt.p_is_gro_sequenced = 1;
+
+    if (nbi_rxd.seqr != 0) {
+        Pkt.p_ro_ctx = (nbi_rxd.seqr << 1) - 1;
+        Pkt.p_is_gro_sequenced = 1;
+        __critical_path();
+    } else {
+        /* pkt is corrupted in some way */
+        Pkt.p_is_gro_sequenced = 0;
+    }
+
     Pkt.p_orig_len = Pkt.p_len;
 
     if (nbi_rxd.ie) {
