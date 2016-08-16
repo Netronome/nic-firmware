@@ -11,6 +11,7 @@ import random
 import hashlib
 import ntpath
 import socket
+import string
 from binascii import hexlify
 from netro.testinfra import Test, LOG_sec, LOG, LOG_endsec
 from scapy.all import TCP, UDP, IP, Ether, wrpcap, IPv6, ICMP, \
@@ -214,18 +215,37 @@ class UnitIP(Test):
 
         # There are counters that we expect to have an exact increment after
         # the test.
-        if self.iperr or self.l4err:
-            # any checksum error in promisc mode
-            self.expect_et_cntr["hw_rx_csum_err"] = self.num_pkts
-            self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
+        if self.promisc:
+            # checksum related counters
+            if self.iperr or self.l4err:
+                # any checksum error in promisc mode
+                self.expect_et_cntr["hw_rx_csum_err"] = self.num_pkts
+                self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
+            else:
+                if self.l4_type == 'udp' or self.l4_type == 'tcp':
+                    # w/o any error, csum_ok only increases when receiving TCP/UDP
+                    self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
+                if self.dst_mac_type == 'mc' and self.src_mac_type == 'src':
+                    self.expect_et_cntr["dev_rx_mc_pkts"] = self.num_pkts
+                if self.dst_mac_type == 'bc' and self.src_mac_type == 'src':
+                    self.expect_et_cntr["dev_rx_bc_pkts"] = self.num_pkts
         else:
-            if self.l4_type == 'udp' or self.l4_type == 'tcp':
-                # w/o any error, csum_ok only increases when receiving TCP/UDP
-                self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
+            if self.dst_mac_type == 'tgt' and self.src_mac_type == 'src':
+                if self.iperr or self.l4err:
+                    # any checksum error in non-promisc mode
+                    self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
+                elif self.l4_type == 'udp' or self.l4_type == 'tcp':
+                    # w/o any error, csum_ok only increases when receiving
+                    # TCP/UDP
+                    self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
+            if self.dst_mac_type == 'diff' or self.src_mac_type != 'src':
+                self.expect_et_cntr["dev_rx_discards"] = self.num_pkts
             if self.dst_mac_type == 'mc' and self.src_mac_type == 'src':
                 self.expect_et_cntr["dev_rx_mc_pkts"] = self.num_pkts
+                self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
             if self.dst_mac_type == 'bc' and self.src_mac_type == 'src':
                 self.expect_et_cntr["dev_rx_bc_pkts"] = self.num_pkts
+                self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
 
         return
 
@@ -233,12 +253,17 @@ class UnitIP(Test):
         """
         Generate packets in scapy format for replay
         """
+        # add a pseudo random payload of 256B so that pkt does not fit
+        # in CTM and make CSUM calculation more than 1 ME code path
+        random.seed(1)
+        payload = ''.join(random.choice(string.ascii_uppercase + string.digits)
+                          for _ in range(2048))
         if self.l4_type == 'udp':
-            pkt = UDP(sport=3000, dport=4000)/self.name
+            pkt = UDP(sport=3000, dport=4000)/payload
         elif self.l4_type == 'tcp':
-            pkt = TCP(sport=3000, dport=4000)/self.name
+            pkt = TCP(sport=3000, dport=4000)/payload
         else:
-            pkt = ICMP(type="echo-reply")/self.name
+            pkt = ICMP(type="echo-reply")/payload
         if self.ipv4:
             if self.ipv4_opt:
                 pkt = IP(src=self.src_ip, dst=self.dst_ip,
@@ -413,6 +438,10 @@ class UnitIP(Test):
         self.dst.cmd("ifconfig %s" % self.dst_ifn)
         self.dst.cmd("ifconfig %s allmulti" % self.dst_ifn)
 
+        # increase MTU to have pkts bigger than CTM size (2K)
+        self.src.cmd("ifconfig %s mtu 3072" % self.src_ifn)
+        self.dst.cmd("ifconfig %s mtu 3072" % self.dst_ifn)
+
     def get_intf_info(self):
         """
         get the IP address (IPv4 or IPv6) and mac address of the src and dst
@@ -477,7 +506,7 @@ class UnitIPv4(UnitIP):
                  name="ipv4", summary=None):
         UnitIP.__init__(self, src, dst, ipv4=True, ipv4_opt=ipv4_opt,
                         l4_type=l4_type, iperr=iperr,
-                        l4err=l4err, group=group,
+                        l4err=l4err, promisc=promisc, group=group,
                         dst_mac_type=dst_mac_type, src_mac_type=src_mac_type,
                         name=name, summary=summary)
 
@@ -500,7 +529,7 @@ class UnitIPv6(UnitIP):
                  name="ipv6", summary=None):
         UnitIP.__init__(self, src, dst, ipv4=False, ipv6_rt=ipv6_rt,
                         ipv6_hbh=ipv6_hbh, l4_type=l4_type,
-                        l4err=l4err, group=group,
+                        l4err=l4err, promisc=promisc, group=group,
                         dst_mac_type=dst_mac_type, src_mac_type=src_mac_type,
                         name=name, summary=summary)
 
