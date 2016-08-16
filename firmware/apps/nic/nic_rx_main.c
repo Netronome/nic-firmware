@@ -229,7 +229,6 @@ err_out:
     nic_rx_finalise_meta(app_meta, plen);
     Pkt.p_len = plen;
     Pkt.p_offset += offset;
-    Pkt.p_is_gro_sequenced = 1;
     if (err != NIC_RX_DROP) {
         Pkt.p_dst = PKT_HOST_PORT(0, port, qid);
     }
