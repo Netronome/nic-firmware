@@ -218,7 +218,7 @@ class UnitIP(Test):
         if self.promisc:
             # checksum related counters
             if self.iperr or self.l4err:
-                # any checksum error in promisc mode
+                # any checksum error in promisc/non-promisc mode
                 self.expect_et_cntr["hw_rx_csum_err"] = self.num_pkts
                 self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
             else:
@@ -232,7 +232,8 @@ class UnitIP(Test):
         else:
             if self.dst_mac_type == 'tgt' and self.src_mac_type == 'src':
                 if self.iperr or self.l4err:
-                    # any checksum error in non-promisc mode
+                    # any checksum error in promisc/non-promisc mode
+                    self.expect_et_cntr["hw_rx_csum_err"] = self.num_pkts
                     self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
                 elif self.l4_type == 'udp' or self.l4_type == 'tcp':
                     # w/o any error, csum_ok only increases when receiving
