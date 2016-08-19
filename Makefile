@@ -8,10 +8,7 @@ NFP_COMMON    := $(abspath $(CURDIR))
 NETRONOME = /opt/netronome
 
 DEPS_DIR      = $(NFP_COMMON)/deps
-SCRIPTS_DIR   = $(NFP_COMMON)/scripts
 FIRMWARE_DIR  = $(NFP_COMMON)/firmware
-HOST_DIR      = $(NFP_COMMON)/src
-KERN_DIR      = $(NFP_COMMON)/kernel
 DOC_DIR       = $(NFP_COMMON)/docs
 TEST_DIR      = $(NFP_COMMON)/test
 
@@ -28,8 +25,5 @@ help:
 
 include $(DEPS_DIR)/Makefile
 include $(FIRMWARE_DIR)/Makefile
-include $(HOST_DIR)/Makefile
-include $(KERN_DIR)/Makefile
-include $(SCRIPTS_DIR)/Makefile
 include $(DOC_DIR)/Makefile
 include $(TEST_DIR)/Makefile

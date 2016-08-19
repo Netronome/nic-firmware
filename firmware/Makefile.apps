@@ -7,4 +7,3 @@
 PLATFORM_LIST = Hydrogen Hydrogen_4x10 Lithium
 $(foreach PLATFORM,$(PLATFORM_LIST),$(eval \
           include $(FIRMWARE_DIR)/apps/nic/Makefile))
-include $(FIRMWARE_DIR)/apps/vrouter/Makefile
