@@ -583,6 +583,7 @@ pkt_tx(void)
     case PKT_PTYPE_DROP_HOST:
         drop_packet(&gmeta.drop);
         INFRA_CNTR_INC(INFRA_CNTR_TX_TO_HOST_DROP);
+        break;
 
     case PKT_PTYPE_DROP_WIRE:
 /* Notify the NBI to ignore the packets sequence number */
