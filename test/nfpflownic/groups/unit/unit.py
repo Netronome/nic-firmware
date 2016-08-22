@@ -158,9 +158,8 @@ class UnitIP(Test):
             self.dst = dst[0]
             self.dst_addr = dst[1]
             self.dst_ifn = dst[2]
-            if not self.ipv4:
-                self.src_addr_v6 = src[3]
-                self.dst_addr_v6 = dst[3]
+            self.src_addr_v6 = src[3]
+            self.dst_addr_v6 = dst[3]
 
         # These will be set in the run() method
         self.src_mac = None
@@ -1403,9 +1402,8 @@ class RSStest_same_l4_tuple(Test):
             self.dst = dst[0]
             self.dst_addr = dst[1]
             self.dst_ifn = dst[2]
-            if not self.ipv4:
-                self.src_addr_v6 = src[3]
-                self.dst_addr_v6 = dst[3]
+            self.src_addr_v6 = src[3]
+            self.dst_addr_v6 = dst[3]
 
         if dst[4]:
             self.rss_key = dst[4]

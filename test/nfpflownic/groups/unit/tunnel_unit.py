@@ -7,6 +7,7 @@ Iperf test classes for the NFPFlowNIC Software Group.
 
 import os
 import re
+import time
 import random
 import string
 from netro.testinfra import Test, LOG_sec, LOG, LOG_endsec
@@ -26,6 +27,14 @@ from unit import RSStest_same_l4_tuple, RSStest_diff_l4_tuple, \
 from netro.testinfra.nti_exceptions import NtiTimeoutError, NtiGeneralError
 from netro.tests.tcpreplay import TCPReplay
 from expect_cntr_list import RingSize_ethtool_tx_cntr, RingSize_ethtool_rx_cntr
+
+
+def get_new_mac():
+    return '54:%s:%s:%s:%s:%s' % (hex(random.randrange(0, 255))[2:],
+                                  hex(random.randrange(0, 255))[2:],
+                                  hex(random.randrange(0, 255))[2:],
+                                  hex(random.randrange(0, 255))[2:],
+                                  hex(random.randrange(0, 255))[2:])
 
 
 class RSStest_diff_inner_tuple(RSStest_diff_l4_tuple):
@@ -74,15 +83,15 @@ class RSStest_diff_inner_tuple(RSStest_diff_l4_tuple):
         self.inner_vlan_id = 20
 
         self.vxlan_id = 42
-        self.dst_vxlan_intf = 'vxlan0'
-        self.src_vxlan_intf = 'vxlan0'
+        self.dst_vxlan_intf = 'vxlan_%s' % self.dst_ifn
+        self.src_vxlan_intf = 'vxlan_%s' % self.src_ifn
         self.vxlan_mc = '239.1.1.1'
-        self.src_inner_hwaddr = '54:8:20:0:0:1'
-        self.dst_inner_hwaddr = '54:8:20:0:0:2'
-        self.src_inner_addr = '20.0.0.1'
-        self.dst_inner_addr = '20.0.0.2'
-        self.src_inner_addr6 = 'fc00:2222:0:0:0:0:0:1'
-        self.dst_inner_addr6 = 'fc00:2222:0:0:0:0:0:2'
+        self.src_inner_hwaddr = None
+        self.dst_inner_hwaddr = None
+        self.src_inner_addr = None
+        self.dst_inner_addr = None
+        self.src_inner_addr6 = None
+        self.dst_inner_addr6 = None
 
     def gen_pkts(self):
         """
@@ -226,10 +235,55 @@ class RSStest_diff_inner_tuple(RSStest_diff_l4_tuple):
             rss_expt_q_table[rss_expt_q] += 1
         return rss_expt_q_table
 
+
     def interface_cfg(self):
         """
         Configure interfaces, including RSS parameters
         """
+        random.seed(os.getpid())
+        self.src_inner_hwaddr = get_new_mac()
+        self.dst_inner_hwaddr = get_new_mac()
+
+        src_if = self.src.netifs[self.src_ifn]
+        dst_if = self.dst.netifs[self.dst_ifn]
+        src_ip6 = self.get_ipv6(self.src, self.src_ifn, self.src_addr_v6)
+        dst_ip6 = self.get_ipv6(self.dst, self.dst_ifn, self.dst_addr_v6)
+        ipv4_re_str = '(\d{1,3}).(\d{1,3}.\d{1,3}.\d{1,3})'
+        src_ipv4_octl = re.findall(ipv4_re_str, src_if.ip)
+        if src_ipv4_octl:
+            new_octl = (int(src_ipv4_octl[0][0]) + 100) % 255
+            new_src_ipv4 = '%s.%s' % (new_octl, src_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+        dst_ipv4_octl = re.findall(ipv4_re_str, dst_if.ip)
+        if dst_ipv4_octl:
+            new_octl = (int(dst_ipv4_octl[0][0]) + 100) % 255
+            new_dst_ipv4 = '%s.%s' % (new_octl, dst_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+
+        ipv6_re_str = '(^[a-f\d]{1,4})'
+        src_ipv6_octl = re.findall(ipv6_re_str, src_ip6)
+        if src_ipv6_octl:
+            new_octl = (int(src_ipv6_octl[0], 16) + 100) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_src_ipv6 = re.sub(ipv6_re_str, octl_str[2:], src_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        dst_ipv6_octl = re.findall(ipv6_re_str, dst_ip6)
+        if dst_ipv6_octl:
+            new_octl = (int(dst_ipv6_octl[0], 16) + 100) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_dst_ipv6 = re.sub(ipv6_re_str, octl_str[2:], dst_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        self.src_inner_addr = new_src_ipv4
+        self.dst_inner_addr = new_dst_ipv4
+        self.src_inner_addr6 = new_src_ipv6
+        self.dst_inner_addr6 = new_dst_ipv6
+
         # Add cfg later
         if self.inner_ipv4:
             if self.inner_l4_type == 'udp':
@@ -245,12 +299,13 @@ class RSStest_diff_inner_tuple(RSStest_diff_l4_tuple):
                                                              protocol))
 
         if self.tunnel_type == 'vxlan':
-            self.dst.cmd("ip link delete vxlan0", fail=False)
-            cmd = 'ip link add vxlan0 type vxlan id 42 group %s dev %s ' \
-                  'dstport 4789' % (self.vxlan_mc, self.dst_ifn)
+            self.dst.cmd("ip link delete %s" % self.src_vxlan_intf, fail=False)
+            cmd = 'ip link add %s type vxlan id %d group %s dev %s ' \
+                  'dstport 4789' % (self.dst_vxlan_intf, self.vxlan_id,
+                                    self.vxlan_mc, self.dst_ifn)
             self.dst.cmd(cmd)
             # The following cmd is needed for kernel 4.2
-            cmd = 'ip link set up vxlan0'
+            cmd = 'ip link set up %s' % self.dst_vxlan_intf
             self.dst.cmd(cmd)
         return
 
@@ -264,7 +319,7 @@ class RSStest_diff_inner_tuple(RSStest_diff_l4_tuple):
                                                                 send_pcap,
                                                                 tmpdir)
         if self.tunnel_type == 'vxlan':
-            self.dst.cmd("ip link delete vxlan0", fail=False)
+            self.dst.cmd("ip link delete %s" % self.dst_vxlan_intf, fail=False)
 
         return res
 
@@ -314,37 +369,95 @@ class RSStest_diff_inner_tuple_multi_tunnels(RSStest_diff_l4_tuple):
         self.inner_vlan_tag = inner_vlan_tag
         self.inner_vlan_id = 20
 
-        self.vxlan_id = [42]
-        self.vxlan_mc = ['239.1.1.1']
-        self.dst_vxlan_intf = ['vxlan0']
-        self.src_vxlan_intf = ['vxlan0']
-        self.dst_vxlan_dport = ['4789']
-        self.src_vxlan_dport = ['4789']
-        self.src_inner_hwaddr = ['54:8:20:0:0:1']
-        self.dst_inner_hwaddr = ['54:8:20:0:0:2']
-        self.src_inner_addr = ['20.0.0.1']
-        self.dst_inner_addr = ['20.0.0.2']
-        self.src_inner_addr6 = ['fc00:2222:0:0:0:0:0:1']
-        self.dst_inner_addr6 = ['fc00:2222:0:0:0:0:0:2']
+        self.vxlan_id = None
+        self.vxlan_mc = None
+        self.dst_vxlan_intf = None
+        self.src_vxlan_intf = None
+        self.dst_vxlan_dport = None
+        self.src_vxlan_dport = None
+        self.src_inner_hwaddr = None
+        self.dst_inner_hwaddr = None
+        self.src_inner_addr = None
+        self.dst_inner_addr = None
+        self.src_inner_addr6 = None
+        self.dst_inner_addr6 = None
         self.tunnel_number = 4
-        for i in range(1, self.tunnel_number):
-            self.vxlan_id.append(42 + i)
-            self.vxlan_mc.append('239.%s1.1.1' % i)
-            self.dst_vxlan_intf.append('vxlan%s' % i)
-            self.src_vxlan_intf.append('vxlan%s' % i)
-            self.dst_vxlan_dport.append('%s' % (4789 + i))
-            self.src_vxlan_dport.append('%s' % (4789 + i))
-            self.src_inner_hwaddr.append('54:%s8:20:0:0:1' % i)
-            self.dst_inner_hwaddr.append('54:%s8:20:0:0:2' % i)
-            self.src_inner_addr.append('20.%s0.0.1' % i)
-            self.dst_inner_addr.append('20.%s0.0.2' % i)
-            self.src_inner_addr6.append('fc00:2222:%s:0:0:0:0:1' % i)
-            self.dst_inner_addr6.append('fc00:2222:%s:0:0:0:0:2' % i)
+
+    def get_ipv46_addr(self, channel):
+        index = channel + 1
+        src_if = self.src.netifs[self.src_ifn]
+        dst_if = self.dst.netifs[self.dst_ifn]
+        src_ip6 = self.get_ipv6(self.src, self.src_ifn, self.src_addr_v6)
+        dst_ip6 = self.get_ipv6(self.dst, self.dst_ifn, self.dst_addr_v6)
+        ipv4_re_str = '(\d{1,3}).(\d{1,3}.\d{1,3}.\d{1,3})'
+        src_ipv4_octl = re.findall(ipv4_re_str, src_if.ip)
+        if src_ipv4_octl:
+            new_octl = (int(src_ipv4_octl[0][0]) + (10 * index)) % 255
+            new_src_ipv4 = '%s.%s' % (new_octl, src_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+        dst_ipv4_octl = re.findall(ipv4_re_str, dst_if.ip)
+        if dst_ipv4_octl:
+            new_octl = (int(dst_ipv4_octl[0][0]) + (10 * index)) % 255
+            new_dst_ipv4 = '%s.%s' % (new_octl, dst_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+
+        ipv6_re_str = '(^[a-f\d]{1,4})'
+        src_ipv6_octl = re.findall(ipv6_re_str, src_ip6)
+        if src_ipv6_octl:
+            new_octl = (int(src_ipv6_octl[0], 16) + (100 * index)) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_src_ipv6 = re.sub(ipv6_re_str, octl_str[2:], src_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        dst_ipv6_octl = re.findall(ipv6_re_str, dst_ip6)
+        if dst_ipv6_octl:
+            new_octl = (int(dst_ipv6_octl[0], 16) + (100 * index)) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_dst_ipv6 = re.sub(ipv6_re_str, octl_str[2:], dst_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        return new_src_ipv4, new_dst_ipv4, new_src_ipv6, new_dst_ipv6
 
     def interface_cfg(self):
         """
         Configure interfaces, including RSS parameters
         """
+        random.seed(os.getpid())
+        self.vxlan_id = [42]
+        self.vxlan_mc = ['239.1.1.1']
+        self.dst_vxlan_intf = ['vxlan_0_%s' % self.dst_ifn]
+        self.src_vxlan_intf = ['vxlan_0_%s' % self.src_ifn]
+        self.dst_vxlan_dport = ['4789']
+        self.src_vxlan_dport = ['4789']
+        self.src_inner_hwaddr = [get_new_mac()]
+        self.dst_inner_hwaddr = [get_new_mac()]
+        new_src_ipv4, new_dst_ipv4, new_src_ipv6, new_dst_ipv6 = \
+            self.get_ipv46_addr(0)
+        self.src_inner_addr = [new_src_ipv4]
+        self.dst_inner_addr = [new_dst_ipv4]
+        self.src_inner_addr6 = [new_src_ipv6]
+        self.dst_inner_addr6 = [new_dst_ipv6]
+        self.tunnel_number = 4
+        for i in range(1, self.tunnel_number):
+            self.vxlan_id.append(42 + i)
+            self.vxlan_mc.append('239.%s1.1.1' % i)
+            self.dst_vxlan_intf.append('vxlan_%s_%s' % (i, self.dst_ifn))
+            self.src_vxlan_intf.append('vxlan_%s_%s' % (i, self.src_ifn))
+            self.dst_vxlan_dport.append('%s' % (4789 + i))
+            self.src_vxlan_dport.append('%s' % (4789 + i))
+            self.src_inner_hwaddr.append(get_new_mac())
+            self.dst_inner_hwaddr.append(get_new_mac())
+            new_src_ipv4, new_dst_ipv4, new_src_ipv6, new_dst_ipv6 = \
+                self.get_ipv46_addr(i)
+            self.src_inner_addr.append(new_src_ipv4)
+            self.dst_inner_addr.append(new_dst_ipv4)
+            self.src_inner_addr6.append(new_src_ipv6)
+            self.dst_inner_addr6.append(new_dst_ipv6)
+
         # Add cfg later
         if self.inner_ipv4:
             if self.inner_l4_type == 'udp':
@@ -407,22 +520,24 @@ class RSStest_diff_inner_tuple_multi_tunnels(RSStest_diff_l4_tuple):
                 cmd = 'ip link set up %s' % self.dst_vxlan_intf[i]
                 self.dst.cmd(cmd)
 
+            for i in range(0, self.tunnel_number):
                 # we ping the tunnel address first as to not begging
                 # sending multicast traffic
+                time.sleep(10)
                 if self.ipv4:
-                    cmd = 'ping -c 1 -I %s -i 1 %s -w 4' % \
-                          (self.dst_vxlan_intf[i], self.src_inner_addr[i])
-                    self.dst.cmd(cmd)
                     cmd = 'ping -c 1 -I %s -i 1 %s -w 4' % \
                           (self.src_vxlan_intf[i], self.dst_inner_addr[i])
                     self.src.cmd(cmd)
-                else:
-                    cmd = 'ping6 -c 1 -I %s -i 1 %s -w 4' % \
-                          (self.dst_vxlan_intf[i], self.src_inner_addr6[i])
+                    cmd = 'ping -c 1 -I %s -i 1 %s -w 4' % \
+                          (self.dst_vxlan_intf[i], self.src_inner_addr[i])
                     self.dst.cmd(cmd)
+                else:
                     cmd = 'ping6 -c 1 -I %s -i 1 %s -w 4' % \
                           (self.src_vxlan_intf[i], self.dst_inner_addr6[i])
                     self.src.cmd(cmd)
+                    cmd = 'ping6 -c 1 -I %s -i 1 %s -w 4' % \
+                          (self.dst_vxlan_intf[i], self.src_inner_addr6[i])
+                    self.dst.cmd(cmd)
 
             cmd = 'ifconfig -a'
             self.src.cmd(cmd)
@@ -518,9 +633,8 @@ class TunnelTest(Test):
             self.dst = dst[0]
             self.dst_addr = dst[1]
             self.dst_ifn = dst[2]
-            if not self.ipv4:
-                self.src_addr_v6 = src[3]
-                self.dst_addr_v6 = dst[3]
+            self.src_addr_v6 = src[3]
+            self.dst_addr_v6 = dst[3]
 
         # These will be set in the run() method
         self.src_mac = None
@@ -572,13 +686,15 @@ class TunnelTest(Test):
         self.iperf_client_arg_str = ''
 
         self.vxlan_id = 42
-        self.dst_vxlan_intf = 'vxlan0'
-        self.src_vxlan_intf = 'vxlan0'
+        self.dst_vxlan_intf = 'vxlan_%s' % self.dst_ifn
+        self.src_vxlan_intf = 'vxlan_%s' % self.src_ifn
         self.vxlan_mc = '239.1.1.1'
-        self.src_inner_hwaddr = '54:8:20:0:0:1'
-        self.dst_inner_hwaddr = '54:8:20:0:0:2'
-        self.src_inner_addr = '20.0.0.1/24'
-        self.dst_inner_addr = '20.0.0.2/24'
+        self.src_inner_hwaddr = None
+        self.dst_inner_hwaddr = None
+        self.src_inner_addr = None
+        self.dst_inner_addr = None
+        self.src_inner_addr6 = None
+        self.dst_inner_addr6 = None
 
         return
 
@@ -617,6 +733,51 @@ class TunnelTest(Test):
     def set_up_tunnel(self, tunnel_type):
 
         if tunnel_type == 'vxlan':
+
+            random.seed(os.getpid())
+            self.src_inner_hwaddr = get_new_mac()
+            self.dst_inner_hwaddr = get_new_mac()
+
+            src_if = self.src.netifs[self.src_ifn]
+            dst_if = self.dst.netifs[self.dst_ifn]
+            src_ip6 = self.get_ipv6(self.src, self.src_ifn, self.src_addr_v6)
+            dst_ip6 = self.get_ipv6(self.dst, self.dst_ifn, self.dst_addr_v6)
+            ipv4_re_str = '(\d{1,3}).(\d{1,3}.\d{1,3}.\d{1,3})'
+            src_ipv4_octl = re.findall(ipv4_re_str, src_if.ip)
+            if src_ipv4_octl:
+                new_octl = (int(src_ipv4_octl[0][0]) + 100) % 255
+                new_src_ipv4 = '%s.%s' % (new_octl, src_ipv4_octl[0][1])
+            else:
+                raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+            dst_ipv4_octl = re.findall(ipv4_re_str, dst_if.ip)
+            if dst_ipv4_octl:
+                new_octl = (int(dst_ipv4_octl[0][0]) + 100) % 255
+                new_dst_ipv4 = '%s.%s' % (new_octl, dst_ipv4_octl[0][1])
+            else:
+                raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+
+            ipv6_re_str = '(^[a-f\d]{1,4})'
+            src_ipv6_octl = re.findall(ipv6_re_str, src_ip6)
+            if src_ipv6_octl:
+                new_octl = (int(src_ipv6_octl[0], 16) + 100) % 65536
+                octl_str = '%s' % hex(new_octl)
+                new_src_ipv6 = re.sub(ipv6_re_str, octl_str[2:], src_ip6)
+            else:
+                raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+            dst_ipv6_octl = re.findall(ipv6_re_str, dst_ip6)
+            if dst_ipv6_octl:
+                new_octl = (int(dst_ipv6_octl[0], 16) + 100) % 65536
+                octl_str = '%s' % hex(new_octl)
+                new_dst_ipv6 = re.sub(ipv6_re_str, octl_str[2:], dst_ip6)
+            else:
+                raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+            self.src_inner_addr = new_src_ipv4 + '/24'
+            self.dst_inner_addr = new_dst_ipv4 + '/24'
+            self.src_inner_addr6 = new_src_ipv6 + '/64'
+            self.dst_inner_addr6 = new_dst_ipv6 + '/64'
+
             cmd = 'ip link delete %s' % self.src_vxlan_intf
             self.src.cmd(cmd, fail=False)
             cmd = 'ip link delete %s' % self.dst_vxlan_intf
@@ -678,15 +839,15 @@ class Csum_Tx_tunnel(Csum_Tx):
         self.tunnel_type = tunnel_type
 
         self.vxlan_id = 42
-        self.dst_vxlan_intf = 'vxlan0'
-        self.src_vxlan_intf = 'vxlan0'
+        self.dst_vxlan_intf = 'vxlan_%s' % self.dst_ifn
+        self.src_vxlan_intf = 'vxlan_%s' % self.src_ifn
         self.vxlan_mc = '239.1.1.1'
-        self.src_inner_hwaddr = '54:8:20:0:0:1'
-        self.dst_inner_hwaddr = '54:8:20:0:0:2'
-        self.src_inner_addr = '20.0.0.1/24'
-        self.dst_inner_addr = '20.0.0.2/24'
-        self.src_inner_addr6 = 'fc00:2222::1/64'
-        self.dst_inner_addr6 = 'fc00:2222::2/64'
+        self.src_inner_hwaddr = None
+        self.dst_inner_hwaddr = None
+        self.src_inner_addr = None
+        self.dst_inner_addr = None
+        self.src_inner_addr6 = None
+        self.dst_inner_addr6 = None
         self.src_inner_mac = None
         self.dst_inner_mac = None
         self.src_inner_ip = None
@@ -715,12 +876,55 @@ class Csum_Tx_tunnel(Csum_Tx):
 
         self.src.cmd("ethtool -k %s" % self.src_ifn)
         self.dst.cmd("ethtool -k %s" % self.dst_ifn)
-        return
 
     def vxlan_cfg(self):
         """
         Create and configure vlan interfaces
         """
+        random.seed(os.getpid())
+        self.src_inner_hwaddr = get_new_mac()
+        self.dst_inner_hwaddr = get_new_mac()
+
+        src_if = self.src.netifs[self.src_ifn]
+        dst_if = self.dst.netifs[self.dst_ifn]
+        src_ip6 = self.get_ipv6(self.src, self.src_ifn, self.src_addr_v6)
+        dst_ip6 = self.get_ipv6(self.dst, self.dst_ifn, self.dst_addr_v6)
+        ipv4_re_str = '(\d{1,3}).(\d{1,3}.\d{1,3}.\d{1,3})'
+        src_ipv4_octl = re.findall(ipv4_re_str, src_if.ip)
+        if src_ipv4_octl:
+            new_octl = (int(src_ipv4_octl[0][0]) + 100) % 255
+            new_src_ipv4 = '%s.%s' % (new_octl, src_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+        dst_ipv4_octl = re.findall(ipv4_re_str, dst_if.ip)
+        if dst_ipv4_octl:
+            new_octl = (int(dst_ipv4_octl[0][0]) + 100) % 255
+            new_dst_ipv4 = '%s.%s' % (new_octl, dst_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+
+        ipv6_re_str = '(^[a-f\d]{1,4})'
+        src_ipv6_octl = re.findall(ipv6_re_str, src_ip6)
+        if src_ipv6_octl:
+            new_octl = (int(src_ipv6_octl[0], 16) + 100) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_src_ipv6 = re.sub(ipv6_re_str, octl_str[2:], src_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        dst_ipv6_octl = re.findall(ipv6_re_str, dst_ip6)
+        if dst_ipv6_octl:
+            new_octl = (int(dst_ipv6_octl[0], 16) + 100) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_dst_ipv6 = re.sub(ipv6_re_str, octl_str[2:], dst_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        self.src_inner_addr = new_src_ipv4 + '/24'
+        self.dst_inner_addr = new_dst_ipv4 + '/24'
+        self.src_inner_addr6 = new_src_ipv6 + '/64'
+        self.dst_inner_addr6 = new_dst_ipv6 + '/64'
+
         cmd = 'ip link delete %s' % self.src_vxlan_intf
         self.src.cmd(cmd, fail=False)
         cmd = 'ip link delete %s' % self.dst_vxlan_intf
@@ -1064,15 +1268,15 @@ class LSO_tunnel(LSO_iperf):
         self.src_mtu = src_mtu
         self.dst_mtu = dst_mtu
         self.vxlan_id = 42
-        self.dst_vxlan_intf = 'vxlan0'
-        self.src_vxlan_intf = 'vxlan0'
+        self.dst_vxlan_intf = 'vxlan_%s' % self.dst_ifn
+        self.src_vxlan_intf = 'vxlan_%s' % self.src_ifn
         self.vxlan_mc = '239.1.1.1'
-        self.src_inner_hwaddr = '54:8:20:0:0:1'
-        self.dst_inner_hwaddr = '54:8:20:0:0:2'
-        self.src_inner_addr = '20.0.0.1/24'
-        self.dst_inner_addr = '20.0.0.2/24'
-        self.src_inner_addr6 = 'fc00:2222::1/64'
-        self.dst_inner_addr6 = 'fc00:2222::2/64'
+        self.src_inner_hwaddr = None
+        self.dst_inner_hwaddr = None
+        self.src_inner_addr = None
+        self.dst_inner_addr = None
+        self.src_inner_addr6 = None
+        self.dst_inner_addr6 = None
         self.src_inner_mac = None
         self.dst_inner_mac = None
         self.src_inner_ip = None
@@ -1112,6 +1316,50 @@ class LSO_tunnel(LSO_iperf):
         """
         Create and configure vlan interfaces
         """
+        random.seed(os.getpid())
+        self.src_inner_hwaddr = get_new_mac()
+        self.dst_inner_hwaddr = get_new_mac()
+
+        src_if = self.src.netifs[self.src_ifn]
+        dst_if = self.dst.netifs[self.dst_ifn]
+        src_ip6 = self.get_ipv6(self.src, self.src_ifn, self.src_addr_v6)
+        dst_ip6 = self.get_ipv6(self.dst, self.dst_ifn, self.dst_addr_v6)
+        ipv4_re_str = '(\d{1,3}).(\d{1,3}.\d{1,3}.\d{1,3})'
+        src_ipv4_octl = re.findall(ipv4_re_str, src_if.ip)
+        if src_ipv4_octl:
+            new_octl = (int(src_ipv4_octl[0][0]) + 100) % 255
+            new_src_ipv4 = '%s.%s' % (new_octl, src_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+        dst_ipv4_octl = re.findall(ipv4_re_str, dst_if.ip)
+        if dst_ipv4_octl:
+            new_octl = (int(dst_ipv4_octl[0][0]) + 100) % 255
+            new_dst_ipv4 = '%s.%s' % (new_octl, dst_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+
+        ipv6_re_str = '(^[a-f\d]{1,4})'
+        src_ipv6_octl = re.findall(ipv6_re_str, src_ip6)
+        if src_ipv6_octl:
+            new_octl = (int(src_ipv6_octl[0], 16) + 100) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_src_ipv6 = re.sub(ipv6_re_str, octl_str[2:], src_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        dst_ipv6_octl = re.findall(ipv6_re_str, dst_ip6)
+        if dst_ipv6_octl:
+            new_octl = (int(dst_ipv6_octl[0], 16) + 100) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_dst_ipv6 = re.sub(ipv6_re_str, octl_str[2:], dst_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        self.src_inner_addr = new_src_ipv4 + '/24'
+        self.dst_inner_addr = new_dst_ipv4 + '/24'
+        self.src_inner_addr6 = new_src_ipv6 + '/64'
+        self.dst_inner_addr6 = new_dst_ipv6 + '/64'
+
         cmd = 'ip link delete %s' % self.src_vxlan_intf
         self.src.cmd(cmd, fail=False)
         cmd = 'ip link delete %s' % self.dst_vxlan_intf
@@ -1439,15 +1687,15 @@ class Csum_rx_tnl(UnitIP):
 
         self.tunnel_type = tunnel_type
         self.vxlan_id = 42
-        self.dst_vxlan_intf = 'vxlan0'
-        self.src_vxlan_intf = 'vxlan0'
+        self.dst_vxlan_intf = 'vxlan_%s' % self.dst_ifn
+        self.src_vxlan_intf = 'vxlan_%s' % self.src_ifn
         self.vxlan_mc = '239.1.1.1'
-        self.src_inner_hwaddr = '54:8:20:0:0:1'
-        self.dst_inner_hwaddr = '54:8:20:0:0:2'
-        self.src_inner_addr = '20.0.0.1/24'
-        self.dst_inner_addr = '20.0.0.2/24'
-        self.src_inner_addr6 = 'fc00:2222::1/64'
-        self.dst_inner_addr6 = 'fc00:2222::2/64'
+        self.src_inner_hwaddr = None
+        self.dst_inner_hwaddr = None
+        self.src_inner_addr = None
+        self.dst_inner_addr = None
+        self.src_inner_addr6 = None
+        self.dst_inner_addr6 = None
         self.src_inner_mac = None
         self.dst_inner_mac = None
         self.src_inner_ip = None
@@ -1530,7 +1778,7 @@ class Csum_rx_tnl(UnitIP):
 
         """
         if self.tunnel_type == 'vxlan':
-            src_ifn = 'vxlan0'
+            src_ifn = self.src_vxlan_intf
         else:
             src_ifn = self.src_ifn
 
@@ -1589,6 +1837,50 @@ class Csum_rx_tnl(UnitIP):
         """
         Create and configure vlan interfaces
         """
+        random.seed(os.getpid())
+        self.src_inner_hwaddr = get_new_mac()
+        self.dst_inner_hwaddr = get_new_mac()
+
+        src_if = self.src.netifs[self.src_ifn]
+        dst_if = self.dst.netifs[self.dst_ifn]
+        src_ip6 = self.get_ipv6(self.src, self.src_ifn, self.src_addr_v6)
+        dst_ip6 = self.get_ipv6(self.dst, self.dst_ifn, self.dst_addr_v6)
+        ipv4_re_str = '(\d{1,3}).(\d{1,3}.\d{1,3}.\d{1,3})'
+        src_ipv4_octl = re.findall(ipv4_re_str, src_if.ip)
+        if src_ipv4_octl:
+            new_octl = (int(src_ipv4_octl[0][0]) + 100) % 255
+            new_src_ipv4 = '%s.%s' % (new_octl, src_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+        dst_ipv4_octl = re.findall(ipv4_re_str, dst_if.ip)
+        if dst_ipv4_octl:
+            new_octl = (int(dst_ipv4_octl[0][0]) + 100) % 255
+            new_dst_ipv4 = '%s.%s' % (new_octl, dst_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+
+        ipv6_re_str = '(^[a-f\d]{1,4})'
+        src_ipv6_octl = re.findall(ipv6_re_str, src_ip6)
+        if src_ipv6_octl:
+            new_octl = (int(src_ipv6_octl[0], 16) + 100) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_src_ipv6 = re.sub(ipv6_re_str, octl_str[2:], src_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        dst_ipv6_octl = re.findall(ipv6_re_str, dst_ip6)
+        if dst_ipv6_octl:
+            new_octl = (int(dst_ipv6_octl[0], 16) + 100) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_dst_ipv6 = re.sub(ipv6_re_str, octl_str[2:], dst_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        self.src_inner_addr = new_src_ipv4 + '/24'
+        self.dst_inner_addr = new_dst_ipv4 + '/24'
+        self.src_inner_addr6 = new_src_ipv6 + '/64'
+        self.dst_inner_addr6 = new_dst_ipv6 + '/64'
+
         cmd = 'ip link delete %s' % self.src_vxlan_intf
         self.src.cmd(cmd, fail=False)
         cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport 4789' % \

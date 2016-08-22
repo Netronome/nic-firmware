@@ -59,9 +59,8 @@ class Iperftest(Test):
             self.dst = dst[0]
             self.dst_addr = dst[1]
             self.dst_ifn = dst[2]
-            if not self.ipv4:
-                self.src_addr_v6 = src[3]
-                self.dst_addr_v6 = dst[3]
+            self.src_addr_v6 = src[3]
+            self.dst_addr_v6 = dst[3]
 
         # These will be set in the run() method
         self.src_mac = None
@@ -498,25 +497,57 @@ class Csum_Tx(Iperftest):
         #dst_random_last_octal = str(random.randint(100, 254))
         #if src_random_last_octal == dst_random_last_octal:
         #    src_random_last_octal = str(int(dst_random_last_octal) - 1)
-        src_random_last_octal = '1'
-        dst_random_last_octal = '2'
-        ipv4_prefix = '10.255.255.'
-        ipv6_prefix = 'fc00:ffff::'
+        src_if = self.src.netifs[self.src_ifn]
+        dst_if = self.dst.netifs[self.dst_ifn]
+        src_ip6 = self.get_ipv6(self.src, self.src_ifn,
+                                    self.src_addr_v6)
+        dst_ip6 = self.get_ipv6(self.dst, self.dst_ifn,
+                                    self.dst_addr_v6)
+        ipv4_re_str = '(\d{1,3}).(\d{1,3}.\d{1,3}.\d{1,3})'
+        src_ipv4_octl = re.findall(ipv4_re_str, src_if.ip)
+        if src_ipv4_octl:
+            new_octl = (int(src_ipv4_octl[0][0]) + 100) % 255
+            new_src_ipv4 = '%s.%s' % (new_octl, src_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+        dst_ipv4_octl = re.findall(ipv4_re_str, dst_if.ip)
+        if dst_ipv4_octl:
+            new_octl = (int(dst_ipv4_octl[0][0]) + 100) % 255
+            new_dst_ipv4 = '%s.%s' % (new_octl, dst_ipv4_octl[0][1])
+        else:
+            raise NtiGeneralError('Failed to create ipv4 for tunnel intf')
+
+        ipv6_re_str = '(^[a-f\d]{1,4})'
+        src_ipv6_octl = re.findall(ipv6_re_str, src_ip6)
+        if src_ipv6_octl:
+            new_octl = (int(src_ipv6_octl[0], 16) + 100) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_src_ipv6 = re.sub(ipv6_re_str, octl_str[2:], src_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
+
+        dst_ipv6_octl = re.findall(ipv6_re_str, dst_ip6)
+        if dst_ipv6_octl:
+            new_octl = (int(dst_ipv6_octl[0], 16) + 100) % 65536
+            octl_str = '%s' % hex(new_octl)
+            new_dst_ipv6 = re.sub(ipv6_re_str, octl_str[2:], dst_ip6)
+        else:
+            raise NtiGeneralError('Failed to create ipv6 for tunnel intf')
 
         if self.ipv4:
-            self.src_vlan_ip = ipv4_prefix + src_random_last_octal
+            self.src_vlan_ip = new_src_ipv4
             self.src.cmd('ifconfig %s %s/24 up' % (self.src_vlan_ifn,
                                                    self.src_vlan_ip))
-            self.dst_vlan_ip = ipv4_prefix + dst_random_last_octal
+            self.dst_vlan_ip = new_dst_ipv4
             self.dst.cmd('ifconfig %s %s/24 up' % (self.dst_vlan_ifn,
                                                    self.dst_vlan_ip))
         else:
-            self.src_vlan_ip = ipv6_prefix + src_random_last_octal
+            self.src_vlan_ip = new_src_ipv6
             self.src.cmd('ifconfig %s inet6 add %s/64' % (self.src_vlan_ifn,
                                                           self.src_vlan_ip))
             self.src.cmd('ifconfig %s up' % self.src_vlan_ifn)
             self.src.cmd('ifconfig -a')
-            self.dst_vlan_ip = ipv6_prefix + dst_random_last_octal
+            self.dst_vlan_ip = new_dst_ipv6
             self.dst.cmd('ifconfig %s inet6 add %s/64' % (self.dst_vlan_ifn,
                                                           self.dst_vlan_ip))
             self.dst.cmd('ifconfig %s up' % self.dst_vlan_ifn)
@@ -1048,6 +1079,8 @@ class LSO_iperf(Csum_Tx):
             self.dst.rm_dir(self.dst_tmp_dir)
         if self.src_tmp_dir and passed:
             self.src.rm_dir(self.dst_tmp_dir)
+        self.src.cmd('ifconfig %s mtu %s' % (self.src_ifn, 1500))
+        self.dst.cmd('ifconfig %s mtu %s' % (self.dst_ifn, 1500))
         return
 
     def check_tcp_len(self, cur_send_pkt, ipv4):
