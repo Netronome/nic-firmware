@@ -53,6 +53,10 @@
 #define NBI_TM_NUM_SEQUENCERS    1
 #define NBI_TM_ENABLE_SEQUENCER0 1
 
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON)
+    #define NBI_TM_ENABLE_SHAPER 1
+#endif
+
 /* Determine the NBI TM queue depth based on port configuration. */
 #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 <= 1
     /* 1-port Configuration. */

@@ -31,8 +31,10 @@
 #define NS_PLATFORM_BERYLLIUM            7
 #define NS_PLATFORM_BERYLLIUM_4x10_1x40  8
 #define NS_PLATFORM_BERYLLIUM_8x10       9
+#define NS_PLATFORM_CARBON               10
+#define NS_PLATFORM_CARBON_2x10          11
 
-#define NS_PLATFORM_LAST                 NS_PLATFORM_BERYLLIUM_8x10
+#define NS_PLATFORM_LAST                 NS_PLATFORM_CARBON_2x10
 
 
 /*
@@ -123,10 +125,16 @@
  *             - return  The number of ports belonging to the MAC island 1 for
  *                       that platform; an integer from 0 to 128, inclusive
  *
+ *         - NS_PLATFORM_PCLK
+ *             - return  The PClk frequency for the NFP (in MHz)
+ *
  *         - NS_PLATFORM_PORT_SPEED(_port)
  *             - param _port  Platform physical port number; an integer from 0
  *                            to (NS_PLATFORM_NUM_PORTS - 1), inclusive
  *             - return  The speed of the port, in Gbps; a non-negative integer
+ *
+ *         - NS_PLATFORM_TCLK
+ *             - return  The TClk frequency for the NFP (in MHz)
  *
  *
  * Note: The following macros will automatically be defined for each platform:
@@ -278,7 +286,9 @@
     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       1
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      800
     #define NS_PLATFORM_PORT_SPEED(_port)         40
+    #define NS_PLATFORM_TCLK                      800
     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x001
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
@@ -299,7 +309,9 @@
     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       4
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      800
     #define NS_PLATFORM_PORT_SPEED(_port)         10
+    #define NS_PLATFORM_TCLK                      800
     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x00F
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
@@ -320,7 +332,9 @@
     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       2
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      633
     #define NS_PLATFORM_PORT_SPEED(_port)         10
+    #define NS_PLATFORM_TCLK                      633
     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
@@ -341,7 +355,9 @@
     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       2
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      633
     #define NS_PLATFORM_PORT_SPEED(_port)         ((_port == 0) ? 1 : 10)
+    #define NS_PLATFORM_TCLK                      633
     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
@@ -362,7 +378,9 @@
     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       2
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      633
     #define NS_PLATFORM_PORT_SPEED(_port)         ((_port == 0) ? 10 : 1)
+    #define NS_PLATFORM_TCLK                      633
     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
@@ -383,7 +401,9 @@
     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       2
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      633
     #define NS_PLATFORM_PORT_SPEED(_port)         1
+    #define NS_PLATFORM_TCLK                      633
     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
@@ -404,7 +424,9 @@
     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       2
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      800
     #define NS_PLATFORM_PORT_SPEED(_port)         40
+    #define NS_PLATFORM_TCLK                      800
     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
@@ -425,7 +447,9 @@
     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       5
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      800
     #define NS_PLATFORM_PORT_SPEED(_port)         ((_port < 4) ? 10 : 40)
+    #define NS_PLATFORM_TCLK                      800
     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x01F
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
@@ -446,8 +470,56 @@
     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       8
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      800
     #define NS_PLATFORM_PORT_SPEED(_port)         10
+    #define NS_PLATFORM_TCLK                      800
     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x0FF
+    #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
+    #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
+    #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
+
+/* Carbon 2x25GE */
+#elif (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON)
+    #define NS_PLATFORM_MAC_CORE(_port)           0
+    #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
+    #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port)   \
+        (NS_PLATFORM_MAC_CORE_SERDES_LO(_port) + 3)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        ((_serdes) >> 2)
+    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
+    #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
+        (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
+    #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
+    #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
+    #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       2
+    #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      800
+    #define NS_PLATFORM_PORT_SPEED(_port)         25
+    #define NS_PLATFORM_TCLK                      800
+    #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
+    #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
+    #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
+    #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
+
+/* Carbon 2x10GE */
+#elif (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON_2x10)
+    #define NS_PLATFORM_MAC_CORE(_port)           0
+    #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
+    #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
+        NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        ((_serdes) >> 2)
+    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
+    #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
+        (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
+    #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
+    #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
+    #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       2
+    #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      800
+    #define NS_PLATFORM_PORT_SPEED(_port)         10
+    #define NS_PLATFORM_TCLK                      800
+    #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000

@@ -21,6 +21,14 @@ else ifeq ($(PLATFORM),Beryllium)
     NS_PLATFORM_TYPE = 7
     PROJECT = ns_nic_cx40_2
     AMDA = AMDA0097-0001
+else ifeq ($(PLATFORM),Carbon)
+    NS_PLATFORM_TYPE = 10
+    PROJECT = ns_nic_cx25_2
+    AMDA = AMDA0099-0001
+else ifeq ($(PLATFORM),Carbon_2x10)
+    NS_PLATFORM_TYPE = 11
+    PROJECT = ns_nic_cx25_2_2x10
+    AMDA = AMDA0099-0001
 endif
 
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
