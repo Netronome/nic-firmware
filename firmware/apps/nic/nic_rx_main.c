@@ -67,8 +67,8 @@ proc_from_wire(int port)
 
     app_meta = (void *)&(Pkt.app0);
 
-    plen = Pkt.p_orig_len;
-    offset = 0;
+    plen = Pkt.p_orig_len - MAC_PREPEND_BYTES;
+    offset = MAC_PREPEND_BYTES;
 
     /* Check if interface is up as well MTU */
     err = nic_rx_l1_checks(port);
@@ -98,10 +98,6 @@ proc_from_wire(int port)
      * the packet.  It might be garbage. */
     if (err == NIC_RX_CSUM_BAD)
         goto err_out;
-
-    /* Strip the CSUM and timestamp prepend, this is not transferred to host */
-    offset += MAC_PREPEND_BYTES;
-    plen -= MAC_PREPEND_BYTES;
 
     vxlan_ports = nic_rx_vxlan_ports();
 
