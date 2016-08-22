@@ -292,8 +292,7 @@ main()
         /* Receive a packet from the wire */
         ret = pkt_rx_wire();
         if (ret < 0) {
-            Pkt.p_dst = PKT_DROP;
-            goto send_packet;
+            goto bad_packet;
         } else {
             __critical_path();
         }
@@ -301,6 +300,7 @@ main()
         /* Do RX processing on packet and populate the TX descriptor */
         ret = proc_from_wire(PKT_PORT_QUEUE_of(Pkt.p_src));
         if (ret == NIC_RX_DROP) {
+        bad_packet:
             Pkt.p_dst = PKT_DROP_HOST;
             nic_rx_discard_cntr(PKT_PORT_QUEUE_of(Pkt.p_src));
         }
