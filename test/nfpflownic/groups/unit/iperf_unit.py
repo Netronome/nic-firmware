@@ -1512,3 +1512,135 @@ class LSO_iperf(Csum_Tx):
             raise NtiGeneralError(msg='ethtool counters did not increase as '
                                       'expected: tx_lso = %s' %
                                       diff_src_cntrs.ethtool['tx_lso'])
+
+
+
+class Tx_Drop_test(Iperftest):
+    """Test class for dropping packets by changing MTU during iperf"""
+    # Information applicable to all subclasses
+    _gen_info = """
+    Dropping TX packets by changing MTU during iperf.
+    """
+
+    def __init__(self, src, dst,
+                 group=None, name="", summary=None):
+        """
+        @src:        A tuple of System and interface name from which to send
+        @dst:        A tuple of System and interface name which should receive
+        @group:      Test group this test belongs to
+        @name:       Name for this test instance
+        @summary:    Optional one line summary for the test
+        """
+        Iperftest.__init__(
+            self, src, dst, promisc=False, ipv4=True, ipv4_opt=False,
+            ipv6_rt=False, ipv6_hbh=False, l4_type='tcp', iperr=False,
+            l4err=False, dst_mac_type="tgt", src_mac_type="src",
+            vlan=False, vlan_id=100, num_pkts=1, iperf_time=20,
+            src_mtu=1500, dst_mtu=1500, group=group, name=name,
+            summary=summary)
+
+        # in tx_drop (dut_is_dst==False), we change DUT (src)'s MTU, while in
+        # rx_drop, we change DUT (dst)'s MTU
+    def run(self):
+
+        """Run the test
+        @return:  A result object"""
+
+        # Remove get_result() and check_result() from iperftest class, as we
+        # use timed_cmd to run iperf client and if it finishes without
+        # timeout, it passes. Otherwise, it failed as timeout
+        rc_passed = True
+        rc_comment = ''
+        try:
+            self.get_intf_info()
+
+            self.interface_cfg()
+
+            self.ping_before_iperf()
+
+            self.run_iperf()
+        except:
+            rc_passed = False
+            raise
+        finally:
+            self.clean_up(passed=rc_passed)
+
+        return NrtResult(name=self.name, testtype=self.__class__.__name__,
+                         passed=rc_passed, comment=rc_comment)
+
+
+    def run_iperf(self):
+
+        self.prepare_temp_dir()
+        self.iperf_arg_str_cfg()
+
+        self.start_tshark_listening()
+        self.start_iperf_server()
+        self.start_iperf_client()
+
+        return
+
+    def interface_cfg(self):
+        """
+        Configure interfaces, including offload parameters
+        """
+        self.dst.cmd("ethtool -K %s rx on" % self.dst_ifn)
+        self.dst.cmd("ethtool -K %s tx on" % self.dst_ifn)
+        self.src.cmd("ethtool -K %s rx on" % self.src_ifn)
+        self.src.cmd("ethtool -K %s tx on" % self.src_ifn)
+        if not self.ipv4:
+            self.dst.cmd("ifconfig %s allmulti" % self.dst_ifn)
+            self.src.cmd("ifconfig %s allmulti" % self.src_ifn)
+
+        return
+
+    def iperf_arg_str_cfg(self):
+        """
+        Configure the command-line argument strings for both iperf server and
+        iperf client
+        """
+        Iperftest.iperf_arg_str_cfg(self)
+        self.iperf_client_arg_str += ' -P 50'
+        return
+
+    def start_iperf_client(self):
+        """
+        Start the iperf client, using the command-line argument string
+        configured in iperf_arg_str_cfg().
+        """
+        dst_netifs = self.dst.netifs[self.dst_ifn]
+        src_netifs = self.src.netifs[self.src_ifn]
+        before_dst_cntrs = dst_netifs.stats()
+        before_src_cntrs = src_netifs.stats()
+        # for Dropping test, we run a background sleep + mtu change cmd on DUT
+        # and run iperf client with a timeout. When timeout is not triggered,
+        # test passes.
+        sleep_time = self.iperf_time / 2
+        cmd = 'sleep %s; ifconfig %s mtu 500' % (sleep_time, self.src_ifn)
+        #TODO: need to change to the new pid_background method once the parallel
+        # test code is pushed. Also need to modify the clean up accordingly
+        self.src.cmd(cmd, background=True)
+        cmd = "iperf -c %s %s" % (self.dst_ip, self.iperf_client_arg_str)
+        iperf_wait_time = self.iperf_time * 2
+        self.src.timed_cmd(cmd, timeout=iperf_wait_time)
+        after_dst_cntrs = dst_netifs.stats()
+        after_src_cntrs = src_netifs.stats()
+        diff_dst_cntrs = after_dst_cntrs - before_dst_cntrs
+        diff_src_cntrs = after_src_cntrs - before_src_cntrs
+        # dump the stats to the log
+        LOG_sec("DST Interface stats difference")
+        LOG(diff_dst_cntrs.pp())
+        LOG_endsec()
+        LOG_sec("SRC Interface stats difference")
+        LOG(diff_src_cntrs.pp())
+        LOG_endsec()
+        return
+
+    def clean_up(self, passed=True):
+        """
+        Reset MTU, and remove temporary directory and files
+        """
+        self.dst.cmd("ifconfig %s mtu 1500" % self.dst_ifn)
+        self.src.cmd("ifconfig %s mtu 1500" % self.src_ifn)
+        Iperftest.clean_up(self, passed=passed)
+        return

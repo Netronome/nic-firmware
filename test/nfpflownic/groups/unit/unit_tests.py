@@ -12,10 +12,10 @@ from unit import UnitIPv4, UnitIPv6, NFPFlowNICPing, UnitPing, JumboPacket, \
     RxVlan, Stats_rx_err_cnt, LinkState, RSStest_same_l4_tuple, \
     RSStest_diff_l4_tuple, Stats_per_queue_cntr, RxVlan_rx_byte, \
     RSStest_diff_l4_tuple_modify_table, Kmod_perf, \
-    RSStest_diff_part_l4_tuple, NFPFlowNICContentCheck, McPing
+    RSStest_diff_part_l4_tuple, NFPFlowNICContentCheck, McPing, Rx_Drop_test
 from tunnel_unit import TunnelTest, Csum_Tx_tunnel, RSStest_diff_inner_tuple,\
     LSO_tunnel, RSStest_diff_inner_tuple_multi_tunnels, Csum_rx_tnl
-from iperf_unit import Csum_Tx, Ring_size, LSO_iperf
+from iperf_unit import Csum_Tx, Ring_size, LSO_iperf, Tx_Drop_test
 from cfg_unit import NFPFlowNICCfgUnitTest
 from gather_dma import NFPFlowNICGatherDMA
 
@@ -1258,6 +1258,21 @@ class Unit_dict(object):
                   'rx_byte counters'
         self.tests[tn] = RxVlan_rx_byte(a_t, dut_t_x, group=group,
                                  name=tn, summary=summary)
+
+        #######################################################################
+        # tx/rx drop tests
+        #######################################################################
+        # dropping packets by changing MTU during iperf.
+
+        tn = self.prefix + 'drop_tx_mtu_iperf'
+        summary = 'Drop tx packets by changing MTU during iperf.'
+        self.tests[tn] = Tx_Drop_test(dut_t_x, a_t, group=group,
+                                      name=tn, summary=summary)
+
+        tn = self.prefix + 'drop_rx_mtu_iperf'
+        summary = 'Drop rx packets by changing MTU during iperf.'
+        self.tests[tn] = Rx_Drop_test(a_t, dut_t_x, group=group,
+                                      name=tn, summary=summary)
 
 
         #######################################################################

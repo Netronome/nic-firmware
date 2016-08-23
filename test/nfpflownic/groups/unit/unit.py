@@ -12,6 +12,7 @@ import hashlib
 import ntpath
 import socket
 import string
+import time
 from binascii import hexlify
 from netro.testinfra import Test, LOG_sec, LOG, LOG_endsec
 from scapy.all import TCP, UDP, IP, Ether, wrpcap, IPv6, ICMP, \
@@ -2714,3 +2715,79 @@ class McPing(Test):
 
         return NrtResult(name=self.name, testtype=self.__class__.__name__,
                          passed=passed, comment=comment)
+
+
+class Rx_Drop_test(UnitIP):
+    """Test class for dropping packets by changing MTU during iperf"""
+    # Information applicable to all subclasses
+    _gen_info = """
+    receiving and dropping packets (wrong DST MAC address packets).
+    """
+
+    def __init__(self, src, dst,
+                 group=None, name="", summary=None):
+        """
+        @src:        A tuple of System and interface name from which to send
+        @dst:        A tuple of System and interface name which should receive
+        @group:      Test group this test belongs to
+        @name:       Name for this test instance
+        @summary:    Optional one line summary for the test
+        """
+        UnitIP.__init__(
+            self, src, dst, promisc=False, ipv4=True, ipv4_opt=False,
+            ipv6_rt=False, ipv6_hbh=False, l4_type='tcp', iperr=False,
+            l4err=False, dst_mac_type="diff", src_mac_type="src",
+            vlan=False, vlan_id=100, group=group, name=name,
+            summary=summary)
+
+        self.num_pkts = 1000000
+        self.iperf_time = 5
+        self.iperf_server_arg_str = ''
+        self.iperf_client_arg_str = ''
+
+    def send_packets(self, send_pcap):
+        """
+        Send packets by using TCPReplay
+
+        """
+        # adding the -t flag in tcpreplay for max throughput
+        intf_with_flag = '%s -t -q' % self.src_ifn
+        pcapre = TCPReplay(self.src, intf_with_flag, send_pcap,
+                           loop=self.num_pkts)
+        attempt, sent = pcapre.run()
+        if attempt == -1 or sent == -1:
+            return False
+        else:
+            return True
+
+    def check_result(self, if_stat_diff):
+        """
+        Check if the interface is still functional by running iperf
+        """
+        passed = True
+        msg = ''
+        try:
+            ret = self.is_pingable()
+            if not ret:
+                passed = False
+                msg = 'Ping after rx_drop_pkts_tcpreplay failed'
+        except:
+            passed = False
+            msg = 'Exception during ping after rx_drop_pkts_tcpreplay failed'
+        finally:
+            return NrtResult(name=self.name, testtype=self.__class__.__name__,
+                             passed=passed, comment=msg)
+
+    def is_pingable(self):
+
+        dst_ip = self.dst_ip
+
+        if self.ipv4:
+            cmd = 'ping -c 1  -i 1 %s -w 4' % dst_ip
+        else:
+            cmd = 'ping6 -c 1  -i 1 %s -w 4' % dst_ip
+        ret, _ = self.src.cmd(cmd, fail=False)
+        if ret:
+            return False
+        else:
+            return True
