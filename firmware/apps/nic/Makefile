@@ -18,7 +18,7 @@ else ifeq ($(PLATFORM),Lithium)
     PROJECT = ns_nic_cx10_2
     AMDA = AMDA0096-0001
 else ifeq ($(PLATFORM),Beryllium)
-    NS_PLATFORM_TYPE = 8
+    NS_PLATFORM_TYPE = 7
     PROJECT = ns_nic_cx40_2
     AMDA = AMDA0097-0001
 endif

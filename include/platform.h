@@ -40,11 +40,9 @@
 #define NS_PLATFORM_LITHIUM_1x1_1x10     4
 #define NS_PLATFORM_LITHIUM_1x10_1x1     5
 #define NS_PLATFORM_LITHIUM_2x1          6
-#define NS_PLATFORM_BERYLLIUM_1x40       7
-#define NS_PLATFORM_BERYLLIUM_2x40       8
-#define NS_PLATFORM_BERYLLIUM_4x10       9
-#define NS_PLATFORM_BERYLLIUM_4x10_1x40  10
-#define NS_PLATFORM_BERYLLIUM_8x10       11
+#define NS_PLATFORM_BERYLLIUM            7
+#define NS_PLATFORM_BERYLLIUM_4x10_1x40  8
+#define NS_PLATFORM_BERYLLIUM_8x10       9
 
 #define NS_PLATFORM_LAST                 NS_PLATFORM_BERYLLIUM_8x10
 
@@ -403,27 +401,8 @@
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
 
-/* Beryllium 1x40GE */
-#elif (NS_PLATFORM_TYPE == NS_PLATFORM_BERYLLIUM_1x40)
-    #define NS_PLATFORM_MAC_CORE(_port)           0
-    #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) 7
-    #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) 4
-    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
-        0
-    #define NS_PLATFORM_MAC_CHANNEL_HI(_port)     19
-    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     16
-    #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
-    #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
-    #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       1
-    #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
-    #define NS_PLATFORM_PORT_SPEED(_port)         40
-    #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x010
-    #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
-    #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
-    #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
-
 /* Beryllium 2x40GE */
-#elif (NS_PLATFORM_TYPE == NS_PLATFORM_BERYLLIUM_2x40)
+#elif (NS_PLATFORM_TYPE == NS_PLATFORM_BERYLLIUM)
     #define NS_PLATFORM_MAC_CORE(_port)           0
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port)   \
@@ -439,27 +418,6 @@
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
     #define NS_PLATFORM_PORT_SPEED(_port)         40
     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
-    #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
-    #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
-    #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
-
-/* Beryllium 4x10GE (using breakout) */
-#elif (NS_PLATFORM_TYPE == NS_PLATFORM_BERYLLIUM_4x10)
-    #define NS_PLATFORM_MAC_CORE(_port)           0
-    #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) + 4)
-    #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
-        NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
-    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
-        ((_serdes) - 4)
-    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     (((_port) << 2) + 16)
-    #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
-        (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
-    #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
-    #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
-    #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       4
-    #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
-    #define NS_PLATFORM_PORT_SPEED(_port)         10
-    #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x0F0
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
