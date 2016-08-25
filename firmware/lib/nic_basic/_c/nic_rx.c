@@ -329,11 +329,6 @@ nic_rx_rss(int vport, void *o_l3, void *o_l4,
     if (!(nic->control[vport] & NFP_NET_CFG_CTRL_RSS))
         goto no_rss;
 
-    /* If switch enabled and no RSS configured for VPort */
-    if ((nic->control[vport] & NFP_NET_CFG_CTRL_L2SWITCH) &&
-        !(nic->sw_vp_rss_en & VPORT_MASK(vport)))
-        goto no_rss;
-
     /* From here we assume only one VPort supports RSS */
 
     if (!rss_ctrl)

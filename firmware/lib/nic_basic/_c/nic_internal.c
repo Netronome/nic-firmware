@@ -42,11 +42,9 @@ NFD_CFG_BASE_DECLARE(NIC_PCI);
  * @nic_cnt_rx_eth_bc       Ethernet broadcast packets
  * @nic_cnt_rx_eth_mc       Ethernet multicast packets
  * @nic_cnt_rx_drop_eth     Packets dropped by L2 filters
- * @nic_cnt_rx_switch_multi Packets on RX with multiple destination VPorts
  *
  * @nic_cnt_tx_drop_down    Packets dropped due to device disabled
  * @nic_cnt_tx_drop_mtu     Packets dropped due to MTU size check
- * @nic_cnt_rx_switch_int   Packets on TX requested to be send to host
  */
 #define NIC_LIB_CNTR(_x) mem_incr64(_x)
 __export __dram uint64_t nic_reconfig_cnt[40];
@@ -63,11 +61,9 @@ __export __dram uint64_t nic_cnt_rx_eth_sa_err;
 __export __dram uint64_t nic_cnt_rx_eth_drop;
 __export __dram uint64_t nic_cnt_rx_eth_drop_mc;
 __export __dram uint64_t nic_cnt_rx_eth_drop_da;
-__export __dram uint64_t nic_cnt_rx_switch_multi;
 
 __export __dram uint64_t nic_cnt_tx_drop_down;
 __export __dram uint64_t nic_cnt_tx_drop_mtu;
-__export __dram uint64_t nic_cnt_tx_switch_int;
 #else
 #define NIC_LIB_CNTR(_me)
 #endif
@@ -195,20 +191,6 @@ struct nic_local_state {
 /* 0x024: Cache of RSS key */
     uint8_t  rss_key[NVNICS][NFP_NET_CFG_RSS_KEY_SZ];
     uint8_t  rss_tbl[NVNICS][NFP_NET_CFG_RSS_ITBL_SZ]; /* 0x04c: Cache of RSS ITBL */
-
-    /* Switch local state */
-    uint32_t sw_default_rx_vp;  /* 0x0cc: Default VPort */
-
-    uint64_t sw_vp_spoof_en;       /* 0x0d0: Mask for VPs w/ spoofing enabled */
-    uint64_t sw_vp_bc_en;          /* 0x0d8: Mask for VPs w/ BC allowed */
-    uint64_t sw_vp_mc_promisc_en;  /* 0x0e0: Mask for VPs w/ MC allowed */
-    uint64_t sw_vp_vlan_promisc_en;/* 0x0e8: Mask for VPs w/ VLAN promisc set */
-    uint64_t sw_vp_promisc_en;     /* 0x0f0: Mask for VPs w/ promisc enabled */
-    uint64_t sw_vp_rss_en;         /* 0x0f8: Mask per VPs w/ RSS is enabled */
-    uint64_t sw_vp_has_defaultq;   /* 0x100: Does vport have a default Q? */
-    uint8_t  sw_txq_to_vport[NFP_NET_TXR_MAX]; /* 0x108: Map of TX Qs to VPs */
-    uint8_t  sw_default_rxq[NIC_SWITCH_VPORTS_MAX];
-                                               /* 0x148: Default RX Q per VP */
     uint16_t vxlan_ports[NFP_NET_N_VXLAN_PORTS]; /* 0x188 vxlan ports */
 
 };
@@ -241,20 +223,6 @@ swapw64(uint64_t val)
     return (val << 32) + tmp;
 }
 
-/* Prototypes */
-__intrinsic void nic_switch_reconfig();
-
-/*
- * Reconfiguration mechanism:
- *
- * One context in the app master ME is the master for the
- * reconfiguration.  It initializes a synchronization counter
- * @nic_cfg_synch to the number of application MEs and signals the
- * application MEs whenever a configuration change happened. The app master
- * also communicates the pci island number and vnic number of the changes
- * config BAR.
- *
- */
 
 /*
  * Initialise the rings and eventfilters/autopushes.
@@ -388,12 +356,6 @@ nic_local_reconfig(uint32_t *enable_changed)
 
         /* Write control word to activate */
         nic->rss_ctrl[vnic] = rss_ctrl[0];
-    }
-
-    /* Switch reconfiguration */
-    if (update & NFP_NET_CFG_UPDATE_L2SWITCH &&
-        nic->control[vnic] & NFP_NET_CFG_CTRL_L2SWITCH) {
-        nic_switch_reconfig();
     }
 
     /* VXLAN reconfig */

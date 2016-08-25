@@ -69,9 +69,7 @@ proc_from_host(int port)
 
     __gpr uint16_t tci;
 
-    __gpr int vport;
     __gpr uint16_t vlan;
-    __gpr uint64_t out_vport_mask;
     __gpr int uplink;
     void *app_meta;
     __gpr struct tx_tsk_config offload_cfg;
@@ -174,7 +172,6 @@ proc_from_host(int port)
         NIC_APP_CNTR(&nic_cnt_tx_vlan);
     }
 
-    vport = nic_switch_tx_vport(port, PKT_PORT_QUEUE_of(Pkt.p_src));
     vlan = (hdrs.present & HDR_O_VLAN) ?
         NET_ETH_TCI_VID_of(hdrs.o_vlan.tci) : 0;
 
@@ -185,18 +182,6 @@ proc_from_host(int port)
     } else {
         sa = &hdrs.o_eth.src;
         da = &hdrs.o_eth.dst;
-    }
-
-    out_vport_mask = nic_switch(vport, sa, da, vlan, &uplink);
-
-    /* XXX Don't support switching to other VPorts for now */
-    if (out_vport_mask)
-        NIC_APP_CNTR(&nic_cnt_tx_sw_vport_err);
-
-    if (!uplink) {
-        err = NIC_TX_DROP;
-        NIC_APP_CNTR(&nic_cnt_tx_sw_drop);
-        goto err_out;
     }
 
     /* Checksum offload */
