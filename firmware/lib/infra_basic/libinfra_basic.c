@@ -275,12 +275,10 @@ pkt_rx_wire(void)
     Pkt.p_ctm_sz = status.size;
 
     if (nbi_rxd.seqr != 0) {
+        /* pkt is not malformed */
+        __critical_path();
         Pkt.p_ro_ctx = (nbi_rxd.seqr << 1) - 1;
         Pkt.p_is_gro_sequenced = 1;
-        __critical_path();
-    } else {
-        /* pkt is corrupted in some way */
-        Pkt.p_is_gro_sequenced = 0;
     }
 
     Pkt.p_orig_len = Pkt.p_len;
@@ -409,10 +407,7 @@ pkt_rx_wq(int ring_num, mem_ring_addr_t ring_addr)
 __intrinsic void
 drop_packet(__xwrite struct gro_meta_drop *gmeta)
 {
-    __addr40 void *mu_ptr;
-
-    mu_ptr = (__addr40 void *)((uint64_t)Pkt.p_muptr << 11);
-    blm_buf_free(blm_buf_ptr2handle(mu_ptr), Pkt.p_bls);
+    blm_buf_free(Pkt.p_muptr, Pkt.p_bls);
 
     if (!Pkt.p_is_gro_sequenced)
 #ifdef INFRA_HANDLE_REMOTE_PACKETS
