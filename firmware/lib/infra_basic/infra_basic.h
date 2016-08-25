@@ -57,14 +57,13 @@ enum {
 #define PKT_PORT_BUILD(_type, _subsys, _queue) \
     (((_type) << 13) | ((_subsys) << 10) | (_queue))
 
-#define PKT_DROP \
-    PKT_PORT_BUILD(PKT_PTYPE_DROP, 0, PKT_DROPT_ALL)
 #define PKT_DROP_SEQ \
     PKT_PORT_BUILD(PKT_PTYPE_DROP_SEQ, 0, 0)
 #define PKT_DROP_WIRE \
     PKT_PORT_BUILD(PKT_PTYPE_DROP_WIRE, 0, 0)
 #define PKT_DROP_HOST \
     PKT_PORT_BUILD(PKT_PTYPE_DROP_HOST, 0, 0)
+#define PKT_DROP PKT_DROP_HOST
 #define PKT_NOTX \
     PKT_PORT_BUILD(PKT_PTYPE_NONE, 0, 0)
 #define PKT_WIRE_PORT(_nbi, _q) \

@@ -579,7 +579,7 @@ pkt_tx(void)
                          Pkt.p_ro_ctx, Pkt.p_seq, Pkt.p_ctm_sz);
 
         drop_packet(&gmeta.drop);
-        INFRA_CNTR_INC(INFRA_CNTR_TX_TO_HOST_DROP);
+        INFRA_CNTR_INC(INFRA_CNTR_TX_TO_WIRE_DROP);
         break;
 
     default:
