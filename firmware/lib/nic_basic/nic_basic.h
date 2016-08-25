@@ -158,7 +158,6 @@ __intrinsic void nic_tx_discard_cntr(int port);
  * Miscellaneous:
  * @NIC_NO_VLAN         Used as a No VLAN present indication. Note this
  *                      can't be used for tci fields, just VLAN IDs.
- * @NIC_SWITCH_UPLINK   Special VPort ID to represent the uplink
  */
 #define NIC_RX_OK               0
 #define NIC_RX_DROP             1
@@ -167,8 +166,7 @@ __intrinsic void nic_tx_discard_cntr(int port);
 #define NIC_TX_OK               (NIC_RX_OK)
 #define NIC_TX_DROP             (NIC_RX_DROP)
 
-#define NIC_NO_VLAN             NIC_SWITCH_NO_VLAN
-#define NIC_SWITCH_UPLINK       0xff
+#define NIC_NO_VLAN             0xff
 
 
 /*
@@ -396,49 +394,6 @@ __intrinsic void nic_tx_csum_offload(int port, void *meta,
 __intrinsic int nic_tx_encap(void *meta);
 
 
-/*
- * L2 switch
- */
-
-/**
- * Get default RX queue for VPort
- *
- * @param vport         VPort to receive packet on
- * @param qid           The returned queue number
- *
- * Sets the RX queue to receive packet on.  This is supposed to be
- * called if no other means (like RSS or secondary filters) are
- * available to determine the RX queue.  If the switch is disabled,
- * this functions sets the RX queue to the first configured RX queue.
- * Returns @NIC_RX_OK if a queue was set and @NIC_RX_DROP if no RX
- * queue could be found.
- */
-__intrinsic int nic_switch_rx_defaultq(int vport, uint32_t *qid);
-
-
-/**
- * Match TX Queue to VPort
- *
- * @param vport         VPort to receive packet on
- * @param qid           TX queue pkt was received on
- *
- * Returns the VPort ID associated with the TX queue.  If the switch
- * is not configured, the default VPort ID of 0 is returned.
- */
-__intrinsic int nic_switch_tx_vport(int vport, uint8_t qid);
-
-
-/**
- * Perform L2 switching
- *
- * @param in_vport      VPort a packet arrived on (0-64 or NIC_SWITCH_UPLINK)
- * @param sa            Source MAC address
- * @param da            Destination MAC address
- * @param vlan          VLAN tag (not tci) or 0 if none
- * @param uplink        return value. If true send to uplink
- */
-__intrinsic uint64_t nic_switch(int in_vport, void *sa, void *da,
-                                uint16_t vlan, __gpr int *uplink);
 
 #endif /* !_NIC_BASIC_H_ */
 

@@ -56,7 +56,6 @@
 #include "_c/nic_rx.c"
 #include "_c/nic_tx.c"
 #include "_c/nic_stats.c"
-#include "_c/nic_switch.c"
 
 #endif /* _NIC_LIBNIC_BASIC_C_ */
 

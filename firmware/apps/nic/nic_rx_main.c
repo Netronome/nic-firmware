@@ -70,9 +70,8 @@ proc_from_wire(int port)
     __gpr uint16_t vlan;
     __gpr int rss_flags;
     __gpr uint32_t hash, hash_type;
-    __gpr int unused, vport;
+    __gpr int unused;
     __xwrite uint32_t tmp[2];
-    __gpr uint64_t out_vport_mask;
     void *app_meta;
     __lmem uint16_t *vxlan_ports;
     __lmem void *sa, *da;
@@ -110,7 +109,6 @@ proc_from_wire(int port)
      * the packet.  It might be garbage. */
     if (err == NIC_RX_CSUM_BAD)
         goto err_out;
-
     vxlan_ports = nic_rx_vxlan_ports();
 
     /* Parse/Extract the header fields we are interested in */
@@ -159,17 +157,6 @@ proc_from_wire(int port)
         da = &hdrs.o_eth.dst;
     }
     
-    out_vport_mask = nic_switch(NIC_SWITCH_UPLINK, sa, da, vlan, &unused);
-    
-    if (!out_vport_mask) {
-        err = NIC_RX_DROP;
-        NIC_APP_CNTR(&nic_cnt_rx_sw_drop);
-        goto err_out;
-    }
-    
-    /* XXX assume for now only one VPort is returned */
-    vport = ffs64(out_vport_mask);
-    
     /* RSS */
     rss_flags = 0;
     if (hdrs.present & HDR_O_IP4)
@@ -206,10 +193,6 @@ proc_from_wire(int port)
         tmp[0] = hash_type;
         tmp[1] = hash;
         mem_write8(&tmp, (void *)(pkt_start + offset), sizeof(tmp));
-    } else {
-        err = nic_switch_rx_defaultq(vport, &qid);
-        if (err != NIC_RX_OK)
-            goto err_out;
     }
 
 pkt_out:
