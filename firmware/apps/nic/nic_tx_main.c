@@ -298,7 +298,7 @@ main()
     for (;;) {
         ret = pkt_rx_host();
         if (ret < 0) {
-            Pkt.p_dst = PKT_DROP;
+            Pkt.p_dst = PKT_DROP_WIRE;
             goto send_packet;
         } else {
             __critical_path();
