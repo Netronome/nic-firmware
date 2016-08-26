@@ -97,7 +97,7 @@ proc_from_wire(int port)
     csum_prepend = pkt_csum_read(pkt_cache, PKT_START_OFF + 4);
 
     /* MTU check */
-    err = nic_rx_mtu_check(port, csum_prepend, plen - MAC_PREPEND_BYTES);
+    err = nic_rx_mtu_check(port, csum_prepend, plen);
     if (err == NIC_RX_DROP)
         goto err_out;
 
