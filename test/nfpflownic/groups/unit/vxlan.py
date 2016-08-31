@@ -28,5 +28,8 @@ class VXLAN(Packet):
     def mysummary(self):
         return self.sprintf("VXLAN (vni=%VXLAN.vni%)")
 
-bind_layers(UDP, VXLAN, dport=4789)
+# we used to had 'bind_layers(UDP, VXLAN, dport=4789)'here. As it broke the test
+# when we tried to use different dport for vxlan tests, we now move this binding
+# whenever the scapy vxlan header function is called, with dport="the desired
+# dport"
 bind_layers(VXLAN, Ether)

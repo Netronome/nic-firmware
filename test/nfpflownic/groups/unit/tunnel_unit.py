@@ -10,6 +10,7 @@ import re
 import time
 import random
 import string
+from scapy.packet import bind_layers
 from netro.testinfra import Test, LOG_sec, LOG, LOG_endsec
 from scapy.all import TCP, UDP, IP, Ether, wrpcap, IPv6, ICMP, \
     IPOption_NOP, IPv6ExtHdrRouting, IPv6ExtHdrHopByHop, Dot1Q, Raw, rdpcap, \
@@ -35,6 +36,13 @@ def get_new_mac():
                                   hex(random.randrange(0, 255))[2:],
                                   hex(random.randrange(0, 255))[2:],
                                   hex(random.randrange(0, 255))[2:])
+
+def get_vxlan_dport(src_ip, dst_ip):
+    my_ip_key = src_ip + dst_ip
+    port_hash = hash(my_ip_key) % 100
+    dport = 4789 + port_hash
+    bind_layers(UDP, VXLAN, dport=dport)
+    return dport
 
 
 class RSStest_diff_inner_tuple(RSStest_diff_l4_tuple):
@@ -83,6 +91,8 @@ class RSStest_diff_inner_tuple(RSStest_diff_l4_tuple):
         self.inner_vlan_id = 20
 
         self.vxlan_id = 42
+        if src[0]:
+            self.vxlan_dport = get_vxlan_dport(self.src_addr, self.dst_addr)
         self.dst_vxlan_intf = 'vxlan_%s' % self.dst_ifn
         self.src_vxlan_intf = 'vxlan_%s' % self.src_ifn
         self.vxlan_mc = '239.1.1.1'
@@ -181,7 +191,7 @@ class RSStest_diff_inner_tuple(RSStest_diff_l4_tuple):
             if self.tunnel_type == 'vxlan':
                 pkt = VXLAN(vni=self.vxlan_id)/pkt
                 if self.l4_type == 'udp':
-                    pkt = UDP(sport=3000, dport=4789)/pkt
+                    pkt = UDP(sport=3000, dport=self.vxlan_dport)/pkt
                 else:
                     raise NtiGeneralError(msg='Only UDP is supported as '
                                               'outer header in vxlan '
@@ -301,8 +311,8 @@ class RSStest_diff_inner_tuple(RSStest_diff_l4_tuple):
         if self.tunnel_type == 'vxlan':
             self.dst.cmd("ip link delete %s" % self.src_vxlan_intf, fail=False)
             cmd = 'ip link add %s type vxlan id %d group %s dev %s ' \
-                  'dstport 4789' % (self.dst_vxlan_intf, self.vxlan_id,
-                                    self.vxlan_mc, self.dst_ifn)
+                  'dstport %s' % (self.dst_vxlan_intf, self.vxlan_id,
+                                  self.vxlan_mc, self.dst_ifn, self.vxlan_dport)
             self.dst.cmd(cmd)
             # The following cmd is needed for kernel 4.2
             cmd = 'ip link set up %s' % self.dst_vxlan_intf
@@ -382,6 +392,9 @@ class RSStest_diff_inner_tuple_multi_tunnels(RSStest_diff_l4_tuple):
         self.src_inner_addr6 = None
         self.dst_inner_addr6 = None
         self.tunnel_number = 4
+        if src[0]:
+            self.vxlan_dport = get_vxlan_dport(self.src_addr, self.dst_addr)
+
 
     def get_ipv46_addr(self, channel):
         index = channel + 1
@@ -431,8 +444,8 @@ class RSStest_diff_inner_tuple_multi_tunnels(RSStest_diff_l4_tuple):
         self.vxlan_mc = ['239.1.1.1']
         self.dst_vxlan_intf = ['vxlan_0_%s' % self.dst_ifn]
         self.src_vxlan_intf = ['vxlan_0_%s' % self.src_ifn]
-        self.dst_vxlan_dport = ['4789']
-        self.src_vxlan_dport = ['4789']
+        self.dst_vxlan_dport = ['%s' % self.vxlan_dport]
+        self.src_vxlan_dport = ['%s' % self.vxlan_dport]
         self.src_inner_hwaddr = [get_new_mac()]
         self.dst_inner_hwaddr = [get_new_mac()]
         new_src_ipv4, new_dst_ipv4, new_src_ipv6, new_dst_ipv6 = \
@@ -447,8 +460,8 @@ class RSStest_diff_inner_tuple_multi_tunnels(RSStest_diff_l4_tuple):
             self.vxlan_mc.append('239.%s1.1.1' % i)
             self.dst_vxlan_intf.append('vxlan_%s_%s' % (i, self.dst_ifn))
             self.src_vxlan_intf.append('vxlan_%s_%s' % (i, self.src_ifn))
-            self.dst_vxlan_dport.append('%s' % (4789 + i))
-            self.src_vxlan_dport.append('%s' % (4789 + i))
+            self.dst_vxlan_dport.append('%s' % (self.vxlan_dport + i))
+            self.src_vxlan_dport.append('%s' % (self.vxlan_dport + i))
             self.src_inner_hwaddr.append(get_new_mac())
             self.dst_inner_hwaddr.append(get_new_mac())
             new_src_ipv4, new_dst_ipv4, new_src_ipv6, new_dst_ipv6 = \
@@ -695,6 +708,8 @@ class TunnelTest(Test):
         self.dst_inner_addr = None
         self.src_inner_addr6 = None
         self.dst_inner_addr6 = None
+        if src[0]:
+            self.vxlan_dport = get_vxlan_dport(self.src_addr, self.dst_addr)
 
         return
 
@@ -783,14 +798,14 @@ class TunnelTest(Test):
             cmd = 'ip link delete %s' % self.dst_vxlan_intf
             self.dst.cmd(cmd, fail=False)
             cmd = 'ip link add %s type vxlan id %d group %s dev %s ' \
-                  'dstport 4789' % \
+                  'dstport %s' % \
                   (self.src_vxlan_intf, self.vxlan_id, self.vxlan_mc,
-                   self.src_ifn)
+                   self.src_ifn, self.vxlan_dport)
             self.src.cmd(cmd)
             cmd = 'ip link add %s type vxlan id %d group %s dev %s ' \
-                  'dstport 4789' % \
+                  'dstport %s' % \
                   (self.dst_vxlan_intf, self.vxlan_id, self.vxlan_mc,
-                   self.dst_ifn)
+                   self.dst_ifn, self.vxlan_dport)
             self.dst.cmd(cmd)
             cmd = 'ip link set %s address %s' % (self.src_vxlan_intf,
                                                  self.src_inner_hwaddr)
@@ -852,6 +867,8 @@ class Csum_Tx_tunnel(Csum_Tx):
         self.dst_inner_mac = None
         self.src_inner_ip = None
         self.dst_inner_ip = None
+        if src[0]:
+            self.vxlan_dport = get_vxlan_dport(self.src_addr, self.dst_addr)
 
     def interface_cfg(self):
         """
@@ -929,11 +946,13 @@ class Csum_Tx_tunnel(Csum_Tx):
         self.src.cmd(cmd, fail=False)
         cmd = 'ip link delete %s' % self.dst_vxlan_intf
         self.dst.cmd(cmd, fail=False)
-        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport 4789' % \
-              (self.src_vxlan_intf, self.vxlan_id, self.vxlan_mc, self.src_ifn)
+        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport %s' % \
+              (self.src_vxlan_intf, self.vxlan_id, self.vxlan_mc,
+               self.src_ifn, self.vxlan_dport)
         self.src.cmd(cmd)
-        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport 4789' % \
-              (self.dst_vxlan_intf, self.vxlan_id, self.vxlan_mc, self.dst_ifn)
+        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport %s' % \
+              (self.dst_vxlan_intf, self.vxlan_id, self.vxlan_mc,
+               self.dst_ifn, self.vxlan_dport)
         self.dst.cmd(cmd)
         cmd = 'ip link set %s address %s' % (self.src_vxlan_intf,
                                              self.src_inner_hwaddr)
@@ -1262,7 +1281,6 @@ class LSO_tunnel(LSO_iperf):
                            )
 
         self.tunnel_type = tunnel_type
-
         self.inner_ipv4 = ipv4
         self.inner_l4_type = l4_type
         self.src_mtu = src_mtu
@@ -1281,6 +1299,8 @@ class LSO_tunnel(LSO_iperf):
         self.dst_inner_mac = None
         self.src_inner_ip = None
         self.dst_inner_ip = None
+        if src[0]:
+            self.vxlan_dport = get_vxlan_dport(self.src_addr, self.dst_addr)
 
     def interface_cfg(self):
         """
@@ -1364,11 +1384,13 @@ class LSO_tunnel(LSO_iperf):
         self.src.cmd(cmd, fail=False)
         cmd = 'ip link delete %s' % self.dst_vxlan_intf
         self.dst.cmd(cmd, fail=False)
-        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport 4789' % \
-              (self.src_vxlan_intf, self.vxlan_id, self.vxlan_mc, self.src_ifn)
+        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport %s' % \
+              (self.src_vxlan_intf, self.vxlan_id, self.vxlan_mc,
+               self.src_ifn, self.vxlan_dport)
         self.src.cmd(cmd)
-        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport 4789' % \
-              (self.dst_vxlan_intf, self.vxlan_id, self.vxlan_mc, self.dst_ifn)
+        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport %s' % \
+              (self.dst_vxlan_intf, self.vxlan_id, self.vxlan_mc,
+               self.dst_ifn, self.vxlan_dport)
         self.dst.cmd(cmd)
         cmd = 'ip link set %s address %s' % (self.src_vxlan_intf,
                                              self.src_inner_hwaddr)
@@ -1553,9 +1575,9 @@ class LSO_tunnel(LSO_iperf):
 
                 if tunnel_layer in pkt:
                     inner_pkt = pkt[tunnel_layer][Ether]
-                if IP in inner_pkt or IPv6 in inner_pkt:
-                    inner_passed, inner_comment = self.check_csum(
-                        inner_pkt, self.inner_ipv4, self.inner_l4_type)
+                    if IP in inner_pkt or IPv6 in inner_pkt:
+                        inner_passed, inner_comment = self.check_csum(
+                            inner_pkt, self.inner_ipv4, self.inner_l4_type)
 
             if not outer_passed:
                 cr_passed = False
@@ -1687,6 +1709,8 @@ class Csum_rx_tnl(UnitIP):
 
         self.tunnel_type = tunnel_type
         self.vxlan_id = 42
+        if src[0]:
+            self.vxlan_dport = get_vxlan_dport(self.src_addr, self.dst_addr)
         self.dst_vxlan_intf = 'vxlan_%s' % self.dst_ifn
         self.src_vxlan_intf = 'vxlan_%s' % self.src_ifn
         self.vxlan_mc = '239.1.1.1'
@@ -1883,8 +1907,9 @@ class Csum_rx_tnl(UnitIP):
 
         cmd = 'ip link delete %s' % self.src_vxlan_intf
         self.src.cmd(cmd, fail=False)
-        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport 4789' % \
-              (self.src_vxlan_intf, self.vxlan_id, self.vxlan_mc, self.src_ifn)
+        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport %s' % \
+              (self.src_vxlan_intf, self.vxlan_id, self.vxlan_mc,
+               self.src_ifn, self.vxlan_dport)
         self.src.cmd(cmd)
         cmd = 'ip link set %s address %s' % (self.src_vxlan_intf,
                                              self.src_inner_hwaddr)
@@ -1892,8 +1917,9 @@ class Csum_rx_tnl(UnitIP):
 
         cmd = 'ip link delete %s' % self.dst_vxlan_intf
         self.dst.cmd(cmd, fail=False)
-        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport 4789' % \
-              (self.dst_vxlan_intf, self.vxlan_id, self.vxlan_mc, self.dst_ifn)
+        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport %s' % \
+              (self.dst_vxlan_intf, self.vxlan_id, self.vxlan_mc,
+               self.dst_ifn, self.vxlan_dport)
         self.dst.cmd(cmd)
         cmd = 'ip link set %s address %s' % (self.dst_vxlan_intf,
                                              self.dst_inner_hwaddr)
