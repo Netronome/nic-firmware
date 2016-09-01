@@ -10,10 +10,9 @@ import os
 import re
 
 import netro.testinfra
-from netro.testinfra import LOG_sec, LOG_endsec
+from netro.testinfra import LOG_sec, LOG_endsec, LOG
 from netro.testinfra.nti_exceptions import NtiError, NtiFatalError
-from nfpflownicsystem import NFPFlowNICSystem
-from libs.nrt_system import NrtSystem
+from nfpflownicsystem import NFPFlowNICSystem, localNrtSystem
 from libs.nrt_system import kill_bg_process
 
 
@@ -240,7 +239,7 @@ class _NFPFlowNIC(netro.testinfra.Group):
                                     " configuration code needs to be added")
 
         # Host A
-        self.host_a = NrtSystem(host_a_obj.name, self.quick)
+        self.host_a = localNrtSystem(host_a_obj.name, self.quick)
         self.eth_a = host_a_obj.intfX
         self.addr_a = "10.%s.%s.2/24" % (intf_id, intf_id)
         self.addr_v6_a = ipv6 + ":2/" + ipv6_pl
@@ -253,6 +252,7 @@ class _NFPFlowNIC(netro.testinfra.Group):
         IPv6 address addr_v6_x
         """
 
+        cmd = 'ifconfig %s up ; ifconfig %s down' % (self.eth_x, self.eth_x)
         self.dut.clean_attached_nodes(intf=self.eth_x)
         cmd = 'ip addr flush dev %s; ' % self.eth_x
         cmd += 'ifconfig %s inet6 add %s; ' % (self.eth_x, self.addr_v6_x)
@@ -360,7 +360,7 @@ class _NFPFlowNIC(netro.testinfra.Group):
         self.rss_key = self.dut.rss_key
 
          # Host A
-        self.host_a = NrtSystem(self.cfg.get("HostA", "name"), self.quick)
+        self.host_a = localNrtSystem(self.cfg.get("HostA", "name"), self.quick)
         self.eth_a = self.cfg.get("HostA", "eth")
         self.addr_a = self.cfg.get("HostA", "addrA")
         self.addr_v6_a = self.cfg.get("HostA", "addr6A")
@@ -440,7 +440,7 @@ class _NFPFlowNIC_userspace(_NFPFlowNIC):
                                      " configuration code needs to be added")
 
          # Host A
-         self.host_a = NrtSystem(host_a_obj.name, self.quick)
+         self.host_a = localNrtSystem(host_a_obj.name, self.quick)
          self.eth_a = host_a_obj.intfX
          self.addr_a = "10.%s.%s.2/24" % (intf_id, intf_id)
          self.addr_v6_a = ipv6 + ":2/" + ipv6_pl
@@ -520,7 +520,7 @@ class _NFPFlowNIC_userspace(_NFPFlowNIC):
         self.rss_key = self.dut.rss_key
 
          # Host A
-        self.host_a = NrtSystem(self.cfg.get("HostA", "name"), self.quick)
+        self.host_a = localNrtSystem(self.cfg.get("HostA", "name"), self.quick)
         self.eth_a = self.cfg.get("HostA", "eth")
         self.addr_a = self.cfg.get("HostA", "addrA")
         self.addr_v6_a = self.cfg.get("HostA", "addr6A")
@@ -791,7 +791,7 @@ class _NFPFlowNIC_2port(_NFPFlowNIC):
                                     " configuration code needs to be added")
 
         # Host A
-        self.host_a = NrtSystem(host_a_obj.name, self.quick)
+        self.host_a = localNrtSystem(host_a_obj.name, self.quick)
         self.eth_a = host_a_obj.intfX
         self.addr_a = "10.%s.%s.2/24" % (intf_id, intf_id)
         self.addr_v6_a = ipv6 + ":2/" + ipv6_pl
@@ -916,7 +916,7 @@ class _NFPFlowNIC_2port(_NFPFlowNIC):
         self.rss_key = self.dut.rss_key
 
         # Host A
-        self.host_a = NrtSystem(self.cfg.get("HostA", "name"), self.quick)
+        self.host_a = localNrtSystem(self.cfg.get("HostA", "name"), self.quick)
         self.eth_a = self.cfg.get("HostA", "eth")
         self.addr_a = self.cfg.get("HostA", "addrA")
         self.addr_v6_a = self.cfg.get("HostA", "addr6A")
@@ -925,7 +925,7 @@ class _NFPFlowNIC_2port(_NFPFlowNIC):
 
 
         # Host B
-        self.host_b = NrtSystem(self.cfg.get("HostB", "name"), self.quick)
+        self.host_b = localNrtSystem(self.cfg.get("HostB", "name"), self.quick)
         self.eth_b = self.cfg.get("HostB", "eth")
         self.addr_b = self.cfg.get("HostB", "addrB")
         self.addr_v6_b = self.cfg.get("HostB", "addr6B")
@@ -1180,7 +1180,7 @@ class _NFPFlowNIC_nport(netro.testinfra.Group):
                                     " configuration code needs to be added")
 
         # Host A
-        self.host_a = NrtSystem(host_a_obj.name, self.quick)
+        self.host_a = localNrtSystem(host_a_obj.name, self.quick)
         self.eth_a = host_a_obj.intfX
         self.addr_a = "10.%s.%s.2/24" % (intf_id, intf_id)
         self.addr_v6_a = ipv6 + ":2/" + ipv6_pl
@@ -1322,7 +1322,7 @@ class _NFPFlowNIC_nport(netro.testinfra.Group):
         # Hosts
         host_list = self.cfg.get("HostEP", "names").split(',')
         for i in range(0, len(host_list)):
-            self.host_ep[i] = NrtSystem(host_list[i], self.quick)
+            self.host_ep[i] = localNrtSystem(host_list[i], self.quick)
         self.eth_ep = self.cfg.get("HostEP", "ethEP").split(',')
         self.addr_ep = self.cfg.get("HostEP", "addrEP").split(',')
         self.addr_v6_ep = self.cfg.get("HostEP", "addr6EP").split(',')
@@ -1336,3 +1336,333 @@ class _NFPFlowNIC_nport(netro.testinfra.Group):
             self.reload_ep = self.cfg.getboolean("HostEP", "reload")
 
         return
+
+###############################################################################
+# A group of unit tests
+###############################################################################
+class _NFPFlowNIC_no_fw_loading(netro.testinfra.Group):
+    """Simple unit tests tests"""
+
+    summary = "NFPFlowNIC tests without auto fw loading"
+
+    _info = """
+    Run a barrage of simple unit tests against an NFP configured as
+    Just-a-NIC. The tests are designed to test particular aspects of
+    the nfpflowNIC.
+
+    The test configuration looks like this:
+
+                     DUT
+                 ethX
+                  ^
+    Host A        |
+      ethA <------+
+
+    The kernel module can also be optionally copied from the controller to
+    the DUT and loaded before tests are run. Also, the standard BSP kernel
+    modules as well as the ME firmware image can optionally be copied
+    and loaded prior to running any tests.
+
+    If cfg file are not used, the tests  will load them from the build located
+    in releases-interm->msft->builds. This also allows to run the tests
+    against a suitably configured standard NIC as well.
+
+    """
+
+    _config = collections.OrderedDict()
+    _config["General"] = collections.OrderedDict([
+        ('noclean', [False, "Don't clean the systems after a run (default "
+                            "False). Useful for debugging test failures."])])
+    _config["DUT"] = collections.OrderedDict([
+        ("name", [True, "Host name of the DUT (can also be <user>@<host> or "
+                        "IP address). Assumes root as default."]),
+        ("ethX", [True, "Name of the interface on the DUT"]),
+        ("addrX", [True, "IPv4 address/mask to be assigned to ethX"]),
+        ("addr6X", [True, "IPv6 address/mask to be assigned to ethX"])
+    ])
+    _config["HostA"] = collections.OrderedDict([
+        ("name", [True, "Host name of the Host A (can also be <user>@<host> "
+                        "or IP address). Assumes root as default."]),
+        ("eth", [True, "Name of the interface on Host A"]),
+        ("addrA", [True, "IPv4 address/mask to be assigned to Host A"]),
+        ("addr6A", [True, "IPv4 address/mask to be assigned to Host A"]),
+        ("reload", [False, "Attempt to reload the kmod for ethA "
+                           "(default false)."])
+    ])
+
+    def __init__(self, name, cfg=None, quick=False, dut_object=None):
+        """Initialise base NFPFlowNIC class
+
+        @name:       A unique name for the group of tests
+        @cfg:        A Config parser object (optional)
+        @quick:      Omit some system info gathering to speed up running tests
+        @dut_object: A DUT object used for pulling in endpoint/DUT data
+                     (optional), only used when the PALAB is used
+        """
+        self.quick = quick
+        self.dut_object = dut_object
+
+        self.tmpdir = None
+        self.cfg = cfg
+
+        # Set up attributes initialised by the config file.
+        # If no config was provided these will be None.
+        self.noclean = False
+
+        self.dut = None
+        self.eth_x = None
+        self.addr_x = None
+        self.addr_v6_x = None
+        self.intf_x = None
+
+        self.host_a = None
+        self.eth_a = None
+        self.addr_a = None
+        self.addr_v6_a = None
+        self.intf_a = None
+        self.reload_a = False
+        self.rss_key = None
+
+        self.nc_path = '/tmp/nc/'
+        self.nc_repo = './lib/nc.c'
+        self.nc_src = 'nc.c'
+        self.nc_bin = 'nc'
+        self.rm_nc_src = '%s/%s' % (self.nc_path, self.nc_src)
+        self.rm_nc_bin = '%s/%s' % (self.nc_path, self.nc_bin)
+
+        # Call the parent's initializer.  It'll set up common attributes
+        # and parses/validates the config file.
+        netro.testinfra.Group.__init__(self, name, cfg=cfg,
+                                       quick=quick, dut_object=dut_object)
+        if self.dut_object or self.cfg:
+            self._configure_intfs()
+
+    def clean_hosts(self):
+        """ Clean host A.
+        """
+        # Clean attached hosts
+        LOG_sec("Cleaning Host A: %s" % self.host_a.host)
+
+        self.host_a.clean_attached_nodes(intf="")
+
+        LOG_endsec()
+
+        return
+
+    def _init(self):
+        """ Clean up the systems for tests from this group
+        called from the groups run() method.
+        """
+        netro.testinfra.Group._init(self)
+        # Unit test group needs Jakub's netcat tools. So copy and compile
+        # it here
+
+        if not self.dut.exists_host(self.rm_nc_bin):
+            self.dut.cmd('mkdir %s' % self.nc_path)
+            self.dut.cp_to(self.nc_repo, self.nc_path)
+            self.dut.cmd('gcc %s -o %s' % (self.rm_nc_src, self.rm_nc_bin))
+        if not self.host_a.exists_host(self.rm_nc_bin):
+            self.host_a.cmd('mkdir %s' % self.nc_path)
+            self.host_a.cp_to(self.nc_repo, self.nc_path)
+            self.host_a.cmd('gcc %s -o %s' % (self.rm_nc_src, self.rm_nc_bin))
+
+        return
+
+
+    def _fini(self):
+        """ Clean up the systems for tests from this group
+        called from the groups run() method.
+        """
+        client_list = [self.dut, self.host_a]
+        for client in client_list:
+            kill_bg_process(client.host, "TCPKeepAlive")
+
+        netro.testinfra.Group._fini(self)
+        return
+
+    ### TODO: need to update for no-fw-loading
+    def _parse_palab_cfg(self):
+        """
+        Assign values to the members of NFPFlowNIC based on the DUT object.
+        The DUT object is created by the main.py when the PALAB file is
+        pulled and parsed. This method is used when there is no cfg file
+        given in the command line.
+        """
+
+        # We assume that only the 0.0 port is activated, and we need to find
+        # out which of the two endpoint is the one connected to 1.0 or 0.0,
+        # For test DUT with both 4k and 6k, 4k (1.0) has higher priority
+        if self.dut_object.client != None and \
+                        self.dut_object.client.pifX == '1.0':
+            host_a_obj = self.dut_object.client
+        elif self.dut_object.server != None and \
+                        self.dut_object.server.pifX == '1.0':
+            host_a_obj = self.dut_object.server
+        elif self.dut_object.client != None and \
+                        self.dut_object.client.pifX == '0.0':
+            host_a_obj = self.dut_object.client
+        elif self.dut_object.server != None and \
+                        self.dut_object.server.pifX == '0.0':
+            host_a_obj = self.dut_object.server
+        else:
+            raise NtiFatalError(msg="0.0 port is not connected to any endpoint"
+                                    " found in dut_object")
+        self.intf_x = host_a_obj.pifX
+        # there are two intf format in PALAB: "Y" and "X.Y" (X and Y as
+        # integers). We use Y in forming the ip address
+        intf_id_str = "[0-9.]*([0-9]+)"
+        intf_find = re.findall(intf_id_str, self.intf_x)
+        if intf_find:
+            intf_id = intf_find[0]
+        else:
+            raise NtiFatalError(msg="Error in generating IP address")
+        self.addr_x = "10.%s.%s.1/24" % (intf_id, intf_id)
+        ipv6 = "fc00:1:%s:%s:" % (intf_id, intf_id)
+        ipv6_pl = "64"
+        self.addr_v6_x = ipv6 + ":1/" + ipv6_pl
+
+        self.nfp = 0
+        self.vnic_fn = 'nfp_net'
+        self.mefw_fn = 'basic_nic.nffw'
+        self.macinitjson = None
+        self.macinitjson_fn = None
+        self.dut = NFPFlowNICSystem(self.dut_object.name, cfg=self.cfg,
+                                    dut=self.dut_object,
+                                    nfp=self.nfp,
+                                    macinitjson=self.macinitjson,
+                                    macinitjson_fn=self.macinitjson_fn,
+                                    vnic_fn=self.vnic_fn,
+                                    mefw_fn=self.mefw_fn, quick=self.quick)
+        self.eth_x = self.dut.eth_list[0]
+        self.rss_key = self.dut.rss_key
+
+        if len(self.dut.eth_list) > 1:
+            # multiple interfaces are generated
+            raise NtiFatalError(msg="more than one interfaces are created, new"
+                                    " configuration code needs to be added")
+
+        # Host A
+        self.host_a = localNrtSystem(host_a_obj.name, self.quick)
+        self.eth_a = host_a_obj.intfX
+        self.addr_a = "10.%s.%s.2/24" % (intf_id, intf_id)
+        self.addr_v6_a = ipv6 + ":2/" + ipv6_pl
+        self.reload_a = False
+
+    def _configure_intfs(self):
+        """
+        Configure eth_a of the host_a with IPv4 address addr_a and IPv6 address
+        addr_v6_a. Also configure eth_x of the DUT with IPv4 address addr_x and
+        IPv6 address addr_v6_x
+        """
+
+        self.dut.clean_attached_nodes(intf=self.eth_x)
+        cmd = 'ip addr flush dev %s; ' % self.eth_x
+        cmd += 'ifconfig %s inet6 add %s; ' % (self.eth_x, self.addr_v6_x)
+        cmd += 'ifconfig %s %s up; ' % (self.eth_x, self.addr_x)
+        ret, _ = self.dut.cmd(cmd)
+        if ret:
+            raise NtiFatalError(msg="Error in DUT VNIC addr configuration")
+        self.host_a.clean_attached_nodes(intf=self.eth_a)
+        cmd = 'ip addr flush dev %s; ' % self.eth_a
+        cmd += 'ifconfig %s inet6 add %s; ' % (self.eth_a, self.addr_v6_a)
+        cmd += 'ifconfig %s %s up; ' % (self.eth_a, self.addr_a)
+        ret, _ = self.host_a.cmd(cmd)
+        if ret:
+            raise NtiFatalError(msg="Error in endpoint intf addr configuration")
+        self.dut.refresh()
+        self.host_a.refresh()
+
+    def _get_service_status(self, device, service_name):
+        """
+        To get the status of the given service (start/running, or stop/waiting),
+        return "running", "stop", or "fail"
+        """
+        status = "fail"
+        running_str = '%s\s+start/running,\s+process\s+\d+\s+' % service_name
+        stop_str = '%s\s+stop/waiting\s+' % service_name
+        cmd = 'service %s status' % service_name
+        ret, out = device.cmd(cmd, fail=False)
+        if not ret:
+            if re.findall(running_str, out):
+                status = "running"
+            elif re.findall(stop_str, out):
+                status = "stop"
+        return status
+
+    def _parse_cfg(self):
+        """
+        Assign values to the members of NFPFlowNIC based on the cfg file.
+        This method is used only when a cfg file is given in the command line
+        Make sure the config is suitable for this project of tests
+        """
+
+        # The superclass implementation takes care of sanity checks
+        netro.testinfra.Group._parse_cfg(self)
+
+        self.dut_object = None
+
+        # General
+        if self.cfg.has_option("General", "noclean"):
+            self.noclean = self.cfg.getboolean("General", "noclean")
+
+        # DUT
+        self.dut = localNrtSystem(self.cfg.get("DUT", "name"), self.quick)
+        self.eth_x = self.cfg.get("DUT", "ethX")
+        self.addr_x = self.cfg.get("DUT", "addrX")
+        self.addr_v6_x = self.cfg.get("DUT", "addr6X")
+
+        self.rss_key = self.get_rss_key()
+
+         # Host A
+        self.host_a = localNrtSystem(self.cfg.get("HostA", "name"), self.quick)
+        self.eth_a = self.cfg.get("HostA", "eth")
+        self.addr_a = self.cfg.get("HostA", "addrA")
+        self.addr_v6_a = self.cfg.get("HostA", "addr6A")
+        if self.cfg.has_option("HostA", "reload"):
+            self.reload_a = self.cfg.getboolean("HostA", "reload")
+
+        return
+
+    def get_rss_key(self):
+        # Checking the value of _pf0_net_bar0 to get the RSS key
+        # To parse it, we need to use the info from
+        # nfp-drv-kmods.git/src/nfp_net_ctrl. (see SB-116 Pablo's comment)
+        reg_name = '_pf0_net_bar0'
+        cmd = 'nfp-rtsym %s' % reg_name
+        _, out = self.dut.cmd(cmd)
+        # The following value is from nfp-drv-kmods.git/src/nfp_net_ctrl
+        rss_base = '0x0100'
+        rss_offset = '0x4'
+        rss_size = '0x28'
+
+        rss_start = int(rss_base, 16) + int(rss_offset, 16)
+        rss_end = int(rss_base, 16) + int(rss_offset, 16) + int(rss_size, 16)
+        rss_str = '0x'
+        lines = out.splitlines()
+        for line in lines:
+            line_re = '0x[\da-fA-F]{10}:\s+(?:0x[\da-fA-F]{8}\s*){4}'
+            index_re = '(0x[\da-fA-F]{10}):\s+'
+            value_re = '\s+(0x[\da-fA-F]{8})'
+            if re.match(line_re, line):
+                index = re.findall(index_re, line)
+                values = re.findall(value_re, line)
+                if int(rss_base, 16) <= int(index[0], 16) < rss_end:
+                    for i in range(0, 4):
+                        cur_index = int(index[0], 16) + i * 4
+                        if rss_start <= cur_index < rss_end:
+                            rss_str = rss_str + values[i][2:]
+
+        bit_number = {'0': 0, '1': 1, '2': 1, '3': 2, '4': 1, '5': 2, '6': 2,
+                      '7': 3, '8': 1, '9': 2, 'a': 2, 'b': 3, 'c': 2, 'd': 3,
+                      'e': 3, 'f': 4}
+        rss_str_stripped = rss_str[2:]
+        total_1_bits = 0
+        for i in range(0, len(rss_str_stripped)):
+            total_1_bits += bit_number[rss_str_stripped[i]]
+        LOG_sec("Checking the RSS key from nfp-rtsym")
+        LOG('The RSS key is: ')
+        LOG(rss_str)
+        LOG('The number of bit 1 in RSS key is: %d' % total_1_bits)
+        LOG_endsec()
+
+        return rss_str

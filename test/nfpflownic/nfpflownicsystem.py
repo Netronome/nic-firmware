@@ -11,14 +11,184 @@ These are functions to encapsulate the loading, configuring of NFPFLOWNIC.
 
 import os
 import re
-from netro.testinfra import LOG_sec, LOG_endsec, NFESystem, LOG
+from subprocess import Popen, PIPE
+import time
+from netro.testinfra import LOG_sec, LOG_endsec, NFESystem, LOG, CMD
 from libs.nrt_system import NrtSystem
 from netro.testinfra.nti_exceptions import NtiFatalError, NtiTimeoutError
 from nfpflownicpath import VROUTER_BUILD_PATH
 from netro.testinfra.utilities import timed_poll
 
 
-class NFPFlowNICSystem(NFESystem, NrtSystem):
+class localNrtSystem(NrtSystem):
+###############################################################################
+# A function to execute a command and log and return it's output and pid
+###############################################################################
+    def cmd_bg_pid_file(self, command, tmp_file, background=True, fail=True,
+                        include_stderr=False):
+        """
+        ssh background cmd to remote machine and get the pid of the cmd (by
+        checking the diff between ps aux | grep $keyword before and after
+        ssh background cmd)
+        """
+
+        bg_pid = []
+        bg_cmd = command + '& BG_PID=$! ; sleep 5; echo $BG_PID > %s' % \
+                 tmp_file
+        ret, ret_data = self.cmd(bg_cmd, fail=fail, background=background,
+                                 include_stderr=include_stderr)
+        time.sleep(10)
+        cmd = 'cat %s' % tmp_file
+        ret, out = self.cmd(cmd, fail=False)
+        if ret == 0:
+            lines = out.splitlines()
+            for line in lines:
+                pid = int(line)
+                bg_pid.append(pid)
+
+        return (ret, bg_pid), ret_data
+
+
+    def killall_w_pid(self, diff_pid, fail=True, kill_9=True):
+
+        if kill_9:
+            kill_priority = '-9'
+        else:
+            kill_priority = ' '
+        if diff_pid:
+            for pid in diff_pid:
+                self.cmd('kill %s %d' % (kill_priority, pid), fail=fail)
+
+
+    def cmd(self, command, fail=True, background=False, include_stderr=False):
+        """
+            Execute a command on the system using ssh.
+
+            @command     Command to execute
+            @fail        Boolean indicating if an exception should be
+                         raised on error
+            @background  Boolean indicating whether to run command
+                         in background
+            @return      Return code and command output.
+
+            The full interactions are also logged in the log file.
+        """
+        # XXX change from " to ' might cause a problem.
+        #     NEED TO CHECK WHEN SDN TESTS run
+        if self.local_cmds:
+            cmd = command
+        else:
+            cmd = 'ssh -x %s \'%s\'' % (self.rem, command)
+
+        LOG_sec ("CMD %s: %s" % (self.host, command))
+        ret, ret_data = self.cmd_log(cmd, fail, background, include_stderr)
+        LOG_endsec()
+
+        return ret, ret_data
+
+    def cmd_log(self, cmd, fail=True, background=False, include_stderr=False):
+        """
+        Execute a command on the local system
+
+        @cmd         Command to execute
+        @fail        Boolean indicating if an exception should be raised on error
+        @background  Boolean indicating whether to run command in background
+        @include_stderr  Boolean indicating whether stderr should be returned as
+                         well. If True, output is a tuple of (stdout, stderr)
+        @return      Return code and command output and optionally stderr as well.
+
+        The full interactions are also logged in the log file.
+        """
+        res_data = ""
+        err_data = ""
+        ret = 0
+        log_data = ""
+
+        # Log the command
+        # CMD(cmd)
+
+        try:
+            if background:
+                pid = Popen(cmd, bufsize=32768, shell=True, close_fds=True,
+                            stdin=PIPE, stdout=PIPE, stderr=PIPE).pid
+                log_data += "BACKGROUND: pid=%d\n" % pid
+                cmd += " &"
+                # Log the command.
+                CMD(cmd, 0, ret, log_data, err_data)
+            else:
+                start = time.clock()
+                proc = Popen(cmd, bufsize=32768, shell=True, close_fds=True,
+                             stdin=PIPE, stdout=PIPE, stderr=PIPE)
+                end = time.clock()
+                elapsed = end - start
+
+                # wait for process to terminate
+                res_data, err_data = proc.communicate()
+                ret = proc.returncode
+
+                # Log the command and its output
+                CMD(cmd, elapsed, ret, res_data, err_data)
+
+                log_data += "RETURN: %d\n" % ret
+                log_data += "STDOUT:\n"
+                log_data += res_data
+                log_data += "\nSTDERR:\n"
+                log_data += err_data
+
+                if fail and (ret != 0):
+                    raise Exception("cmd '%s' returned non zero" % cmd)
+        except KeyboardInterrupt:
+            raise
+        except:
+            # CMD(cmd)
+            LOG(cmd)
+            LOG(log_data)
+            if fail:
+                raise
+            else:
+                if include_stderr:
+                    return -1, ("", "")
+                else:
+                    return -1, ""
+
+        LOG(cmd)
+        LOG(log_data)
+
+        if include_stderr:
+            return ret, (res_data, err_data)
+        else:
+            return ret, res_data
+
+    def clean_attached_nodes(self, fail=True, **kwargs):
+        """ Cleanup a the test nodes's available interfaces (for CLIENT and
+        SERVER machines only). The available interfaces are listed in the
+        specific DUT's configuration settings. For test environments where
+        there are two interfaces on the CLIENT and two on the SERVER,
+        we clear all four.
+        """
+        ret = 0
+        out = ""
+        dict_arg = dict(kwargs)
+        self.rmmod("bonding", fail=False)
+
+        # clean interface(s)
+        if dict_arg['intf'] != "":
+            cmd = ("for i in \`seq 1 4094\`; "
+                   "do vconfig rem %s.\$i 2>/dev/null; "
+                   "done;" % (dict_arg['intf']))
+            cmd += "ip addr flush dev %s;" % (dict_arg['intf'])
+            cmd += "ip route flush dev %s;" % (dict_arg['intf'])
+            self.cmd(cmd, fail)
+
+            cmd = "ifconfig %s up;" % (dict_arg['intf'])
+            cmd += "ifconfig %s mtu 1500;" % (dict_arg['intf'])
+            ret, out = self.cmd(cmd, fail)
+
+        return ret, out
+
+
+
+class NFPFlowNICSystem(NFESystem, localNrtSystem):
     """A class for a system running NFPFLOWNIC"""
 
     def __init__(self, remote, cfg=None, dut=None, nfp=0, vnic_fn="nfp_net",
@@ -39,7 +209,7 @@ class NFPFlowNICSystem(NFESystem, NrtSystem):
         """
 
         NFESystem.__init__(self, remote, quick=quick, _noendsec=True)
-        NrtSystem.__init__(self, remote, quick=quick)
+        localNrtSystem.__init__(self, remote, quick=quick)
 
         self.cfg = cfg
         self.dut_object = dut

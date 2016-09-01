@@ -203,6 +203,12 @@ class UnitIP(Test):
         # vlan_id: vlan_id when vlan tag is included in the packet
         self.vlan_id = vlan_id
 
+        self.iperf_s_pid = None
+        self.iperf_c_pid = None
+        self.tcpdump_dst_pid = None
+        self.tcpdump_src_pid = None
+        self.nc_pid = None
+
         self.num_queue = None
 
         # Dictionary of ethtool Counters we expect to increment
@@ -874,7 +880,6 @@ class RxVlan(UnitComparePacket):
         """
         UnitComparePacket.clean_up(self, tmpdir)
         self.dst.cmd('vconfig rem %s' % self.dst_vlan_ifn, fail=False)
-        self.dst.killall("tshark", fail=False)
 
     def send_pckts_and_check_result(self, src_if, dst_if, send_pcap, tmpdir):
         """
@@ -955,7 +960,6 @@ class RxVlan_rx_byte(RxVlan):
         """
         UnitComparePacket.clean_up(self, tmpdir)
         self.dst.cmd('vconfig rem %s' % self.dst_vlan_ifn, fail=False)
-        self.dst.killall("tshark", fail=False)
 
     def send_pckts_and_check_result(self, src_if, dst_if, send_pcap, tmpdir):
         """
@@ -2424,6 +2428,12 @@ class NFPFlowNICContentCheck(Test):
         self.src_mtu = src_mtu
         self.dst_mtu = dst_mtu
 
+        self.iperf_s_pid = None
+        self.iperf_c_pid = None
+        self.tcpdump_dst_pid = None
+        self.tcpdump_src_pid = None
+        self.nc_pid = None
+
         return
 
     def run(self):
@@ -2506,8 +2516,7 @@ class NFPFlowNICContentCheck(Test):
                                  passed=False, comment=comment)
 
         finally:
-            self.src.cmd('killall nc', fail=False)
-            self.dst.cmd('killall nc', fail=False)
+            self.dst.killall_w_pid(self.nc_pid, fail=False)
 
             # check netcat server err (for debugging) after netcat client ends
             self.dst.cmd('cat %s' % os.path.join(self.tmp_dst_dir,
@@ -2564,8 +2573,7 @@ class NFPFlowNICContentCheck(Test):
                                 ntpath.basename(self.tmp_file)),
                    delay=1)
 
-        self.src.cmd('killall nc', fail=False)
-        self.dst.cmd('killall nc', fail=False)
+        self.dst.killall_w_pid(self.nc_pid, fail=False)
 
         return
 
@@ -2597,17 +2605,14 @@ class NFPFlowNICContentCheck(Test):
         """
         Run netcat cmd, return True when nc client returns no-error.
         """
-        self.src.killall('nc', fail=False)
-        self.dst.killall('nc', fail=False)
         nc_cmd = 'nc %s -l -p 5000 2> %s 1> %s' % \
                  (ipv4_str,
                   os.path.join(self.tmp_dst_dir, 'nc_server_err.txt'),
                   os.path.join(self.tmp_dst_dir,
                                ntpath.basename(self.tmp_file)))
-        cmd = 'ssh -x %s \'%s\'' % (self.dst.rem, nc_cmd)
-        LOG_sec ("CMD %s: %s" % (self.dst.host, cmd))
-        cmd_log(cmd, background=True)
-        LOG_endsec()
+        nc_pid_file = os.path.join(self.tmp_dst_dir, 'nc_tmp_pid.txt')
+        ret, _ = self.dst.cmd_bg_pid_file(nc_cmd, nc_pid_file, background=True)
+        self.nc_pid = ret[1]
         timed_poll(30, self.dst.exists_host,
                    os.path.join(self.tmp_dst_dir,
                                 ntpath.basename(self.tmp_file)), delay=1)
@@ -2632,8 +2637,7 @@ class NFPFlowNICContentCheck(Test):
         try:
             self.src.cmd(nc_cmd)
         except:
-            self.src.killall('nc', fail=False)
-            self.dst.killall('nc', fail=False)
+            self.dst.killall_w_pid(self.nc_pid, fail=False)
             return False
 
         after_dst_cntrs = dst_netifs.stats()
@@ -2641,8 +2645,7 @@ class NFPFlowNICContentCheck(Test):
         diff_dst_cntrs = after_dst_cntrs - before_dst_cntrs
         diff_src_cntrs = after_src_cntrs - before_src_cntrs
 
-        self.src.killall('nc', fail=False)
-        self.dst.killall('nc', fail=False)
+        self.dst.killall_w_pid(self.nc_pid, fail=False)
 
         if diff_src_cntrs.ethtool['tx_lso']:
             return True

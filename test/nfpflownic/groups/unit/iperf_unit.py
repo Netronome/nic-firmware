@@ -110,6 +110,10 @@ class Iperftest(Test):
         # Command-line argument strings for iperf server and iperf client
         self.iperf_server_arg_str = ''
         self.iperf_client_arg_str = ''
+        self.iperf_s_pid = None
+        self.iperf_c_pid = None
+        self.tcpdump_dst_pid = None
+        self.tcpdump_src_pid = None
 
         return
 
@@ -180,9 +184,6 @@ class Iperftest(Test):
 
         self.prepare_temp_dir()
         self.iperf_arg_str_cfg()
-
-        self.dst.killall('iperf', fail=False)
-        self.dst.killall('tcpdump', fail=False)
 
         self.start_tshark_listening()
         self.start_iperf_server()
@@ -286,11 +287,27 @@ class Iperftest(Test):
         configured in iperf_arg_str_cfg(). Use a timed_poll method to check if
         the iperf server has started properly.
         """
-        cmd = "iperf -s %s 2>&1 > %s" % (self.iperf_server_arg_str,
-                                         self.dst_srv_file)
-        self.dst.cmd(cmd, background=True)
-        ## Check output of iperf server to make sure it is running
-        timed_poll(30, self.is_iperf_server_running, self.dst_srv_file)
+        if self.vlan:
+            dst_ip = self.dst_vlan_ip
+        else:
+            dst_ip = self.dst_ip
+        iperf_s_str = 'iperf -s -B %s' % dst_ip
+        cmd = "ps aux | grep \"%s\" | grep -v grep" % iperf_s_str
+        ret, _ = self.dst.cmd(cmd, fail=False)
+        if ret:
+            iperf_pid_file = os.path.join(self.dst_tmp_dir, 'ipf_tmp_pid.txt')
+            cmd = "%s %s 2>&1 > %s" % (iperf_s_str,
+                                       self.iperf_server_arg_str,
+                                       self.dst_srv_file)
+            ret, _ = self.dst.cmd_bg_pid_file(cmd, iperf_pid_file,
+                                              background=True)
+            self.iperf_s_pid = ret[1]
+            ## Check output of iperf server to make sure it is running
+            timed_poll(30, self.is_iperf_server_running, self.dst_srv_file)
+        else:
+            raise NtiGeneralError('%s has already started before test, '
+                                  'please clean up machines first' %
+                                  iperf_s_str)
         return
 
     def start_iperf_client(self):
@@ -321,10 +338,12 @@ class Iperftest(Test):
         """
         Start the tcpdump to listening to the interfaces.
         """
+        tcpd_pid_file = os.path.join(self.dst_tmp_dir, 'tcpd_tmp_pid.txt')
         cmd = "tcpdump -w %s -i %s -p 'ether src %s and ether dst %s' " \
               % (self.dst_pcap_file, self.dst_ifn, self.src_mac,
                  self.dst_mac)
-        self.dst.cmd(cmd, background=True)
+        ret, _ = self.dst.cmd_bg_pid_file(cmd, tcpd_pid_file, background=True)
+        self.tcpdump_dst_pid = ret[1]
         timed_poll(30, self.dst.exists_host, self.dst_pcap_file, delay=1)
         return
 
@@ -364,15 +383,13 @@ class Iperftest(Test):
         try:
             timed_poll(10, self.is_iperf_traffic_received)
         except NtiTimeoutError:
-            self.dst.killall('iperf', fail=False)
-            self.src.killall('iperf', fail=False)
+            self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
             # check the iperf server output one more time
             if not self.is_iperf_traffic_received():
                 msg = 'Iperf server does not receive traffic'
                 raise NtiGeneralError(msg)
-        self.dst.killall('iperf', fail=False)
-        self.src.killall('iperf', fail=False)
-        self.dst.cmd('killall -w tcpdump', fail=False)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False, kill_9=False)
+        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False, kill_9=False)
         self.dst.cmd('cat %s' % self.dst_srv_file, fail=False)
         _, self.local_recv_pcap = mkstemp()
         self.dst.cp_from(self.dst_pcap_file, self.local_recv_pcap)
@@ -384,9 +401,9 @@ class Iperftest(Test):
         Remove temporary directory and files
         """
         # make sure iperf and tcpdump are stopped.
-        self.dst.killall('iperf', fail=False)
-        self.src.killall('iperf', fail=False)
-        self.dst.killall('tcpdump', fail=False)
+        self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False)
+        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False)
         if not self.ipv4:
             self.dst.cmd("ifconfig %s -allmulti" % self.dst_ifn)
             self.src.cmd("ifconfig %s -allmulti" % self.src_ifn)
@@ -983,8 +1000,9 @@ class Ring_size(Iperftest):
         """
         make sure iperf and tcpdump are stopped. And reset the ring size.
         """
-        self.dst.killall('iperf', fail=False)
-        self.dst.killall('tcpdump', fail=False)
+        self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False)
+        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False)
         # reset ring size
         self.set_ring_size(self.dst, self.dst_ifn, self.default_ring_size,
                            self.default_ring_size)
@@ -1034,14 +1052,19 @@ class LSO_iperf(Csum_Tx):
         Start the tcpdump to listening to the interfaces.
         """
         #CHANGED, 50 to 200 packet to capture
+        tcpd_pid_file = os.path.join(self.dst_tmp_dir, 'tcpd_tmp_pid.txt')
         cmd = "tcpdump -w %s -i %s -p 'ether src %s and ether dst %s' " \
               % (self.dst_pcap_file, self.dst_ifn, self.src_mac,
                  self.dst_mac)
-        self.dst.cmd(cmd, background=True)
+        ret, _ = self.dst.cmd_bg_pid_file(cmd, tcpd_pid_file,
+                                          background=True)
+        self.tcpdump_dst_pid = ret[1]
+        tcpd_pid_file = os.path.join(self.src_tmp_dir, 'tcpd_tmp_pid.txt')
         cmd = "tcpdump -w %s -i %s -p 'ether src %s and ether dst %s' " \
               % (self.src_pcap_file, self.src_ifn, self.src_mac,
                  self.dst_mac)
-        self.src.cmd(cmd, background=True)
+        ret, _ = self.src.cmd_bg_pid_file(cmd, tcpd_pid_file, background=True)
+        self.tcpdump_src_pid = ret[1]
         timed_poll(30, self.dst.exists_host, self.dst_pcap_file, delay=1)
         timed_poll(30, self.src.exists_host, self.src_pcap_file, delay=1)
         return
@@ -1052,7 +1075,8 @@ class LSO_iperf(Csum_Tx):
         packets from the pcap file on the local machine.
         """
         Csum_Tx.get_result(self)
-        self.src.cmd('killall -w tcpdump', fail=False)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False, kill_9=False)
+        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False, kill_9=False)
         _, self.local_send_pcap = mkstemp()
         self.src.cp_from(self.src_pcap_file, self.local_send_pcap)
         self.snd_pkts = rdpcap(self.local_send_pcap)
@@ -1063,11 +1087,9 @@ class LSO_iperf(Csum_Tx):
         Remove temporary directory and files
         """
         # make sure iperf and tcpdump are stopped.
-        self.dst.killall('iperf', fail=False)
-        self.src.killall('iperf', fail=False)
-        self.dst.killall('tcpdump', fail=False)
-        #NEW
-        self.src.killall('tcpdump', fail=False)
+        self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False)
+        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False)
         if not self.ipv4:
             self.dst.cmd("ifconfig %s -allmulti" % self.dst_ifn)
             self.src.cmd("ifconfig %s -allmulti" % self.src_ifn)

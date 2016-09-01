@@ -1046,6 +1046,37 @@ class Csum_Tx_tunnel(Csum_Tx):
 
         return
 
+    def start_iperf_server(self):
+        """
+        Start the iperf server, using the command-line argument string
+        configured in iperf_arg_str_cfg(). Use a timed_poll method to check if
+        the iperf server has started properly.
+        """
+        if self.tunnel_type == 'vxlan':
+            dst_ip = self.dst_inner_ip
+        else:
+            dst_ip = self.dst_ip
+
+        iperf_s_str = 'iperf -s -B %s' % dst_ip
+        cmd = "ps aux | grep \"%s\" | grep -v grep" % iperf_s_str
+        ret, _ = self.dst.cmd(cmd, fail=False)
+        if ret:
+            iperf_pid_file = os.path.join(self.dst_tmp_dir, 'ipf_tmp_pid.txt')
+            cmd = "%s %s 2>&1 > %s" % (iperf_s_str,
+                                       self.iperf_server_arg_str,
+                                       self.dst_srv_file)
+            ret, _ = self.dst.cmd_bg_pid_file(cmd, iperf_pid_file,
+                                              background=True)
+            self.iperf_s_pid = ret[1]
+            ## Check output of iperf server to make sure it is running
+            timed_poll(30, self.is_iperf_server_running, self.dst_srv_file)
+        else:
+            raise NtiGeneralError('%s has already started before test, '
+                                  'please clean up machines first' %
+                                  iperf_s_str)
+        return
+
+
     def start_iperf_client(self):
         """
         Start the iperf client, using the command-line argument string
@@ -1101,9 +1132,9 @@ class Csum_Tx_tunnel(Csum_Tx):
             cmd = 'ip link delete %s' % self.dst_vxlan_intf
             self.dst.cmd(cmd, fail=False)
         # make sure iperf and tcpdump are stopped.
-        self.dst.killall('iperf', fail=False)
-        self.src.killall('iperf', fail=False)
-        self.dst.killall('tcpdump', fail=False)
+        self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False)
+        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False)
         if not self.ipv4:
             self.dst.cmd("ifconfig %s -allmulti" % self.dst_ifn)
             self.src.cmd("ifconfig %s -allmulti" % self.src_ifn)
@@ -1482,6 +1513,36 @@ class LSO_tunnel(LSO_iperf):
 
         return
 
+    def start_iperf_server(self):
+        """
+        Start the iperf server, using the command-line argument string
+        configured in iperf_arg_str_cfg(). Use a timed_poll method to check if
+        the iperf server has started properly.
+        """
+        if self.tunnel_type == 'vxlan':
+            dst_ip = self.dst_inner_ip
+        else:
+            dst_ip = self.dst_ip
+
+        iperf_s_str = 'iperf -s -B %s' % dst_ip
+        cmd = "ps aux | grep \"%s\" | grep -v grep" % iperf_s_str
+        ret, _ = self.dst.cmd(cmd, fail=False)
+        if ret:
+            iperf_pid_file = os.path.join(self.dst_tmp_dir, 'ipf_tmp_pid.txt')
+            cmd = "%s %s 2>&1 > %s" % (iperf_s_str,
+                                       self.iperf_server_arg_str,
+                                       self.dst_srv_file)
+            ret, _ = self.dst.cmd_bg_pid_file(cmd, iperf_pid_file,
+                                              background=True)
+            self.iperf_s_pid = ret[1]
+            ## Check output of iperf server to make sure it is running
+            timed_poll(30, self.is_iperf_server_running, self.dst_srv_file)
+        else:
+            raise NtiGeneralError('%s has already started before test, '
+                                  'please clean up machines first' %
+                                  iperf_s_str)
+        return
+
     def start_iperf_client(self):
         """
         Start the iperf client, using the command-line argument string
@@ -1535,9 +1596,9 @@ class LSO_tunnel(LSO_iperf):
             cmd = 'ip link delete %s' % self.dst_vxlan_intf
             self.dst.cmd(cmd, fail=False)
         # make sure iperf and tcpdump are stopped.
-        self.dst.killall('iperf', fail=False)
-        self.src.killall('iperf', fail=False)
-        self.dst.killall('tcpdump', fail=False)
+        self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False)
+        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False)
         if not self.ipv4:
             self.dst.cmd("ifconfig %s -allmulti" % self.dst_ifn)
             self.src.cmd("ifconfig %s -allmulti" % self.src_ifn)
@@ -1834,14 +1895,11 @@ class Csum_rx_tnl(UnitIP):
             promisc_str = ''
         else:
             promisc_str = '-p'
-        #cmd = "tcpdump -w %s -i %s -p 'ether src %s and ether dst %s' " \
-        #      % (self.dst_pcap_file, self.dst_ifn, self.src_outer_mac,
-        #         self.dst_outer_mac)
-        #cmd = "tcpdump -w %s -i %s -p 'ether src %s ' " \
-        #      % (self.dst_pcap_file, self.dst_ifn, self.src_outer_mac)
+        tcpd_pid_file = os.path.join(self.dst_tmp_dir, 'tcpd_tmp_pid.txt')
         cmd = "tcpdump %s -w %s -i %s  " \
               % (promisc_str, self.dst_pcap_file, self.dst_ifn, )
-        self.dst.cmd(cmd, background=True)
+        ret, _ = self.dst.cmd_bg_pid_file(cmd, tcpd_pid_file, background=True)
+        self.tcpdump_dst_pid = ret[1]
         timed_poll(30, self.dst.exists_host, self.dst_pcap_file, delay=1)
         return
 
@@ -1965,7 +2023,6 @@ class Csum_rx_tnl(UnitIP):
         """
         import time
         time.sleep(3)
-        self.dst.cmd('killall -w tcpdump', fail=False)
         _, local_recv_pcap = mkstemp()
         self.dst.cp_from(self.dst_pcap_file, local_recv_pcap)
         rcv_pkts = rdpcap(local_recv_pcap)
@@ -1991,7 +2048,7 @@ class Csum_rx_tnl(UnitIP):
         #if "hw_rx_csum_ok" in self.expect_et_cntr and \
         #        self.expect_et_cntr["hw_rx_csum_ok"]:
         #    self.expect_et_cntr["hw_rx_csum_ok"] = outer_rx_pkts
-        self.dst.killall('tcpdump', fail=False)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False, kill_9=False)
         if local_recv_pcap:
             os.remove(local_recv_pcap)
         res = UnitIP.check_result(self, if_stat_diff)

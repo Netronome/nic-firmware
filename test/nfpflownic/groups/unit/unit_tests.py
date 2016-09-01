@@ -7,7 +7,8 @@ Unit test group for the NFPFlowNIC Software Group.
 
 import collections
 from netro.tests.null import NullTest
-from ...nfpflownic_tests import _NFPFlowNIC, _NFPFlowNIC_nport
+from ...nfpflownic_tests import _NFPFlowNIC, _NFPFlowNIC_nport, \
+    _NFPFlowNIC_no_fw_loading
 from unit import UnitIPv4, UnitIPv6, NFPFlowNICPing, UnitPing, JumboPacket, \
     RxVlan, Stats_rx_err_cnt, LinkState, RSStest_same_l4_tuple, \
     RSStest_diff_l4_tuple, Stats_per_queue_cntr, RxVlan_rx_byte, \
@@ -1308,7 +1309,7 @@ class Unit_dict(object):
             summary = _stats_cntr_rx_err_hdr_sum(Stats_rx_err_cnt, src_mtu,
                                                  dst_mtu, pck_size)
             self.tests[tn] = Stats_rx_err_cnt(a_t, dut_t_x,
-                                               l4_type=l4_type,
+                                               l4_type='tcp',
                                                src_mtu=src_mtu,
                                                dst_mtu=dst_mtu,
                                                payload_size=pck_size,
@@ -1477,5 +1478,38 @@ class NFPFlowNICUnit_n8_port(_NFPFlowNIC_nport):
             else:
                 self._tests.update(self.unit_dict.tests)
 
+
+
+###########################################################################
+# Unit Tests
+###########################################################################
+class NFPFlowNIC_no_fw_loading(_NFPFlowNIC_no_fw_loading):
+    """Unit tests for the NFPFlowNIC Software Group"""
+
+    summary = "Unit tests for the NFPFlowNIC project with kernel space " \
+              "firmware loading. "
+
+    def __init__(self, name, cfg=None,
+                 quick=False, dut_object=None):
+        """Initialise
+        @name:   A unique name for the group of tests
+        @cfg:    A Config parser object (optional)
+        @quick:  Omit some system info gathering to speed up running tests
+        """
+
+        _NFPFlowNIC_no_fw_loading.__init__(self, name, cfg=cfg, quick=quick,
+                                           dut_object=dut_object)
+
+        ping_dut = (self.dut, self.eth_x)
+        ping_a_t = (self.host_a, self.eth_a)
+
+        dut_t_x = (self.dut, self.addr_x, self.eth_x, self.addr_v6_x,
+                   self.rss_key, self.rm_nc_bin)
+        a_t = (self.host_a, self.addr_a, self.eth_a, self.addr_v6_a, None,
+               self.rm_nc_bin)
+
+        self.unit_dict = Unit_dict(self, dut_t_x, a_t,
+                                   ping_dut, ping_a_t)
+        self._tests = self.unit_dict.tests
 
 

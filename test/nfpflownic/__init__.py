@@ -20,6 +20,8 @@ class Project(netro.testinfra.Project):
     summary = "Tests for NFPFlowNIC"
     _groups = collections.OrderedDict((("setup", NFPFlowNICSetup),
                                        ("unit", NFPFlowNICUnit),
+                                       ("unit_no_fw_ld",
+                                        NFPFlowNIC_no_fw_loading),
                                        ("unit_2_port", NFPFlowNICUnit_n2_port),
                                        ("unit_4_port", NFPFlowNICUnit_n4_port),
                                        ("unit_5_port", NFPFlowNICUnit_n5_port),
