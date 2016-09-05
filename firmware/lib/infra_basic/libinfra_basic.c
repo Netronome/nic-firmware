@@ -57,8 +57,6 @@
 #endif
 
 /* Debug counters */
-#define INFRA_CNTRS_ENABLE
-
 #define INFRA_CNTR_RX_FROM_WIRE         0
 #define INFRA_CNTR_ERR_FROM_WIRE        1
 #define INFRA_CNTR_RX_FROM_HOST         2
@@ -69,9 +67,8 @@
 #define INFRA_CNTR_TX_TO_HOST_DROP      7
 #define INFRA_CNTR_ERR_TO_HOST          8
 
-__shared __gpr uint32_t infra_cntrs_base;
-
 #ifdef INFRA_CNTRS_ENABLE
+__shared __gpr uint32_t infra_cntrs_base;
     CNTRS64_DECLARE(vr_infra_dbg_cntrs, 32, __emem);
     #define INFRA_CNTR_INC(_cntr) \
                     cntr64_incr(infra_cntrs_base, _cntr)
