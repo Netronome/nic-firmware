@@ -73,7 +73,7 @@ pkt_hdrs_read(__addr40 char * buf_addr, uint32_t buf_off,
               __lmem struct pkt_encap *ec, int tunnel,
               __lmem uint16_t *vxlan_ports)
 {
-    __lmem uint32_t src_buf[16];
+    __shared __lmem uint32_t src_buf[16];
     __gpr int src_off = cur_off;
     __gpr int res;
     __gpr int next_proto;
