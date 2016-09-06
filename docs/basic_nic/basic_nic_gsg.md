@@ -91,16 +91,8 @@ The location of the report is:
 
 # Loading the NIC driver and NIC firmware
 
-There is a temporary limitation in the NIC for lithium and hydrogen
-with 4x10 breakout cable. As stated they can not be run with IOMMU
-enabled. To disable it change/add:
-
-GRUB_CMDLINE_LINUX_DEFAULT="intel_iommu=off intremap=off"
-
-on file /etc/default/grub and run "update-grub" before rebooting
-
-The recommendation for the basic NIC in hydrogen (1x40) is to run it
-with IOMMU and pass through enabled. Please change/add:
+The recommendation for the basic NIC is to run it with IOMMU and pass
+through enabled. Please change/add:
 
 GRUB_CMDLINE_LINUX_DEFAULT="intel_iommu=on iommu=pt"
 
