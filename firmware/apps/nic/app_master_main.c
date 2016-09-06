@@ -25,6 +25,7 @@
 #include <std/synch.h>
 #include <std/reg_utils.h>
 
+#include "nfd_user_cfg.h"
 #include <vnic/shared/nfd_cfg.h>
 #include <vnic/pci_in.h>
 #include <vnic/pci_out.h>
@@ -298,14 +299,16 @@ perq_stats_loop(void)
 
     for (;;) {
         for (txq = 0;
-             txq < (NFD_MAX_VFS * NFD_MAX_VF_QUEUES + NFD_MAX_PF_QUEUES);
+             txq < ((NFD_MAX_VFS * NFD_MAX_VF_QUEUES) +
+                    (NFD_MAX_PFS * NFD_MAX_PF_QUEUES));
              txq++) {
             __nfd_out_push_pkt_cnt(NIC_PCI, txq, ctx_swap, &txq_sig);
             sleep(PERQ_STATS_SLEEP);
         }
 
         for (rxq = 0;
-             rxq < (NFD_MAX_VFS * NFD_MAX_VF_QUEUES + NFD_MAX_PF_QUEUES);
+             rxq < ((NFD_MAX_VFS * NFD_MAX_VF_QUEUES) +
+                    (NFD_MAX_PFS * NFD_MAX_PF_QUEUES));
              rxq++) {
             __nfd_in_push_pkt_cnt(NIC_PCI, rxq, ctx_swap, &rxq_sig);
             sleep(PERQ_STATS_SLEEP);           

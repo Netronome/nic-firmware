@@ -278,7 +278,7 @@ main()
         }
 
 #if NS_PLATFORM_NUM_PORTS > 1
-        port = PKT_PORT_QUEUE_of(Pkt.p_src) / NFD_MAX_VF_QUEUES;
+        port = PKT_PORT_QUEUE_of(Pkt.p_src) / NFD_MAX_PF_QUEUES;
 #else
         port = 0;
 #endif

@@ -22,19 +22,20 @@
  * VNICs attached to it.
  */
 #ifndef NFD_MAX_VF_QUEUES
-#define NFD_MAX_VF_QUEUES       8
+#define NFD_MAX_VF_QUEUES       0
 #endif
 
 #ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       0
+#define NFD_MAX_PF_QUEUES       8
 #endif
 
-/* 1 VF per port */
 #ifndef NFD_MAX_VFS
-#define NFD_MAX_VFS             NS_PLATFORM_NUM_PORTS
+#define NFD_MAX_VFS             0
 #endif
 
-#define NFD_VROUTER_MULTINETDEV_PF
+#ifndef NFD_MAX_PFS
+#define NFD_MAX_PFS             NS_PLATFORM_NUM_PORTS
+#endif
 
 /* TEMP enable writing VF queue offsets into the BAR */
 #define NFD_NO_ISOLATION
@@ -47,6 +48,10 @@
 
 #ifndef NFD_MAX_PF_QUEUES
 #define NFD_MAX_PF_QUEUES       32
+#endif
+
+#ifndef NFD_MAX_PFS
+#define NFD_MAX_PFS             1
 #endif
 
 /* No VFs needed */

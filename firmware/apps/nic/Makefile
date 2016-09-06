@@ -84,6 +84,7 @@ $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,link_state))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,npfw))
 $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(NFD_DIR)/me/blocks/vnic/svc,msix))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnn_mode=1))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))
 
 # Add NFD for PCIE0
