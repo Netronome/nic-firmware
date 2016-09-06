@@ -60,15 +60,7 @@ struct nic_port_stats_extra {
     unsigned long long tx_bc_pkts;
 };
 /* Export for debug visibility */
-#if NFD_MAX_VFS != 0
-    #define NVNICS NFD_MAX_VFS
-#else
-    #define NVNICS 2
-#endif
-
-__export __shared __imem
-struct nic_port_stats_extra nic_stats_extra[NVNICS];
-
+__export __shared __imem struct nic_port_stats_extra nic_stats_extra[NVNICS];
 
 /*
  * Global declarations for MAC Statistics
@@ -168,7 +160,7 @@ nic_tx_ring_cntrs(void *meta, uint32_t port, uint32_t qid)
     uint32_t nfd_q;
     struct pcie_in_nfp_desc *in_desc = (struct pcie_in_nfp_desc *)meta;
 
-    nfd_q = nfd_out_map_queue(port, qid);
+    nfd_q = NFD_BUILD_NATQ(port, qid);
 
     __nfd_in_cnt_pkt(NIC_PCI, nfd_q, in_desc->data_len, ctx_swap, &sig);
 }
