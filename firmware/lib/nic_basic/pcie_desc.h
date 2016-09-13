@@ -155,7 +155,7 @@ struct pcie_out_buf_desc {
 /**
  * Flags in the RX descriptor
  *
- * @PCIE_DESC_RX_RSS            RSS Hash calculated and prepended
+ * @PCIE_DESC_RX_SPARE2
  * @PCIE_DESC_RX_I_IP4_CSUM     Inner IPv4 checksum checked
  * @PCIE_DESC_RX_I_IP4_CSUM_OK  Inner IPv4 checksum correct
  * @PCIE_DESC_RX_I_TCP_CSUM     Inner TCP checksum checked
@@ -172,7 +172,7 @@ struct pcie_out_buf_desc {
  * @PCIE_DESC_RX_UDP_CSUM_OK    Outer UDP checksum correct
  * @PCIE_DESC_RX_VLAN           VLAN stripped and added to descriptor
  */
-#define PCIE_DESC_RX_RSS                (1 << 15)
+#define PCIE_DESC_RX_SPARE2             (1 << 15)
 #define PCIE_DESC_RX_I_IP4_CSUM         (1 << 14)
 #define PCIE_DESC_RX_I_IP4_CSUM_OK      (1 << 13)
 #define PCIE_DESC_RX_I_TCP_CSUM         (1 << 12)
