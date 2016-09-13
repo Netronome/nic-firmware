@@ -178,7 +178,7 @@ proc_from_wire(int port)
         /* Write Hash value in front of the packet */
         offset -= sizeof(tmp);
         plen += sizeof(tmp);
-        tmp[0] = hash_type;
+        tmp[0] = (hash_type << NFP_NET_META_FIELD_SIZE) | NFP_NET_META_HASH;
         tmp[1] = hash;
         mem_write8(&tmp, (void *)(pkt_start + offset), sizeof(tmp));
     }
