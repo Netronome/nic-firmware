@@ -14,6 +14,9 @@ else ifeq ($(PLATFORM),Hydrogen_4x10)
 else ifeq ($(PLATFORM),Lithium)
     NS_PLATFORM_TYPE = 3
     PROJECT = ns_nic_cx10_2
+else ifeq ($(PLATFORM),Beryllium)
+    NS_PLATFORM_TYPE = 8
+    PROJECT = ns_nic_cx40_2
 endif
 
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
