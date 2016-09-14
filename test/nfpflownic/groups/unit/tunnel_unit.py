@@ -309,7 +309,7 @@ class RSStest_diff_inner_tuple(RSStest_diff_l4_tuple):
                                                              protocol))
 
         if self.tunnel_type == 'vxlan':
-            self.dst.cmd("ip link delete %s" % self.src_vxlan_intf, fail=False)
+            self.dst.cmd("ip link delete %s" % self.dst_vxlan_intf, fail=False)
             cmd = 'ip link add %s type vxlan id %d group %s dev %s ' \
                   'dstport %s' % (self.dst_vxlan_intf, self.vxlan_id,
                                   self.vxlan_mc, self.dst_ifn, self.vxlan_dport)
@@ -564,7 +564,6 @@ class RSStest_diff_inner_tuple_multi_tunnels(RSStest_diff_l4_tuple):
 
         """
         passed = True
-        self.dst.cmd('nfp-rtsym -L | grep nic_cnt_rx_')
         self.dst.cmd('ethtool -S %s | grep hw_rx_csum_inner_ok' % self.dst_ifn)
         for i in range(0, self.tunnel_number):
             pcapre = TCPReplay(self.src, self.src_vxlan_intf[i], send_pcap,
@@ -591,7 +590,6 @@ class RSStest_diff_inner_tuple_multi_tunnels(RSStest_diff_l4_tuple):
                                                                 send_pcap,
                                                                 tmpdir)
 
-        self.dst.cmd('nfp-rtsym -L | grep nic_cnt_rx_')
         # will remove it after SB-186
         self.dst.cmd('ifconfig %s -allmulti' % self.dst_ifn)
         if self.tunnel_type == 'vxlan':
