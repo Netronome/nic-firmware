@@ -271,7 +271,7 @@ pkt_rx_wire(void)
 {
     __xread struct nbi_meta_catamaran nbi_rxd;
     __xread pkt_status_t status;
-    int ret;
+    int ret = 0;
 
     pkt_nbi_recv(&nbi_rxd, sizeof(nbi_rxd));
     reg_zero((void *)Pkt.__raw, sizeof(Pkt));
