@@ -6,6 +6,7 @@
 
 FW_BUILD = $(FIRMWARE_DIR)/build
 FW_NFFW  = $(FIRMWARE_DIR)/nffw
+FW_CAT  = $(FIRMWARE_DIR)/cat
 
 # Card version
 NFP_SKU?=nfp-4xxx-b0
@@ -62,6 +63,8 @@ PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp6000
 NFLD = $(NETRONOME)/bin/nfld
 NFLD_BASE_FLAGS =
 
+NFFW2CA = $(NETRONOME)/bin/nfp-nffw2ca
+
 FW_BUILD_DIRS =
 
 FW_BUILD_TARGETS =
@@ -73,11 +76,13 @@ include $(FIRMWARE_DIR)/Makefile.templates
 include $(FIRMWARE_DIR)/Makefile.deps.templates
 include $(FIRMWARE_DIR)/Makefile.apps
 
-firmware_all: firmware_fetch_deps all_nffw
+firmware_all: firmware_fetch_deps all_nffw all_cat
 
 firmware_fetch_deps:
 
 all_nffw:
+
+all_cat:
 
 firmware_help:
 	@echo "Global commands"
@@ -105,6 +110,8 @@ firmware_clean:
 	done
 	@rm -f $(FW_BUILD)/*.map
 	@rm -f $(FW_NFFW)/*.nffw
+	@rm -f $(FW_CAT)/*.cat
+	@rm -f $(FW_CAT)/*.trace
 
 firmware_veryclean: firmware_clean firmware_clean_deps
 
