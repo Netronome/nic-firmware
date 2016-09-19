@@ -8,18 +8,23 @@ endif
 ifeq ($(PLATFORM),Hydrogen)
     NS_PLATFORM_TYPE = 1
     PROJECT = ns_nic_cx40q_1
+    AMDA = AMDA0081-0001
 else ifeq ($(PLATFORM),Hydrogen_4x10)
     NS_PLATFORM_TYPE = 2
     PROJECT = ns_nic_cx40q_1_4x10
+    AMDA = AMDA0081-0001
 else ifeq ($(PLATFORM),Lithium)
     NS_PLATFORM_TYPE = 3
     PROJECT = ns_nic_cx10_2
+    AMDA = AMDA0096-0001
 else ifeq ($(PLATFORM),Beryllium)
     NS_PLATFORM_TYPE = 8
     PROJECT = ns_nic_cx40_2
+    AMDA = AMDA0097-0001
 endif
 
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
+$(eval $(call nffw.set_amda,$(PROJECT),$(AMDA)))
 $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/include))
 $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/deps/npfw))
 $(eval $(call nffw.add_ppc,$(PROJECT),i8,$(PICOCODE_DIR)/catamaran/catamaran.npfw))
@@ -158,3 +163,4 @@ $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
 $(eval $(call nffw.add_rtsyms,$(PROJECT)))
 # TODO get link_w_analysis to work without adding a warning
 $(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx))
+$(eval $(call nffw.cat,$(PROJECT),nic_rx,nic_tx))

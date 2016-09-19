@@ -32,6 +32,7 @@ $1__NFAS_FLAGS = -include config.h
 $1__NFCC_FLAGS = -FI config.h
 $1__NFCC_CLIBS = 
 $1__CHIP = nfp-4xxx-b0
+$1__AMDA = AMDA0081-0001   # hydrogen
 
 $(if $3,$1__NFAS_FLAGS = -include $(FIRMWARE_DIR)/$2/$3)
 $(if $3,$1__NFCC_FLAGS = -FI $(FIRMWARE_DIR)/$2/$3)
@@ -118,6 +119,19 @@ endef
 define nffw.set_chip
 
 $1__CHIP += $2
+
+endef
+
+#f nffw.set_amda
+#
+# Add a single define to a firmware builds
+#
+# @param $1 firmware name
+# @param $2 AMDA board number
+#
+define nffw.set_amda
+
+$1__AMDA = $2
 
 endef
 
@@ -682,6 +696,30 @@ FW_LOAD_TARGETS += load_$1
 
 load_$1:
 	nfp-nffw $$($1__NFFW) load
+
+endef
+
+#a CAT templates
+#f nffw.cat
+#
+# Create targets to build a .cat firmware image
+#
+# @param $1 firmware name (for .cat)
+#
+define nffw.cat
+
+$1__NFFW = $(FW_NFFW)/$1.nffw
+$1__CAT = $(FW_CAT)/$1.cat
+
+$$($1__CAT): $$($1__NFFW)
+	@echo  Create $$($1__CAT) from $$($1__NFFW) ...
+	$(Q)$(NFFW2CA) -a $$($1__AMDA) -z $$($1__NFFW) $$($1__CAT)
+
+$1.cat: $$($1__CAT)
+
+all_cat: $1.cat
+
+FW_BUILD_TARGETS += $1.cat
 
 endef
 
