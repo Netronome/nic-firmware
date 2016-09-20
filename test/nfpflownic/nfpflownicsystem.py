@@ -337,12 +337,7 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
             if self.load_mode == 'kernel':
                 self.cmd("rmmod nfp_netvf", fail=False)
                 self.cmd("rmmod nfp_net", fail=False)
-                if self.nfpkmods:
-                    self.cp_to(self.nfpkmods, self.tmpdir)
-                    nfp_ko_file = os.path.join(self.tmpdir, "nfp.ko")
-                    self.cmd('insmod %s nfp_reset=1' % nfp_ko_file)
-                else:
-                    self.cmd("modprobe nfp nfp_reset=1")
+                self.cmd("rmmod nfp", fail=False)
 
                 lib_netro_dir = os.path.join(os.path.sep, 'lib', 'firmware',
                                              'netronome')
@@ -350,30 +345,9 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
                 self.cmd(cmd, fail=False)
                 cmd = 'mkdir -p %s' % lib_netro_dir
                 self.cmd(cmd, fail=False)
-                #self.unload_preload_mefw()
 
-                try:
-                    # Create the firmware image.
-                    self.cp_to(self.mefw, self.tmpdir)
-                    cmd = ('LD_LIBRARY_PATH=/opt/netronome/lib nfp-nffw2ca -a `nfp-hwinfo | grep -o "AMDA.*$"` -z %s %s' %
-                           (os.path.join(self.tmpdir, self.mefw_fn),
-                            os.path.join(self.tmpdir, 'nfp6000_net.cat')))
-                    self.cmd(cmd)
-
-                    # Copy the newly created image into the default location.
-                    cmd = 'cp %s %s' % (os.path.join(self.tmpdir,
-                                                     'nfp6000_net.cat'),
-                                        os.path.join(lib_netro_dir,
-                                                     'nfp6000_net.cat'))
-                    self.cmd(cmd)
-
-                    self.cmd("rmmod nfp", fail=False)
-
-                except:
-                    msg = 'Faile to create nfp6000_net.cat. ' \
-                          'You may need to power cycle the DUT. '
-                    self.rm_dir(self.tmpdir)
-                    raise NtiFatalError(msg=msg)
+                self.cp_to(self.mefw,
+                           os.path.join(lib_netro_dir,'nfp6000_net.cat'))
 
                 try:
                     before_eth_dict = self.get_eth_dict()
