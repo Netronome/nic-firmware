@@ -18,6 +18,7 @@
 #include <nfp/me.h>
 #include <nfp/mem_bulk.h>
 #include <nfp/macstats.h>
+#include <nfp/remote_me.h>
 #include <nfp/xpb.h>
 #include <nfp6000/nfp_mac.h>
 #include <nfp6000/nfp_me.h>
@@ -143,6 +144,14 @@ __intrinsic extern int msix_vf_send(unsigned int pcie_nr,
      NFP_MAC_CSR_EQ_INH_DONE)
 
 
+/* Carbon flow-control settings. */
+#define CARBON_FLOWCTL_ISL               1
+#define CARBON_FLOWCTL_ME                3
+#define CARBON_FLOWCTL_MBOX0_CFG         0x25
+#define CARBON_FLOWCTL_MBOX1_CFG_DISABLE (~0)
+#define CARBON_FLOWCTL_MBOX1_CFG_ENABLE  0x20
+
+
 /*
  * Config change management.
  *
@@ -186,6 +195,40 @@ ct_reflect_data(unsigned int dst_me, unsigned int dst_xfer,
            __ct_const_val(count)], indirect_ref;
     };
 }
+
+
+#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
+
+__inline static void
+carbon_flow_control_disable()
+{
+    unsigned int port;
+
+    /* Check to see if all ports are disabled. */
+    for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+        /* Do not disable flow-control if any port is enabled. */
+        if (nic_control_word[port] & NFP_NET_CFG_CTRL_ENABLE)
+            return;
+    }
+
+    /* Disable the flow-control ME. */
+    remote_csr_write(CARBON_FLOWCTL_ISL, CARBON_FLOWCTL_ME,
+                     local_csr_mailbox_1, CARBON_FLOWCTL_MBOX1_CFG_DISABLE);
+}
+
+
+__inline static void
+carbon_flow_control_enable()
+{
+    /* Enable the flow-control ME. */
+    remote_csr_write(CARBON_FLOWCTL_ISL, CARBON_FLOWCTL_ME,
+                     local_csr_mailbox_1, CARBON_FLOWCTL_MBOX1_CFG_ENABLE);
+    remote_csr_write(CARBON_FLOWCTL_ISL, CARBON_FLOWCTL_ME,
+                     local_csr_mailbox_0, CARBON_FLOWCTL_MBOX0_CFG);
+}
+
+#endif /* NS_PLATFORM_TYPE == NS_PLATFORM_CARBON */
+
 
 static void
 cfg_changes_loop(void)
@@ -262,6 +305,14 @@ cfg_changes_loop(void)
 
             /* Save the control word */
             nic_control_word[port] = cfg_bar_data[0];
+
+#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
+            /* Check if enabling or disabling the flow-control mechanism. */
+            if (nic_control_word[port] & NFP_NET_CFG_CTRL_ENABLE)
+                carbon_flow_control_enable();
+            else
+                carbon_flow_control_disable();
+#endif
 
             /* Wait for all APP MEs to ack the config change */
             synch_cnt_dram_wait(&nic_cfg_synch);

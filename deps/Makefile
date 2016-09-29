@@ -1,8 +1,8 @@
 #
 # Change these revisions to suit the project
 #
-# FLOWENV_REV - Tip as of Sept 12 2016
-FLOWENV_REV=7abd4b14a27f
+# FLOWENV_REV - Tip as of Sept 29 2016
+FLOWENV_REV=a8812aa943a0
 # GRO_REV  - Tip as of July 12 2016
 GRO_REV=25c868a8c724
 # NFD_REV - Tip of default branch as of 27 Oct 2016
