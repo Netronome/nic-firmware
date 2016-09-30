@@ -55,6 +55,429 @@
 
 #if (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON)
     #define NBI_TM_ENABLE_SHAPER 1
+
+    /* Rate adjustment to account for oscillator PPM. */
+    #define PPM                  1
+
+    #define NBI_TM_L2_SHAPER_START_NUM(_port) \
+        (NS_PLATFORM_MAC_CHANNEL_LO(_port))
+    #define NBI_TM_L2_SHAPER_END_NUM(_port) \
+        (NS_PLATFORM_MAC_CHANNEL_HI(_port))
+    #define NBI_TM_L2_SHAPER_RATE(_port)                                       \
+        ((NS_PLATFORM_PORT_SPEED(_port) * 100 * 1000 / NS_PLATFORM_PCLK) + PPM)
+    #define NBI_TM_L2_SHAPER_THRESHOLD(_port) 7
+    #define NBI_TM_L2_SHAPER_OVERSHOOT(_port) 7
+    #define NBI_TM_L2_SHAPER_RATE_ADJ(_port)  -24
+
+    #define NBI_TM_L1_SHAPER_NUM(_port)                  \
+        (128 + (NS_PLATFORM_MAC_CHANNEL_LO(_port) >> 3))
+    #define NBI_TM_L1_SHAPER_RATE(_port)      NBI_TM_L2_SHAPER_RATE(_port)
+    /* Note: Adjust rate to account for inter-packet gap, preamble and CRC. */
+    #define NBI_TM_L1_SHAPER_THRESHOLD(_port) NBI_TM_L2_SHAPER_THRESHOLD(_port)
+    #define NBI_TM_L1_SHAPER_OVERSHOOT(_port) NBI_TM_L2_SHAPER_OVERSHOOT(_port)
+    #define NBI_TM_L1_SHAPER_RATE_ADJ(_port)  NBI_TM_L2_SHAPER_RATE_ADJ(_port)
+
+    #define NBI_TM_L0_SHAPER_NUM              144
+    #define NBI_TM_L0_SHAPER_THRESHOLD        7
+    #define NBI_TM_L0_SHAPER_OVERSHOOT        7
+    #define NBI_TM_L0_SHAPER_RATE_ADJ         -24
+
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 == 1
+        #define NBI0_TM_L0_SHAPER_RATE (NBI_TM_L1_SHAPER_RATE(0))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_0 == 2
+        #define NBI0_TM_L0_SHAPER_RATE                            \
+            (NBI_TM_L1_SHAPER_RATE(0) + NBI_TM_L1_SHAPER_RATE(1))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_0 == 3
+        #define NBI0_TM_L0_SHAPER_RATE                             \
+            (NBI_TM_L1_SHAPER_RATE(0) + NBI_TM_L1_SHAPER_RATE(1) + \
+             NBI_TM_L1_SHAPER_RATE(2))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_0 == 4
+        #define NBI0_TM_L0_SHAPER_RATE                             \
+            (NBI_TM_L1_SHAPER_RATE(0) + NBI_TM_L1_SHAPER_RATE(1) + \
+             NBI_TM_L1_SHAPER_RATE(2) + NBI_TM_L1_SHAPER_RATE(3))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_0 == 5
+        #define NBI0_TM_L0_SHAPER_RATE                             \
+            (NBI_TM_L1_SHAPER_RATE(0) + NBI_TM_L1_SHAPER_RATE(1) + \
+             NBI_TM_L1_SHAPER_RATE(2) + NBI_TM_L1_SHAPER_RATE(3) + \
+             NBI_TM_L1_SHAPER_RATE(4))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_0 == 6
+        #define NBI0_TM_L0_SHAPER_RATE                             \
+            (NBI_TM_L1_SHAPER_RATE(0) + NBI_TM_L1_SHAPER_RATE(1) + \
+             NBI_TM_L1_SHAPER_RATE(2) + NBI_TM_L1_SHAPER_RATE(3) + \
+             NBI_TM_L1_SHAPER_RATE(4) + NBI_TM_L1_SHAPER_RATE(5))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_0 == 7
+        #define NBI0_TM_L0_SHAPER_RATE                             \
+            (NBI_TM_L1_SHAPER_RATE(0) + NBI_TM_L1_SHAPER_RATE(1) + \
+             NBI_TM_L1_SHAPER_RATE(2) + NBI_TM_L1_SHAPER_RATE(3) + \
+             NBI_TM_L1_SHAPER_RATE(4) + NBI_TM_L1_SHAPER_RATE(5) + \
+             NBI_TM_L1_SHAPER_RATE(6))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_0 == 8
+        #define NBI0_TM_L0_SHAPER_RATE                             \
+            (NBI_TM_L1_SHAPER_RATE(0) + NBI_TM_L1_SHAPER_RATE(1) + \
+             NBI_TM_L1_SHAPER_RATE(2) + NBI_TM_L1_SHAPER_RATE(3) + \
+             NBI_TM_L1_SHAPER_RATE(4) + NBI_TM_L1_SHAPER_RATE(5) + \
+             NBI_TM_L1_SHAPER_RATE(6) + NBI_TM_L1_SHAPER_RATE(7))
+    #endif
+
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_1 == 1
+        #define NBI1_TM_L0_SHAPER_RATE                                   \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_1 == 2
+        #define NBI1_TM_L0_SHAPER_RATE                                    \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_1 == 3
+        #define NBI1_TM_L0_SHAPER_RATE                                    \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_1 == 4
+        #define NBI1_TM_L0_SHAPER_RATE                                    \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_1 == 5
+        #define NBI1_TM_L0_SHAPER_RATE                                    \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_1 == 6
+        #define NBI1_TM_L0_SHAPER_RATE                                    \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_1 == 7
+        #define NBI1_TM_L0_SHAPER_RATE                                    \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6))
+    #elif NS_PLATFORM_NUM_PORTS_PER_MAC_1 == 8
+        #define NBI1_TM_L0_SHAPER_RATE                                    \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6) + \
+            (NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7))
+    #endif
+
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 0
+        #define NBI0_TM_SHAPER_CFG_RANGE0 \
+            1,                            \
+            NBI_TM_L0_SHAPER_NUM,         \
+            NBI_TM_L0_SHAPER_NUM,         \
+            NBI0_TM_L0_SHAPER_RATE,       \
+            NBI_TM_L0_SHAPER_THRESHOLD,   \
+            NBI_TM_L0_SHAPER_OVERSHOOT,   \
+            NBI_TM_L0_SHAPER_RATE_ADJ
+        #define NBI0_TM_SHAPER_CFG_RANGE1  \
+            1,                             \
+            NBI_TM_L1_SHAPER_NUM(0),       \
+            NBI_TM_L1_SHAPER_NUM(0),       \
+            NBI_TM_L1_SHAPER_RATE(0),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(0), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(0), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(0)
+        #define NBI0_TM_SHAPER_CFG_RANGE2  \
+            1,                             \
+            NBI_TM_L2_SHAPER_START_NUM(0), \
+            NBI_TM_L2_SHAPER_END_NUM(0),   \
+            NBI_TM_L2_SHAPER_RATE(0),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(0), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(0), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(0)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 1
+        #define NBI0_TM_SHAPER_CFG_RANGE3  \
+            1,                             \
+            NBI_TM_L1_SHAPER_NUM(1),       \
+            NBI_TM_L1_SHAPER_NUM(1),       \
+            NBI_TM_L1_SHAPER_RATE(1),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(1), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(1), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(1)
+        #define NBI0_TM_SHAPER_CFG_RANGE4  \
+            1,                             \
+            NBI_TM_L2_SHAPER_START_NUM(1), \
+            NBI_TM_L2_SHAPER_END_NUM(1),   \
+            NBI_TM_L2_SHAPER_RATE(1),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(1), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(1), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(1)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 2
+        #define NBI0_TM_SHAPER_CFG_RANGE5  \
+            1,                             \
+            NBI_TM_L1_SHAPER_NUM(2),       \
+            NBI_TM_L1_SHAPER_NUM(2),       \
+            NBI_TM_L1_SHAPER_RATE(2),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(2), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(2), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(2)
+        #define NBI0_TM_SHAPER_CFG_RANGE6  \
+            1,                             \
+            NBI_TM_L2_SHAPER_START_NUM(2), \
+            NBI_TM_L2_SHAPER_END_NUM(2),   \
+            NBI_TM_L2_SHAPER_RATE(2),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(2), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(2), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(2)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 3
+        #define NBI0_TM_SHAPER_CFG_RANGE7  \
+            1,                             \
+            NBI_TM_L1_SHAPER_NUM(3),       \
+            NBI_TM_L1_SHAPER_NUM(3),       \
+            NBI_TM_L1_SHAPER_RATE(3),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(3), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(3), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(3)
+        #define NBI0_TM_SHAPER_CFG_RANGE8  \
+            1,                             \
+            NBI_TM_L2_SHAPER_START_NUM(3), \
+            NBI_TM_L2_SHAPER_END_NUM(3),   \
+            NBI_TM_L2_SHAPER_RATE(3),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(3), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(3), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(3)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 4
+        #define NBI0_TM_SHAPER_CFG_RANGE9  \
+            1,                             \
+            NBI_TM_L1_SHAPER_NUM(4),       \
+            NBI_TM_L1_SHAPER_NUM(4),       \
+            NBI_TM_L1_SHAPER_RATE(4),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(4), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(4), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(4)
+        #define NBI0_TM_SHAPER_CFG_RANGE10 \
+            1,                             \
+            NBI_TM_L2_SHAPER_START_NUM(4), \
+            NBI_TM_L2_SHAPER_END_NUM(4),   \
+            NBI_TM_L2_SHAPER_RATE(4),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(4), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(4), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(4)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 5
+        #define NBI0_TM_SHAPER_CFG_RANGE11 \
+            1,                             \
+            NBI_TM_L1_SHAPER_NUM(5),       \
+            NBI_TM_L1_SHAPER_NUM(5),       \
+            NBI_TM_L1_SHAPER_RATE(5),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(5), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(5), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(5)
+        #define NBI0_TM_SHAPER_CFG_RANGE12 \
+            1,                             \
+            NBI_TM_L2_SHAPER_START_NUM(5), \
+            NBI_TM_L2_SHAPER_END_NUM(5),   \
+            NBI_TM_L2_SHAPER_RATE(5),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(5), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(5), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(5)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 6
+        #define NBI0_TM_SHAPER_CFG_RANGE13 \
+            1,                             \
+            NBI_TM_L1_SHAPER_NUM(6),       \
+            NBI_TM_L1_SHAPER_NUM(6),       \
+            NBI_TM_L1_SHAPER_RATE(6),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(6), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(6), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(6)
+        #define NBI0_TM_SHAPER_CFG_RANGE14 \
+            1,                             \
+            NBI_TM_L2_SHAPER_START_NUM(6), \
+            NBI_TM_L2_SHAPER_END_NUM(6),   \
+            NBI_TM_L2_SHAPER_RATE(6),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(6), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(6), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(6)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 > 7
+        #define NBI0_TM_SHAPER_CFG_RANGE15 \
+            1,                             \
+            NBI_TM_L1_SHAPER_NUM(7),       \
+            NBI_TM_L1_SHAPER_NUM(7),       \
+            NBI_TM_L1_SHAPER_RATE(7),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(7), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(7), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(7)
+        #define NBI0_TM_SHAPER_CFG_RANGE16 \
+            1,                             \
+            NBI_TM_L2_SHAPER_START_NUM(7), \
+            NBI_TM_L2_SHAPER_END_NUM(7),   \
+            NBI_TM_L2_SHAPER_RATE(7),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(7), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(7), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(7)
+    #endif
+
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 0
+        #define NBI1_TM_SHAPER_CFG_RANGE0 \
+            1,                            \
+            NBI_TM_L0_SHAPER_NUM,         \
+            NBI_TM_L0_SHAPER_NUM,         \
+            NBI1_TM_L0_SHAPER_RATE,       \
+            NBI_TM_L0_SHAPER_THRESHOLD,   \
+            NBI_TM_L0_SHAPER_OVERSHOOT,   \
+            NBI_TM_L0_SHAPER_RATE_ADJ
+        #define NBI1_TM_SHAPER_CFG_RANGE1                                    \
+            1,                                                               \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0),       \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0),       \
+            NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0)
+        #define NBI1_TM_SHAPER_CFG_RANGE2                                    \
+            1,                                                               \
+            NBI_TM_L2_SHAPER_START_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0), \
+            NBI_TM_L2_SHAPER_END_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0),   \
+            NBI_TM_L2_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 0)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 1
+        #define NBI1_TM_SHAPER_CFG_RANGE3                                    \
+            1,                                                               \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1),       \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1),       \
+            NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1)
+        #define NBI1_TM_SHAPER_CFG_RANGE4                                    \
+            1,                                                               \
+            NBI_TM_L2_SHAPER_START_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1), \
+            NBI_TM_L2_SHAPER_END_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1),   \
+            NBI_TM_L2_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 1)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 2
+        #define NBI1_TM_SHAPER_CFG_RANGE5                                    \
+            1,                                                               \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2),       \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2),       \
+            NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2)
+        #define NBI1_TM_SHAPER_CFG_RANGE6                                    \
+            1,                                                               \
+            NBI_TM_L2_SHAPER_START_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2), \
+            NBI_TM_L2_SHAPER_END_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2),   \
+            NBI_TM_L2_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 2)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 3
+        #define NBI1_TM_SHAPER_CFG_RANGE7                                    \
+            1,                                                               \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3),       \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3),       \
+            NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3)
+        #define NBI1_TM_SHAPER_CFG_RANGE8                                    \
+            1,                                                               \
+            NBI_TM_L2_SHAPER_START_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3), \
+            NBI_TM_L2_SHAPER_END_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3),   \
+            NBI_TM_L2_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 3)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 4
+        #define NBI1_TM_SHAPER_CFG_RANGE9                                    \
+            1,                                                               \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4),       \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4),       \
+            NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4)
+        #define NBI1_TM_SHAPER_CFG_RANGE10                                   \
+            1,                                                               \
+            NBI_TM_L2_SHAPER_START_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4), \
+            NBI_TM_L2_SHAPER_END_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4),   \
+            NBI_TM_L2_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 4)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 5
+        #define NBI1_TM_SHAPER_CFG_RANGE11                                   \
+            1,                                                               \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5),       \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5),       \
+            NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5)
+        #define NBI1_TM_SHAPER_CFG_RANGE12                                   \
+            1,                                                               \
+            NBI_TM_L2_SHAPER_START_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5), \
+            NBI_TM_L2_SHAPER_END_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5),   \
+            NBI_TM_L2_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 5)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 6
+        #define NBI1_TM_SHAPER_CFG_RANGE13                                   \
+            1,                                                               \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6),       \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6),       \
+            NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6)
+        #define NBI1_TM_SHAPER_CFG_RANGE14                                   \
+            1,                                                               \
+            NBI_TM_L2_SHAPER_START_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6), \
+            NBI_TM_L2_SHAPER_END_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6),   \
+            NBI_TM_L2_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 6)
+    #endif
+    #if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 7
+        #define NBI1_TM_SHAPER_CFG_RANGE15                                   \
+            1,                                                               \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7),       \
+            NBI_TM_L1_SHAPER_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7),       \
+            NBI_TM_L1_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7),      \
+            NBI_TM_L1_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7), \
+            NBI_TM_L1_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7), \
+            NBI_TM_L1_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7)
+        #define NBI1_TM_SHAPER_CFG_RANGE16                                   \
+            1,                                                               \
+            NBI_TM_L2_SHAPER_START_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7), \
+            NBI_TM_L2_SHAPER_END_NUM(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7),   \
+            NBI_TM_L2_SHAPER_RATE(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7),      \
+            NBI_TM_L2_SHAPER_THRESHOLD(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7), \
+            NBI_TM_L2_SHAPER_OVERSHOOT(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7), \
+            NBI_TM_L2_SHAPER_RATE_ADJ(NS_PLATFORM_NUM_PORTS_PER_MAC_0 + 7)
+    #endif
 #endif
 
 /* Determine the NBI TM queue depth based on port configuration. */
