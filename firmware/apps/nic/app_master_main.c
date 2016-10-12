@@ -393,14 +393,18 @@ lsc_check(__gpr unsigned int *ls_current, int nic_intf)
     __mem char *nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, nic_intf);
     __gpr enum link_state ls;
     __gpr int changed = 0;
-    __xwrite uint32_t sts = NFP_NET_CFG_STS_LINK;
+    __xwrite uint32_t sts;
     __gpr int ret = 0;
 
     /* XXX Only check link state once the device is up.  This is
      * temporary to avoid a system crash when the MAC gets reset after
      * FW has been loaded. */
-    if (!(nic_control_word[nic_intf] & NFP_NET_CFG_CTRL_ENABLE))
-        goto out;
+    if (!(nic_control_word[nic_intf] & NFP_NET_CFG_CTRL_ENABLE)) {
+        ls = LINK_DOWN;
+        goto skip_link_read;
+    } else {
+        __critical_path();
+    }
 
     /* Read the current link state and if it changed set the bit in
      * the control BAR status */
@@ -411,12 +415,24 @@ lsc_check(__gpr unsigned int *ls_current, int nic_intf)
         changed = 1;
     *ls_current = ls;
 
+skip_link_read:
     /* Make sure the status bit reflects the link state. Write this
      * every time to avoid a race with resetting the BAR state. */
-    if (ls == LINK_DOWN)
-        mem_bitclr(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
-    else
-        mem_bitset(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
+    if (ls == LINK_DOWN) {
+        sts = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
+               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 0;
+    } else {
+#if NS_PLATFORM_TYPE == 1 || NS_PLATFORM_TYPE == 8
+        /* hydrogen 1x40 || beryllium 2x40 */
+        sts = (NFP_NET_CFG_STS_LINK_RATE_40G <<
+               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
+#elif NS_PLATFORM_TYPE == 2 || NS_PLATFORM_TYPE == 3
+        /* hydrogen 4x10 || lithium 2x10 */
+        sts = (NFP_NET_CFG_STS_LINK_RATE_10G <<
+               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
+#endif
+    }
+    mem_write32(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
 
     /* If the link state changed, try to send in interrupt */
     if (changed)
