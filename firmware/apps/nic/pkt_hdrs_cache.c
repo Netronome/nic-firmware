@@ -17,7 +17,6 @@
  * @brief         Utility functions to cache packet headers in LM
  */
 
-#include "memory.h"
 
 #include <nfp.h>
 #include <stdint.h>
