@@ -13,7 +13,8 @@ from unit import UnitIPv4, UnitIPv6, NFPFlowNICPing, UnitPing, JumboPacket, \
     RxVlan, Stats_rx_err_cnt, LinkState, RSStest_same_l4_tuple, \
     RSStest_diff_l4_tuple, Stats_per_queue_cntr, RxVlan_rx_byte, \
     RSStest_diff_l4_tuple_modify_table, Kmod_perf, \
-    RSStest_diff_part_l4_tuple, NFPFlowNICContentCheck, McPing, Rx_Drop_test
+    RSStest_diff_part_l4_tuple, NFPFlowNICContentCheck, McPing, Rx_Drop_test, \
+    DstMACFltr
 from tunnel_unit import TunnelTest, Csum_Tx_tunnel, RSStest_diff_inner_tuple,\
     LSO_tunnel, RSStest_diff_inner_tuple_multi_tunnels, Csum_rx_tnl
 from iperf_unit import Csum_Tx, Ring_size, LSO_iperf, Tx_Drop_test
@@ -66,7 +67,7 @@ class Unit_dict(object):
         self.prefix = prefix
 
         #######################################################################
-        # Ping tests
+        # General tests
         #######################################################################
         combos = (("fromA", ping_a_t, ping_dut),
                   ("toA", ping_dut, ping_a_t))
@@ -78,14 +79,15 @@ class Unit_dict(object):
                                              summary="Send a single ping %s"
                                                      % postf)
 
-        #######################################################################
-        # Multicast tests
-        #######################################################################
-
         summary = 'Multicast ping test'
         tn = self.prefix + 'mc_ping'
         self.tests[tn] = McPing(a_t, dut_t_x, ipv4=True, group=group,
                                 name=tn, summary=summary)
+
+        summary = 'MAC address filtering test'
+        tn = self.prefix + 'dst_mac_filter'
+        self.tests[tn] = DstMACFltr(a_t, dut_t_x, group=group,
+                                    name=tn, summary=summary)
 
         #######################################################################
         # LSO tests

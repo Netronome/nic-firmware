@@ -10,6 +10,7 @@ import re
 import random
 import hashlib
 import ntpath
+import math
 import socket
 import string
 import time
@@ -28,6 +29,7 @@ from libs.pcap_cmp import Pcap_Cmp_BaseTest
 from netro.testinfra.nti_exceptions import NtiTimeoutError, NtiGeneralError
 from netro.testinfra.log import LOG_exception
 from expect_cntr_list import UnitIP_dont_care_cntrs, RingSize_ethtool_rx_cntr
+from ...common_test import CommonTest
 
 class NFPFlowNICPing(Ping):
     """
@@ -1361,6 +1363,142 @@ class LinkState(Test):
             if 'NO-CARRIER' in out:
                 return True
         return False
+
+
+class DstMACFltr(CommonTest):
+    """Test class for destination MAC address filtering"""
+    _gen_info = """
+    Destination MAC address filtering
+    """
+
+    def __init__(self, src, dst, group=None, name="", summary=None):
+        """
+        @src:        A tuple of System and interface name from which to send
+        @dst:        A tuple of System and interface name which should receive
+        @group:      Test group this test belongs to
+        @name:       Name for this test instance
+        @summary:    Optional one line summary for the test
+        """
+        CommonTest.__init__(self, src, dst, group, name, summary)
+
+        if not src[0]:
+            return
+
+        self.uniqe_pkts = 100
+        # Number of repetitions of every packet.  To avoid packet noise breaking
+        # the test we repeat the pcap @rep_pkts times and complain only if we see
+        # at lease @rep_pkts packets comming through.
+        # @rep_pkts can't be lower than 2, shoudn't be lower than 4
+        self.rep_pkts = 5
+        self.tmp_mac = "60:11:22:33:44:55"
+
+        # src and dst maybe None if called without config file for list
+        _, self.tmp_pcap = mkstemp()
+        return
+
+    def send_packets(self):
+        """
+        Send packets by using TCPReplay
+        """
+        pcapre = TCPReplay(self.src, self.src_ifn, self.tmp_pcap,
+                           loop=self.rep_pkts, pps=10000)
+        attempt, sent = pcapre.run()
+        if attempt == -1 or sent == -1:
+            return False
+        else:
+            return True
+
+    def prep_pcap(self, avoid, start):
+        pkts = PacketList()
+
+        dst_mac = ""
+        new_mac = start
+
+        for i in range(0, self.uniqe_pkts):
+            while new_mac == dst_mac or new_mac == avoid:
+                idx = random.randrange(0, 12)
+                idx += idx / 2
+                # Don't change the nibble with multicast bits
+                if idx != 1:
+                    str_list = list(new_mac)
+                    str_list[idx] = hex(random.randrange(0, 15)).split('x')[1]
+                    new_mac = "".join(str_list)
+
+            dst_mac = new_mac
+            pkt = Ether(src=self.src_if.mac, dst=dst_mac)/IP(src=self.src_if.ip,
+                                                             dst=self.dst_if.ip)
+            pkts.append(pkt)
+
+        wrpcap(self.tmp_pcap, pkts)
+        self.src.cp_to(self.tmp_pcap, self.tmp_pcap)
+        os.remove(self.tmp_pcap)
+
+
+    def execute(self):
+        """
+        Send a few packets and see if they are filtered by the NFP based on
+        destination MAC address.
+        """
+
+        # Simply check if there is connectivity
+        self.src.cmd('ping -i0.2 -c 10 %s' % self.dst_if.ip)
+
+        old_dst_stats = self.dst.netifs[self.dst_ifn].stats()
+
+        # Generate traffic with random DST MAC addrs
+        self.prep_pcap(avoid=self.dst_if.mac, start=self.tmp_mac)
+        if not self.send_packets():
+            raise NtiGeneralError("Couldn't send packets")
+
+        new_dst_stats = self.dst.netifs[self.dst_ifn].stats()
+
+        diff = new_dst_stats - old_dst_stats
+        discards = diff.ethtool['dev_rx_discards']
+        if diff.ifconfig['rx_pkts'] + diff.ifconfig['rx_err'] > self.rep_pkts - 1:
+            raise NtiGeneralError("Filtering failed (pass 1) (got %d)" %
+                               (diff.ifconfig['rx_pkts'] + diff.ifconfig['rx_err']))
+
+        # Change the MAC address on DUT
+        self.dst.cmd("ip link set dev %s down; " \
+                     "ip link set dev %s addr %s; " \
+                     "ip link set dev %s up" %
+                     (self.dst_ifn, self.dst_ifn, self.tmp_mac, self.dst_ifn))
+        self.src.cmd("ip ne fl dev %s" % self.src_ifn)
+
+        # Simply check if there is connectivity
+        self.src.cmd('ping -i0.2 -c 10 %s' % self.dst_if.ip)
+
+        old_dst_stats = self.dst.netifs[self.dst_ifn].stats()
+
+        # Generate traffic with random DST MAC addrs
+        self.prep_pcap(avoid=self.tmp_mac, start=self.dst_if.mac)
+        if not self.send_packets():
+            raise NtiGeneralError("Couldn't send packets")
+
+        new_dst_stats = self.dst.netifs[self.dst_ifn].stats()
+
+        diff = new_dst_stats - old_dst_stats
+        discards += diff.ethtool['dev_rx_discards']
+        if diff.ifconfig['rx_pkts'] + diff.ifconfig['rx_err'] > self.rep_pkts - 1:
+            raise NtiGeneralError("Filtering failed (pass 2) (got %d)" %
+                                   (diff.ifconfig['rx_pkts'] + diff.ifconfig['rx_err']))
+
+        if discards != self.uniqe_pkts * self.rep_pkts * 2:
+            raise NtiGeneralError("Filtered packets not reported as discards (exp %d, got %d)" %
+                               (self.uniqe_pkts * self.rep_pkts * 2,
+                                new_dst_stats.ethtool['dev_rx_discards']))
+
+
+    def cleanup(self):
+        # Restore the MAC address on DUT
+        self.dst.cmd("ip link set dev %s down; " \
+                     "ip link set dev %s addr %s; " \
+                     "ip link set dev %s up" %
+                     (self.dst_ifn, self.dst_ifn, self.dst_if.mac, self.dst_ifn))
+        self.src.cmd("ip ne fl dev %s" % self.src_ifn)
+
+        cmd = "rm -rf " + self.tmp_pcap
+        self.src.cmd(cmd, fail=False)
 
 
 class RSStest_same_l4_tuple(Test):
