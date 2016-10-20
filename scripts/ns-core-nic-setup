@@ -1,0 +1,308 @@
+#! /bin/bash
+
+# Check for root user
+if [ "$EUID" -ne 0 ]; then
+    echo "This script must be run as root"
+    exit 1
+fi
+
+NETRONOME_DIR=/opt/netronome
+NETRONOME_BIN="$NETRONOME_DIR"/bin
+
+udev_file=/etc/udev/rules.d/99-netronome-corenic.udev.rules
+blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
+fw_file=/lib/firmware/netronome/nfp6000_net.cat
+log_file_dir=/opt/netronome/log
+log_file=$log_file_dir/ns-core-nic.log
+log_disable_file=$log_file_dir/ns-core-nic-log.disable
+
+mkdir -p $log_file_dir
+
+function log() {
+    logger -si "ns-core-nic: $@"
+    d=$(date)
+    if [ ! -e "$log_disable_file" ]; then
+        echo "$d | ns-core-nic: $@" >> $log_file
+    fi
+}
+
+function write_head() {
+    local out_file
+    out_file=$1
+
+    echo "# Copyright (C) 2012-2016 Netronome Systems, Inc. All rights reserved." > $out_file
+    echo "# Netronome Core NIC udev rules to configure the names of the" >> $out_file
+    echo "# netdev(s) created when using the Core NIC."   >> $out_file
+    echo "# Netronome Core NIC uses the nfp_net driver." >> $out_file
+    echo "" >> $out_file
+}
+
+function write_rule() {
+    local out_file mac id
+    out_file=$1
+    mac=$2
+    id=$3
+    # TBD - ATTR{dev_id}=="0x0", ATTR{type}=="1"
+    echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"nfp_net\", ATTR{address}==\"$mac\", KERNEL==\"eth*\", NAME=\"nfp_p$id\""  >> $out_file
+    echo "" >> $out_file
+}
+
+function check_and_load_driver() {
+    local nfp_net_drv_check
+    lsmod | grep -wq "nfp_net" > /dev/null 2>&1
+    nfp_net_drv_check=$?
+
+    if [ "$nfp_net_drv_check" -eq 1 ]; then
+        log "Attempting to auto load nfp_net driver"
+        modprobe nfp_net
+        if [ "$?" -ne 0 ]; then
+            log "Auto load of nfp_net driver failed"
+            log "nfp_net driver is not loaded."
+            log "ERROR"
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+function clean_udev() {
+    log "Removing udev file $udev_file..."
+    rm -f "$udev_file"
+}
+
+function write_udev() {
+    local hwinfo_macs macs id_prefix mac_addr netdev_id
+    if [ -e "$udev_file" ]; then
+        clean_udev
+    fi
+
+    log "Writing udev header..."
+    write_head "$udev_file"
+
+    log "Obtaining hwinfo..."
+    hwinfo_macs=$($NETRONOME_BIN/nfp-hwinfo | grep "eth[0-7].mac")
+    macs=$(echo "$hwinfo_macs" | tr " " "\n")
+    id_prefix="eth"
+
+    log "Writing Rules..."
+    for mac in $macs
+    do
+        mac_addr=$(echo "$mac" | cut -d '=' -f 2)
+        netdev_id=$(echo "$mac" | cut -d '=' -f 1 | cut -d '.' -f 1)
+        netdev_id=${netdev_id#$id_prefix}  # remove id_prefix
+
+        write_rule "$udev_file" "$mac_addr" "$netdev_id"
+    done
+
+    return 0
+}
+
+function clean_fw() {
+    log "Removing replay files from /lib/firmware/netronome..."
+    rm -f /lib/firmware/netronome/*.cat
+}
+
+function process_platform() {
+    local hwinfo_amda hwinfo_mac_ct selected_fw fw_path
+    ## TODO replace with nfp-platform.py calls
+    hwinfo_amda=$($NETRONOME_BIN/nfp-hwinfo | grep "assembly.partno" | cut -d '=' -f 2)
+    hwinfo_mac_ct=$($NETRONOME_BIN/nfp-hwinfo | grep -c "eth[0-7].mac")
+    log "Detecting platform..."
+    selected_fw=
+    fw_path=/opt/netronome/firmware/ns-agilio-core-nic/cat
+
+    err=0
+
+    if [ "$hwinfo_amda" == "AMDA0096-0001" ]; then
+        # No breakout cables supported
+        selected_fw=ns_nic_cx10_2.cat
+    elif [ "$hwinfo_amda" == "AMDA0081-0001" ]; then
+        if [ "$hwinfo_mac_ct" == "1" ]; then
+            selected_fw=ns_nic_cx40q_1.cat
+        elif [ "$hwinfo_mac_ct" == "4" ]; then
+            selected_fw=ns_nic_cx40q_1_4x10.cat
+        else
+            err=1
+        fi
+    elif [ "$hwinfo_amda" == "AMDA0097-0001" ]; then
+        if [ "$hwinfo_mac_ct" == "2" ]; then
+            selected_fw=ns_nic_cx40_2.cat
+        else
+            err=1
+        fi
+    else
+        err=1
+    fi
+
+    if [ $err -ne 0 ]; then
+        log "NS Platform detection failed!"
+        log "  Invalid AMDA or Port count"
+        log "    AMDA: $hwinfo_amda"
+        log "    CT  : $hwinfo_mac_ct"
+        log "ERROR"
+        return $err
+    else
+        if [ -a "$fw_path/$selected_fw" ]; then
+            log "Copying Firmware..."
+            mkdir -p /lib/firmware/netronome/
+            cp "$fw_path/$selected_fw" "$fw_file"
+        else
+            log "Firmware file $fw_path/$selected_fw does not exist."
+            log "ERROR"
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+function err47_check() {
+    grep -wq quirk_nfp6000 /boot/System.map-"$(uname -r)"
+    if [ $? -ne 0 ]; then
+        log "ERR47 kernel patches not detected on this system"
+        # TODO: instruct the user on how to apply them
+        return 1
+    fi
+    return 0
+}
+
+function reload_nfp_net() {
+    local nfp_drv_check nfp_net_drv_check
+    log "Reloading nfp_net..."
+    lsmod | grep -wq "nfp" > /dev/null 2>&1
+    nfp_drv_check=$?
+
+    lsmod | grep -wq "nfp_net" > /dev/null 2>&1
+    nfp_net_drv_check=$?
+
+    if [ "$nfp_drv_check" -eq 0 ]; then
+        rmmod nfp
+    fi
+
+    if [ "$nfp_net_drv_check" -eq 0 ]; then
+        rmmod nfp_net
+    fi
+
+    modprobe nfp_net
+    return $?
+}
+
+function blacklist_nfp() {
+    log "Permitting auto-load of nfp_net..."
+    # Overwrite file
+    echo "# This file is used to select the NFP vs nfp_net kernel module" > $blacklist_file
+    echo "#" >> $blacklist_file
+    echo "# Permit autoloading of the the nfp_net.ko kernel module" >> $blacklist_file
+    echo "blacklist nfp" >> $blacklist_file
+    echo "blacklist nfp_uio" >> $blacklist_file
+}
+
+function check_file_status() {
+    local udev_status modprobe_status fw_file_status
+
+    udev_status=1
+    if [ -f "$udev_file" ]; then
+        udev_status=0
+    fi
+
+    modprobe_status=1
+    if [ -f "$blacklist_file" ]; then
+        modprobe_status=0
+    fi
+
+    fw_file_status=1
+    if [ -f "$fw_file" ]; then
+        fw_file_status=0
+    fi
+
+    if [ $udev_status -eq 0 ] && [ $modprobe_status -eq 0 ] && [ $fw_file_status -eq 0 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function setup_nic() {
+    # check err47
+    err47_check || return
+    # verify nfp or nfp_net is loaded
+    check_and_load_driver || return
+    # remove udev file
+    clean_udev
+    # remove nic firmware
+    clean_fw
+    # detect platform and copy new firmware
+    process_platform || return
+    # write udev rules based on current platform
+    write_udev || return
+    # select nfp_net over nfp
+    blacklist_nfp
+    # reload nfp_net
+    reload_nfp_net || return
+}
+
+function usage() {
+    echo "CLI: $1 (<no param> | clean | force | help | log-enable | log-disable)"
+    echo "This utility is used to setup the CoreNIC configuration"
+    echo "  for ns-agilio-corenic usage"
+    echo ""
+    echo "This utility will update udev rules, set up driver blacklists,"
+    echo "  place the proper CoreNIC firmware in"
+    echo "  /lib/firmware/netronome/nfp6000_net.cat"
+    echo ""
+    echo "Usage examples:"
+    echo "EX: $0"
+    echo "  Will configure CoreNIC for the nfp nic detected on the system"
+    echo "EX: $0 clean"
+    echo "  Will clean all CoreNIC configuration from the system"
+    echo "EX: $0 force"
+    echo "  Will force the configuration of CoreNIC on the system"
+    echo ""
+    echo "EX: $0 log-disable"
+    echo "  Disables logging to /opt/netronome/log"
+    echo "EX: $0 log-enable"
+    echo "  Enables logging to /opt/netronome/log"
+    echo ""
+    exit 0
+}
+
+case "$1" in
+    "clean")
+        # remove udev file
+        clean_udev
+        # remove nic firmware
+        clean_fw
+        ;;
+    "force")
+        setup_nic || exit
+        ;;
+    "-h")
+        usage $0
+        ;;
+    "help")
+        usage $0
+        ;;
+    "log-enable")
+        if [ -e "$log_disable_file" ]; then
+            rm "$log_disable_file"
+        fi
+        log "Logging enabled"
+        ;;
+    "log-disable")
+        log "Logging disabled"
+        echo "# File used to indicate logging is disable to /opt/netronome/log" > "$log_disable_file"
+        ;;
+    *)
+        check_file_status
+        if [ $? -ne 0 ]; then
+            setup_nic || exit
+        else
+            log "CoreNIC files already exist."
+            log "Re-run with '$0 force' to force a CoreNIC new setup"
+        fi
+        ;;
+esac
+
+log "Done!"
+exit 0
