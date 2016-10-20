@@ -1,0 +1,22 @@
+#! /bin/bash
+
+nfp_net_name=nfp_net
+nfp_net_ver=$(dkms status | grep $nfp_net_name |grep installed | grep $(uname -r) | cut -d ',' -f2 | xargs)
+src_name="$nfp_net_name"-"$nfp_net_ver"
+
+# remove nfp_net driver from dkms
+dkms remove -m  $nfp_net_name -v $nfp_net_ver --all
+
+blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
+
+# Delete udev rules, modprobe blacklist, and firmware files
+service ns-core-nic.autorun clean
+
+# restore netronome blacklist file
+if [ -e "$blacklist_file".corenic.bak ]; then
+    cp "$blacklist_file".corenic.bak "$blacklist_file"
+    rm "$blacklist_file".corenic.bak
+fi
+
+# disable autostart
+update-rc.d ns-core-nic.autorun disable

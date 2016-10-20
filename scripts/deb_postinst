@@ -1,0 +1,74 @@
+#! /bin/bash
+
+ret=0
+ERR_DKMS_ADD=16
+ERR_DKMS_BUILD=17
+ERR_DKMS_INSTALL=18
+ERR_DKMS_MOD_NAME=19
+ERR_DKMS_MOD_VERSION=20
+ERR_DKMS_REMOVE=21
+
+# Deb packaging scons target modifies the below fields
+DKMS_MODULE_NAME=""
+DKMS_MODULE_VERSION=""
+
+if [ "$DKMS_MODULE_NAME" = "" ]; then
+    echo "DKMS_MODULE_NAME must be specified."
+    ret=$ERR_DKMS_MOD_NAME
+fi
+
+if [ "$DKMS_MODULE_VERSION" = "" ]; then
+    echo "DKMS_MODULE_VERSION must be specified."
+    ret=$ERR_DKMS_MOD_VERSION
+fi
+
+print_heading() {
+    echo "======== $1 ========"
+}
+
+process_dkms() {
+    print_heading "Processing DKMS"
+    dkms add -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION"
+    ret=$?
+    if [ $ret -ne 0 ]; then
+        ret=$ERR_DKMS_ADD
+    else
+        dkms build -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION"
+        ret=$?
+        if [ $ret -ne 0 ]; then
+            ret=$ERR_DKMS_BUILD
+        else
+            dkms install -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION"
+            ret=$?
+            if [ $ret -ne 0 ]; then
+                ret=$ERR_DKMS_INSTALL
+            fi
+        fi
+    fi
+}
+
+echo "Executing the Post install script"
+process_dkms
+if [ $ret -ne 0 ]; then
+    echo "There was an error processing dkms install. ERROR $ret"
+    exit $ret
+fi
+
+# Backup netronome blacklist
+blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
+
+if [ -e "$blacklist_file" ]; then
+    cp "$blacklist_file" "$blacklist_file".corenic.bak
+fi
+
+# Enable start script
+update-rc.d ns-core-nic.autorun defaults
+update-rc.d ns-core-nic.autorun enable
+
+# Clear any old config
+service ns-core-nic.autorun clean
+# Generate new config
+service ns-core-nic.autorun start
+
+# Disable logging
+/opt/netronome/bin/ns-core-nic-setup log-disable
