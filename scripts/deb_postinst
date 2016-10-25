@@ -33,18 +33,36 @@ process_dkms() {
     if [ $ret -ne 0 ]; then
         ret=$ERR_DKMS_ADD
     else
-        dkms build -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION"
-        ret=$?
-        if [ $ret -ne 0 ]; then
-            ret=$ERR_DKMS_BUILD
-        else
-            dkms install -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION"
-            ret=$?
-            if [ $ret -ne 0 ]; then
-                ret=$ERR_DKMS_INSTALL
+        kernel_count=0
+        for sm in `find /boot -nowarn -name "System.map*"`; do
+            kernel=${sm#"/boot/System.map-"}
+            grep -wq quirk_nfp6000 $sm
+            if [ $? -ne 0 ]; then
+                echo -n "ERR47 kernel patches not detected for version: "
+                echo $kernel
+                # TODO: instruct the user on how to apply them
+            else
+                echo -n $sm
+                echo " has ERR47 patch"
+                dkms build -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION" \
+                    -k $kernel
+                ret=$?
+                if [ $ret -ne 0 ]; then
+                    ret=$ERR_DKMS_BUILD
+                else
+                    dkms install -m "$DKMS_MODULE_NAME" -v \
+                        "$DKMS_MODULE_VERSION" -k $kernel
+                    ret=$?
+                    if [ $ret -ne 0 ]; then
+                        ret=$ERR_DKMS_INSTALL
+                    fi
+                    kernel_array[kernel_count]=$kernel
+                    let "kernel_count= $kernel_count + 1"
+                fi
             fi
-        fi
-    fi
+        done
+
+   fi
 }
 
 echo "Executing the Post install script"
@@ -72,3 +90,14 @@ service ns-core-nic.autorun start
 
 # Disable logging
 /opt/netronome/bin/ns-core-nic-setup log-disable
+
+echo "Core NIC's nfp_net driver succesfully installed for the following"
+echo "kernel versions:"
+echo -n -e "\t"
+count=0
+while [ $count -lt $kernel_count ]; do
+    echo -n ${kernel_array[${count}]}
+    echo -n " "
+    count=$(( $count + 1 ))
+done
+echo ""
