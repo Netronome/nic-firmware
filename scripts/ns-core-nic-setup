@@ -48,19 +48,31 @@ function write_rule() {
 }
 
 function check_and_load_driver() {
+    # after DKMS install the nfp_net driver is not automatically
+    # loaded. If nfp_net is loaded it is a previous version that we
+    # have to unload. And then load the version we just installed
     local nfp_net_drv_check
     lsmod | grep -wq "nfp_net" > /dev/null 2>&1
     nfp_net_drv_check=$?
 
-    if [ "$nfp_net_drv_check" -eq 1 ]; then
-        log "Attempting to auto load nfp_net driver"
-        modprobe nfp_net
+    if [ "$nfp_net_drv_check" -eq 0 ]; then
+        log "nfp_net already loaded"
+        log "Attempting to unload nfp_net driver"
+        rmmod nfp_net
         if [ "$?" -ne 0 ]; then
-            log "Auto load of nfp_net driver failed"
-            log "nfp_net driver is not loaded."
+            log "Unload of nfp_net driver failed"
             log "ERROR"
             return 1
         fi
+    fi
+
+    log "Attempting to load nfp_net driver"
+    modprobe nfp_net
+    if [ "$?" -ne 0 ]; then
+        log "Auto load of nfp_net driver failed"
+        log "nfp_net driver is not loaded."
+        log "ERROR"
+        return 1
     fi
 
     return 0
