@@ -64,6 +64,22 @@ function check_and_load_driver() {
             log "ERROR"
             return 1
         fi
+    else
+        # Unload nfp driver if loaded
+        local nfp_drv_check
+        lsmod | grep -wq "nfp" > /dev/null 2>&1
+        nfp_drv_check=$?
+
+        if [ "$nfp_drv_check" -eq 0 ]; then
+            log "nfp already loaded"
+            log "Attempting to unload nfp driver"
+            rmmod nfp
+            if [ "$?" -ne 0 ]; then
+                log "Unload of nfp driver failed"
+                log "ERROR"
+                return 1
+            fi
+        fi
     fi
 
     log "Attempting to load nfp_net driver"
