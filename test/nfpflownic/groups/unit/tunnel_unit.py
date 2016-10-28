@@ -1259,7 +1259,7 @@ class Csum_Tx_tunnel(Csum_Tx):
             cr_comment = 'Checksum error'
             LOG_sec("IP checksum error in packet:")
             if IP in pkt:
-                LOG_sec("IP_ID %d" % pkt[IP].id)
+                LOG("IP_ID %d" % pkt[IP].id)
             LOG("ip_chksum, rc_ip_chksum")
             LOG('%s, %s' % (ip_chksum, rc_ip_chksum))
             LOG_endsec()
@@ -1270,7 +1270,7 @@ class Csum_Tx_tunnel(Csum_Tx):
                 cr_comment = 'Checksum error'
                 LOG_sec("TCP/UDP checksum error in packet")
                 if IP in pkt:
-                    LOG_sec("IP_ID %d" % pkt[IP].id)
+                    LOG("IP_ID %d" % pkt[IP].id)
                 LOG("l4_chksum, rc_l4_chksum")
                 LOG('%s, %s' % (l4_chksum, rc_l4_chksum))
                 LOG_endsec()
