@@ -341,8 +341,9 @@ class Iperftest(Test):
         """
         tcpd_pid_file = os.path.join(self.dst_tmp_dir, 'tcpd_tmp_pid.txt')
         cmd = "tcpdump -w %s -i %s -p 'ether src %s and ether dst %s' " \
+              " 2> %s/tcpdump_stderr.txt"
               % (self.dst_pcap_file, self.dst_ifn, self.src_mac,
-                 self.dst_mac)
+                 self.dst_mac, self.dst_tmp_dir)
         ret, _ = self.dst.cmd_bg_pid_file(cmd, tcpd_pid_file, background=True)
         self.tcpdump_dst_pid = ret[1]
         timed_poll(30, self.dst.exists_host, self.dst_pcap_file, delay=1)
@@ -1057,15 +1058,17 @@ class LSO_iperf(Csum_Tx):
         #CHANGED, 50 to 200 packet to capture
         tcpd_pid_file = os.path.join(self.dst_tmp_dir, 'tcpd_tmp_pid.txt')
         cmd = "tcpdump -w %s -i %s -p 'ether src %s and ether dst %s' " \
+              " 2> %s/tcpdump_stderr.txt"
               % (self.dst_pcap_file, self.dst_ifn, self.src_mac,
-                 self.dst_mac)
+                 self.dst_mac, self.dst_tmp_dir)
         ret, _ = self.dst.cmd_bg_pid_file(cmd, tcpd_pid_file,
                                           background=True)
         self.tcpdump_dst_pid = ret[1]
         tcpd_pid_file = os.path.join(self.src_tmp_dir, 'tcpd_tmp_pid.txt')
         cmd = "tcpdump -w %s -i %s -p 'ether src %s and ether dst %s' " \
+              " 2> %s/tcpdump_stderr.txt"
               % (self.src_pcap_file, self.src_ifn, self.src_mac,
-                 self.dst_mac)
+                 self.dst_mac, self.dst_tmp_dir)
         ret, _ = self.src.cmd_bg_pid_file(cmd, tcpd_pid_file, background=True)
         self.tcpdump_src_pid = ret[1]
         timed_poll(30, self.dst.exists_host, self.dst_pcap_file, delay=1)

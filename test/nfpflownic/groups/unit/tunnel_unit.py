@@ -1894,8 +1894,9 @@ class Csum_rx_tnl(UnitIP):
         else:
             promisc_str = '-p'
         tcpd_pid_file = os.path.join(self.dst_tmp_dir, 'tcpd_tmp_pid.txt')
-        cmd = "tcpdump %s -w %s -i %s  " \
-              % (promisc_str, self.dst_pcap_file, self.dst_ifn, )
+        cmd = "tcpdump %s -w %s -i %s 2> %s/tcpdump_stderr.txt" \
+              % (promisc_str, self.dst_pcap_file, self.dst_ifn,
+                 self.dst_tmp_dir)
         ret, _ = self.dst.cmd_bg_pid_file(cmd, tcpd_pid_file, background=True)
         self.tcpdump_dst_pid = ret[1]
         timed_poll(30, self.dst.exists_host, self.dst_pcap_file, delay=1)
