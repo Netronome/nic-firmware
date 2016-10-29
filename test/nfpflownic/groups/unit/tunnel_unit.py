@@ -1413,11 +1413,11 @@ class LSO_tunnel(LSO_iperf):
         self.src.cmd(cmd, fail=False)
         cmd = 'ip link delete %s' % self.dst_vxlan_intf
         self.dst.cmd(cmd, fail=False)
-        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport %s' % \
+        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport %s noudpcsum' % \
               (self.src_vxlan_intf, self.vxlan_id, self.vxlan_mc,
                self.src_ifn, self.vxlan_dport)
         self.src.cmd(cmd)
-        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport %s' % \
+        cmd = 'ip link add %s type vxlan id %d group %s dev %s dstport %s noudpcsum' % \
               (self.dst_vxlan_intf, self.vxlan_id, self.vxlan_mc,
                self.dst_ifn, self.vxlan_dport)
         self.dst.cmd(cmd)
