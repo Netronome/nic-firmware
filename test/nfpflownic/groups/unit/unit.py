@@ -2516,7 +2516,7 @@ class NFPFlowNICContentCheck(Test):
                                  passed=False, comment=comment)
 
         finally:
-            self.dst.killall_w_pid(self.nc_pid, fail=False)
+            self.dst.killall_w_pid(self.nc_pid, signal='-9')
 
             # check netcat server err (for debugging) after netcat client ends
             self.dst.cmd('cat %s' % os.path.join(self.tmp_dst_dir,
@@ -2573,7 +2573,7 @@ class NFPFlowNICContentCheck(Test):
                                 ntpath.basename(self.tmp_file)),
                    delay=1)
 
-        self.dst.killall_w_pid(self.nc_pid, fail=False)
+        self.dst.killall_w_pid(self.nc_pid, signal='-9')
 
         return
 
@@ -2637,7 +2637,7 @@ class NFPFlowNICContentCheck(Test):
         try:
             self.src.cmd(nc_cmd)
         except:
-            self.dst.killall_w_pid(self.nc_pid, fail=False)
+            self.dst.killall_w_pid(self.nc_pid, signal='-9')
             return False
 
         after_dst_cntrs = dst_netifs.stats()
@@ -2645,7 +2645,7 @@ class NFPFlowNICContentCheck(Test):
         diff_dst_cntrs = after_dst_cntrs - before_dst_cntrs
         diff_src_cntrs = after_src_cntrs - before_src_cntrs
 
-        self.dst.killall_w_pid(self.nc_pid, fail=False)
+        self.dst.killall_w_pid(self.nc_pid, signal='-9')
 
         if diff_src_cntrs.ethtool['tx_lso']:
             return True

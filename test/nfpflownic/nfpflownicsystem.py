@@ -49,15 +49,14 @@ class localNrtSystem(NrtSystem):
         return (ret, bg_pid), ret_data
 
 
-    def killall_w_pid(self, diff_pid, fail=True, kill_9=True):
+    def killall_w_pid(self, diff_pid, fail=False, signal=""):
 
-        if kill_9:
-            kill_priority = '-9'
-        else:
-            kill_priority = ' '
         if diff_pid:
+            wait_for = ""
             for pid in diff_pid:
-                self.cmd('kill %s %d' % (kill_priority, pid), fail=fail)
+                self.cmd('kill %s %d' % (signal, pid), fail=fail)
+                wait_for += "-p %d" % pid
+            self.cmd('while ps %s; do true; done >> /dev/null' % wait_for)
 
 
     def cmd(self, command, fail=True, background=False, include_stderr=False):

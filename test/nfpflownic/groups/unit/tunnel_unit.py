@@ -1130,9 +1130,9 @@ class Csum_Tx_tunnel(Csum_Tx):
             cmd = 'ip link delete %s' % self.dst_vxlan_intf
             self.dst.cmd(cmd, fail=False)
         # make sure iperf and tcpdump are stopped.
-        self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
-        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False)
-        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False)
+        self.dst.killall_w_pid(self.iperf_s_pid, signal="-9")
+        self.dst.killall_w_pid(self.tcpdump_dst_pid)
+        self.src.killall_w_pid(self.tcpdump_src_pid)
         if not self.ipv4:
             self.dst.cmd("ifconfig %s -allmulti" % self.dst_ifn)
             self.src.cmd("ifconfig %s -allmulti" % self.src_ifn)
@@ -1594,9 +1594,9 @@ class LSO_tunnel(LSO_iperf):
             cmd = 'ip link delete %s' % self.dst_vxlan_intf
             self.dst.cmd(cmd, fail=False)
         # make sure iperf and tcpdump are stopped.
-        self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
-        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False)
-        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False)
+        self.dst.killall_w_pid(self.iperf_s_pid, signal='-9')
+        self.dst.killall_w_pid(self.tcpdump_dst_pid)
+        self.src.killall_w_pid(self.tcpdump_src_pid)
         if not self.ipv4:
             self.dst.cmd("ifconfig %s -allmulti" % self.dst_ifn)
             self.src.cmd("ifconfig %s -allmulti" % self.src_ifn)
@@ -2019,8 +2019,8 @@ class Csum_rx_tnl(UnitIP):
         """
         Check the result
         """
-        import time
-        time.sleep(3)
+        time.sleep(1)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid)
         _, local_recv_pcap = mkstemp()
         self.dst.cp_from(self.dst_pcap_file, local_recv_pcap)
         rcv_pkts = rdpcap(local_recv_pcap)
@@ -2046,7 +2046,6 @@ class Csum_rx_tnl(UnitIP):
         #if "hw_rx_csum_ok" in self.expect_et_cntr and \
         #        self.expect_et_cntr["hw_rx_csum_ok"]:
         #    self.expect_et_cntr["hw_rx_csum_ok"] = outer_rx_pkts
-        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False, kill_9=False)
         if local_recv_pcap:
             os.remove(local_recv_pcap)
         res = UnitIP.check_result(self, if_stat_diff)

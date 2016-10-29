@@ -8,6 +8,7 @@ Iperf test classes for the NFPFlowNIC Software Group.
 import os
 import re
 import random
+import time
 from netro.testinfra import Test, LOG_sec, LOG, LOG_endsec
 from scapy.all import TCP, UDP, IP, IPv6, rdpcap, Raw, PacketList, Packet
 from netro.testinfra.utilities import timed_poll
@@ -383,13 +384,15 @@ class Iperftest(Test):
         try:
             timed_poll(10, self.is_iperf_traffic_received)
         except NtiTimeoutError:
-            self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
+            self.dst.killall_w_pid(self.iperf_s_pid, signal='-9')
             # check the iperf server output one more time
             if not self.is_iperf_traffic_received():
                 msg = 'Iperf server does not receive traffic'
                 raise NtiGeneralError(msg)
-        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False, kill_9=False)
-        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False, kill_9=False)
+        # wait a second to allow tcpdump to finish writting packets.
+        time.sleep(1)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid)
+        self.src.killall_w_pid(self.tcpdump_src_pid)
         self.dst.cmd('cat %s' % self.dst_srv_file, fail=False)
         _, self.local_recv_pcap = mkstemp()
         self.dst.cp_from(self.dst_pcap_file, self.local_recv_pcap)
@@ -401,9 +404,9 @@ class Iperftest(Test):
         Remove temporary directory and files
         """
         # make sure iperf and tcpdump are stopped.
-        self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
-        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False)
-        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False)
+        self.dst.killall_w_pid(self.iperf_s_pid, signal='-9')
+        self.dst.killall_w_pid(self.tcpdump_dst_pid)
+        self.src.killall_w_pid(self.tcpdump_src_pid)
         if not self.ipv4:
             self.dst.cmd("ifconfig %s -allmulti" % self.dst_ifn)
             self.src.cmd("ifconfig %s -allmulti" % self.src_ifn)
@@ -1000,9 +1003,9 @@ class Ring_size(Iperftest):
         """
         make sure iperf and tcpdump are stopped. And reset the ring size.
         """
-        self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
-        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False)
-        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False)
+        self.dst.killall_w_pid(self.iperf_s_pid, signal='-9')
+        self.dst.killall_w_pid(self.tcpdump_dst_pid)
+        self.src.killall_w_pid(self.tcpdump_src_pid)
         # reset ring size
         self.set_ring_size(self.dst, self.dst_ifn, self.default_ring_size,
                            self.default_ring_size)
@@ -1075,8 +1078,10 @@ class LSO_iperf(Csum_Tx):
         packets from the pcap file on the local machine.
         """
         Csum_Tx.get_result(self)
-        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False, kill_9=False)
-        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False, kill_9=False)
+        # wait a second to allow tcpdump to finish writting packets.
+        time.sleep(1)
+        self.dst.killall_w_pid(self.tcpdump_dst_pid)
+        self.src.killall_w_pid(self.tcpdump_src_pid)
         _, self.local_send_pcap = mkstemp()
         self.src.cp_from(self.src_pcap_file, self.local_send_pcap)
         self.snd_pkts = rdpcap(self.local_send_pcap)
@@ -1087,9 +1092,9 @@ class LSO_iperf(Csum_Tx):
         Remove temporary directory and files
         """
         # make sure iperf and tcpdump are stopped.
-        self.dst.killall_w_pid(self.iperf_s_pid, fail=False)
-        self.dst.killall_w_pid(self.tcpdump_dst_pid, fail=False)
-        self.src.killall_w_pid(self.tcpdump_src_pid, fail=False)
+        self.dst.killall_w_pid(self.iperf_s_pid, signal='-9')
+        self.dst.killall_w_pid(self.tcpdump_dst_pid)
+        self.src.killall_w_pid(self.tcpdump_src_pid)
         if not self.ipv4:
             self.dst.cmd("ifconfig %s -allmulti" % self.dst_ifn)
             self.src.cmd("ifconfig %s -allmulti" % self.src_ifn)
