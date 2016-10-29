@@ -33,11 +33,10 @@ class localNrtSystem(NrtSystem):
         """
 
         bg_pid = []
-        bg_cmd = command + '& BG_PID=$! ; sleep 5; echo $BG_PID > %s' % \
-                 tmp_file
+        bg_cmd = command + '& echo $! > %s' % tmp_file
         ret, ret_data = self.cmd(bg_cmd, fail=fail, background=background,
                                  include_stderr=include_stderr)
-        time.sleep(10)
+        time.sleep(2)
         cmd = 'cat %s' % tmp_file
         ret, out = self.cmd(cmd, fail=False)
         if ret == 0:
