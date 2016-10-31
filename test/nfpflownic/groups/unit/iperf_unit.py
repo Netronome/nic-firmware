@@ -340,7 +340,7 @@ class Iperftest(Test):
         Start the tcpdump to listening to the interfaces.
         """
         tcpd_pid_file = os.path.join(self.dst_tmp_dir, 'tcpd_tmp_pid.txt')
-        cmd = "tcpdump -w %s -i %s -p 'ether src %s and ether dst %s' " \
+        cmd = "tcpdump -n -w %s -i %s -p 'ether src %s and ether dst %s' " \
               " 2> %s/tcpdump_stderr.txt"
               % (self.dst_pcap_file, self.dst_ifn, self.src_mac,
                  self.dst_mac, self.dst_tmp_dir)
@@ -1057,7 +1057,7 @@ class LSO_iperf(Csum_Tx):
         """
         #CHANGED, 50 to 200 packet to capture
         tcpd_pid_file = os.path.join(self.dst_tmp_dir, 'tcpd_tmp_pid.txt')
-        cmd = "tcpdump -w %s -i %s -p 'ether src %s and ether dst %s' " \
+        cmd = "tcpdump -n -w %s -i %s -p 'ether src %s and ether dst %s' " \
               " 2> %s/tcpdump_stderr.txt"
               % (self.dst_pcap_file, self.dst_ifn, self.src_mac,
                  self.dst_mac, self.dst_tmp_dir)
@@ -1065,7 +1065,7 @@ class LSO_iperf(Csum_Tx):
                                           background=True)
         self.tcpdump_dst_pid = ret[1]
         tcpd_pid_file = os.path.join(self.src_tmp_dir, 'tcpd_tmp_pid.txt')
-        cmd = "tcpdump -w %s -i %s -p 'ether src %s and ether dst %s' " \
+        cmd = "tcpdump -n -w %s -i %s -p 'ether src %s and ether dst %s' " \
               " 2> %s/tcpdump_stderr.txt"
               % (self.src_pcap_file, self.src_ifn, self.src_mac,
                  self.dst_mac, self.dst_tmp_dir)
