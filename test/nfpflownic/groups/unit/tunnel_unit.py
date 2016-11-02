@@ -1627,8 +1627,8 @@ class LSO_tunnel(LSO_iperf):
             outer_passed = True
             inner_passed = True
 
-            if IP in pkt or IPv6 in pkt:
-                # only check checksum of IP/IPv6 packet=
+            if (self.ipv4 and IP in pkt) or (not self.ipv4 and IPv6 in pkt):
+                # only check checksum if IP/IPv6 packet
                 outer_passed, outer_comment = self.check_csum(pkt, self.ipv4,
                                                               self.l4_type)
 
