@@ -65,6 +65,29 @@ process_dkms() {
    fi
 }
 
+check_flash() {
+    print_heading "Check flash version in the NFP NIC"
+
+    local NETRONOME_BIN="/opt/netronome/bin"
+    local flash_image=/opt/netronome/flash/flash-nic.bin
+    # Note, the sed below ifgnores nfp-media changes IE using a breakout cable
+    local nfp_versions=$($NETRONOME_BIN/nfp-fis list -v | sed '/^hwinfo.bin.*$/d')
+    local flash_versions=$($NETRONOME_BIN/nfp-fis --image=$flash_image list -v)
+
+    if [ "$flash_versions" = "$nfp_versions" ]; then
+        echo "NFP has desired flash image"
+    else
+        print_heading "NFP needs to be flashed. Please run the following commands:"
+        # TODO use newer BSP and nfp-flash flag '--preserve-media-overrides'
+        echo -n -e "\t"
+        echo "$NETRONOME_BIN/nfp-flash --i-accept-the-risk-of-overwriting-miniloader -w $flash_image"
+        # TODO change this when supporting SFs
+        echo -n -e "\t"
+        echo "$NETRONOME_BIN/nfp-one"
+        print_heading
+    fi
+}
+
 echo "Executing the Post install script"
 process_dkms
 if [ $ret -ne 0 ]; then
@@ -101,3 +124,5 @@ while [ $count -lt $kernel_count ]; do
     count=$(( $count + 1 ))
 done
 echo ""
+
+check_flash
