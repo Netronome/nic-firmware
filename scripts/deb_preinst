@@ -1,0 +1,12 @@
+#! /bin/bash
+
+echo "Executing the pre install script"
+grep -wq quirk_nfp6000 /boot/System.map-"$(uname -r)"
+if [ $? -ne 0 ]; then
+    echo -n "Error: running kernel "
+    echo -n "$(uname -r)"
+    echo "does not have quirk_nfp6000."
+    echo "Please try again with a kernel with quirk_nfp6000"
+    echo "Please contact support@netronome.com for more information"
+    exit 1
+fi
