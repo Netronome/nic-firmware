@@ -84,6 +84,8 @@ check_flash() {
         # TODO change this when supporting SFs
         echo -n -e "\t"
         echo "$NETRONOME_BIN/nfp-one"
+        echo -n -e "\t"
+        echo "reboot"
         print_heading
     fi
 }
