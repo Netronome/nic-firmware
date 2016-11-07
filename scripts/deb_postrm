@@ -1,4 +1,0 @@
-#! /bin/bash
-
-# remove start script
-update-rc.d ns-core-nic.autorun remove

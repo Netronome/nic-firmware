@@ -20,3 +20,6 @@ fi
 
 # disable autostart
 update-rc.d ns-core-nic.autorun disable
+
+# remove start script
+update-rc.d -f ns-core-nic.autorun remove
