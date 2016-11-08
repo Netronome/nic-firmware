@@ -81,6 +81,9 @@ struct cfg_bar_cntrs {
     uint64_t bc_frames;
 };
 
+/* enable getting the MAC stats */
+#define ACC_MAC_STATS
+
 #ifndef ACC_MAC_STATS
 #define EXTRA_CNT_INCR(cntr)        mem_incr64(cntr)
 #else
@@ -106,7 +109,7 @@ nic_rx_cntrs(int port, void *da, int len)
         }
     } else {
         mem_add64_imm(len, &nic_stats_extra[port].rx_uc_octets);
-        EXTRA_CNT_INCR(&nic_stats_extra[port].rx_uc_pkts);
+        mem_incr64(&nic_stats_extra[port].rx_uc_pkts);
     }
 }
 
@@ -125,7 +128,7 @@ nic_tx_cntrs(int port, void *da, int len)
         }
     } else {
         mem_add64_imm(len, &nic_stats_extra[port].tx_uc_octets);
-        EXTRA_CNT_INCR(&nic_stats_extra[port].tx_uc_pkts);
+        mem_incr64(&nic_stats_extra[port].tx_uc_pkts);
     }
 
 }
@@ -216,6 +219,7 @@ nic_stats_rx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
     __xread uint64_t read_array[8];
     __xread uint64_t read_val;
 
+#ifdef ACC_MAC_STATS
     /* Retrieve the corresponding MAC port stats. */
     if (port < NS_PLATFORM_NUM_PORTS) {
         port_stats = &nic_mac_cntrs_accum[NS_PLATFORM_MAC_SERDES_LO(port)];
@@ -233,6 +237,7 @@ nic_stats_rx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
                    sizeof(read_val));
         bar_cntrs.bc_frames += read_val;
     }
+#endif
 
     mem_read64(read_array, &nic_stats_extra[port].rx_discards,
                sizeof(read_array));
@@ -241,12 +246,18 @@ nic_stats_rx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
     bar_cntrs.uc_octets += read_array[2];
     bar_cntrs.mc_octets += read_array[3];
     bar_cntrs.bc_octets += read_array[4];
+#ifndef ACC_MAC_STATS
     bar_cntrs.mc_frames += read_array[6];
     bar_cntrs.bc_frames += read_array[7];
+#endif
 
     /* Accumulated stats */
     bar_cntrs.octets = read_array[2] + read_array[3] + read_array[4];
+#ifndef  ACC_MAC_STATS
     bar_cntrs.frames = read_array[5] + read_array[6] + read_array[7];
+#else
+    bar_cntrs.frames = read_array[5] + bar_cntrs.mc_frames + bar_cntrs.bc_frames;
+#endif
 
     *write_bar_cntrs = bar_cntrs;
 }
@@ -259,6 +270,7 @@ nic_stats_tx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
     __xread uint64_t read_array[8];
     __xread uint64_t read_val;
 
+#ifdef ACC_MAC_STATS
     /* Retrieve the corresponding MAC port stats. */
     if (port < NS_PLATFORM_NUM_PORTS) {
         port_stats = &nic_mac_cntrs_accum[NS_PLATFORM_MAC_SERDES_LO(port)];
@@ -281,6 +293,7 @@ nic_stats_tx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
         mem_read64(&read_val, &nic_tmq_drop_cntr_accum[port], sizeof(uint64_t));
         bar_cntrs.discards += read_val;
     }
+#endif
 
     mem_read64(read_array, &nic_stats_extra[port].tx_discards,
                sizeof(read_array));
@@ -289,12 +302,19 @@ nic_stats_tx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
     bar_cntrs.uc_octets += read_array[2];
     bar_cntrs.mc_octets += read_array[3];
     bar_cntrs.bc_octets += read_array[4];
+#ifndef ACC_MAC_STATS
     bar_cntrs.mc_frames += read_array[6];
     bar_cntrs.bc_frames += read_array[7];
+#endif
 
     /* Accumulated stats */
     bar_cntrs.octets = read_array[2] + read_array[3] + read_array[4];
+#ifndef  ACC_MAC_STATS
     bar_cntrs.frames = read_array[5] + read_array[6] + read_array[7];
+#else
+    bar_cntrs.frames = read_array[5] + bar_cntrs.mc_frames + bar_cntrs.bc_frames;
+#endif
+
 
     *write_bar_cntrs = bar_cntrs;
 }
@@ -364,8 +384,10 @@ nic_stats_loop(void)
     set_alarm(MAC_STATS_CNTRS_INTERVAL, &sig);
 
     for (;;) {
+#ifdef ACC_MAC_STATS
         /* Accumulate the MAC statistics. */
         mac_stats_accumulate();
+#endif
 
         /* Push the accumulated counters to the config BAR. */
         if (signal_test(&sig)) {
