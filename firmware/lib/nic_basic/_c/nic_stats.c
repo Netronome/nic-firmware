@@ -109,7 +109,7 @@ nic_rx_cntrs(int port, void *da, int len)
         }
     } else {
         mem_add64_imm(len, &nic_stats_extra[port].rx_uc_octets);
-        mem_incr64(&nic_stats_extra[port].rx_uc_pkts);
+        EXTRA_CNT_INCR(&nic_stats_extra[port].rx_uc_pkts);
     }
 }
 
@@ -255,8 +255,6 @@ nic_stats_rx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
     bar_cntrs.octets = read_array[2] + read_array[3] + read_array[4];
 #ifndef  ACC_MAC_STATS
     bar_cntrs.frames = read_array[5] + read_array[6] + read_array[7];
-#else
-    bar_cntrs.frames = read_array[5] + bar_cntrs.mc_frames + bar_cntrs.bc_frames;
 #endif
 
     *write_bar_cntrs = bar_cntrs;
