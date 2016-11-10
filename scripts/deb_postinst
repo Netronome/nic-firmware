@@ -80,7 +80,7 @@ check_flash() {
         print_heading "NFP needs to be flashed. Please run the following commands:"
         # TODO use newer BSP and nfp-flash flag '--preserve-media-overrides'
         echo -n -e "\t"
-        echo "$NETRONOME_BIN/nfp-flash --i-accept-the-risk-of-overwriting-miniloader -w $flash_image"
+        echo "$NETRONOME_BIN/nfp-flash --i-accept-the-risk-of-overwriting-miniloader --preserve-media-overrides -w $flash_image"
         # TODO change this when supporting SFs
         echo -n -e "\t"
         echo "$NETRONOME_BIN/nfp-one"
