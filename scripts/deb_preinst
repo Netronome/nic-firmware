@@ -10,3 +10,17 @@ if [ $? -ne 0 ]; then
     echo "Please contact support@netronome.com for more information"
     exit 1
 fi
+
+cmdline=`cat /proc/cmdline`
+
+if ( [[ ${cmdline} != *"intel_iommu=on"* ]] || [[ ${cmdline} != *"iommu=pt"* ]] || [[ ${cmdline} != *"intremap=on"* ]] );then
+    echo "Error: running kernel was not booted with the:"
+    echo ""
+    echo "       intel_iommu=on iommu=pt intremap=on"
+    echo "command-line option (typically set in `/etc/default/grub`)."
+    echo ""
+    echo "Please try again with a kernel with those options."
+    echo "If the command-line option needs to be added to the grub menu,"
+    echo "don't forget to run `update-grub` before rebooting."
+    exit 1
+fi
