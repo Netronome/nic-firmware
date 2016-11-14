@@ -152,6 +152,39 @@ __intrinsic extern int msix_vf_send(unsigned int pcie_nr,
 #define CARBON_FLOWCTL_MBOX1_CFG_ENABLE  0x20
 
 
+/* Translate port speed to link rate encoding */
+__intrinsic static unsigned int
+port_speed_to_link_rate(unsigned int port_speed)
+{
+    unsigned int link_rate;
+
+    switch (port_speed) {
+    case 1:
+        link_rate = NFP_NET_CFG_STS_LINK_RATE_1G;
+        break;
+    case 10:
+        link_rate = NFP_NET_CFG_STS_LINK_RATE_10G;
+        break;
+    case 25:
+        link_rate = NFP_NET_CFG_STS_LINK_RATE_25G;
+        break;
+    case 40:
+        link_rate = NFP_NET_CFG_STS_LINK_RATE_40G;
+        break;
+    case 50:
+        link_rate = NFP_NET_CFG_STS_LINK_RATE_50G;
+        break;
+    case 100:
+        link_rate = NFP_NET_CFG_STS_LINK_RATE_100G;
+        break;
+    default:
+        link_rate = NFP_NET_CFG_STS_LINK_RATE_UNSUPPORTED;
+        break;
+    }
+
+    return link_rate;
+}
+
 /*
  * Config change management.
  *
@@ -461,15 +494,8 @@ skip_link_read:
         sts = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
                NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 0;
     } else {
-#if NS_PLATFORM_TYPE == 1 || NS_PLATFORM_TYPE == 8
-        /* hydrogen 1x40 || beryllium 2x40 */
-        sts = (NFP_NET_CFG_STS_LINK_RATE_40G <<
+        sts = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(nic_intf)) <<
                NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
-#elif NS_PLATFORM_TYPE == 2 || NS_PLATFORM_TYPE == 3
-        /* hydrogen 4x10 || lithium 2x10 */
-        sts = (NFP_NET_CFG_STS_LINK_RATE_10G <<
-               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
-#endif
     }
     mem_write32(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
 
