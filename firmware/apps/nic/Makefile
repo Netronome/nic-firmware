@@ -21,6 +21,10 @@ else ifeq ($(PLATFORM),Beryllium)
     NS_PLATFORM_TYPE = 7
     PROJECT = ns_nic_cx40_2
     AMDA = AMDA0097-0001
+else ifeq ($(PLATFORM),Beryllium_4x10_1x40)
+    NS_PLATFORM_TYPE = 8
+    PROJECT = ns_nic_cx40_2_4x10_1x40
+    AMDA = AMDA0097-0001
 else ifeq ($(PLATFORM),Carbon)
     NS_PLATFORM_TYPE = 10
     PROJECT = ns_nic_cx25_2
