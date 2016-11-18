@@ -1315,8 +1315,6 @@ class _NFPFlowNIC_nport(netro.testinfra.Group):
         if len(self.addr_d) != self.num_port \
                 or len(self.addr_v6_d) != self.num_port \
                 or self.num_port!= self.expected_ports:
-            print(len(self.addr_d), len(self.addr_v6_d), self.num_port,
-                  self.expected_ports)
             raise NtiFatalError(msg="number of DUT ports in cfg file not "
                                     "correct")
         # Hosts
@@ -1666,3 +1664,159 @@ class _NFPFlowNIC_no_fw_loading(netro.testinfra.Group):
         LOG_endsec()
 
         return rss_str
+
+
+###############################################################################
+# A group of Perf tests with kernel loading
+###############################################################################
+class _NFPFlowNICPerfTest_nport(_NFPFlowNIC_nport):
+
+    # Perf test group does not need Jakub's netcat tools. So override the _init
+    # and _fini here
+    def _init(self):
+        """ Clean up the systems for tests from this group
+        called from the groups run() method.
+        """
+        netro.testinfra.Group._init(self)
+
+        return
+
+    def _configure_intfs(self):
+        """
+        Configure eth_a of the host_a with IPv4 address addr_a and IPv6 address
+        addr_v6_a. Also configure eth_x of the DUT with IPv4 address addr_x and
+        IPv6 address addr_v6_x
+        Also Pin interrupts for iperf tests
+        """
+
+        _NFPFlowNIC_nport._configure_intfs(self)
+        ir_list = []
+
+        for i in range(0, self.num_port):
+            cmd = 'cat /proc/interrupts | grep %s-rxtx | cut -d : -f 1' % \
+                  self.eth_d[i]
+            ret, out = self.dut.cmd(cmd)
+            ir_list.append([y for y in (x.strip() for x in out.splitlines()) if y])
+
+        cmd = 'service irqbalance stop'
+        self.dut.cmd(cmd, fail=False)
+
+        cmd = ""
+        for j in range(0, self.num_port):
+            i = 0
+            for ir in ir_list[j]:
+                cmd += "echo %d > /proc/irq/%d/smp_affinity_list && " % \
+                       (i, int(ir))
+                i += 1
+            cmd = cmd[:-2]
+            self.dut.cmd(cmd)
+
+class _NFPFlowNIC_nport_no_fw_loading(_NFPFlowNIC_nport):
+
+    def _parse_cfg(self):
+        """
+        Assign values to the members of NFPFlowNIC based on the cfg file.
+        This method is used only when a cfg file is given in the command line
+        Make sure the config is suitable for this project of tests
+        """
+
+        # The superclass implementation takes care of sanity checks
+        netro.testinfra.Group._parse_cfg(self)
+
+        self.dut_object = None
+
+        # General
+        if self.cfg.has_option("General", "noclean"):
+            self.noclean = self.cfg.getboolean("General", "noclean")
+
+        # DUT
+        if self.cfg.has_option("DUT", "num_port"):
+            self.num_port = self.cfg.getint("DUT", "num_port")
+
+        self.eth_d = self.cfg.get("DUT", "ethD").split(',')
+        self.addr_d = self.cfg.get("DUT", "addrD").split(',')
+        self.addr_v6_d = self.cfg.get("DUT", "addr6D").split(',')
+
+        self.dut = localNrtSystem(self.cfg.get("DUT", "name"), self.quick)
+
+        cmd = 'nfp-hwinfo | grep mac'
+        _, out = self.dut.cmd(cmd)
+        re_ethmac = 'eth\d+.mac='
+        ports_strs = re.findall(re_ethmac, out)
+
+        cmd = 'nfp-media'
+        _, out = self.dut.cmd(cmd)
+
+        if ports_strs:
+            num_ports = len(ports_strs)
+            if num_ports != self.expected_ports:
+                raise NtiFatalError(msg="%d ports are expected, but only %d "
+                                        "created" % (self.expected_ports,
+                                                     num_ports))
+        else:
+            raise NtiFatalError(msg="nfp-hwinfo | grep mac returns no ports")
+
+        if len(self.addr_d) != self.num_port \
+                or len(self.addr_v6_d) != self.num_port \
+                or self.num_port!= self.expected_ports:
+            raise NtiFatalError(msg="number of DUT ports in cfg file not "
+                                    "correct")
+        # Hosts
+        host_list = self.cfg.get("HostEP", "names").split(',')
+        for i in range(0, len(host_list)):
+            self.host_ep[i] = localNrtSystem(host_list[i], self.quick)
+        self.eth_ep = self.cfg.get("HostEP", "ethEP").split(',')
+        self.addr_ep = self.cfg.get("HostEP", "addrEP").split(',')
+        self.addr_v6_ep = self.cfg.get("HostEP", "addr6EP").split(',')
+        if len(self.host_ep) != self.num_port \
+                or len(self.eth_ep) != self.num_port \
+                or len(self.addr_ep) != self.num_port \
+                or len(self.addr_v6_ep) != self.num_port:
+            raise NtiFatalError(msg="number of endpoint ports in cfg file not "
+                                    "correct")
+        if self.cfg.has_option("HostEP", "reload"):
+            self.reload_ep = self.cfg.getboolean("HostEP", "reload")
+
+        return
+
+class _NFPFlowNICPerfTest_nport_no_fw_loading(_NFPFlowNIC_nport_no_fw_loading):
+
+    # Perf test group does not need Jakub's netcat tools. So override the _init
+    # and _fini here
+    def _init(self):
+        """ Clean up the systems for tests from this group
+        called from the groups run() method.
+        """
+        netro.testinfra.Group._init(self)
+
+        return
+
+    def _configure_intfs(self):
+        """
+        Configure eth_a of the host_a with IPv4 address addr_a and IPv6 address
+        addr_v6_a. Also configure eth_x of the DUT with IPv4 address addr_x and
+        IPv6 address addr_v6_x
+        Also Pin interrupts for iperf tests
+        """
+
+        _NFPFlowNIC_nport._configure_intfs(self)
+        ir_list = []
+
+        for i in range(0, self.num_port):
+            cmd = 'cat /proc/interrupts | grep %s-rxtx | cut -d : -f 1' % \
+                  self.eth_d[i]
+            ret, out = self.dut.cmd(cmd)
+            ir_list.append([y for y in (x.strip() for x in out.splitlines()) if y])
+
+        cmd = 'service irqbalance stop'
+        self.dut.cmd(cmd, fail=False)
+
+        cmd = ""
+        for j in range(0, self.num_port):
+            i = 0
+            for ir in ir_list[j]:
+                cmd += "echo %d > /proc/irq/%d/smp_affinity_list && " % \
+                       (i, int(ir))
+                i += 1
+            cmd = cmd[:-2]
+            self.dut.cmd(cmd)

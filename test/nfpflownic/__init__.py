@@ -31,7 +31,19 @@ class Project(netro.testinfra.Project):
                                        ("perf",
                                         NFPFlowNICPerfTest),
                                        ("perf_userspace",
-                                        NFPFlowNICPerfTest_userspace)))
+                                        NFPFlowNICPerfTest_userspace),
+                                       ("perf_2port",
+                                        NFPFlowNICPerfTest_2port),
+                                       ("perf_4port",
+                                        NFPFlowNICPerfTest_4port),
+                                       ("perf_8port",
+                                        NFPFlowNICPerfTest_8port),
+                                       ("perf_2port_no_fw_ld",
+                                        NFPFlowNICPerfTest_2_no_fw_ld),
+                                       ("perf_4port_no_fw_ld",
+                                        NFPFlowNICPerfTest_4_no_fw_ld),
+                                       ("perf_8port_no_fw_ld",
+                                        NFPFlowNICPerfTest_8_no_fw_ld)))
 
     def _init(self):
         """

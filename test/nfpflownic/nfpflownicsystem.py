@@ -185,7 +185,6 @@ class localNrtSystem(NrtSystem):
         return ret, out
 
 
-
 class NFPFlowNICSystem(NFESystem, localNrtSystem):
     """A class for a system running NFPFLOWNIC"""
 
