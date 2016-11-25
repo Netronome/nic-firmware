@@ -136,6 +136,7 @@ function process_platform() {
     ## TODO replace with nfp-platform.py calls
     hwinfo_amda=$($NETRONOME_BIN/nfp-hwinfo | grep "assembly.partno" | cut -d '=' -f 2)
     hwinfo_mac_ct=$($NETRONOME_BIN/nfp-hwinfo | grep -c "eth[0-7].mac")
+    nfp_media=$($NETRONOME_BIN/nfp-media  | cut -d '=' -f 2)
     log "Detecting platform..."
     selected_fw=
     fw_path=/opt/netronome/firmware/ns-agilio-core-nic/cat
@@ -159,15 +160,24 @@ function process_platform() {
         else
             err=1
         fi
+    elif [ "$hwinfo_amda" == "AMDA0099-0001" ]; then
+        if ( [[ ${nfp_media} == *"10G"*"10G"* ]] ) ; then
+            selected_fw=ns_nic_cx25_2_2x10.cat
+        elif ( [[ ${nfp_media} == *"25G"*"25G"* ]] ) ; then
+            selected_fw=ns_nic_cx25_2.cat
+        else
+            err=1
+        fi
     else
         err=1
     fi
 
     if [ $err -ne 0 ]; then
         log "NS Platform detection failed!"
-        log "  Invalid AMDA or Port count"
-        log "    AMDA: $hwinfo_amda"
-        log "    CT  : $hwinfo_mac_ct"
+        log "  Invalid AMDA, Port count or Media config"
+        log "    AMDA  : $hwinfo_amda"
+        log "    CT    : $hwinfo_mac_ct"
+        log "    Media : $nfp_media"
         log "ERROR"
         return $err
     else
