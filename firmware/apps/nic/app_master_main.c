@@ -458,12 +458,7 @@ lsc_send(int nic_intf)
         mem_write8_le(&mask_w, nic_ctrl_bar + NFP_NET_CFG_ICR(entry), 1);
     }
 
-#ifdef NFD_VROUTER_MULTINETDEV_PF
-    ret = msix_vf_send(NIC_PCI + 4, PCIE_CPP2PCIE_LSC, nic_intf, entry,
-                       automask);
-#else
     ret = msix_pf_send(NIC_PCI + 4, PCIE_CPP2PCIE_LSC, entry, automask);
-#endif
 
 out:
     return ret;
