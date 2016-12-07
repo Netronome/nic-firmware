@@ -66,8 +66,6 @@
 
 #define NFD_IN_DATA_OFFSET      64
 
-#define NFD_OUT_3_PD_MES        1
-
 /* Number of credits allocated per VNIC queue */
 #ifndef NFD_QUEUE_CREDITS
 #define NFD_QUEUE_CREDITS       256
@@ -128,7 +126,7 @@
 
 /* Optional defines */
 #define NFD_IN_ADD_SEQN
-#define NFD_IN_NUM_WQS          8
+#define NFD_IN_NUM_WQS          1
 
 /* PCI.OUT block defines */
 #define NFD_OUT_BLM_POOL_START  BLM_NBI8_BLQ0_EMU_QID
