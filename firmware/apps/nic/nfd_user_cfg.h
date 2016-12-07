@@ -43,9 +43,6 @@
 #define NFD_MAX_PFS             NS_PLATFORM_NUM_PORTS
 #endif
 
-/* TEMP enable writing VF queue offsets into the BAR */
-#define NFD_NO_ISOLATION
-
 #else /* NS_PLATFORM_NUM_PORTS <= 1 */
 
 #ifndef NFD_MAX_VF_QUEUES
