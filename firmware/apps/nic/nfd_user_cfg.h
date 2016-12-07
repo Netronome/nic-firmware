@@ -15,12 +15,6 @@
 #include <platform.h>
 
 #if NS_PLATFORM_NUM_PORTS > 1
-
-/* The lithium support is a temporary set of changes:
- * from the fw/NFD point of view there are 2 VF-style VNICs and
- * from the driver point of view there is a single PF that has two
- * VNICs attached to it.
- */
 #ifndef NFD_MAX_VF_QUEUES
 #define NFD_MAX_VF_QUEUES       0
 #endif
