@@ -63,6 +63,10 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 0, 5), \
         $(call NIC_ISL_ME_DEST, 0, 6), \
         $(call NIC_ISL_ME_DEST, 0, 7), \
+        $(call NIC_ISL_ME_DEST, 0, 8), \
+        $(call NIC_ISL_ME_DEST, 0, 9), \
+        $(call NIC_ISL_ME_DEST, 0, 10), \
+        $(call NIC_ISL_ME_DEST, 0, 11), \
         \
         $(call NIC_ISL_ME_DEST, 1, 0), \
         $(call NIC_ISL_ME_DEST, 1, 1), \
@@ -72,6 +76,10 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 1, 5), \
         $(call NIC_ISL_ME_DEST, 1, 6), \
         $(call NIC_ISL_ME_DEST, 1, 7), \
+        $(call NIC_ISL_ME_DEST, 1, 8), \
+        $(call NIC_ISL_ME_DEST, 1, 9), \
+        $(call NIC_ISL_ME_DEST, 1, 10), \
+        $(call NIC_ISL_ME_DEST, 1, 11), \
         \
         $(call NIC_ISL_ME_DEST, 2, 0), \
         $(call NIC_ISL_ME_DEST, 2, 1), \
@@ -81,6 +89,10 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 2, 5), \
         $(call NIC_ISL_ME_DEST, 2, 6), \
         $(call NIC_ISL_ME_DEST, 2, 7), \
+        $(call NIC_ISL_ME_DEST, 2, 8), \
+        $(call NIC_ISL_ME_DEST, 2, 9), \
+        $(call NIC_ISL_ME_DEST, 2, 10), \
+        $(call NIC_ISL_ME_DEST, 2, 11), \
         \
         $(call NIC_ISL_ME_DEST, 3, 0), \
         $(call NIC_ISL_ME_DEST, 3, 1), \
@@ -89,7 +101,11 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 3, 4), \
         $(call NIC_ISL_ME_DEST, 3, 5), \
         $(call NIC_ISL_ME_DEST, 3, 6), \
-        $(call NIC_ISL_ME_DEST, 3, 7)"
+        $(call NIC_ISL_ME_DEST, 3, 7), \
+        $(call NIC_ISL_ME_DEST, 3, 8), \
+        $(call NIC_ISL_ME_DEST, 3, 9), \
+        $(call NIC_ISL_ME_DEST, 3, 10), \
+        $(call NIC_ISL_ME_DEST, 3, 11)"
 
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
@@ -134,9 +150,9 @@ $(eval $(call micro_c.add_flags,$(PROJECT),nic_rx,-Qnn_mode=1))
 $(eval $(call micro_c.add_flags,$(PROJECT),nic_rx,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call nffw.add_obj,$(PROJECT),nic_rx,\
 	mei2.me0 mei2.me1 mei2.me2 mei2.me3 mei2.me4 mei2.me5  \
-	mei2.me6 mei2.me7 \
+	mei2.me6 mei2.me7 mei2.me8 mei2.me9 mei2.me10 mei2.me11 \
 	mei3.me0 mei3.me1 mei3.me2 mei3.me3 mei3.me4 mei3.me5  \
-	mei3.me6 mei3.me7 \
+	mei3.me6 mei3.me7 mei3.me8 mei3.me9 mei3.me10 mei3.me11 \
 	))
 
 # Add a microcoengine named 'nic_tx' written in microC
@@ -158,9 +174,9 @@ $(eval $(call micro_c.add_flags,$(PROJECT),nic_tx,-Qnn_mode=1))
 $(eval $(call micro_c.add_flags,$(PROJECT),nic_tx,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call nffw.add_obj,$(PROJECT),nic_tx,\
 	mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5  \
-	mei0.me6 mei0.me7 \
+	mei0.me6 mei0.me7 mei0.me8 mei0.me9 mei0.me10 mei0.me11 \
 	mei1.me0 mei1.me1 mei1.me2 mei1.me3 mei1.me4 mei1.me5  \
-	mei1.me6 mei1.me7 \
+	mei1.me6 mei1.me7 mei1.me8 mei1.me9 mei1.me10 mei1.me11 \
 	))
 
 # Add TM PM initialization (codeless)
