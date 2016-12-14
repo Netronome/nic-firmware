@@ -157,6 +157,14 @@ function process_platform() {
     elif [ "$hwinfo_amda" == "AMDA0097-0001" ]; then
         if [ "$hwinfo_mac_ct" == "2" ]; then
             selected_fw=ns_nic_cx40_2.cat
+        elif [ "$hwinfo_mac_ct" == "5" ]; then
+            if ( [[ ${nfp_media} == *"4x10G"*"40G"* ]] ) ; then
+                selected_fw= ns_nic_cx40_2_4x10_1x40.cat
+            else
+                err=1
+            fi
+        elif [ "$hwinfo_mac_ct" == "8" ]; then
+            selected_fw= ns_nic_cx40_2_8x10.cat
         else
             err=1
         fi
