@@ -430,40 +430,36 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
         cmd = 'nfp-rtsym %s' % reg_name
         _, out = self.cmd(cmd)
         # The following value is from nfp-drv-kmods.git/src/nfp_net_ctrl
-        rss_base = '0x0100'
-        rss_offset = '0x4'
-        rss_size = '0x28'
+        rss_keys = []
+        for rss_base in ['0x00100', '0x08100', '0x10100', '0x18100',
+                         '0x20100', '0x28100', '0x30100', '0x38100']:
+            rss_offset = '0x4'
+            rss_size = '0x28'
 
-        rss_start = int(rss_base, 16) + int(rss_offset, 16)
-        rss_end = int(rss_base, 16) + int(rss_offset, 16) + int(rss_size, 16)
-        rss_str = '0x'
-        lines = out.splitlines()
-        for line in lines:
-            line_re = '0x[\da-fA-F]{10}:\s+(?:0x[\da-fA-F]{8}\s*){4}'
-            index_re = '(0x[\da-fA-F]{10}):\s+'
-            value_re = '\s+(0x[\da-fA-F]{8})'
-            if re.match(line_re, line):
-                index = re.findall(index_re, line)
-                values = re.findall(value_re, line)
-                if int(rss_base, 16) <= int(index[0], 16) < rss_end:
-                    for i in range(0, 4):
-                        cur_index = int(index[0], 16) + i * 4
-                        if rss_start <= cur_index < rss_end:
-                            rss_str = rss_str + values[i][2:]
+            rss_start = int(rss_base, 16) + int(rss_offset, 16)
+            rss_end = int(rss_base, 16) + int(rss_offset, 16) + int(rss_size, 16)
+            rss_str = '0x'
+            lines = out.splitlines()
+            for line in lines:
+                line_re = '0x[\da-fA-F]{10}:\s+(?:0x[\da-fA-F]{8}\s*){4}'
+                index_re = '(0x[\da-fA-F]{10}):\s+'
+                value_re = '\s+(0x[\da-fA-F]{8})'
+                if re.match(line_re, line):
+                    index = re.findall(index_re, line)
+                    values = re.findall(value_re, line)
+                    if int(rss_base, 16) <= int(index[0], 16) < rss_end:
+                        for i in range(0, 4):
+                            cur_index = int(index[0], 16) + i * 4
+                            if rss_start <= cur_index < rss_end:
+                                rss_str = rss_str + values[i][2:]
+            rss_keys.append(rss_str)
 
-        bit_number = {'0': 0, '1': 1, '2': 1, '3': 2, '4': 1, '5': 2, '6': 2,
-                      '7': 3, '8': 1, '9': 2, 'a': 2, 'b': 3, 'c': 2, 'd': 3,
-                      'e': 3, 'f': 4}
-        rss_str_stripped = rss_str[2:]
-        total_1_bits = 0
-        for i in range(0, len(rss_str_stripped)):
-            total_1_bits += bit_number[rss_str_stripped[i]]
         LOG_sec("Checking the RSS key from nfp-rtsym")
-        LOG('The RSS key is: ')
-        LOG(rss_str)
-        LOG('The number of bit 1 in RSS key is: %d' % total_1_bits)
+        LOG('The RSS keys are: ')
+        for rss_str in rss_keys:
+            LOG(rss_str)
         LOG_endsec()
-        self.rss_key = rss_str
+        self.rss_key = rss_keys
 
         return
 

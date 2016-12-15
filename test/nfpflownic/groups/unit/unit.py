@@ -1590,9 +1590,10 @@ class RSStest_same_l4_tuple(Test):
             self.dst_addr_v6 = dst[3]
 
         if dst[4]:
-            self.rss_key = dst[4]
+            self.rss_keys = dst[4]
         else:
-            self.rss_key = None
+            self.rss_keys = None
+        self.port_id = None
 
         # These will be set in the run() method
         self.src_mac = None
@@ -1650,6 +1651,23 @@ class RSStest_same_l4_tuple(Test):
         return self.send_pckts_and_check_result(self.src_ifn, self.dst_ifn,
                                                 r_in, tmpdir)
 
+    def get_intf_number(self):
+        # using nfp-hwinfo to get the index of the interface
+
+        #Get the port index (0~7) by looking up MAC in nfp-hwinfo
+        dst_if = self.dst.netifs[self.dst_ifn]
+        dst_mac = dst_if.mac
+        _, out = self.dst.cmd('nfp-hwinfo | grep mac')
+        re_str = 'eth(\d+).mac=%s' % dst_mac
+        port_id_list = re.findall(re_str, out)
+        if port_id_list:
+            self.port_id = int(port_id_list[0])
+            self.rss_key = self.rss_keys[self.port_id]
+        else:
+            NtiGeneralError("Cannot find the port_id using MAC")
+
+        return
+
     def get_intf_info(self):
         """
         get the IP address (IPv4 or IPv6) and mac address of the src and dst
@@ -1659,6 +1677,7 @@ class RSStest_same_l4_tuple(Test):
         self.dst.refresh()
         src_if = self.src.netifs[self.src_ifn]
         dst_if = self.dst.netifs[self.dst_ifn]
+        self.get_intf_number()
 
         self.src_mac = src_if.mac
         self.dst_mac = dst_if.mac
