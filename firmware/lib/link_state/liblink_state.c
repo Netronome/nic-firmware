@@ -20,9 +20,12 @@
 #ifndef _LIBLINK_STATE_C_
 #define _LIBLINK_STATE_C_
 
+
+#include "link_ctrl.h"
+#include "link_state.h"
+
 /* Include other C files. */
+#include "_c/link_ctrl.c"
 #include "_c/link_state.c"
 
 #endif /* _LIBLINK_STATE_C_ */
-
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*- */

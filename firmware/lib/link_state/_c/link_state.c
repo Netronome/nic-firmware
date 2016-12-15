@@ -19,9 +19,10 @@
 
 
 #include <assert.h>
-#include <nfp/link_state.h>
 #include <nfp/xpb.h>
 #include <nfp6000/nfp_mac.h>
+
+#include <link_state/link_state.h>
 
 
 __intrinsic void

@@ -26,7 +26,6 @@
 #include <nic/nic.h>
 #include <platform.h>
 
-#include <nfp/link_state.h>
 #include <nfp/me.h>
 #include <nfp/mem_bulk.h>
 #include <nfp/macstats.h>
@@ -44,6 +43,9 @@
 #include <vnic/pci_out.h>
 
 #include <shared/nfp_net_ctrl.h>
+
+#include <link_state/link_ctrl.h>
+#include <link_state/link_state.h>
 
 #include <npfw/catamaran_app_utils.h>
 
@@ -140,20 +142,6 @@ __intrinsic extern int msix_vf_send(unsigned int pcie_nr,
 
 /* Amount of time between each link status check */
 #define LSC_POLL_PERIOD            100000
-
-/* Address of the MAC Ethernet port configuration register */
-#define MAC_CONF_ADDR(_port)                                            \
-    (NFP_MAC_XPB_OFF(NS_PLATFORM_MAC(_port)) |                          \
-     NFP_MAC_ETH(NS_PLATFORM_MAC_CORE(_port)) |                         \
-     NFP_MAC_ETH_SEG_CMD_CONFIG(NS_PLATFORM_MAC_CORE_SERDES_LO(_port)))
-
-/* Addresses of the MAC enqueue inhibit registers */
-#define MAC_EQ_INH_ADDR(_port)                               \
-    (NFP_MAC_XPB_OFF(NS_PLATFORM_MAC(_port)) | NFP_MAC_CSR | \
-     NFP_MAC_CSR_EQ_INH)
-#define MAC_EQ_INH_DONE_ADDR(_port)                          \
-    (NFP_MAC_XPB_OFF(NS_PLATFORM_MAC(_port)) | NFP_MAC_CSR | \
-     NFP_MAC_CSR_EQ_INH_DONE)
 
 
 /* Carbon flow-control settings. */
@@ -282,10 +270,6 @@ cfg_changes_loop(void)
     __xread unsigned int cfg_bar_data[2];
     volatile __xwrite uint32_t cfg_pci_vnic;
     __gpr int i;
-    uint32_t mac_conf;
-    uint32_t mac_inhibit;
-    uint32_t mac_inhibit_done;
-    uint32_t mac_port_mask;
     uint32_t port;
 
     /* Initialisation */
@@ -318,33 +302,17 @@ cfg_changes_loop(void)
             if ((nic_control_word[port] ^ cfg_bar_data[0]) &
                     NFP_NET_CFG_CTRL_ENABLE) {
 
-                mac_conf = xpb_read(MAC_CONF_ADDR(port));
                 if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
-                    mac_conf |= NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
-                    xpb_write(MAC_CONF_ADDR(port), mac_conf);
+                    /* Enable the MAC RX. */
+                    mac_eth_enable_rx(NS_PLATFORM_MAC(port),
+                                      NS_PLATFORM_MAC_CORE(port),
+                                      NS_PLATFORM_MAC_CORE_SERDES_LO(port));
                 } else {
-                    /* Inhibit packets from enqueueing in the MAC RX */
-                    mac_port_mask =
-                        (((1 << NS_PLATFORM_MAC_NUM_SERDES(port)) - 1) <<
-                         NS_PLATFORM_MAC_CORE_SERDES_LO(port));
-
-                    mac_inhibit = xpb_read(MAC_EQ_INH_ADDR(port));
-                    mac_inhibit |= mac_port_mask;
-                    xpb_write(MAC_EQ_INH_ADDR(port), mac_inhibit);
-
-                    /* Polling to see that the inhibit took effect */
-                    do {
-                        mac_inhibit_done =
-                            xpb_read(MAC_EQ_INH_DONE_ADDR(port));
-                        mac_inhibit_done &= mac_port_mask;
-                    } while (mac_inhibit_done != mac_port_mask);
-
-                    /* Disable the RX, and then disable the inhibit feature*/
-                    mac_conf &= ~NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
-                    xpb_write(MAC_CONF_ADDR(port), mac_conf);
-
-                    mac_inhibit &= ~mac_port_mask;
-                    xpb_write(MAC_EQ_INH_ADDR(port), mac_inhibit);
+                    /* Inhibit and disable the MAC RX. */
+                    mac_eth_disable_rx(NS_PLATFORM_MAC(port),
+                                       NS_PLATFORM_MAC_CORE(port),
+                                       NS_PLATFORM_MAC_CORE_SERDES_LO(port),
+                                       NS_PLATFORM_MAC_NUM_SERDES(port));
                 }
             }
 

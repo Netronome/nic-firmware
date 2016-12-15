@@ -22,6 +22,7 @@
 #define _LINK_STATE_H_
 
 
+#include <nfp.h>
 #include <stdint.h>
 
 
