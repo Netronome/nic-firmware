@@ -51,6 +51,8 @@
     (NFP_MAC_XPB_OFF(_isl) | NFP_MAC_CSR | NFP_MAC_CSR_EQ_INH_DONE)
 
 
+/* *** MAC RX Enable/Disable Functions *** */
+
 __intrinsic int
 mac_eth_check_rx_enable(unsigned int mac_isl, unsigned int mac_core,
                         unsigned int mac_core_port)
@@ -135,6 +137,72 @@ mac_eth_enable_rx(unsigned int mac_isl, unsigned int mac_core,
     mac_conf_addr  = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
     mac_conf       = xpb_read(mac_conf_addr);
     mac_conf      |= NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
+    xpb_write(mac_conf_addr, mac_conf);
+
+    return;
+}
+
+
+/* *** MAC TX Flush Enable/Disable Functions *** */
+
+__intrinsic int
+mac_eth_check_tx_flush_enable(unsigned int mac_isl, unsigned int mac_core,
+                              unsigned int mac_core_port)
+{
+    uint32_t mac_conf;
+    uint32_t mac_conf_addr;
+
+    /* Check the parameters */
+    assert(mac_isl < MAX_MAC_ISLANDS_PER_NFP);
+    assert(mac_core < MAX_MAC_CORES_PER_MAC_ISL);
+    assert(mac_core_port < MAX_ETH_PORTS_PER_MAC_CORE);
+
+    /* Read the configuration register for the port. */
+    mac_conf_addr = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
+    mac_conf      = xpb_read(mac_conf_addr);
+
+    return ((mac_conf & NFP_MAC_ETH_SEG_CMD_CONFIG_TX_FLUSH) ? 1 : 0);
+}
+
+
+__intrinsic void
+mac_eth_disable_tx_flush(unsigned int mac_isl, unsigned int mac_core,
+                         unsigned int mac_core_port)
+{
+    uint32_t mac_conf;
+    uint32_t mac_conf_addr;
+
+    /* Check the parameters */
+    assert(mac_isl < MAX_MAC_ISLANDS_PER_NFP);
+    assert(mac_core < MAX_MAC_CORES_PER_MAC_ISL);
+    assert(mac_core_port < MAX_ETH_PORTS_PER_MAC_CORE);
+
+    /* Clear the MAC TX flush enable for the port. */
+    mac_conf_addr  = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
+    mac_conf       = xpb_read(mac_conf_addr);
+    mac_conf      &= ~NFP_MAC_ETH_SEG_CMD_CONFIG_TX_FLUSH;
+    xpb_write(mac_conf_addr, mac_conf);
+
+    return;
+}
+
+
+__intrinsic void
+mac_eth_enable_tx_flush(unsigned int mac_isl, unsigned int mac_core,
+                        unsigned int mac_core_port)
+{
+    uint32_t mac_conf;
+    uint32_t mac_conf_addr;
+
+    /* Check the parameters */
+    assert(mac_isl < MAX_MAC_ISLANDS_PER_NFP);
+    assert(mac_core < MAX_MAC_CORES_PER_MAC_ISL);
+    assert(mac_core_port < MAX_ETH_PORTS_PER_MAC_CORE);
+
+    /* Set the MAC TX flush enable for the port. */
+    mac_conf_addr  = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
+    mac_conf       = xpb_read(mac_conf_addr);
+    mac_conf      |= NFP_MAC_ETH_SEG_CMD_CONFIG_TX_FLUSH;
     xpb_write(mac_conf_addr, mac_conf);
 
     return;

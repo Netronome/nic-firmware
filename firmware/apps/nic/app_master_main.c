@@ -141,7 +141,22 @@ __intrinsic extern int msix_vf_send(unsigned int pcie_nr,
 
 
 /* Amount of time between each link status check */
-#define LSC_POLL_PERIOD            100000
+#define LSC_POLL_PERIOD            10000
+
+/* Mutex for accessing MAC registers. */
+__shared __gpr volatile int mac_reg_lock = 0;
+
+/* Macros for local mutexes. */
+#define LOCAL_MUTEX_LOCK(_mutex) \
+    do {                         \
+        while (_mutex)           \
+            ctx_swap();          \
+        _mutex = 1;              \
+    } while (0)
+#define LOCAL_MUTEX_UNLOCK(_mutex) \
+    do {                           \
+        _mutex = 0;                \
+    } while (0)
 
 
 /* Carbon flow-control settings. */
@@ -263,6 +278,60 @@ carbon_flow_control_enable()
 #endif /* NS_PLATFORM_TYPE == NS_PLATFORM_CARBON */
 
 
+__inline static void
+mac_port_disable_rx(unsigned int mac, unsigned int mac_core,
+                    unsigned int mac_core_port, unsigned int num_lanes)
+{
+    LOCAL_MUTEX_LOCK(mac_reg_lock);
+
+    mac_eth_disable_rx(mac, mac_core, mac_core_port, num_lanes);
+
+    /* Flush TX datapath to prevent stranding any packets. */
+    mac_eth_enable_tx_flush(mac, mac_core, mac_core_port);
+
+    LOCAL_MUTEX_UNLOCK(mac_reg_lock);
+}
+
+
+__inline static void
+mac_port_disable_tx_flush(unsigned int mac, unsigned int mac_core,
+                          unsigned int mac_core_port)
+{
+    LOCAL_MUTEX_LOCK(mac_reg_lock);
+
+    mac_eth_disable_tx_flush(mac, mac_core, mac_core_port);
+
+    LOCAL_MUTEX_UNLOCK(mac_reg_lock);
+}
+
+
+__inline static void
+mac_port_enable_rx(unsigned int mac, unsigned int mac_core,
+                   unsigned int mac_core_port)
+{
+    LOCAL_MUTEX_LOCK(mac_reg_lock);
+
+    /* Re-enable TX datapath before enabling RX datapath. */
+    mac_eth_disable_tx_flush(mac, mac_core, mac_core_port);
+
+    mac_eth_enable_rx(mac, mac_core, mac_core_port);
+
+    LOCAL_MUTEX_UNLOCK(mac_reg_lock);
+}
+
+
+__inline static void
+mac_port_enable_tx_flush(unsigned int mac, unsigned int mac_core,
+                         unsigned int mac_core_port)
+{
+    LOCAL_MUTEX_LOCK(mac_reg_lock);
+
+    mac_eth_enable_tx_flush(mac, mac_core, mac_core_port);
+
+    LOCAL_MUTEX_UNLOCK(mac_reg_lock);
+}
+
+
 static void
 cfg_changes_loop(void)
 {
@@ -304,15 +373,15 @@ cfg_changes_loop(void)
 
                 if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
                     /* Enable the MAC RX. */
-                    mac_eth_enable_rx(NS_PLATFORM_MAC(port),
-                                      NS_PLATFORM_MAC_CORE(port),
-                                      NS_PLATFORM_MAC_CORE_SERDES_LO(port));
+                    mac_port_enable_rx(NS_PLATFORM_MAC(port),
+                                       NS_PLATFORM_MAC_CORE(port),
+                                       NS_PLATFORM_MAC_CORE_SERDES_LO(port));
                 } else {
                     /* Inhibit and disable the MAC RX. */
-                    mac_eth_disable_rx(NS_PLATFORM_MAC(port),
-                                       NS_PLATFORM_MAC_CORE(port),
-                                       NS_PLATFORM_MAC_CORE_SERDES_LO(port),
-                                       NS_PLATFORM_MAC_NUM_SERDES(port));
+                    mac_port_disable_rx(NS_PLATFORM_MAC(port),
+                                        NS_PLATFORM_MAC_CORE(port),
+                                        NS_PLATFORM_MAC_CORE_SERDES_LO(port),
+                                        NS_PLATFORM_MAC_NUM_SERDES(port));
                 }
             }
 
@@ -461,6 +530,20 @@ lsc_check(__gpr unsigned int *ls_current, int nic_intf)
     if (ls != *ls_current)
         changed = 1;
     *ls_current = ls;
+
+    if (changed) {
+        if (ls == LINK_DOWN) {
+            /* Prevent MAC TX datapath from stranding any packets. */
+            mac_port_enable_tx_flush(NS_PLATFORM_MAC(nic_intf),
+                                     NS_PLATFORM_MAC_CORE(nic_intf),
+                                     NS_PLATFORM_MAC_CORE_SERDES_LO(nic_intf));
+        } else {
+            /* Re-enable MAC TX datapath. */
+            mac_port_disable_tx_flush(
+                NS_PLATFORM_MAC(nic_intf), NS_PLATFORM_MAC_CORE(nic_intf),
+                NS_PLATFORM_MAC_CORE_SERDES_LO(nic_intf));
+        }
+    }
 
 skip_link_read:
     /* Make sure the status bit reflects the link state. Write this

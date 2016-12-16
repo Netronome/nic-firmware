@@ -26,6 +26,8 @@
 #include <stdint.h>
 
 
+/* *** MAC RX Enable/Disable Functions *** */
+
 /**
  * Check if the MAC RX is enabled for a given port.
  *
@@ -65,6 +67,48 @@ __intrinsic void mac_eth_disable_rx(unsigned int mac_isl,
  */
 __intrinsic void mac_eth_enable_rx(unsigned int mac_isl, unsigned int mac_core,
                                    unsigned int mac_core_port);
+
+
+/* *** MAC TX Flush Enable/Disable Functions *** */
+
+/**
+ * Check if the MAC TX flush is enabled for a given port.
+ *
+ * @param mac_isl        MAC island to query
+ * @param mac_core       MAC core to query
+ * @param mac_core_port  MAC core port to check
+ *
+ * @return 0 = disabled, 1 = enabled
+ */
+__intrinsic int mac_eth_check_tx_flush_enable(unsigned int mac_isl,
+                                              unsigned int mac_core,
+                                              unsigned int mac_core_port);
+
+/**
+ * Disable the MAC TX flush for a given port.
+ *
+ * @param mac_isl        MAC island to configure
+ * @param mac_core       MAC core to configure
+ * @param mac_core_port  MAC core port to disable TX flush
+ *
+ * @note This function is not safe for multi-threaded use.
+ */
+__intrinsic void mac_eth_disable_tx_flush(unsigned int mac_isl,
+                                          unsigned int mac_core,
+                                          unsigned int mac_core_port);
+
+/**
+ * Enable the MAC TX flush for a given port.
+ *
+ * @param mac_isl        MAC island to configure
+ * @param mac_core       MAC core to configure
+ * @param mac_core_port  MAC core port to enable TX flush
+ *
+ * @note This function is not safe for multi-threaded use.
+ */
+__intrinsic void mac_eth_enable_tx_flush(unsigned int mac_isl,
+                                         unsigned int mac_core,
+                                         unsigned int mac_core_port);
 
 
 #endif /* _LINK_CTRL_H_ */
