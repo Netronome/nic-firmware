@@ -1322,9 +1322,58 @@ class LinkState(Test):
 
         passed = True
         comment = ''
+        sd_family = None
+        sd_family_lane = None
+        port_id = 0
+        #Get the port index (0~7) by looking up MAC in nfp-hwinfo
+        src_if = self.src.netifs[self.src_ifn]
+        src_mac = src_if.mac
+        _, out = self.src.cmd('nfp-hwinfo | grep mac')
+        re_str = 'eth(\d+).mac=%s' % src_mac
+        port_id_list = re.findall(re_str, out)
+        if port_id_list:
+            port_id = int(port_id_list[0])
+        else:
+            NtiGeneralError("Cannot find the port_id using MAC")
+        _, out = self.src.cmd('nfp-media')
+        #Assuming that when we use breakout cable, we use it in all ports
+        re_no_boc_str = 'phy0=\d+G'
+        re_boc_str = 'phy0=\d+x\d+G'
+        with_boc = None
+        if re.findall(re_no_boc_str, out):
+            with_boc = False
+        elif re.findall(re_boc_str, out):
+            with_boc = True
+        else:
+            NtiGeneralError("Cannot find the breakout cable setup using "
+                            "nfp-media")
+        # Look up chip model in nfp-hwinfo and determine "SerDes family,
+        # SerDes family land" (NIC-52)
+        hydrogen_str = 'AMDA0081'
+        lithium_str = 'AMDA0096'
+        beryllium_str = 'AMDA0097'
+        chip_cmd = 'nfp-hwinfo | grep -o "AMDA.*$"'
+        _, chip_model = self.src.cmd(chip_cmd)
+        if hydrogen_str in chip_model:
+            sd_family = 0
+            sd_family_lane = port_id
+        elif lithium_str in chip_model:
+            sd_family = port_id
+            sd_family_lane = 0
+        elif beryllium_str in chip_model:
+            if with_boc:
+                sd_family = port_id / 4
+                sd_family_lane = port_id % 4
+            else:
+                sd_family = port_id
+                sd_family_lane = 0
+        else:
+            NtiGeneralError("Cannot find supported chip model in nfp-hwinfo")
+
         ip_cmd = 'ip addr show dev %s' % self.src_ifn
         self.src.cmd(ip_cmd)
-        cmd = 'nfp-serdes -n 0 8 0 0  LANEPCSPSTATE_RX 0x1'
+        cmd = 'nfp-serdes -n 0 8 %d %d  LANEPCSPSTATE_RX 0x1' % (sd_family,
+                                                                 sd_family_lane)
         self.src.cmd(cmd)
         try:
             timed_poll(30, self.is_link_state_correct, "down", delay=1)
@@ -1335,7 +1384,8 @@ class LinkState(Test):
                              comment="The expected NO-CARRIER string is not "
                                      "found in the output of ip addr show cmd "
                                      "after the PHY is powered down")
-        cmd = 'nfp-serdes -n 0 8 0 0  LANEPCSPSTATE_RX 0x10'
+        cmd = 'nfp-serdes -n 0 8 %d %d  LANEPCSPSTATE_RX 0x10' % \
+              (sd_family, sd_family_lane)
         self.src.cmd(cmd)
         try:
             timed_poll(30, self.is_link_state_correct, "up", delay=1)
