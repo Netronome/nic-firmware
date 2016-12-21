@@ -279,15 +279,49 @@ carbon_flow_control_enable()
 
 
 __inline static void
-mac_port_disable_rx(unsigned int mac, unsigned int mac_core,
-                    unsigned int mac_core_port, unsigned int num_lanes)
+disable_port_tx_datapath(unsigned int nbi, unsigned int start_q,
+                         unsigned int end_q)
 {
+    unsigned int q_num;
+
+    /* Disable the NBI TM queues to prevent any packets from being enqueued. */
+    for (q_num = start_q; q_num <= end_q; ++q_num) {
+        nbi_tm_disable_queue(nbi, q_num);
+    }
+}
+
+
+__inline static void
+enable_port_tx_datapath(unsigned int nbi, unsigned int start_q,
+                        unsigned int end_q)
+{
+    unsigned int q_num;
+
+    /* Re-enable the NBI TM queues. */
+    for (q_num = start_q; q_num <= end_q; ++q_num) {
+        nbi_tm_enable_queue(nbi, q_num);
+    }
+}
+
+
+__inline static void
+mac_port_disable_rx(unsigned int port)
+{
+    unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
+    unsigned int mac_core      = NS_PLATFORM_MAC_CORE(port);
+    unsigned int mac_core_port = NS_PLATFORM_MAC_CORE_SERDES_LO(port);
+    unsigned int num_lanes     = NS_PLATFORM_MAC_NUM_SERDES(port);
+
     LOCAL_MUTEX_LOCK(mac_reg_lock);
 
-    mac_eth_disable_rx(mac, mac_core, mac_core_port, num_lanes);
+    mac_eth_disable_rx(mac_nbi_isl, mac_core, mac_core_port, num_lanes);
+
+    /* Disable the port TX. */
+    disable_port_tx_datapath(mac_nbi_isl, NS_PLATFORM_NBI_TM_QID_LO(port),
+                             NS_PLATFORM_NBI_TM_QID_HI(port));
 
     /* Flush TX datapath to prevent stranding any packets. */
-    mac_eth_enable_tx_flush(mac, mac_core, mac_core_port);
+    mac_eth_enable_tx_flush(mac_nbi_isl, mac_core, mac_core_port);
 
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
@@ -306,15 +340,22 @@ mac_port_disable_tx_flush(unsigned int mac, unsigned int mac_core,
 
 
 __inline static void
-mac_port_enable_rx(unsigned int mac, unsigned int mac_core,
-                   unsigned int mac_core_port)
+mac_port_enable_rx(unsigned int port)
 {
+    unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
+    unsigned int mac_core      = NS_PLATFORM_MAC_CORE(port);
+    unsigned int mac_core_port = NS_PLATFORM_MAC_CORE_SERDES_LO(port);
+
     LOCAL_MUTEX_LOCK(mac_reg_lock);
 
     /* Re-enable TX datapath before enabling RX datapath. */
-    mac_eth_disable_tx_flush(mac, mac_core, mac_core_port);
+    mac_eth_disable_tx_flush(mac_nbi_isl, mac_core, mac_core_port);
 
-    mac_eth_enable_rx(mac, mac_core, mac_core_port);
+    /* Enable the port TX. */
+    enable_port_tx_datapath(mac_nbi_isl, NS_PLATFORM_NBI_TM_QID_LO(port),
+                            NS_PLATFORM_NBI_TM_QID_HI(port));
+
+    mac_eth_enable_rx(mac_nbi_isl, mac_core, mac_core_port);
 
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
@@ -373,15 +414,10 @@ cfg_changes_loop(void)
 
                 if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
                     /* Enable the MAC RX. */
-                    mac_port_enable_rx(NS_PLATFORM_MAC(port),
-                                       NS_PLATFORM_MAC_CORE(port),
-                                       NS_PLATFORM_MAC_CORE_SERDES_LO(port));
+                    mac_port_enable_rx(port);
                 } else {
                     /* Inhibit and disable the MAC RX. */
-                    mac_port_disable_rx(NS_PLATFORM_MAC(port),
-                                        NS_PLATFORM_MAC_CORE(port),
-                                        NS_PLATFORM_MAC_CORE_SERDES_LO(port),
-                                        NS_PLATFORM_MAC_NUM_SERDES(port));
+                    mac_port_disable_rx(port);
                 }
             }
 
