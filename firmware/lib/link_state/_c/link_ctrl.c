@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <nfp/xpb.h>
 #include <nfp6000/nfp_mac.h>
+#include <nfp6000/nfp_nbi_tm.h>
 
 #include <link_state/link_ctrl.h>
 
@@ -37,6 +38,18 @@
     (NFP_MAC_XPB_OFF(_isl) | NFP_MAC_CSR | NFP_MAC_CSR_EQ_INH)
 #define MAC_EQ_INH_DONE_ADDR(_isl)                                  \
     (NFP_MAC_XPB_OFF(_isl) | NFP_MAC_CSR | NFP_MAC_CSR_EQ_INH_DONE)
+
+
+/* Maximum number of NBI islands supported on the NFP */
+#define MAX_NBI_ISLANDS_PER_NFP    2
+
+/* Maximum number of TM queues per NBI */
+#define MAX_TM_QUEUES_PER_NBI_ISL  1024
+
+/* Address of the NBI TM queue configuration register */
+#define NBI_TM_Q_CFG_ADDR(_isl, _q)                    \
+    (NFP_NBI_TM_XPB_OFF(_isl) | NFP_NBI_TM_QUEUE_REG | \
+     NFP_NBI_TM_QUEUE_CONFIG(_q))
 
 
 /* *** MAC RX Enable/Disable Functions *** */
@@ -195,3 +208,42 @@ mac_eth_enable_tx_flush(unsigned int mac_isl, unsigned int mac_core,
 
     return;
 }
+
+
+/* *** NBI TM Queue Enable/Disable Functions *** */
+
+__intrinsic void
+nbi_tm_disable_queue(unsigned int nbi_isl, unsigned int tm_q)
+{
+    uint32_t tm_q_cfg;
+    uint32_t tm_q_cfg_addr;
+
+    /* Check the parameters */
+    assert(nbi_isl < MAX_NBI_ISLANDS_PER_NFP);
+    assert(tm_q < MAX_TM_QUEUES_PER_NBI_ISL);
+
+    /* Clear the NBI TM queue enable. */
+    tm_q_cfg_addr  = NBI_TM_Q_CFG_ADDR(nbi_isl, tm_q);
+    tm_q_cfg       = xpb_read(tm_q_cfg_addr);
+    tm_q_cfg      &= ~NFP_NBI_TM_QUEUE_CONFIG_QUEUEENABLE;
+    xpb_write(tm_q_cfg_addr, tm_q_cfg);
+}
+
+
+__intrinsic void
+nbi_tm_enable_queue(unsigned int nbi_isl, unsigned int tm_q)
+{
+    uint32_t tm_q_cfg;
+    uint32_t tm_q_cfg_addr;
+
+    /* Check the parameters */
+    assert(nbi_isl < MAX_NBI_ISLANDS_PER_NFP);
+    assert(tm_q < MAX_TM_QUEUES_PER_NBI_ISL);
+
+    /* Set the NBI TM queue enable. */
+    tm_q_cfg_addr  = NBI_TM_Q_CFG_ADDR(nbi_isl, tm_q);
+    tm_q_cfg       = xpb_read(tm_q_cfg_addr);
+    tm_q_cfg      |= NFP_NBI_TM_QUEUE_CONFIG_QUEUEENABLE;
+    xpb_write(tm_q_cfg_addr, tm_q_cfg);
+}
+

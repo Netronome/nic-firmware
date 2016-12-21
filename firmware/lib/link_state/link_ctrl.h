@@ -99,4 +99,27 @@ __intrinsic void mac_eth_enable_tx_flush(unsigned int mac_isl,
                                          unsigned int mac_core_port);
 
 
+/* *** NBI TM Queue Enable/Disable Functions *** */
+
+/**
+ * Disable the NBI TM queue.
+ *
+ * @param nbi_isl  NBI island to configure
+ * @param tm_q     NBI TM queue to disable
+ *
+ * @note This function is not safe for multi-threaded use.
+ */
+__intrinsic void nbi_tm_disable_queue(unsigned int nbi_isl, unsigned int tm_q);
+
+/**
+ * Enable the NBI TM queue.
+ *
+ * @param nbi_isl  NBI island to configure
+ * @param tm_q     NBI TM queue to enable
+ *
+ * @note This function is not safe for multi-threaded use.
+ */
+__intrinsic void nbi_tm_enable_queue(unsigned int nbi_isl, unsigned int tm_q);
+
+
 #endif /* _LINK_CTRL_H_ */
