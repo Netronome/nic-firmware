@@ -1,0 +1,15 @@
+Import('env') # exported by parent SConstruct
+from pkgmods.FileList import FileList
+
+# Import base file list from env
+deb_FileList = env['PKG_FILE_LISTS']['ns-agilio-core-nic_deb']
+
+# add files to debian specific packages
+deb_files = [
+    ("opt/netronome/bin/ns-core-nic-setup", "#nfp-nic/scripts/ns-core-nic-setup"),
+    ("etc/init.d/ns-core-nic.autorun", "#nfp-nic/scripts/ns-core-nic.autorun"),
+]
+
+deb_FileList.add_files(deb_files)
+
+env['PKG_FILE_LISTS']['ns-agilio-core-nic_deb'] = deb_FileList

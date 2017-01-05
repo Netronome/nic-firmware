@@ -66,12 +66,22 @@ def add_firmware(env, firmware):
         fw_build_cmd += ' -j ' + str(GetOption('pbuild'))
 
     fw_clean_cmd = 'cd ' + env['ENV']['TOP_SCRIPT_PATH'] + ' && make clean'  # TODO individual clean targets
-    firmware_build = env.Command((env['ENV']['TOP_SCRIPT_PATH'] + '/firmware/cat/' + firmware), None, fw_build_cmd)
+
+    sub_folder = "nffw/"
+    if firmware.endswith(".nffw"):
+        sub_folder = "nffw/"
+    elif firmware.endswith(".cat"):
+        sub_folder = "cat/"
+    else:
+        print "ERROR Firmware file extension invalid"
+        os.exit(1)
+
+    firmware_build = env.Command((env['ENV']['TOP_SCRIPT_PATH'] + '/firmware/' + sub_folder + firmware), None, fw_build_cmd)
+
     env.AlwaysBuild(firmware_build)
     env.Precious(firmware_build)
     Default(firmware_build)
     env.CleanAction(firmware_build, Action(fw_clean_cmd))
-    #load_make_target = ('make load_' + firmware.split()[0])
 
 def default_program(env, *args, **kwargs):
     # Add program as a default
@@ -199,7 +209,10 @@ for line in output.split('\n'):
 
     # Build targets
     if found_firmware_build_targets:
-        if line.endswith('.cat'):
+        if line.endswith('.nffw'):
+            print 'Adding firmware to build:', line
+            env.AddFirmware(line)
+        elif line.endswith('.cat'):
             print 'Adding firmware to build:', line
             env.AddFirmware(line)
         else:

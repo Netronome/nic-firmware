@@ -62,3 +62,7 @@ test/cfg/
 
 # basic_nic unit test rc files
 test/rc.zip
+
+# nfp-nffw cat replay generation files
+*.trace
+nfp-cpp-0.db
