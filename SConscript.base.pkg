@@ -12,7 +12,7 @@ base_files = [
 base_files.append(("opt/netronome/etc/core-nic/repo.xml", "#tmp/repo.xml"))
 
 # Netro Manifest File
-base_files.append(("opt/netronome/etc/ns-agilio-core-nic.manifest", "#tmp/netro_manifest"))
+base_files.append(("opt/netronome/etc/core-nic/ns-agilio-core-nic.manifest", "#tmp/netro_manifest"))
 
 pkg_base_FileList.add_files(base_files)
 
