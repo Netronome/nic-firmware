@@ -1,0 +1,7 @@
+# SConscript - ard
+
+Import('env')
+script_dir = env.Dir(".").srcnode().abspath
+env.MarkdownBuilder('basic_nic_gsg.pdf','basic_nic_gsg.md', \
+                    DOC_PATH=script_dir, \
+                    PANDOC_ARGS='-N')
