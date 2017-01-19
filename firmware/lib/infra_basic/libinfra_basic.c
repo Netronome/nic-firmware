@@ -587,14 +587,15 @@ done:
 
 
 void
-init_rx()
+init_tx()
 {
+    INFRA_CNTRS_SET_BASE(infra_cntrs_base);
     nfd_in_recv_init();
 }
 
 
 void
-init_tx()
+init_rx()
 {
     INFRA_CNTRS_SET_BASE(infra_cntrs_base);
     nfd_out_send_init();
