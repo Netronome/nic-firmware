@@ -235,7 +235,7 @@ main()
         ctxs &= ~NFP_MECSR_CTX_ENABLES_CONTEXTS(0xfe);
         local_csr_write(local_csr_ctx_enables, ctxs);
 
-        init_rx();
+        init_tx();
         nic_local_init(APP_ME_CONFIG_SIGNAL_NUM, APP_ME_CONFIG_XFER_NUM);
 
 #ifdef CFG_NIC_APP_DBG_JOURNAL
@@ -267,11 +267,6 @@ main()
             /* Check for BAR Configuration changes and reinit TX if needed */
             if (nic_local_cfg_changed()) {
                 nic_local_reconfig(&enable_changed);
-                /* TODO: do we need this?
-                if (enable_changed) {
-                    reinit_tx(TO_WIRE);
-                }
-                */
                 nic_local_reconfig_done();
             }
 
