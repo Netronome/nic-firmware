@@ -29,4 +29,10 @@ ns-vrouter-core-nic-setup
       - 2x10G Lithium
       - 2x40G Beryllium
 
+chnicrxic.sh
+chnictxic.sh
+  These two scripts can be run on the build system and it will return the
+  code store values for NIC_RX and NIC_TX for each build type.
+  ./scritps/chnicrxic.sh -s 
+  ./scripts/chnictxic.sh -s
 README - This file
