@@ -211,16 +211,25 @@ port_speed_to_link_rate(unsigned int port_speed)
  */
 
 /* XXX Move to some sort of CT reflect library */
+/*
+ * Note: The transfer register number is an absolute number, that is, not
+ *       relative to the ME context number.  In general, the formula to
+ *       calculate an absolute transfer register number is as follows:
+ *
+ *           dst_xfer = (dst_ctx * 32) + "relative transfer register number"
+ *
+ * TODO - Need to work on solution to make xfer register context-relative,
+ *        rather than absolute.
+ */
 __intrinsic static void
-ct_reflect_data(unsigned int dst_me, unsigned int dst_xfer,
-                unsigned int sig_no, volatile __xwrite void *src_xfer,
-                size_t size)
+ct_reflect_data(unsigned int dst_me, unsigned int dst_ctx,
+                unsigned int dst_xfer, unsigned int sig_no,
+                volatile __xwrite void *src_xfer, size_t size)
 {
-    #define OV_SIG_NUM 13
-
     unsigned int addr;
     unsigned int count = (size >> 2);
     struct nfp_mecsr_cmd_indirect_ref_0 indirect;
+    struct nfp_mecsr_prev_alu prev_alu;
 
     ctassert(__is_ct_const(size));
 
@@ -233,12 +242,17 @@ ct_reflect_data(unsigned int dst_me, unsigned int dst_xfer,
     addr = ((dst_me & 0x3F0)<<20 | ((dst_me & 0xF)<<10 | (dst_xfer & 0xFF)<<2));
 
     indirect.__raw = 0;
+    indirect.signal_ctx = dst_ctx;
     indirect.signal_num = sig_no;
     local_csr_write(local_csr_cmd_indirect_ref_0, indirect.__raw);
 
+    prev_alu.__raw = 0;
+    prev_alu.ov_sig_ctx = 1;
+    prev_alu.ov_sig_num = 1;
+
     /* Reflect the value and signal the remote ME */
     __asm {
-        alu[--, --, b, 1, <<OV_SIG_NUM];
+        alu[--, --, b, prev_alu.__raw];
         ct[reflect_write_sig_remote, *src_xfer, addr, 0, \
            __ct_const_val(count)], indirect_ref;
     };
@@ -402,7 +416,7 @@ cfg_changes_loop(void)
                                  sizeof(app_mes_ids)/sizeof(uint32_t));
             /* Signal all APP MEs about a config change */
             for(i = 0; i < sizeof(app_mes_ids)/sizeof(uint32_t); i++) {
-                ct_reflect_data(app_mes_ids[i],
+                ct_reflect_data(app_mes_ids[i], APP_ME_CONFIG_CTX,
                                 APP_ME_CONFIG_XFER_NUM,
                                 APP_ME_CONFIG_SIGNAL_NUM,
                                 &cfg_pci_vnic, sizeof cfg_pci_vnic);
