@@ -93,6 +93,8 @@
 
 #define NFD_CFG_RING_EMEM       emem0
 
+/* NIC APP ME context handling configuration changes to the config BAR */
+#define APP_ME_CONFIG_CTX 0
 /* Signal number used for APP MASTER to NIC APP MEs signaling of
  * configuration changes to the config BAR */
 #define APP_ME_CONFIG_SIGNAL_NUM 11
