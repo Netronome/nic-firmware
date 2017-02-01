@@ -564,42 +564,6 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
             self._netifs[intf] = None
         return
 
-    def rmmod_bsp(self):
-        """remove the BSP modules (more specifically, rmmod nfp, nfp_net
-        nfp_pcie, and nfp_cppcore).
-        """
-        #cmd = "killall nfp-errlogd; rmmod nfp_err nfp nfp_pcie " \
-        #      "nfp_cppcore"
-        #self.cmd(cmd, fail=False)
-        cmd = 'rmmod nfp'
-        self.cmd(cmd, fail=False)
-        cmd = 'rmmod %s' % self.vnic_fn
-        self.cmd(cmd, fail=False)
-        cmd = 'rmmod nfp_pcie'
-        self.cmd(cmd, fail=False)
-        cmd = 'rmmod nfp_cppcore'
-        self.cmd(cmd, fail=False)
-
-    def reload_bsp(self, path=None):
-        """Reload the BSP modules (more specifically, rmmod nfp,
-        nfp_pcie, and nfp_cppcore, and then insmod nfp only).
-
-        """
-        LOG_sec("%s: (re)load BSP modules from %s" %
-                (self.host, path if path else "default"))
-        try:
-            self.rmmod_bsp()
-            if path:
-                cmd = "insmod %s/nfp.ko" % path
-                self.cmd(cmd)
-            else:
-                self.cmd("modprobe nfp")
-        except:
-            self.rm_dir(self.tmpdir)
-            raise NtiFatalError(msg="Fail to reload_bsp in NFPFlowNICSystem")
-        finally:
-            LOG_endsec()
-
     def load_nfp_net(self,  mode='kernel', ko_file=None):
         """Reload the BSP modules (more specifically, rmmod nfp,
         nfp_pcie, and nfp_cppcore, and then insmod nfp only).
