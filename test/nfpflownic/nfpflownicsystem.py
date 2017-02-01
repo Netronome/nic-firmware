@@ -559,18 +559,18 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
                 self.cmd("rm -rf /lib/firmware/netronome", fail=False)
                 if ko_file:
                     self.cmd("modprobe vxlan", fail=False)
-                    self.cmd("insmod %s num_rings=32 nfp_dev_cpp=1" % ko_file)
+                    self.cmd("insmod %s nfp_dev_cpp=1" % ko_file)
                 else:
-                    self.cmd('modprobe %s num_rings=32 nfp_dev_cpp=1' % self.kmod_fn)
+                    self.cmd('modprobe %s nfp_dev_cpp=1' % self.kmod_fn)
 
             elif mode == 'kernel':
                 # Kernel loading
                 # fw_noload=0 to override grub global setting
                 if ko_file:
                     self.cmd("modprobe vxlan", fail=False)
-                    self.cmd("insmod %s nfp_dev_cpp=1 num_rings=32" % ko_file)
+                    self.cmd("insmod %s nfp_dev_cpp=1" % ko_file)
                 else:
-                    self.cmd('modprobe %s nfp_dev_cpp=1 num_rings=32' % self.kmod_fn)
+                    self.cmd('modprobe %s nfp_dev_cpp=1' % self.kmod_fn)
         except:
             self.rm_dir(self.tmpdir)
             raise NtiFatalError(msg="Fail to load_nfp_net in NFPFlowNICSystem")
