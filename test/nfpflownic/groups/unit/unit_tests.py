@@ -8,7 +8,7 @@ Unit test group for the NFPFlowNIC Software Group.
 import collections
 from netro.tests.null import NullTest
 from ...nfpflownic_tests import _NFPFlowNIC, _NFPFlowNIC_nport, \
-    _NFPFlowNIC_no_fw_loading
+    _NFPFlowNIC_no_fw_loading, _NFPFlowNIC_nport_no_fw_loading
 from unit import UnitIPv4, UnitIPv6, NFPFlowNICPing, UnitPing, JumboPacket, \
     RxVlan, Stats_rx_err_cnt, LinkState, RSStest_same_l4_tuple, \
     RSStest_diff_l4_tuple, Stats_per_queue_cntr, RxVlan_rx_byte, \
@@ -1513,5 +1513,148 @@ class NFPFlowNIC_no_fw_loading(_NFPFlowNIC_no_fw_loading):
         self.unit_dict = Unit_dict(self, dut_t_x, a_t,
                                    ping_dut, ping_a_t)
         self._tests = self.unit_dict.tests
+
+###########################################################################
+# Unit Tests
+###########################################################################
+class NFPFlowNIC_n2port_no_fw_loading(_NFPFlowNIC_nport_no_fw_loading):
+    """Unit tests for the NFPFlowNIC Software Group"""
+
+    summary = "Unit tests for the NFPFlowNIC project with kernel space " \
+              "firmware loading. "
+
+    def __init__(self, name, cfg=None,
+                 quick=False, dut_object=None):
+        """Initialise
+        @name:   A unique name for the group of tests
+        @cfg:    A Config parser object (optional)
+        @quick:  Omit some system info gathering to speed up running tests
+        """
+
+        _NFPFlowNIC_nport_no_fw_loading.__init__(self, name, cfg=cfg, quick=quick,
+                                          dut_object=dut_object, expected_ports=2)
+        self._tests = None
+
+        for i in range(0, self.expected_ports):
+            ping_dut = (self.dut, self.eth_d[i])
+            ping_ep = (self.host_ep[i], self.eth_ep[i])
+
+            dut_t_x = (self.dut, self.addr_d[i], self.eth_d[i],
+                       self.addr_v6_d[i], self.rss_key, self.rm_nc_bin)
+            a_t = (self.host_ep[i], self.addr_ep[i], self.eth_ep[i],
+                   self.addr_v6_ep[i], None, self.rm_nc_bin)
+
+            self.unit_dict = Unit_dict(self, dut_t_x, a_t,
+                                       ping_dut, ping_ep,
+                                       prefix='port_%s_' % i)
+            if not self._tests:
+                self._tests = self.unit_dict.tests
+            else:
+                self._tests.update(self.unit_dict.tests)
+
+class NFPFlowNIC_n4port_no_fw_loading(_NFPFlowNIC_nport_no_fw_loading):
+    """Unit tests for the NFPFlowNIC Software Group"""
+
+    summary = "Unit tests for the NFPFlowNIC project with kernel space " \
+              "firmware loading. "
+
+    def __init__(self, name, cfg=None,
+                 quick=False, dut_object=None):
+        """Initialise
+        @name:   A unique name for the group of tests
+        @cfg:    A Config parser object (optional)
+        @quick:  Omit some system info gathering to speed up running tests
+        """
+
+        _NFPFlowNIC_nport_no_fw_loading.__init__(self, name, cfg=cfg, quick=quick,
+                                   dut_object=dut_object, expected_ports=4)
+        self._tests = None
+
+        for i in range(0, self.expected_ports):
+            ping_dut = (self.dut, self.eth_d[i])
+            ping_ep = (self.host_ep[i], self.eth_ep[i])
+
+            dut_t_x = (self.dut, self.addr_d[i], self.eth_d[i],
+                       self.addr_v6_d[i], self.rss_key, self.rm_nc_bin)
+            a_t = (self.host_ep[i], self.addr_ep[i], self.eth_ep[i],
+                   self.addr_v6_ep[i], None, self.rm_nc_bin)
+
+            self.unit_dict = Unit_dict(self, dut_t_x, a_t,
+                                       ping_dut, ping_ep,
+                                       prefix='port_%s_' % i)
+            if not self._tests:
+                self._tests = self.unit_dict.tests
+            else:
+                self._tests.update(self.unit_dict.tests)
+
+class NFPFlowNIC_n5port_no_fw_loading(_NFPFlowNIC_nport_no_fw_loading):
+    """Unit tests for the NFPFlowNIC Software Group"""
+
+    summary = "Unit tests for the NFPFlowNIC project with kernel space " \
+              "firmware loading. "
+
+    def __init__(self, name, cfg=None,
+                 quick=False, dut_object=None):
+        """Initialise
+        @name:   A unique name for the group of tests
+        @cfg:    A Config parser object (optional)
+        @quick:  Omit some system info gathering to speed up running tests
+        """
+
+        _NFPFlowNIC_nport_no_fw_loading.__init__(self, name, cfg=cfg, quick=quick,
+                                   dut_object=dut_object, expected_ports=5)
+        self._tests = None
+
+        for i in range(0, self.expected_ports):
+            ping_dut = (self.dut, self.eth_d[i])
+            ping_ep = (self.host_ep[i], self.eth_ep[i])
+
+            dut_t_x = (self.dut, self.addr_d[i], self.eth_d[i],
+                       self.addr_v6_d[i], self.rss_key, self.rm_nc_bin)
+            a_t = (self.host_ep[i], self.addr_ep[i], self.eth_ep[i],
+                   self.addr_v6_ep[i], None, self.rm_nc_bin)
+
+            self.unit_dict = Unit_dict(self, dut_t_x, a_t,
+                                       ping_dut, ping_ep,
+                                       prefix='port_%s_' % i)
+            if not self._tests:
+                self._tests = self.unit_dict.tests
+            else:
+                self._tests.update(self.unit_dict.tests)
+
+class NFPFlowNIC_n8port_no_fw_loading(_NFPFlowNIC_nport_no_fw_loading):
+    """Unit tests for the NFPFlowNIC Software Group"""
+
+    summary = "Unit tests for the NFPFlowNIC project with kernel space " \
+              "firmware loading. "
+
+    def __init__(self, name, cfg=None,
+                 quick=False, dut_object=None):
+        """Initialise
+        @name:   A unique name for the group of tests
+        @cfg:    A Config parser object (optional)
+        @quick:  Omit some system info gathering to speed up running tests
+        """
+
+        _NFPFlowNIC_nport_no_fw_loading.__init__(self, name, cfg=cfg, quick=quick,
+                                   dut_object=dut_object, expected_ports=8)
+        self._tests = None
+
+        for i in range(0, self.expected_ports):
+            ping_dut = (self.dut, self.eth_d[i])
+            ping_ep = (self.host_ep[i], self.eth_ep[i])
+
+            dut_t_x = (self.dut, self.addr_d[i], self.eth_d[i],
+                       self.addr_v6_d[i], self.rss_key, self.rm_nc_bin)
+            a_t = (self.host_ep[i], self.addr_ep[i], self.eth_ep[i],
+                   self.addr_v6_ep[i], None, self.rm_nc_bin)
+
+            self.unit_dict = Unit_dict(self, dut_t_x, a_t,
+                                       ping_dut, ping_ep,
+                                       prefix='port_%s_' % i)
+            if not self._tests:
+                self._tests = self.unit_dict.tests
+            else:
+                self._tests.update(self.unit_dict.tests)
 
 

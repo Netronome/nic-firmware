@@ -6,46 +6,19 @@
 
 import collections
 import netro.testinfra
-from groups import *
+from nfpflownic import *
 from netro.testinfra.nrt_result import NrtResult
 from netro.db_schemas import test_suite_info
 from netro.db_schemas import dblib
 from netro.testinfra import test
 from ConfigParser import ConfigParser
 
-
 class Project(netro.testinfra.Project):
     """Tests for nfpflownic."""
 
-    summary = "Tests for NFPFlowNIC"
+    summary = "Tests for NFPFlowNIC with kernel firmware loading"
     _groups = collections.OrderedDict((("setup", NFPFlowNICSetup),
-                                       ("unit", NFPFlowNICUnit),
-                                       ("unit_no_fw_ld",
-                                        NFPFlowNIC_no_fw_loading),
-                                       ("unit_2_port_no_fw_ld", NFPFlowNIC_n2port_no_fw_loading),
-                                       ("unit_4_port_no_fw_ld", NFPFlowNIC_n4port_no_fw_loading),
-                                       ("unit_5_port_no_fw_ld", NFPFlowNIC_n5port_no_fw_loading),
-                                       ("unit_8_port_no_fw_ld", NFPFlowNIC_n8port_no_fw_loading),
-                                       ("unit_2_port", NFPFlowNICUnit_n2_port),
-                                       ("unit_4_port", NFPFlowNICUnit_n4_port),
-                                       ("unit_5_port", NFPFlowNICUnit_n5_port),
-                                       ("unit_8_port", NFPFlowNICUnit_n8_port),
-                                       ("perf",
-                                        NFPFlowNICPerfTest),
-                                       ("perf_userspace",
-                                        NFPFlowNICPerfTest_userspace),
-                                       ("perf_2port",
-                                        NFPFlowNICPerfTest_2port),
-                                       ("perf_4port",
-                                        NFPFlowNICPerfTest_4port),
-                                       ("perf_8port",
-                                        NFPFlowNICPerfTest_8port),
-                                       ("perf_2port_no_fw_ld",
-                                        NFPFlowNICPerfTest_2_no_fw_ld),
-                                       ("perf_4port_no_fw_ld",
-                                        NFPFlowNICPerfTest_4_no_fw_ld),
-                                       ("perf_8port_no_fw_ld",
-                                        NFPFlowNICPerfTest_8_no_fw_ld)))
+                                       ("unit_2_port_no_fw_ld", NFPFlowNIC_n2port_no_fw_loading)))
 
     def _init(self):
         """

@@ -76,7 +76,7 @@ class _NFPFlowNICSetup(netro.testinfra.Group):
         self.dut = None
         self.nfes = 0
 
-        self.src = None
+        self.src = []
         self.src_intf = None
 
         # Call the parent's initializer.  It'll set up common attributes
@@ -94,7 +94,8 @@ class _NFPFlowNICSetup(netro.testinfra.Group):
         """ Clean up the systems for tests from this group
         called from the groups run() method.
         """
-        client_list = [self.dut, self.src]
+        client_list = self.src
+        client_list.append(self.dut)
         for client in client_list:
             kill_bg_process(client.host, "TCPKeepAlive")
 
@@ -157,6 +158,12 @@ class _NFPFlowNICSetup(netro.testinfra.Group):
         if self.cfg.has_option("DUT", "sdk_loc"):
             self.sdk_loc = self.cfg.get("DUT", "sdk_loc")
 
+        # NIC
+        if self.cfg.has_option("DUT", "nic_deb"):
+            self.nic_deb = self.cfg.get("DUT", "nic_deb")
+        if self.cfg.has_option("DUT", "nic_deb_loc"):
+            self.nic_deb_loc = self.cfg.get("DUT", "nic_deb_loc")
+
         # DUT
         self.dut_object = None
         if self.cfg.has_option("DUT", "nfp"):
@@ -165,7 +172,9 @@ class _NFPFlowNICSetup(netro.testinfra.Group):
         self.dut = System(self.cfg.get("DUT", "name"), quick=self.quick,
                           _noendsec=True)
         # Host A
-        self.src = System(self.cfg.get("HostA", "name"), quick=self.quick,
-                          _noendsec=True)
+        host_list = self.cfg.get("HostEP", "names").split(',')
+        for i in range(0, len(host_list)):
+            if host_list[i].strip() not in self.src:
+                self.src.append(System(host_list[i].strip(), self.quick))
 
         return

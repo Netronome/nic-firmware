@@ -41,9 +41,6 @@ class RebootHosts(Test):
 
         LOG_sec("Test Parameters")
         LOG("dut        : %s" % self.test_obj.dut.host)
-        LOG("nfes       : %s" % self.test_obj.nfes)
-        LOG("src        : %s" % self.test_obj.src.host)
-        LOG("src_intf   : %s" % self.test_obj.src_intf)
         LOG("timeout    : %s" % self.timeout)
         LOG("delay      : %s" % self.delay)
         LOG_endsec()
@@ -54,13 +51,17 @@ class RebootHosts(Test):
         # Create the threadpool.
         tp = ThreadPool(num_threads)
         # Reboot both hosts.
-        tp.queueTask(self.power_cycle, host=self.test_obj.dut)
-        tp.queueTask(self.test_obj.src.reboot, timeout=self.timeout,
+        #tp.queueTask(self.power_cycle, host=self.test_obj.dut)
+        tp.queueTask(self.test_obj.dut.reboot, timeout=self.timeout,
                      delay=self.delay)
+        for src in self.test_obj.src:
+            tp.queueTask(src.reboot, timeout=self.timeout,
+                         delay=self.delay)
         tp.joinAll()
 
         # Verify machines are up. If not, an exception will be raised.
-        client_list = [self.test_obj.dut, self.test_obj.src]
+        client_list = self.test_obj.src
+        client_list.append(self.test_obj.dut)
         for client in client_list:
             timed_poll(self.timeout, client.true_cmd, delay=self.delay)
 
