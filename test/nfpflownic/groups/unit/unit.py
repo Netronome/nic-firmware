@@ -1480,8 +1480,7 @@ class DstMACFltr(CommonTest):
             pkts.append(pkt)
 
         wrpcap(self.tmp_pcap, pkts)
-        self.src.cp_to(self.tmp_pcap, self.tmp_pcap)
-        os.remove(self.tmp_pcap)
+        self.src.mv_to(self.tmp_pcap, self.tmp_pcap)
 
 
     def execute(self):
