@@ -172,7 +172,7 @@ class localNrtSystem(NrtSystem):
         # clean interface(s)
         if dict_arg['intf'] != "":
             cmd = ("for i in \`seq 1 4094\`; "
-                   "do vconfig rem %s.\$i 2>/dev/null; "
+                   "do ip link delete dev %s.\$i 2>/dev/null; "
                    "done;" % (dict_arg['intf']))
             cmd += "ip addr flush dev %s;" % (dict_arg['intf'])
             cmd += "ip route flush dev %s;" % (dict_arg['intf'])

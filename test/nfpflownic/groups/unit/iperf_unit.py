@@ -506,11 +506,11 @@ class Csum_Tx(Iperftest):
         """
         Create and configure vlan interfaces
         """
-        self.src.cmd('vconfig rem %s' % self.src_vlan_ifn, fail=False)
-        self.src.cmd('vconfig add %s %s' % (self.src_ifn, self.vlan_id))
+        self.src.vconfig_rem(self.src_ifn, self.vlan_id, fail=False)
+        self.src.vconfig_add(self.src_ifn, self.vlan_id)
         self.src.cmd('ip addr flush dev %s' % self.src_vlan_ifn, fail=False)
-        self.dst.cmd('vconfig rem %s' % self.dst_vlan_ifn, fail=False)
-        self.dst.cmd('vconfig add %s %s' % (self.dst_ifn, self.vlan_id))
+        self.dst.vconfig_rem(self.dst_ifn, self.vlan_id, fail=False)
+        self.dst.vconfig_add(self.dst_ifn, self.vlan_id)
         self.dst.cmd('ip addr flush dev %s' % self.dst_vlan_ifn, fail=False)
         # generate a random number for composing vlan ip (such as 10.255.255.x)
         #  1 and 2 are used on vNIC and endpoint interfaces.
@@ -726,8 +726,8 @@ class Csum_Tx(Iperftest):
         Remove temporary directory and files, remove vlan interfaces
         """
         if self.vlan:
-            self.src.cmd('vconfig rem %s' % self.src_vlan_ifn, fail=False)
-            self.dst.cmd('vconfig rem %s' % self.dst_vlan_ifn, fail=False)
+            self.src.vconfig_rem(self.src_ifn, self.vlan_id, fail=False)
+            self.dst.vconfig_rem(self.dst_ifn, self.vlan_id, fail=False)
         Iperftest.clean_up(self, passed=passed)
         return
 

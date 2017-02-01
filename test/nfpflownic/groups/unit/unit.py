@@ -846,7 +846,7 @@ class RxVlan(UnitComparePacket):
         """
         try:
             UnitComparePacket.interface_cfg(self)
-            self.dst.cmd('vconfig add %s %s' % (self.dst_ifn, self.vlan_id))
+            self.dst.vconfig_add(self.dst_ifn, self.vlan_id)
             self.dst.cmd('ifconfig %s up' % self.dst_vlan_ifn)
         except:
             self.clean_up(None)
@@ -881,7 +881,7 @@ class RxVlan(UnitComparePacket):
         Remove temporary directory and files, and remove vlan interface
         """
         UnitComparePacket.clean_up(self, tmpdir)
-        self.dst.cmd('vconfig rem %s' % self.dst_vlan_ifn, fail=False)
+        self.dst.vconfig_rem(self.dst_ifn, self.vlan_id, fail=False)
 
     def send_pckts_and_check_result(self, src_if, dst_if, send_pcap, tmpdir):
         """
@@ -926,7 +926,7 @@ class RxVlan_rx_byte(RxVlan):
         """
         try:
             UnitComparePacket.interface_cfg(self)
-            self.dst.cmd('vconfig add %s %s' % (self.dst_ifn, self.vlan_id))
+            self.dst.vconfig_add(self.dst_ifn, self.vlan_id)
             self.dst.cmd('ifconfig %s up' % self.dst_vlan_ifn)
         except:
             self.clean_up(None)
@@ -961,7 +961,7 @@ class RxVlan_rx_byte(RxVlan):
         Remove temporary directory and files, and remove vlan interface
         """
         UnitComparePacket.clean_up(self, tmpdir)
-        self.dst.cmd('vconfig rem %s' % self.dst_vlan_ifn, fail=False)
+        self.dst.vconfig_rem(self.dst_ifn, self.vlan_id, fail=False)
 
     def send_pckts_and_check_result(self, src_if, dst_if, send_pcap, tmpdir):
         """
