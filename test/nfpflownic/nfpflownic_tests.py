@@ -57,8 +57,7 @@ class _NFPFlowNIC(netro.testinfra.Group):
                         "IP address). Assumes root as default."]),
         ("addrX", [True, "IPv4 address/mask to be assigned to ethX"]),
         ("addr6X", [True, "IPv6 address/mask to be assigned to ethX"]),
-        #("vnickmod", [False, "Path to vNIC kernel module to load on DUT"]),
-        #("nfpkmods", [False, "Directory with BSP kernel mods load on DUT"]),
+        ("kmod", [False, "Path to dir containing kernel mod to load on DUT"]),
         ("nfp", [False, "NFP device number to use (default 0)"]),
         ("mefw", [False, "Path to firmware image to load"]),
         ("mkfirmware", [False, "Path to the script producing CA kernel ready "
@@ -100,9 +99,7 @@ class _NFPFlowNIC(netro.testinfra.Group):
         self.addr_v6_x = None
         self.intf_x = None
         self.nfp = 0
-        self.vnickmod = None
-        self.vnic_fn = None
-        self.nfpkmods = None
+        self.kmod = None
         self.mefw = None
         self.mefw_fn = None
         self.mkfirmware = None
@@ -218,7 +215,6 @@ class _NFPFlowNIC(netro.testinfra.Group):
         self.addr_v6_x = ipv6 + ":1/" + ipv6_pl
 
         self.nfp = 0
-        self.vnic_fn = 'nfp_net'
         self.mefw_fn = 'basic_nic.nffw'
         self.macinitjson = None
         self.macinitjson_fn = None
@@ -228,7 +224,6 @@ class _NFPFlowNIC(netro.testinfra.Group):
                                     nfp=self.nfp,
                                     macinitjson=self.macinitjson,
                                     macinitjson_fn=self.macinitjson_fn,
-                                    vnic_fn=self.vnic_fn,
                                     mefw_fn=self.mefw_fn, quick=self.quick)
         self.eth_x = self.dut.eth_list[0]
         self.rss_key = self.dut.rss_key
@@ -309,10 +304,8 @@ class _NFPFlowNIC(netro.testinfra.Group):
 
         if self.cfg.has_option("DUT", "nfp"):
             self.nfp = self.cfg.getint("DUT", "nfp")
-        if self.cfg.has_option("DUT", "vnickmod"):
-            self.vnickmod = self.cfg.get("DUT", "vnickmod")
-        if self.cfg.has_option("DUT", "nfpkmods"):
-            self.nfpkmods = self.cfg.get("DUT", "nfpkmods")
+        if self.cfg.has_option("DUT", "kmod"):
+            self.kmod = self.cfg.get("DUT", "kmod")
         if self.cfg.has_option("DUT", "mefw"):
             self.mefw = self.cfg.get("DUT", "mefw")
             self.mefw_fn = os.path.basename(self.mefw)
@@ -340,12 +333,14 @@ class _NFPFlowNIC(netro.testinfra.Group):
             elif c_km_str == 'True':
                 self.customized_kmod = True
 
+        if self.customized_kmod and not self.kmod:
+            raise NtiError('Cannot customized kmod set but no kmod path in cfg')
+
         self.dut = NFPFlowNICSystem(self.cfg.get("DUT", "name"), cfg=self.cfg,
                                     dut=self.dut_object,
                                     nfp=self.nfp,
                                     mefw_fn=self.mefw_fn,
-                                    nfpkmods=self.nfpkmods,
-                                    vnickmod=self.vnickmod,
+                                    kmod=self.kmod,
                                     mefw=self.mefw,
                                     macinitjson=self.macinitjson,
                                     macinitjson_fn=self.macinitjson_fn,
@@ -416,7 +411,6 @@ class _NFPFlowNIC_userspace(_NFPFlowNIC):
          self.addr_v6_x = ipv6 + ":1/" + ipv6_pl
 
          self.nfp = 0
-         self.vnic_fn = 'nfp_net'
          self.mefw_fn = 'basic_nic.nffw'
          self.macinitjson = None
          self.macinitjson_fn = None
@@ -427,7 +421,6 @@ class _NFPFlowNIC_userspace(_NFPFlowNIC):
                                      nfp=self.nfp,
                                      macinitjson=self.macinitjson,
                                      macinitjson_fn=self.macinitjson_fn,
-                                     vnic_fn=self.vnic_fn,
                                      mefw_fn=self.mefw_fn,
                                      load_mode='userspace',
                                      quick=self.quick)
@@ -468,10 +461,8 @@ class _NFPFlowNIC_userspace(_NFPFlowNIC):
 
         if self.cfg.has_option("DUT", "nfp"):
             self.nfp = self.cfg.getint("DUT", "nfp")
-        if self.cfg.has_option("DUT", "vnickmod"):
-            self.vnickmod = self.cfg.get("DUT", "vnickmod")
-        if self.cfg.has_option("DUT", "nfpkmods"):
-            self.nfpkmods = self.cfg.get("DUT", "nfpkmods")
+        if self.cfg.has_option("DUT", "kmod"):
+            self.kmod = self.cfg.get("DUT", "kmod")
         if self.cfg.has_option("DUT", "mefw"):
             self.mefw = self.cfg.get("DUT", "mefw")
             self.mefw_fn = os.path.basename(self.mefw)
@@ -500,12 +491,14 @@ class _NFPFlowNIC_userspace(_NFPFlowNIC):
             elif c_km_str == 'True':
                 self.customized_kmod = True
 
+        if self.customized_kmod and not self.kmod:
+            raise NtiError('Cannot customized kmod set but no kmod path in cfg')
+
         self.dut = NFPFlowNICSystem(self.cfg.get("DUT", "name"), cfg=self.cfg,
                                     dut=self.dut_object,
                                     nfp=self.nfp,
                                     mefw_fn=self.mefw_fn,
-                                    nfpkmods=self.nfpkmods,
-                                    vnickmod=self.vnickmod,
+                                    kmod=self.kmod,
                                     mefw=self.mefw,
                                     macinitjson=self.macinitjson,
                                     macinitjson_fn=self.macinitjson_fn,
@@ -683,8 +676,7 @@ class _NFPFlowNIC_2port(_NFPFlowNIC):
         ("addr6X", [True, "IPv6 address/mask to be assigned to ethX"]),
         ("addrY", [True, "IPv4 address/mask to be assigned to ethY"]),
         ("addr6Y", [True, "IPv6 address/mask to be assigned to ethY"]),
-        #("vnickmod", [False, "Path to vNIC kernel module to load on DUT"]),
-        #("nfpkmods", [False, "Directory with BSP kernel mods load on DUT"]),
+        ("kmod", [False, "Path to dir containing kernel mod to load on DUT"]),
         ("nfp", [False, "NFP device number to use (default 0)"]),
         ("mefw", [False, "Path to firmware image to load"]),
         ("mkfirmware", [False, "Path to the script producing CA kernel ready "
@@ -770,7 +762,6 @@ class _NFPFlowNIC_2port(_NFPFlowNIC):
         self.addr_v6_x = ipv6 + ":1/" + ipv6_pl
 
         self.nfp = 0
-        self.vnic_fn = 'nfp_net'
         self.mefw_fn = 'basic_nic.nffw'
         self.macinitjson = None
         self.macinitjson_fn = None
@@ -780,7 +771,6 @@ class _NFPFlowNIC_2port(_NFPFlowNIC):
                                     nfp=self.nfp,
                                     macinitjson=self.macinitjson,
                                     macinitjson_fn=self.macinitjson_fn,
-                                    vnic_fn=self.vnic_fn,
                                     mefw_fn=self.mefw_fn, quick=self.quick)
         self.eth_x = self.dut.eth_list[0]
         self.rss_key = self.dut.rss_key
@@ -863,10 +853,8 @@ class _NFPFlowNIC_2port(_NFPFlowNIC):
 
         if self.cfg.has_option("DUT", "nfp"):
             self.nfp = self.cfg.getint("DUT", "nfp")
-        if self.cfg.has_option("DUT", "vnickmod"):
-            self.vnickmod = self.cfg.get("DUT", "vnickmod")
-        if self.cfg.has_option("DUT", "nfpkmods"):
-            self.nfpkmods = self.cfg.get("DUT", "nfpkmods")
+        if self.cfg.has_option("DUT", "kmod"):
+            self.kmod = self.cfg.get("DUT", "kmod")
         if self.cfg.has_option("DUT", "mefw"):
             self.mefw = self.cfg.get("DUT", "mefw")
             self.mefw_fn = os.path.basename(self.mefw)
@@ -894,12 +882,14 @@ class _NFPFlowNIC_2port(_NFPFlowNIC):
             elif c_km_str == 'True':
                 self.customized_kmod = True
 
+        if self.customized_kmod and not self.kmod:
+            raise NtiError('Cannot customized kmod set but no kmod path in cfg')
+
         self.dut = NFPFlowNICSystem(self.cfg.get("DUT", "name"), cfg=self.cfg,
                                     dut=self.dut_object,
                                     nfp=self.nfp,
                                     mefw_fn=self.mefw_fn,
-                                    nfpkmods=self.nfpkmods,
-                                    vnickmod=self.vnickmod,
+                                    kmod=self.kmod,
                                     mefw=self.mefw,
                                     macinitjson=self.macinitjson,
                                     macinitjson_fn=self.macinitjson_fn,
@@ -976,8 +966,7 @@ class _NFPFlowNIC_nport(netro.testinfra.Group):
                         "IP address). Assumes root as default."]),
         ("addrD", [True, "IPv4 addresses/masks to be assigned to ethX"]),
         ("addr6D", [True, "IPv6 addresses/masks to be assigned to ethX"]),
-        ("vnickmod", [False, "Path to vNIC kernel module to load on DUT"]),
-        ("nfpkmods", [False, "Directory with BSP kernel mods load on DUT"]),
+        ("kmod", [False, "Path to dir containing kernel mod to load on DUT"]),
         ("nfp", [False, "NFP device number to use (default 0)"]),
         ("num_port", [False, "Number of physical NIC ports and expected "
                              "netdevs"]),
@@ -1044,9 +1033,7 @@ class _NFPFlowNIC_nport(netro.testinfra.Group):
 
         self.dut = None
         self.nfp = 0
-        self.vnickmod = None
-        self.vnic_fn = None
-        self.nfpkmods = None
+        self.kmod = None
         self.mefw = None
         self.mefw_fn = None
         self.mkfirmware = None
@@ -1159,7 +1146,6 @@ class _NFPFlowNIC_nport(netro.testinfra.Group):
         self.addr_v6_x = ipv6 + ":1/" + ipv6_pl
 
         self.nfp = 0
-        self.vnic_fn = 'nfp_net'
         self.mefw_fn = 'basic_nic.nffw'
         self.macinitjson = None
         self.macinitjson_fn = None
@@ -1169,7 +1155,6 @@ class _NFPFlowNIC_nport(netro.testinfra.Group):
                                     nfp=self.nfp,
                                     macinitjson=self.macinitjson,
                                     macinitjson_fn=self.macinitjson_fn,
-                                    vnic_fn=self.vnic_fn,
                                     mefw_fn=self.mefw_fn, quick=self.quick)
         self.eth_x = self.dut.eth_list[0]
         self.rss_key = self.dut.rss_key
@@ -1244,10 +1229,8 @@ class _NFPFlowNIC_nport(netro.testinfra.Group):
 
         if self.cfg.has_option("DUT", "nfp"):
             self.nfp = self.cfg.getint("DUT", "nfp")
-        if self.cfg.has_option("DUT", "vnickmod"):
-            self.vnickmod = self.cfg.get("DUT", "vnickmod")
-        if self.cfg.has_option("DUT", "nfpkmods"):
-            self.nfpkmods = self.cfg.get("DUT", "nfpkmods")
+        if self.cfg.has_option("DUT", "kmod"):
+            self.kmod = self.cfg.get("DUT", "kmod")
         if self.cfg.has_option("DUT", "mefw"):
             self.mefw = self.cfg.get("DUT", "mefw")
             self.mefw_fn = os.path.basename(self.mefw)
@@ -1275,12 +1258,14 @@ class _NFPFlowNIC_nport(netro.testinfra.Group):
             elif c_km_str == 'True':
                 self.customized_kmod = True
 
+        if self.customized_kmod and not self.kmod:
+            raise NtiError('Cannot customized kmod set but no kmod path in cfg')
+
         self.dut = NFPFlowNICSystem(self.cfg.get("DUT", "name"), cfg=self.cfg,
                                     dut=self.dut_object,
                                     nfp=self.nfp,
                                     mefw_fn=self.mefw_fn,
-                                    nfpkmods=self.nfpkmods,
-                                    vnickmod=self.vnickmod,
+                                    kmod=self.kmod,
                                     mefw=self.mefw,
                                     macinitjson=self.macinitjson,
                                     macinitjson_fn=self.macinitjson_fn,
@@ -1520,16 +1505,15 @@ class _NFPFlowNIC_no_fw_loading(netro.testinfra.Group):
         self.addr_v6_x = ipv6 + ":1/" + ipv6_pl
 
         self.nfp = 0
-        self.vnic_fn = 'nfp_net'
         self.mefw_fn = 'basic_nic.nffw'
         self.macinitjson = None
         self.macinitjson_fn = None
+
         self.dut = NFPFlowNICSystem(self.dut_object.name, cfg=self.cfg,
                                     dut=self.dut_object,
                                     nfp=self.nfp,
                                     macinitjson=self.macinitjson,
                                     macinitjson_fn=self.macinitjson_fn,
-                                    vnic_fn=self.vnic_fn,
                                     mefw_fn=self.mefw_fn, quick=self.quick)
         self.eth_x = self.dut.eth_list[0]
         self.rss_key = self.dut.rss_key

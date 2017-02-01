@@ -188,8 +188,8 @@ class localNrtSystem(NrtSystem):
 class NFPFlowNICSystem(NFESystem, localNrtSystem):
     """A class for a system running NFPFLOWNIC"""
 
-    def __init__(self, remote, cfg=None, dut=None, nfp=0, vnic_fn="nfp_net",
-                 mefw_fn="basic_nic.nffw", nfpkmods=None, vnickmod=None,
+    def __init__(self, remote, cfg=None, dut=None, nfp=0, kmod_fn="nfp",
+                 mefw_fn="basic_nic.nffw", kmod=None,
                  mefw=None, macinitjson=None, macinitjson_fn=None,
                  initscript=None, initscript_fn=None,
                  mkfirmware=None, mkfirmware_fn='mkfirmware-device.sh',
@@ -211,10 +211,9 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
         self.cfg = cfg
         self.dut_object = dut
         self.nfp = nfp
-        self.vnic_fn = vnic_fn
+        self.kmod_fn = kmod_fn
         self.mefw_fn = mefw_fn
-        self.nfpkmods = nfpkmods
-        self.vnickmod = vnickmod
+        self.kmod = kmod
         self.mefw = mefw
         self.macinitjson = macinitjson
         self.macinitjson_fn = macinitjson_fn
@@ -276,10 +275,8 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
             cmd = 'tar -C ' + self.tmpdir + ' -xvf ' + tmp_build_file + \
                   ' --strip 2'
             self.cmd(cmd)
-            self.cmd("rmmod %s" % self.vnic_fn, fail=False)
-            self.cmd("rmmod nfp_netvf", fail=False)
-            self.cmd("rmmod nfp_net", fail=False)
-            self.cmd("modprobe nfp nfp_reset=1", fail=False)
+            self.cmd("rmmod %s" % self.kmod_fn, fail=False)
+            self.cmd("modprobe nfp nfp_reset=1 nfp_pf_netdev=0", fail=False)
 
             if self.load_mode == 'userspace':
                 ## User space loading.
@@ -331,9 +328,12 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
                     raise NtiFatalError(msg=msg)
 
         elif self.cfg:
+            if self.customized_kmod:
+                self.cp_to(self.kmod, self.tmpdir)
+                self.kmod_fn = os.path.basename(self.kmod)
+                kmod_file = os.path.join(self.tmpdir, self.kmod_fn)
+
             if self.load_mode == 'kernel':
-                self.cmd("rmmod nfp_netvf", fail=False)
-                self.cmd("rmmod nfp_net", fail=False)
                 self.cmd("rmmod nfp", fail=False)
 
                 lib_netro_dir = os.path.join(os.path.sep, 'lib', 'firmware',
@@ -344,17 +344,13 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
                 self.cmd(cmd, fail=False)
 
                 self.cp_to(self.mefw,
-                           os.path.join(lib_netro_dir,'nfp6000_net.cat'))
+                           os.path.join(lib_netro_dir,'nfp6000_net.nffw'))
 
                 try:
                     before_eth_dict = self.get_eth_dict()
 
                     if self.customized_kmod:
-                        self.cp_to(self.vnickmod, self.tmpdir)
-                        self.vnic_fn = os.path.basename(self.vnickmod)
-                        kmod_file = os.path.join(self.tmpdir, self.vnic_fn)
                         self.load_nfp_net(ko_file=kmod_file)
-
                     else:
                         self.load_nfp_net()
                 except:
@@ -363,23 +359,12 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
                     self.rm_dir(self.tmpdir)
                     raise NtiFatalError(msg=msg)
             elif self.load_mode == 'userspace':
-                if self.nfpkmods:
-                    self.cp_to(self.nfpkmods, self.tmpdir)
-                    nfp_ko_file = os.path.join(self.tmpdir, "nfp.ko")
-                else:
-                    nfp_ko_file = None
-
                 if self.customized_kmod:
-                    self.cp_to(self.vnickmod, self.tmpdir)
-                    self.vnic_fn = os.path.basename(self.vnickmod)
-                    nfp_net_ko_file = os.path.join(self.tmpdir, self.vnic_fn)
-
+                    before_eth_dict = \
+                        self.userspace_mode_setup(nfp_ko_file=kmod_file)
                 else:
-                    nfp_net_ko_file = None
+                    before_eth_dict = self.userspace_mode_setup()
 
-                before_eth_dict = \
-                    self.userspace_mode_setup(nfp_net_ko_file=nfp_net_ko_file,
-                                              nfp_ko_file=nfp_ko_file)
         # Check that a new interface was created.
         LOG_sec("Verify a new interface was created.")
         try:
@@ -565,31 +550,27 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
         return
 
     def load_nfp_net(self,  mode='kernel', ko_file=None):
-        """Reload the BSP modules (more specifically, rmmod nfp,
-        nfp_pcie, and nfp_cppcore, and then insmod nfp only).
-
+        """Load kernel module for netdev operation.
         """
-        LOG_sec("%s: nfp_net modules from /lib/module" % self.host)
+        LOG_sec("%s: load nfp modules from netdev operation" % self.host)
         try:
             if mode == 'userspace':
                 # User space loading
                 self.cmd("rm -rf /lib/firmware/netronome", fail=False)
                 if ko_file:
                     self.cmd("modprobe vxlan", fail=False)
-                    self.cmd("insmod %s num_rings=32" % ko_file)
+                    self.cmd("insmod %s num_rings=32 nfp_dev_cpp=1" % ko_file)
                 else:
-                    self.cmd('modprobe %s num_rings=32' % self.vnic_fn)
+                    self.cmd('modprobe %s num_rings=32 nfp_dev_cpp=1' % self.kmod_fn)
 
             elif mode == 'kernel':
                 # Kernel loading
                 # fw_noload=0 to override grub global setting
                 if ko_file:
                     self.cmd("modprobe vxlan", fail=False)
-                    self.cmd("insmod %s nfp_reset=1 fw_noload=0 "
-                             "num_rings=32" % ko_file)
+                    self.cmd("insmod %s nfp_dev_cpp=1 num_rings=32" % ko_file)
                 else:
-                    self.cmd('modprobe %s nfp_reset=1  fw_noload=0 '
-                             'num_rings=32' % self.vnic_fn)
+                    self.cmd('modprobe %s nfp_dev_cpp=1 num_rings=32' % self.kmod_fn)
         except:
             self.rm_dir(self.tmpdir)
             raise NtiFatalError(msg="Fail to load_nfp_net in NFPFlowNICSystem")
@@ -649,8 +630,7 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
 
         return
 
-    def userspace_mode_setup(self, nfp_net_ko_file=None, nfp_ko_file=None,
-                             use_cfg=True):
+    def userspace_mode_setup(self, nfp_ko_file=None, use_cfg=True):
         """
         load the fw and kernel module in userspace, with cfg
         """
@@ -662,23 +642,16 @@ class NFPFlowNICSystem(NFESystem, localNrtSystem):
             mefw = os.path.join(self.tmpdir, 'firmware', self.mefw_fn)
 
         self.cmd("rmmod nfp", fail=False)
-        self.cmd("rmmod nfp_net", fail=False)
-        self.cmd("rmmod nfp_netvf", fail=False)
 
         before_eth_dict = self.get_eth_dict()
         if nfp_ko_file:
-            self.cmd("insmod %s nfp_reset=1" % nfp_ko_file)
+            self.cmd("insmod %s nfp_reset=1 nfp_pf_netdev=0" % nfp_ko_file)
         else:
-            self.cmd("modprobe nfp nfp_reset=1")
+            self.cmd("modprobe nfp nfp_reset=1 nfp_pf_netdev=0")
         self.cmd("nfp-nffw unload", fail=False)
         self.cmd("nfp-nffw load %s" % mefw)
         self.cmd("rmmod nfp", fail=False)
-        self.cmd("rm -rf /lib/firmware/netronome", fail=False)
-        if nfp_net_ko_file:
-            self.cmd("modprobe vxlan", fail=False)
-            self.cmd("insmod %s" % nfp_net_ko_file)
-        else:
-            self.cmd("modprobe nfp_net")
+        self.load_nfp_net(mode="userspace", ko_file=nfp_ko_file)
 
         return before_eth_dict
 
