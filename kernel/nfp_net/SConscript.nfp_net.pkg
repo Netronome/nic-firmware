@@ -17,6 +17,7 @@ nfp_net_kmod_files = [
     (nfp_net_kmod_dst_dir + "/nfpcore/kcompat.h", nfp_net_kmod_src_dir + "/nfpcore/kcompat.h"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp6000_pcie.c", nfp_net_kmod_src_dir + "/nfpcore/nfp6000_pcie.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp6000_pcie.h", nfp_net_kmod_src_dir + "/nfpcore/nfp6000_pcie.h"),
+    (nfp_net_kmod_dst_dir + "/nfpcore/nfp_arm.h", nfp_net_kmod_src_dir + "/nfpcore/nfp_arm.h"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_cppcore.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_cppcore.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_cpp.h", nfp_net_kmod_src_dir + "/nfpcore/nfp_cpp.h"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_cpplib.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_cpplib.c"),
@@ -33,9 +34,12 @@ nfp_net_kmod_files = [
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nffw.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_nffw.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nffw.h", nfp_net_kmod_src_dir + "/nfpcore/nfp_nffw.h"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nsp.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_nsp.c"),
+    (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nsp_eth.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_nsp_eth.c"),
+    (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nsp_eth.h", nfp_net_kmod_src_dir + "/nfpcore/nfp_nsp_eth.h"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_platform.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_platform.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_resource.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_resource.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_rtsym.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_rtsym.c"),
+    (nfp_net_kmod_dst_dir + "/nfpcore/nfp_target.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_target.c"),
     # nfp6000
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp6000/nfp6000.h", nfp_net_kmod_src_dir + "/nfpcore/nfp6000/nfp6000.h"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp6000/nfp_xpb.h", nfp_net_kmod_src_dir + "/nfpcore/nfp6000/nfp_xpb.h"),
@@ -45,6 +49,8 @@ nfp_net_kmod_files = [
     (nfp_net_kmod_dst_dir + "/nfp_bpf.h", nfp_net_kmod_src_dir + "/nfp_bpf.h"),
     (nfp_net_kmod_dst_dir + "/nfp_bpf_jit.c", nfp_net_kmod_src_dir + "/nfp_bpf_jit.c"),
     (nfp_net_kmod_dst_dir + "/nfp_bpf_verifier.c", nfp_net_kmod_src_dir + "/nfp_bpf_verifier.c"),
+    (nfp_net_kmod_dst_dir + "/nfp_dev_cpp.c", nfp_net_kmod_src_dir + "/nfp_dev_cpp.c"),
+    (nfp_net_kmod_dst_dir + "/nfp_ioctl.h", nfp_net_kmod_src_dir + "/nfp_ioctl.h"),
     (nfp_net_kmod_dst_dir + "/nfp_main.c", nfp_net_kmod_src_dir + "/nfp_main.c"),
     (nfp_net_kmod_dst_dir + "/nfp_main.h", nfp_net_kmod_src_dir + "/nfp_main.h"),
     (nfp_net_kmod_dst_dir + "/nfp_modinfo.h", nfp_net_kmod_src_dir + "/nfp_modinfo.h"),
@@ -57,6 +63,7 @@ nfp_net_kmod_files = [
     (nfp_net_kmod_dst_dir + "/nfp_net_main.c", nfp_net_kmod_src_dir + "/nfp_net_main.c"),
     (nfp_net_kmod_dst_dir + "/nfp_net_offload.c", nfp_net_kmod_src_dir + "/nfp_net_offload.c"),
     (nfp_net_kmod_dst_dir + "/nfp_netvf_main.c", nfp_net_kmod_src_dir + "/nfp_netvf_main.c"),
+    (nfp_net_kmod_dst_dir + "/nfp_plat.c", nfp_net_kmod_src_dir + "/nfp_plat.c"),
 ]
 
 
