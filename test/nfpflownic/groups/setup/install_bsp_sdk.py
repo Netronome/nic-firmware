@@ -152,10 +152,10 @@ class InstallBSPSDK(Test):
         self.unload_deb('nfp-bsp-6000-b0-dkms')
         self.unload_deb('nfp-bsp-6000-b0')
         self.unload_deb('nfp-bsp-6000-b0-dev')
-        self.load_deb(os.path.join(self.test_obj.sdk_loc, self.test_obj.sdk))
+        #self.load_deb(os.path.join(self.test_obj.sdk_loc, self.test_obj.sdk))
         self.load_deb(os.path.join(self.test_obj.bsp_loc, self.test_obj.bsp))
-        self.load_deb(os.path.join(self.test_obj.bsp_loc,
-                                   self.test_obj.bsp_dkms))
+        #self.load_deb(os.path.join(self.test_obj.bsp_loc,
+        #                           self.test_obj.bsp_dkms))
 
         # Update the nfp lib
         self.test_obj.dut.cmd('/sbin/ldconfig', fail=False)
@@ -167,16 +167,7 @@ class InstallBSPSDK(Test):
         self.test_obj.dut.cmd('rmmod nfp_net', fail=False)
         self.test_obj.dut.cmd('rmmod nfp_vrouter', fail=False)
         self.test_obj.dut.cmd('rmmod nfp', fail=False)
-        self.test_obj.dut.cmd('modprobe nfp')
 
-        # Reimage the NFP's ARM Flash device.
-        cmd = ('nfp-flash --i-accept-the-risk-of-overwriting-miniloader -w '
-               '/opt/netronome/flash/flash-nic.bin')
-        self.test_obj.dut.cmd(cmd)
-
-        # Reimage the NFP's ARM Flash device.
-        cmd = ('echo -e \"\\n\" | /opt/netronome/bin/nfp-one')
-        self.test_obj.dut.cmd(cmd)
 
     def install_nic_deb(self):
         """
@@ -196,12 +187,19 @@ class InstallBSPSDK(Test):
             for version_num in version_list:
                 self.test_obj.dut.cmd('dkms remove nfp_net/%s --all' %
                                       version_num, fail=False)
-        self.test_obj.dut.cmd('dpkg -r ns-agilio-core-nic', fail=False)
-        self.test_obj.dut.cmd('dpkg --purge --force-all ns-agilio-core-nic',
-                              fail=False)
         nic_deb = os.path.join(self.test_obj.nic_deb_loc, self.test_obj.nic_deb)
         self.test_obj.dut.cmd('ifconfig -a | grep HWaddr', fail=False)
         self.test_obj.dut.cmd('dpkg -i %s' % nic_deb)
         time.sleep(5)
         self.test_obj.dut.cmd('ifconfig -a | grep HWaddr', fail=False)
+
+
+        # Reimage the NFP's ARM Flash device.
+        cmd = ('nfp-flash --i-accept-the-risk-of-overwriting-miniloader -w '
+               '/opt/netronome/flash/flash-nic.bin')
+        self.test_obj.dut.cmd(cmd)
+
+        # Reimage the NFP's ARM Flash device.
+        cmd = ('echo -e \"\\n\" | /opt/netronome/bin/nfp-one')
+        self.test_obj.dut.cmd(cmd)
 
