@@ -11,7 +11,7 @@ NETRONOME_BIN="$NETRONOME_DIR"/bin
 
 udev_file=/etc/udev/rules.d/99-netronome-corenic.udev.rules
 blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
-fw_file=/lib/firmware/netronome/nfp6000_net.cat
+fw_file=/lib/firmware/netronome/nfp6000_net.nffw
 log_file_dir=/opt/netronome/log
 log_file=$log_file_dir/ns-core-nic.log
 log_disable_file=$log_file_dir/ns-core-nic-log.disable
@@ -127,8 +127,8 @@ function write_udev() {
 }
 
 function clean_fw() {
-    log "Removing replay files from /lib/firmware/netronome..."
-    rm -f /lib/firmware/netronome/*.cat
+    log "Removing fw files from /lib/firmware/netronome..."
+    rm -f /lib/firmware/netronome/*.nffw
 }
 
 function process_platform() {
@@ -139,40 +139,40 @@ function process_platform() {
     nfp_media=$($NETRONOME_BIN/nfp-media  | cut -d '=' -f 2)
     log "Detecting platform..."
     selected_fw=
-    fw_path=/opt/netronome/firmware/ns-agilio-core-nic/cat
+    fw_path=/opt/netronome/firmware/ns-agilio-core-nic/
 
     err=0
 
     if [ "$hwinfo_amda" == "AMDA0096-0001" ]; then
         # No breakout cables supported
-        selected_fw=ns_nic_cx10_2.cat
+        selected_fw=ns_nic_cx10_2.nffw
     elif [ "$hwinfo_amda" == "AMDA0081-0001" ]; then
         if [ "$hwinfo_mac_ct" == "1" ]; then
-            selected_fw=ns_nic_cx40q_1.cat
+            selected_fw=ns_nic_cx40q_1.nffw
         elif [ "$hwinfo_mac_ct" == "4" ]; then
-            selected_fw=ns_nic_cx40q_1_4x10.cat
+            selected_fw=ns_nic_cx40q_1_4x10.nffw
         else
             err=1
         fi
     elif [ "$hwinfo_amda" == "AMDA0097-0001" ]; then
         if [ "$hwinfo_mac_ct" == "2" ]; then
-            selected_fw=ns_nic_cx40_2.cat
+            selected_fw=ns_nic_cx40_2.nffw
         elif [ "$hwinfo_mac_ct" == "5" ]; then
             if ( [[ ${nfp_media} == *"4x10G"*"40G"* ]] ) ; then
-                selected_fw=ns_nic_cx40_2_4x10_1x40.cat
+                selected_fw=ns_nic_cx40_2_4x10_1x40.nffw
             else
                 err=1
             fi
         elif [ "$hwinfo_mac_ct" == "8" ]; then
-            selected_fw=ns_nic_cx40_2_8x10.cat
+            selected_fw=ns_nic_cx40_2_8x10.nffw
         else
             err=1
         fi
     elif [ "$hwinfo_amda" == "AMDA0099-0001" ]; then
         if ( [[ ${nfp_media} == *"10G"*"10G"* ]] ) ; then
-            selected_fw=ns_nic_cx25_2_2x10.cat
+            selected_fw=ns_nic_cx25_2_2x10.nffw
         elif ( [[ ${nfp_media} == *"25G"*"25G"* ]] ) ; then
-            selected_fw=ns_nic_cx25_2.cat
+            selected_fw=ns_nic_cx25_2.nffw
         else
             err=1
         fi
@@ -223,7 +223,8 @@ function reload_nfp_net() {
         rmmod nfp
     fi
 
-    modprobe nfp
+    modprobe nfp nfp_dev_cpp=1
+
     return $?
 }
 
@@ -290,7 +291,7 @@ function usage() {
     echo ""
     echo "This utility will update udev rules, set up driver blacklists,"
     echo "  place the proper CoreNIC firmware in"
-    echo "  /lib/firmware/netronome/nfp6000_net.cat"
+    echo "  /lib/firmware/netronome/nfp6000_net.nffw"
     echo ""
     echo "Usage examples:"
     echo "EX: $0"
