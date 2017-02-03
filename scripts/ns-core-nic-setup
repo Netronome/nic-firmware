@@ -83,7 +83,7 @@ function check_and_load_driver() {
     fi
 
     log "Attempting to load nfp driver"
-    modprobe nfp
+    modprobe nfp nfp_dev_cpp=1
     if [ "$?" -ne 0 ]; then
         log "Auto load of nfp_net driver failed"
         log "nfp driver is not loaded."
