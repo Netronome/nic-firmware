@@ -11,6 +11,7 @@ NETRONOME_BIN="$NETRONOME_DIR"/bin
 
 udev_file=/etc/udev/rules.d/99-netronome-corenic.udev.rules
 blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
+mod_file=/etc/modprobe.d/nfp.conf
 fw_file=/lib/firmware/netronome/nfp6000_net.nffw
 log_file_dir=/opt/netronome/log
 log_file=$log_file_dir/ns-core-nic.log
@@ -235,6 +236,9 @@ function blacklist_nfp() {
     echo "#" >> $blacklist_file
     echo "# Permit autoloading of the the nfp.ko kernel module" >> $blacklist_file
     echo "blacklist nfp_uio" >> $blacklist_file
+
+    echo "# default parameters for Netronome nfp module" > $mod_file
+    echo "options nfp nfp_dev_cpp=1" >> $mod_file
 
     # TODO: edit blacklist file to remove options added by nfp-bsp pkg
 
