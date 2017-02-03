@@ -1,6 +1,6 @@
 PACKAGE_NAME="@PACKAGE_NAME@"
 PACKAGE_VERSION="@PACKAGE_VERSION@"
-BUILT_MODULE_NAME[0]="nfp_net"
+BUILT_MODULE_NAME[0]="nfp"
 DEST_MODULE_LOCATION[0]="/extra/netronome"
 #disable clean to preserve Module.symvers file
 CLEAN="true"

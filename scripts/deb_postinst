@@ -116,7 +116,7 @@ service ns-core-nic.autorun start
 # Disable logging
 /opt/netronome/bin/ns-core-nic-setup log-disable
 
-echo "Core NIC's nfp_net driver succesfully installed for the following"
+echo "Core NIC's nfp driver succesfully installed for the following"
 echo "kernel versions:"
 echo -n -e "\t"
 count=0
