@@ -33,7 +33,7 @@ function write_head() {
     echo "# Copyright (C) 2012-2016 Netronome Systems, Inc. All rights reserved." > $out_file
     echo "# Netronome Core NIC udev rules to configure the names of the" >> $out_file
     echo "# netdev(s) created when using the Core NIC."   >> $out_file
-    echo "# Netronome Core NIC uses the nfp_net driver." >> $out_file
+    echo "# Netronome Core NIC uses the nfp (formerly nfp_net) driver." >> $out_file
     echo "" >> $out_file
 }
 
@@ -43,24 +43,24 @@ function write_rule() {
     mac=$2
     id=$3
     # TBD - ATTR{dev_id}=="0x0", ATTR{type}=="1"
-    echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"nfp_net\", ATTR{address}==\"$mac\", KERNEL==\"eth*\", NAME=\"nfp_p$id\""  >> $out_file
+    echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"nfp\", ATTR{address}==\"$mac\", KERNEL==\"eth*\", NAME=\"nfp_p$id\""  >> $out_file
     echo "" >> $out_file
 }
 
 function check_and_load_driver() {
-    # after DKMS install the nfp_net driver is not automatically
-    # loaded. If nfp_net is loaded it is a previous version that we
+    # after DKMS install the nfp driver is not automatically
+    # loaded. If nfp is loaded it is a previous version that we
     # have to unload. And then load the version we just installed
     local nfp_net_drv_check
-    lsmod | grep -wq "nfp_net" > /dev/null 2>&1
+    lsmod | grep -wq "nfp" > /dev/null 2>&1
     nfp_net_drv_check=$?
 
     if [ "$nfp_net_drv_check" -eq 0 ]; then
-        log "nfp_net already loaded"
-        log "Attempting to unload nfp_net driver"
-        rmmod nfp_net
+        log "nfp already loaded"
+        log "Attempting to unload nfp driver"
+        rmmod nfp
         if [ "$?" -ne 0 ]; then
-            log "Unload of nfp_net driver failed"
+            log "Unload of nfp driver failed"
             log "ERROR"
             return 1
         fi
@@ -82,11 +82,11 @@ function check_and_load_driver() {
         fi
     fi
 
-    log "Attempting to load nfp_net driver"
-    modprobe nfp_net
+    log "Attempting to load nfp driver"
+    modprobe nfp
     if [ "$?" -ne 0 ]; then
         log "Auto load of nfp_net driver failed"
-        log "nfp_net driver is not loaded."
+        log "nfp driver is not loaded."
         log "ERROR"
         return 1
     fi
@@ -214,34 +214,29 @@ function err47_check() {
 }
 
 function reload_nfp_net() {
-    local nfp_drv_check nfp_net_drv_check
-    log "Reloading nfp_net..."
-    lsmod | grep -wq "nfp" > /dev/null 2>&1
-    nfp_drv_check=$?
+    local nfp_net_drv_check
 
-    lsmod | grep -wq "nfp_net" > /dev/null 2>&1
+    lsmod | grep -wq "nfp" > /dev/null 2>&1
     nfp_net_drv_check=$?
 
-    if [ "$nfp_drv_check" -eq 0 ]; then
+    if [ "$nfp_net_drv_check" -eq 0 ]; then
         rmmod nfp
     fi
 
-    if [ "$nfp_net_drv_check" -eq 0 ]; then
-        rmmod nfp_net
-    fi
-
-    modprobe nfp_net
+    modprobe nfp
     return $?
 }
 
 function blacklist_nfp() {
-    log "Permitting auto-load of nfp_net..."
+    log "Permitting auto-load of nfp..."
     # Overwrite file
-    echo "# This file is used to select the NFP vs nfp_net kernel module" > $blacklist_file
+    echo "# This file is used to select the NFP vs nfp kernel module" > $blacklist_file
     echo "#" >> $blacklist_file
-    echo "# Permit autoloading of the the nfp_net.ko kernel module" >> $blacklist_file
-    echo "blacklist nfp" >> $blacklist_file
+    echo "# Permit autoloading of the the nfp.ko kernel module" >> $blacklist_file
     echo "blacklist nfp_uio" >> $blacklist_file
+
+    # TODO: edit blacklist file to remove options added by nfp-bsp pkg
+
 }
 
 function check_file_status() {
@@ -272,7 +267,7 @@ function check_file_status() {
 function setup_nic() {
     # check err47
     err47_check || return
-    # verify nfp or nfp_net is loaded
+    # verify nfp is loaded
     check_and_load_driver || return
     # remove udev file
     clean_udev
@@ -282,9 +277,9 @@ function setup_nic() {
     process_platform || return
     # write udev rules based on current platform
     write_udev || return
-    # select nfp_net over nfp
+    # select nfp over nfp_uio
     blacklist_nfp
-    # reload nfp_net
+    # reload nfp
     reload_nfp_net || return
 }
 
