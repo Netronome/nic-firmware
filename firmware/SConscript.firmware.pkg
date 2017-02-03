@@ -21,12 +21,9 @@ fw_cat_files = [
     (nfp_nic_fw_base_dst_cat_path + "ns_nic_cx25_2_2x10.cat", nfp_nic_fw_base_src_cat_path + "ns_nic_cx25_2_2x10.cat"),
 ]
 
-print "Adding firmware cat files to ns-agilio-core-nic_base"
-pkg_base_FileList.add_files(fw_cat_files)
-
 nfp_nic_fw_base_dst_nffw_path = "opt/netronome/firmware/ns-agilio-core-nic/"
 nfp_nic_fw_base_src_nffw_path = "#nfp-nic/firmware/nffw/"
-fw_cat_files = [
+fw_nffw_files = [
     # Lithium
     (nfp_nic_fw_base_dst_nffw_path + "ns_nic_cx10_2.nffw", nfp_nic_fw_base_src_nffw_path + "ns_nic_cx10_2.nffw"),
     # Hydrogen
@@ -41,6 +38,8 @@ fw_cat_files = [
     (nfp_nic_fw_base_dst_nffw_path + "ns_nic_cx25_2_2x10.nffw", nfp_nic_fw_base_src_nffw_path + "ns_nic_cx25_2_2x10.nffw"),
 ]
 
+print "Adding firmware nffw files to ns-agilio-core-nic_base"
+pkg_base_FileList.add_files(fw_nffw_files)
 
 # push base file list back to env
 env['PKG_FILE_LISTS']['ns-agilio-core-nic_base'] = pkg_base_FileList
