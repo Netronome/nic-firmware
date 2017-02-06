@@ -83,8 +83,8 @@ function check_and_load_driver() {
         fi
     fi
 
-    log "Attempting to load nfp driver"
-    modprobe nfp nfp_dev_cpp=1
+    log "Attempting to load nfp driver (userspace access only)"
+    modprobe nfp nfp_pf_netdev=0 nfp_dev_cpp=1
     if [ "$?" -ne 0 ]; then
         log "Auto load of nfp_net driver failed"
         log "nfp driver is not loaded."
