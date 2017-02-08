@@ -2,7 +2,7 @@ Import('env') # exported by parent SConstruct
 from pkgmods.FileList import FileList
 
 vs = env['ENV']['BRANCH'] + "-" + env['ENV']['BUILD_NUM']
-mod_name = "nfp_net"
+mod_name = "nfp"
 drv_name = mod_name + "-" + vs
 
 # Import base file list from env
