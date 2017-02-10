@@ -7,37 +7,38 @@ endif
 
 ifeq ($(PLATFORM),Hydrogen)
     NS_PLATFORM_TYPE = 1
-    PROJECT = ns_nic_cx40q_1
+    MEDIA = 1x40
     AMDA = AMDA0081-0001
 else ifeq ($(PLATFORM),Hydrogen_4x10)
     NS_PLATFORM_TYPE = 2
-    PROJECT = ns_nic_cx40q_1_4x10
+    MEDIA = 4x10
     AMDA = AMDA0081-0001
 else ifeq ($(PLATFORM),Lithium)
     NS_PLATFORM_TYPE = 3
-    PROJECT = ns_nic_cx10_2
+    MEDIA = 2x10
     AMDA = AMDA0096-0001
 else ifeq ($(PLATFORM),Beryllium)
     NS_PLATFORM_TYPE = 7
-    PROJECT = ns_nic_cx40_2
+    MEDIA = 2x40
     AMDA = AMDA0097-0001
 else ifeq ($(PLATFORM),Beryllium_4x10_1x40)
     NS_PLATFORM_TYPE = 8
-    PROJECT = ns_nic_cx40_2_4x10_1x40
+    MEDIA = 4x10_1x40
     AMDA = AMDA0097-0001
 else ifeq ($(PLATFORM),Beryllium_8x10)
     NS_PLATFORM_TYPE = 9
-    PROJECT = ns_nic_cx40_2_8x10
+    MEDIA = 8x10
     AMDA = AMDA0097-0001
 else ifeq ($(PLATFORM),Carbon)
     NS_PLATFORM_TYPE = 10
-    PROJECT = ns_nic_cx25_2
+    MEDIA = 2x25
     AMDA = AMDA0099-0001
 else ifeq ($(PLATFORM),Carbon_2x10)
     NS_PLATFORM_TYPE = 11
-    PROJECT = ns_nic_cx25_2_2x10
+    MEDIA = 2x10
     AMDA = AMDA0099-0001
 endif
+PROJECT = nic_$(AMDA)_$(MEDIA)
 
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
 $(eval $(call nffw.set_amda,$(PROJECT),$(AMDA)))
