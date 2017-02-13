@@ -8,34 +8,34 @@ nfp_nic_fw_base_dst_cat_path = "opt/netronome/firmware/ns-agilio-core-nic/cat/"
 nfp_nic_fw_base_src_cat_path = "#nfp-nic/firmware/cat/"
 fw_cat_files = [
     # Lithium
-    (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0096-0001_2x10.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0096-0001_2x10.cat"),
+    (nfp_nic_fw_base_dst_cat_path + "ns_nic_cx10_2.cat", nfp_nic_fw_base_src_cat_path + "ns_nic_cx10_2.cat"),
     # Hydrogen
-    (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0081-0001_1x40.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0081-0001_1x40.cat"),
-    (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0081-0001_4x10.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0081-0001_4x10.cat"),
+    (nfp_nic_fw_base_dst_cat_path + "ns_nic_cx40q_1.cat", nfp_nic_fw_base_src_cat_path + "ns_nic_cx40q_1.cat"),
+    (nfp_nic_fw_base_dst_cat_path + "ns_nic_cx40q_1_4x10.cat", nfp_nic_fw_base_src_cat_path + "ns_nic_cx40q_1_4x10.cat"),
     # Beryllium
-    (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0097-0001_4x10_1x40.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0097-0001_4x10_1x40.cat"),
-    (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0097-0001_8x10.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0097-0001_8x10.cat"),
-    (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0097-0001_2x40.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0097-0001_2x40.cat"),
+    (nfp_nic_fw_base_dst_cat_path + "ns_nic_cx40_2_4x10_1x40.cat", nfp_nic_fw_base_src_cat_path + "ns_nic_cx40_2_4x10_1x40.cat"),
+    (nfp_nic_fw_base_dst_cat_path + "ns_nic_cx40_2_8x10.cat", nfp_nic_fw_base_src_cat_path + "ns_nic_cx40_2_8x10.cat"),
+    (nfp_nic_fw_base_dst_cat_path + "ns_nic_cx40_2.cat", nfp_nic_fw_base_src_cat_path + "ns_nic_cx40_2.cat"),
     # Carbon
-    (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0099-0001_2x25.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0099-0001_2x25.cat"),
-    (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0099-0001_2x10.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0099-0001_2x10.cat"),
+    (nfp_nic_fw_base_dst_cat_path + "ns_nic_cx25_2.cat", nfp_nic_fw_base_src_cat_path + "ns_nic_cx25_2.cat"),
+    (nfp_nic_fw_base_dst_cat_path + "ns_nic_cx25_2_2x10.cat", nfp_nic_fw_base_src_cat_path + "ns_nic_cx25_2_2x10.cat"),
 ]
 
 nfp_nic_fw_base_dst_nffw_path = "opt/netronome/firmware/ns-agilio-core-nic/"
 nfp_nic_fw_base_src_nffw_path = "#nfp-nic/firmware/nffw/"
 fw_nffw_files = [
     # Lithium
-    (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0096-0001_2x10.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0096-0001_2x10.nffw"),
+    (nfp_nic_fw_base_dst_nffw_path + "ns_nic_cx10_2.nffw", nfp_nic_fw_base_src_nffw_path + "ns_nic_cx10_2.nffw"),
     # Hydrogen
-    (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0081-0001_1x40.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0081-0001_1x40.nffw"),
-    (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0081-0001_4x10.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0081-0001_4x10.nffw"),
+    (nfp_nic_fw_base_dst_nffw_path + "ns_nic_cx40q_1.nffw", nfp_nic_fw_base_src_nffw_path + "ns_nic_cx40q_1.nffw"),
+    (nfp_nic_fw_base_dst_nffw_path + "ns_nic_cx40q_1_4x10.nffw", nfp_nic_fw_base_src_nffw_path + "ns_nic_cx40q_1_4x10.nffw"),
     # Beryllium
-    (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0097-0001_4x10_1x40.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0097-0001_4x10_1x40.nffw"),
-    (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0097-0001_8x10.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0097-0001_8x10.nffw"),
-    (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0097-0001_2x40.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0097-0001_2x40.nffw"),
+    (nfp_nic_fw_base_dst_nffw_path + "ns_nic_cx40_2_4x10_1x40.nffw", nfp_nic_fw_base_src_nffw_path + "ns_nic_cx40_2_4x10_1x40.nffw"),
+    (nfp_nic_fw_base_dst_nffw_path + "ns_nic_cx40_2_8x10.nffw", nfp_nic_fw_base_src_nffw_path + "ns_nic_cx40_2_8x10.nffw"),
+    (nfp_nic_fw_base_dst_nffw_path + "ns_nic_cx40_2.nffw", nfp_nic_fw_base_src_nffw_path + "ns_nic_cx40_2.nffw"),
     # Carbon
-    (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0099-0001_2x25.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0099-0001_2x25.nffw"),
-    (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0099-0001_2x10.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0099-0001_2x10.nffw"),
+    (nfp_nic_fw_base_dst_nffw_path + "ns_nic_cx25_2.nffw", nfp_nic_fw_base_src_nffw_path + "ns_nic_cx25_2.nffw"),
+    (nfp_nic_fw_base_dst_nffw_path + "ns_nic_cx25_2_2x10.nffw", nfp_nic_fw_base_src_nffw_path + "ns_nic_cx25_2_2x10.nffw"),
 ]
 
 print "Adding firmware nffw files to ns-agilio-core-nic_base"
