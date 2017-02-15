@@ -1738,6 +1738,7 @@ class _NFPFlowNIC_nport_no_fw_loading(_NFPFlowNIC_nport):
         self.addr_v6_d = self.cfg.get("DUT", "addr6D").split(',')
 
         self.dut = localNrtSystem(self.cfg.get("DUT", "name"), self.quick)
+        self.rss_key = self.get_rss_key()
 
         cmd = 'nfp-hwinfo | grep mac'
         _, out = self.dut.cmd(cmd)
@@ -1778,6 +1779,51 @@ class _NFPFlowNIC_nport_no_fw_loading(_NFPFlowNIC_nport):
             self.reload_ep = self.cfg.getboolean("HostEP", "reload")
 
         return
+
+    def get_rss_key(self):
+        # Bring the interface up to makes sure rss key is written to the
+        # BAR after driver commit 0203dee66dcb ("nfp_net: perform RSS init
+        # only during device initialization")
+        for eth in self.eth_d:
+            self.dut.cmd('ifconfig %s up ; ifconfig %s down' % (eth, eth))
+        # Checking the value of _pf0_net_bar0 to get the RSS key
+        # To parse it, we need to use the info from
+        # nfp-drv-kmods.git/src/nfp_net_ctrl. (see SB-116 Pablo's comment)
+        reg_name = '_pf0_net_bar0'
+        cmd = 'nfp-rtsym %s' % reg_name
+        _, out = self.dut.cmd(cmd)
+        # The following value is from nfp-drv-kmods.git/src/nfp_net_ctrl
+        rss_keys = []
+        for rss_base in ['0x00100', '0x08100', '0x10100', '0x18100',
+                         '0x20100', '0x28100', '0x30100', '0x38100']:
+            rss_offset = '0x4'
+            rss_size = '0x28'
+
+            rss_start = int(rss_base, 16) + int(rss_offset, 16)
+            rss_end = int(rss_base, 16) + int(rss_offset, 16) + int(rss_size, 16)
+            rss_str = '0x'
+            lines = out.splitlines()
+            for line in lines:
+                line_re = '0x[\da-fA-F]{10}:\s+(?:0x[\da-fA-F]{8}\s*){4}'
+                index_re = '(0x[\da-fA-F]{10}):\s+'
+                value_re = '\s+(0x[\da-fA-F]{8})'
+                if re.match(line_re, line):
+                    index = re.findall(index_re, line)
+                    values = re.findall(value_re, line)
+                    if int(rss_base, 16) <= int(index[0], 16) < rss_end:
+                        for i in range(0, 4):
+                            cur_index = int(index[0], 16) + i * 4
+                            if rss_start <= cur_index < rss_end:
+                                rss_str = rss_str + values[i][2:]
+            rss_keys.append(rss_str)
+
+        LOG_sec("Checking the RSS key from nfp-rtsym")
+        LOG('The RSS keys are: ')
+        for rss_str in rss_keys:
+            LOG(rss_str)
+        LOG_endsec()
+
+        return rss_keys
 
 class _NFPFlowNICPerfTest_nport_no_fw_loading(_NFPFlowNIC_nport_no_fw_loading):
 
