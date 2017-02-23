@@ -15,6 +15,25 @@ from netro.testinfra.nti_exceptions import NtiError, NtiFatalError
 from nfpflownicsystem import NFPFlowNICSystem, localNrtSystem
 from libs.nrt_system import kill_bg_process
 
+###############################################################################
+# Helpers needed because there is no proper inheritance between classes here :/
+###############################################################################
+def nfd_reg_read_le32(dut, ifc, offset, count=1):
+    # Dump the NFD BAR using ethtool into a giant hex string
+    cmd =  'ethtool -d %s raw on' % (ifc)
+    cmd += ' | hexdump -v -e "1/1 \\"%02X\\""'
+    _, data = dut.cmd(cmd)
+    # Cut out the part we need
+    val_s = data[offset * 2:(offset + count * 4) * 2]
+    # Byte swap
+    res = 0
+    for val_i in range(0, count):
+        # Byte swap one 32bit value
+        for byte_i in range(6, -2, -2):
+            start = val_i * 8 + byte_i
+            res = res << 8 | int('0x' + val_s[start:start + 2], 16)
+    return res
+
 
 ###############################################################################
 # A group of unit tests
@@ -1610,38 +1629,13 @@ class _NFPFlowNIC_no_fw_loading(netro.testinfra.Group):
         # BAR after driver commit 0203dee66dcb ("nfp_net: perform RSS init
         # only during device initialization")
         self.dut.cmd('ifconfig %s up ; ifconfig %s down' % (self.eth_x, self.eth_x))
-        # Checking the value of _pf0_net_bar0 to get the RSS key
-        # To parse it, we need to use the info from
-        # nfp-drv-kmods.git/src/nfp_net_ctrl. (see SB-116 Pablo's comment)
-        reg_name = '_pf0_net_bar0'
-        cmd = 'nfp-rtsym %s' % reg_name
-        _, out = self.dut.cmd(cmd)
-        # The following value is from nfp-drv-kmods.git/src/nfp_net_ctrl
-        rss_keys = []
-        for rss_base in ['0x00100', '0x08100', '0x10100', '0x18100',
-                         '0x20100', '0x28100', '0x30100', '0x38100']:
-            rss_offset = '0x4'
-            rss_size = '0x28'
+        # Read the key out
+        key = "0x%080x" % (nfd_reg_read_le32(self.dut, self.eth_x,
+                                             0x104, 0x28 / 4))
+        # Fill in the rest of the ports with empty
+        rss_keys = [key] + [""] * 7
 
-            rss_start = int(rss_base, 16) + int(rss_offset, 16)
-            rss_end = int(rss_base, 16) + int(rss_offset, 16) + int(rss_size, 16)
-            rss_str = '0x'
-            lines = out.splitlines()
-            for line in lines:
-                line_re = '0x[\da-fA-F]{10}:\s+(?:0x[\da-fA-F]{8}\s*){4}'
-                index_re = '(0x[\da-fA-F]{10}):\s+'
-                value_re = '\s+(0x[\da-fA-F]{8})'
-                if re.match(line_re, line):
-                    index = re.findall(index_re, line)
-                    values = re.findall(value_re, line)
-                    if int(rss_base, 16) <= int(index[0], 16) < rss_end:
-                        for i in range(0, 4):
-                            cur_index = int(index[0], 16) + i * 4
-                            if rss_start <= cur_index < rss_end:
-                                rss_str = rss_str + values[i][2:]
-            rss_keys.append(rss_str)
-
-        LOG_sec("Checking the RSS key from nfp-rtsym")
+        LOG_sec("Checking the RSS key from the BAR")
         LOG('The RSS keys are: ')
         for rss_str in rss_keys:
             LOG(rss_str)
@@ -1768,40 +1762,14 @@ class _NFPFlowNIC_nport_no_fw_loading(_NFPFlowNIC_nport):
         # Bring the interface up to makes sure rss key is written to the
         # BAR after driver commit 0203dee66dcb ("nfp_net: perform RSS init
         # only during device initialization")
+        rss_keys = []
         for eth in self.eth_d:
             self.dut.cmd('ifconfig %s up ; ifconfig %s down' % (eth, eth))
-        # Checking the value of _pf0_net_bar0 to get the RSS key
-        # To parse it, we need to use the info from
-        # nfp-drv-kmods.git/src/nfp_net_ctrl. (see SB-116 Pablo's comment)
-        reg_name = '_pf0_net_bar0'
-        cmd = 'nfp-rtsym %s' % reg_name
-        _, out = self.dut.cmd(cmd)
-        # The following value is from nfp-drv-kmods.git/src/nfp_net_ctrl
-        rss_keys = []
-        for rss_base in ['0x00100', '0x08100', '0x10100', '0x18100',
-                         '0x20100', '0x28100', '0x30100', '0x38100']:
-            rss_offset = '0x4'
-            rss_size = '0x28'
+            key = "0x%080x" % (nfd_reg_read_le32(self.dut, eth,
+                                                 0x104, 0x28 / 4))
+            rss_keys.append(key)
 
-            rss_start = int(rss_base, 16) + int(rss_offset, 16)
-            rss_end = int(rss_base, 16) + int(rss_offset, 16) + int(rss_size, 16)
-            rss_str = '0x'
-            lines = out.splitlines()
-            for line in lines:
-                line_re = '0x[\da-fA-F]{10}:\s+(?:0x[\da-fA-F]{8}\s*){4}'
-                index_re = '(0x[\da-fA-F]{10}):\s+'
-                value_re = '\s+(0x[\da-fA-F]{8})'
-                if re.match(line_re, line):
-                    index = re.findall(index_re, line)
-                    values = re.findall(value_re, line)
-                    if int(rss_base, 16) <= int(index[0], 16) < rss_end:
-                        for i in range(0, 4):
-                            cur_index = int(index[0], 16) + i * 4
-                            if rss_start <= cur_index < rss_end:
-                                rss_str = rss_str + values[i][2:]
-            rss_keys.append(rss_str)
-
-        LOG_sec("Checking the RSS key from nfp-rtsym")
+        LOG_sec("Checking the RSS key from the BAR")
         LOG('The RSS keys are: ')
         for rss_str in rss_keys:
             LOG(rss_str)
