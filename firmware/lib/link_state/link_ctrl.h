@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016,  Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2016-2017,  Netronome Systems, Inc.  All rights reserved.
  *
  * @file          link_ctrl.h
  * @brief         Code for configuring the Ethernet link.
@@ -12,6 +12,25 @@
 
 #include <nfp.h>
 #include <stdint.h>
+
+
+/* *** MAC CSR Sync ME Functions *** */
+
+/**
+ * Notify MAC CSR sync ME to recache MAC CSR state.
+ *
+ * @param mac_isl        MAC island to query
+ * @param mac_core       MAC core to query
+ * @param mac_core_port  MAC core port to check
+ */
+__intrinsic void mac_csr_sync_recache(unsigned int mac_isl,
+                                      unsigned int mac_core,
+                                      unsigned int mac_core_port);
+
+/**
+ * Start MAC CSR sync ME.
+ */
+__intrinsic void mac_csr_sync_start();
 
 
 /* *** MAC RX Enable/Disable Functions *** */

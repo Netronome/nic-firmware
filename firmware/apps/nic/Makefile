@@ -43,6 +43,7 @@ PROJECT = nic_$(AMDA)_$(MEDIA)
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
 $(eval $(call nffw.set_amda,$(PROJECT),$(AMDA)))
 $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/include))
+$(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/deps/nfp-bsp-boardconfig))
 $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/deps/npfw))
 $(eval $(call nffw.add_ppc,$(PROJECT),i8,$(PICOCODE_DIR)/catamaran/catamaran.npfw))
 
