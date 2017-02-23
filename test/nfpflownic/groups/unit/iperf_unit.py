@@ -993,11 +993,9 @@ class Ring_size(Iperftest):
         """
         Bring down the interface, set ring sizes, and bring up the interface
         """
-        device.cmd('ifconfig %s down' % intf)
         device.cmd('ethtool -G %s rx %s' % (intf, rx_ring_size))
         device.cmd('ethtool -G %s tx %s' % (intf, tx_ring_size))
         device.cmd('ethtool -g %s' % intf)
-        device.cmd('ifconfig %s up' % intf)
         return
 
     def clean_up(self):

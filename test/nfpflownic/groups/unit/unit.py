@@ -57,12 +57,8 @@ class NFPFlowNICMTU():
         Set the MTU of the given interface on the given machine
         """
         device.cmd("ifconfig -a")
-        cmd = "ip link set dev %s down; " % inf
-        device.cmd(cmd, fail=False)
         device.change_mtu(inf, mtu_value)
         device.cmd("ifconfig -a")
-        cmd = "ip link set dev %s up; " % inf
-        device.cmd(cmd, fail=False)
         return
 
     def get_mtu(self, device, inf):
