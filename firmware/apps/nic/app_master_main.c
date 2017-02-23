@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2016 Netronome, Inc.
+ * Copyright 2014-2017 Netronome, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -159,39 +159,6 @@ __shared __gpr volatile int mac_reg_lock = 0;
     } while (0)
 
 
-/* Carbon flow-control settings. */
-#define CARBON_FLOWCTL_ISL               1
-#define CARBON_FLOWCTL_ME                3
-#define CARBON_FLOWCTL_MBOX0_CFG         0x25
-#define CARBON_FLOWCTL_MBOX1_CFG_DISABLE (~0)
-#define CARBON_FLOWCTL_MBOX1_CFG_ENABLE  0x20
-#define CARBON_FLOWCTL_REMOTE_CTX_PORT_0 1
-#define CARBON_FLOWCTL_REMOTE_CTX_PORT_1 2
-#define CARBON_FLOWCTL_REMOTE_REG_OFFSET 17
-#define CARBON_FLOWCTL_REMOTE_SIG_NUM    13
-
-#define CARBON_FLOWCTL_REMOVE_REG_ADDR(_ctx)           \
-    (((_ctx) << 5) | CARBON_FLOWCTL_REMOTE_REG_OFFSET)
-
-#define REFLECT_ME_ID(_isl, _me) (((_isl) << 4) | ((_me) + 4))
-
-
-#define MAC_CORE_PORT_TO_MAC_PORT(_core, _core_port)      \
-    ((_core) * MAX_ETH_PORTS_PER_MAC_CORE + (_core_port))
-
-/* Address of the MAC Ethernet port configuration register */
-#define MAC_CONF_ADDR(_isl, _core, _core_port)    \
-    (NFP_MAC_XPB_OFF(_isl) | NFP_MAC_ETH(_core) | \
-     NFP_MAC_ETH_SEG_CMD_CONFIG(_core_port))
-#define MAC_CONF_UPDATE_SLEEP 100
-
-/* Addresses of the MAC enqueue inhibit registers */
-#define MAC_EQ_INH_ADDR(_isl)                                  \
-    (NFP_MAC_XPB_OFF(_isl) | NFP_MAC_CSR | NFP_MAC_CSR_EQ_INH)
-#define MAC_EQ_INH_DONE_ADDR(_isl)                                  \
-    (NFP_MAC_XPB_OFF(_isl) | NFP_MAC_CSR | NFP_MAC_CSR_EQ_INH_DONE)
-
-
 /* Translate port speed to link rate encoding */
 __intrinsic static unsigned int
 port_speed_to_link_rate(unsigned int port_speed)
@@ -284,154 +251,6 @@ ct_reflect_data(unsigned int dst_me, unsigned int dst_ctx,
 }
 
 
-#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
-
-__inline static void
-carbon_flow_control_disable()
-{
-    unsigned int port;
-
-    /* Check to see if all ports are disabled. */
-    for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
-        /* Do not disable flow-control if any port is enabled. */
-        if (nic_control_word[port] & NFP_NET_CFG_CTRL_ENABLE)
-            return;
-    }
-
-    /* Disable the flow-control ME. */
-    remote_csr_write(CARBON_FLOWCTL_ISL, CARBON_FLOWCTL_ME,
-                     local_csr_mailbox_1, CARBON_FLOWCTL_MBOX1_CFG_DISABLE);
-}
-
-
-__inline static void
-carbon_flow_control_enable()
-{
-    /* Enable the flow-control ME. */
-    remote_csr_write(CARBON_FLOWCTL_ISL, CARBON_FLOWCTL_ME,
-                     local_csr_mailbox_1, CARBON_FLOWCTL_MBOX1_CFG_ENABLE);
-    remote_csr_write(CARBON_FLOWCTL_ISL, CARBON_FLOWCTL_ME,
-                     local_csr_mailbox_0, CARBON_FLOWCTL_MBOX0_CFG);
-}
-
-static void
-carbon_mac_eth_cmd_cfg_bitclr(unsigned int mac_isl, unsigned int mac_core,
-                              unsigned int mac_core_port, uint32_t mask)
-{
-    unsigned int ctx = ((mac_core_port == 0)             ?
-                        CARBON_FLOWCTL_REMOTE_CTX_PORT_0 :
-                        CARBON_FLOWCTL_REMOTE_CTX_PORT_1);
-
-    /* Read the current configuration register settings for the port. */
-    uint32_t addr = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
-    uint32_t val  = xpb_read(addr);
-
-    /* Indicate the new value of the configuration register. */
-    volatile __xwrite uint32_t new_val = val & ~mask;
-
-    ct_reflect_data(REFLECT_ME_ID(CARBON_FLOWCTL_ISL, CARBON_FLOWCTL_ME), ctx,
-                    CARBON_FLOWCTL_REMOVE_REG_ADDR(ctx),
-                    CARBON_FLOWCTL_REMOTE_SIG_NUM, &new_val, sizeof(new_val));
-
-    /* Make sure change took effect. */
-    do {
-        val = xpb_read(addr);
-
-        if (val & mask)
-            sleep(MAC_CONF_UPDATE_SLEEP);
-    } while (val & mask);
-}
-
-static void
-carbon_mac_eth_cmd_cfg_bitset(unsigned int mac_isl, unsigned int mac_core,
-                              unsigned int mac_core_port, uint32_t mask)
-{
-    unsigned int ctx = ((mac_core_port == 0)             ?
-                        CARBON_FLOWCTL_REMOTE_CTX_PORT_0 :
-                        CARBON_FLOWCTL_REMOTE_CTX_PORT_1);
-
-    /* Read the current configuration register settings for the port. */
-    uint32_t addr = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
-    uint32_t val  = xpb_read(addr);
-
-    /* Indicate the new value of the configuration register. */
-    volatile __xwrite uint32_t new_val = val | mask;
-
-    ct_reflect_data(REFLECT_ME_ID(CARBON_FLOWCTL_ISL, CARBON_FLOWCTL_ME), ctx,
-                    CARBON_FLOWCTL_REMOVE_REG_ADDR(ctx),
-                    CARBON_FLOWCTL_REMOTE_SIG_NUM, &new_val, sizeof(new_val));
-
-    /* Make sure change took effect. */
-    do {
-        val = xpb_read(addr);
-
-        if ((val & mask) != mask)
-            sleep(MAC_CONF_UPDATE_SLEEP);
-    } while ((val & mask) != mask);
-}
-
-__inline static void
-carbon_mac_eth_rx_disable(unsigned int mac_isl, unsigned int mac_core,
-                          unsigned int mac_core_port, unsigned int num_lanes)
-{
-    int rx_en;
-    uint32_t inhibit_done;
-
-    /* Enable the MAC RX enqueue inhibit. */
-    uint32_t inhibit_addr      = MAC_EQ_INH_ADDR(mac_isl);
-    uint32_t inhibit_done_addr = MAC_EQ_INH_DONE_ADDR(mac_isl);
-    uint32_t inhibit_mask      = (((1 << num_lanes) - 1) <<
-                                  MAC_CORE_PORT_TO_MAC_PORT(mac_core,
-                                                            mac_core_port));
-    uint32_t inhibit_val       = xpb_read(inhibit_addr) | inhibit_mask;
-
-    xpb_write(inhibit_addr, inhibit_val);
-
-    /* Poll until the MAC inhibit takes effect. */
-    do {
-        inhibit_done  = xpb_read(inhibit_done_addr);
-        inhibit_done &= inhibit_mask;
-    } while (inhibit_done != inhibit_mask);
-
-    /* Indicate to the Carbon Flow Control ME to disable port RX. */
-    carbon_mac_eth_cmd_cfg_bitclr(mac_isl, mac_core, mac_core_port,
-                                  NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE);
-
-    /* Disable the MAC RX enqueue inhibit. */
-    inhibit_val &= ~inhibit_mask;
-    xpb_write(inhibit_addr, inhibit_val);
-}
-
-__inline static void
-carbon_mac_eth_rx_enable(unsigned int mac_isl, unsigned int mac_core,
-                         unsigned int mac_core_port)
-{
-    /* Indicate to the Carbon Flow Control ME to enable port RX. */
-    carbon_mac_eth_cmd_cfg_bitset(mac_isl, mac_core, mac_core_port,
-                                  NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE);
-}
-
-__inline static void
-carbon_mac_eth_tx_flush_disable(unsigned int mac_isl, unsigned int mac_core,
-                                unsigned int mac_core_port)
-{
-    /* Indicate to the Carbon Flow Control ME to disable port TX flush. */
-    carbon_mac_eth_cmd_cfg_bitclr(mac_isl, mac_core, mac_core_port,
-                                  NFP_MAC_ETH_SEG_CMD_CONFIG_TX_FLUSH);
-}
-
-__inline static void
-carbon_mac_eth_tx_flush_enable(unsigned int mac_isl, unsigned int mac_core,
-                               unsigned int mac_core_port)
-{
-    /* Indicate to the Carbon Flow Control ME to enable port TX flush. */
-    carbon_mac_eth_cmd_cfg_bitset(mac_isl, mac_core, mac_core_port,
-                                  NFP_MAC_ETH_SEG_CMD_CONFIG_TX_FLUSH);
-}
-
-#endif /* NS_PLATFORM_TYPE == NS_PLATFORM_CARBON */
-
-
 __inline static void
 disable_port_tx_datapath(unsigned int nbi, unsigned int start_q,
                          unsigned int end_q)
@@ -468,22 +287,14 @@ mac_port_disable_rx(unsigned int port)
 
     LOCAL_MUTEX_LOCK(mac_reg_lock);
 
-#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
-    carbon_mac_eth_rx_disable(mac_nbi_isl, mac_core, mac_core_port, num_lanes);
-#else
     mac_eth_disable_rx(mac_nbi_isl, mac_core, mac_core_port, num_lanes);
-#endif
 
     /* Disable the port TX. */
     disable_port_tx_datapath(mac_nbi_isl, NS_PLATFORM_NBI_TM_QID_LO(port),
                              NS_PLATFORM_NBI_TM_QID_HI(port));
 
     /* Flush TX datapath to prevent stranding any packets. */
-#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
-    carbon_mac_eth_tx_flush_enable(mac_nbi_isl, mac_core, mac_core_port);
-#else
     mac_eth_enable_tx_flush(mac_nbi_isl, mac_core, mac_core_port);
-#endif
 
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
@@ -495,11 +306,7 @@ mac_port_disable_tx_flush(unsigned int mac, unsigned int mac_core,
 {
     LOCAL_MUTEX_LOCK(mac_reg_lock);
 
-#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
-    carbon_mac_eth_tx_flush_disable(mac, mac_core, mac_core_port);
-#else
     mac_eth_disable_tx_flush(mac, mac_core, mac_core_port);
-#endif
 
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
@@ -515,22 +322,14 @@ mac_port_enable_rx(unsigned int port)
     LOCAL_MUTEX_LOCK(mac_reg_lock);
 
     /* Re-enable TX datapath before enabling RX datapath. */
-#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
-    carbon_mac_eth_tx_flush_disable(mac_nbi_isl, mac_core, mac_core_port);
-#else
     mac_eth_disable_tx_flush(mac_nbi_isl, mac_core, mac_core_port);
-#endif
 
     /* Enable the port TX. */
     enable_port_tx_datapath(mac_nbi_isl, NS_PLATFORM_NBI_TM_QID_LO(port),
                             NS_PLATFORM_NBI_TM_QID_HI(port));
 
     /* Enable the port RX. */
-#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
-    carbon_mac_eth_rx_enable(mac_nbi_isl, mac_core, mac_core_port);
-#else
     mac_eth_enable_rx(mac_nbi_isl, mac_core, mac_core_port);
-#endif
 
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
@@ -542,11 +341,7 @@ mac_port_enable_tx_flush(unsigned int mac, unsigned int mac_core,
 {
     LOCAL_MUTEX_LOCK(mac_reg_lock);
 
-#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
-    carbon_mac_eth_tx_flush_enable(mac, mac_core, mac_core_port);
-#else
     mac_eth_enable_tx_flush(mac, mac_core, mac_core_port);
-#endif
 
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
@@ -587,12 +382,6 @@ cfg_changes_loop(void)
                                 &cfg_pci_vnic, sizeof cfg_pci_vnic);
             }
 
-#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
-            /* Check if enabling the flow-control mechanism. */
-            if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE)
-                carbon_flow_control_enable();
-#endif
-
             /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
             if ((nic_control_word[port] ^ cfg_bar_data[0]) &
                     NFP_NET_CFG_CTRL_ENABLE) {
@@ -608,12 +397,6 @@ cfg_changes_loop(void)
 
             /* Save the control word */
             nic_control_word[port] = cfg_bar_data[0];
-
-#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
-            /* Check if disabling the flow-control mechanism. */
-            if (!(nic_control_word[port] & NFP_NET_CFG_CTRL_ENABLE))
-                carbon_flow_control_disable();
-#endif
 
             /* Wait for all APP MEs to ack the config change */
             synch_cnt_dram_wait(&nic_cfg_synch);
@@ -832,6 +615,7 @@ main(void)
     switch (ctx()) {
     case APP_MASTER_CTX_CONFIG_CHANGES:
         init_catamaran_chan2port_table();
+        mac_csr_sync_start();
         cfg_changes_loop();
         break;
     case APP_MASTER_CTX_MAC_STATS:

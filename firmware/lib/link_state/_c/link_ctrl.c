@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016,  Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2016-2017,  Netronome Systems, Inc.  All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,10 @@
 
 
 #include <assert.h>
+#include <nfp/remote_me.h>
 #include <nfp/xpb.h>
 #include <nfp6000/nfp_mac.h>
+#include <nfp6000/nfp_mac_csr_synch.h>
 #include <nfp6000/nfp_nbi_tm.h>
 
 #include <link_state/link_ctrl.h>
@@ -63,6 +65,89 @@
     (NFP_NBI_TM_XPB_OFF(_isl) | NFP_NBI_TM_QUEUE_REG | \
      NFP_NBI_TM_QUEUE_CONFIG(_q))
 
+/* Source ID for sync ME commands. */
+/* Note: This value is completely arbitrary and does not affect anything. */
+#define LINK_CTRL_SYNC_CMD_ID 1
+
+/* Command word to issue to sync ME. */
+#define LINK_CTRL_SYNC_CMD(_isl, _core, _core_port, _cmd_code, _recache) \
+    ((LINK_CTRL_SYNC_CMD_ID << 24) | (((_recache) & 1)     << 16) |      \
+     (((_isl) & 1)          << 15) | (((_core) & 1)        << 14) |      \
+     (((_core_port) & 0x3f) << 8)  | (((_cmd_code) & 0xff) << 0))
+
+
+/* *** MAC CSR Sync ME Functions *** */
+
+#define MAX_NUM_MBOXES 4
+
+static __intrinsic uint32_t
+mailbox_addr(unsigned int mbox_num)
+{
+    uint32_t addr;
+
+    /* Check the parameter */
+    ctassert(mbox_num < MAX_NUM_MBOXES);
+
+    switch (mbox_num) {
+    case 0:
+        addr = local_csr_mailbox_0;
+        break;
+    case 1:
+        addr = local_csr_mailbox_1;
+        break;
+    case 2:
+        addr = local_csr_mailbox_2;
+        break;
+    case 3:
+        addr = local_csr_mailbox_3;
+        break;
+    default:
+        addr = 0xffffffff;
+        break;
+    }
+
+    return addr;
+}
+
+static __intrinsic void
+issue_sync_me_cmd(unsigned int mac_isl, unsigned int mac_core,
+                  unsigned int mac_core_port, unsigned int cmd_code,
+                  unsigned int force_recache)
+{
+    SIGNAL sig;
+    __xwrite uint32_t cmd_xw = LINK_CTRL_SYNC_CMD(mac_isl, mac_core,
+                                                  mac_core_port, cmd_code,
+                                                  force_recache);
+    uint32_t ring_isl = ARB_CLS_BASE_ADDR_Hi32;
+    uint32_t ring_num = ARB_CLS_RING_NUM << 2;
+
+    __asm cls[ring_workq_add_work, cmd_xw, ring_isl, <<8, ring_num, 1], \
+        ctx_swap[sig];
+}
+
+
+__intrinsic void
+mac_csr_sync_recache(unsigned int mac_isl,
+                     unsigned int mac_core,
+                     unsigned int mac_core_port)
+{
+    /* Check the parameters */
+    assert(mac_isl < MAX_MAC_ISLANDS_PER_NFP);
+    assert(mac_core < MAX_MAC_CORES_PER_MAC_ISL);
+    assert(mac_core_port < MAX_ETH_PORTS_PER_MAC_CORE);
+
+    issue_sync_me_cmd(mac_isl, mac_core, mac_core_port,
+                      ARB_CODE_ETH_CMD_CFG_RECACHE, 0);
+}
+
+
+__intrinsic void
+mac_csr_sync_start()
+{
+    remote_csr_write(ARB_ME_ISLAND, ARB_ME_ID,
+                     mailbox_addr(ARB_FW_KICKSTART_MBOX), ARB_FW_KICKSTART);
+}
+
 
 /* *** MAC RX Enable/Disable Functions *** */
 
@@ -90,8 +175,6 @@ __intrinsic void
 mac_eth_disable_rx(unsigned int mac_isl, unsigned int mac_core,
                    unsigned int mac_core_port, unsigned int num_lanes)
 {
-    uint32_t mac_conf;
-    uint32_t mac_conf_addr;
     uint32_t mac_inhibit;
     uint32_t mac_inhibit_addr;
     uint32_t mac_inhibit_done;
@@ -121,10 +204,11 @@ mac_eth_disable_rx(unsigned int mac_isl, unsigned int mac_core,
     } while (mac_inhibit_done != mac_port_mask);
 
     /* Clear the MAC RX enable for the port. */
-    mac_conf_addr  = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
-    mac_conf       = xpb_read(mac_conf_addr);
-    mac_conf      &= ~NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
-    xpb_write(mac_conf_addr, mac_conf);
+    issue_sync_me_cmd(mac_isl, mac_core, mac_core_port,
+                      ARB_CODE_ETH_CMD_CFG_DISABLE_RX, 0);
+
+    /* Verify that the MAC RX is disabled for the port. */
+    while (mac_eth_check_rx_enable(mac_isl, mac_core, mac_core_port)) { ; }
 
     /* Disable the MAC RX enqueue inhibit. */
     mac_inhibit &= ~mac_port_mask;
@@ -138,19 +222,14 @@ __intrinsic void
 mac_eth_enable_rx(unsigned int mac_isl, unsigned int mac_core,
                   unsigned int mac_core_port)
 {
-    uint32_t mac_conf;
-    uint32_t mac_conf_addr;
-
     /* Check the parameters */
     assert(mac_isl < MAX_MAC_ISLANDS_PER_NFP);
     assert(mac_core < MAX_MAC_CORES_PER_MAC_ISL);
     assert(mac_core_port < MAX_ETH_PORTS_PER_MAC_CORE);
 
     /* Set the MAC RX enable for the port. */
-    mac_conf_addr  = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
-    mac_conf       = xpb_read(mac_conf_addr);
-    mac_conf      |= NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
-    xpb_write(mac_conf_addr, mac_conf);
+    issue_sync_me_cmd(mac_isl, mac_core, mac_core_port,
+                      ARB_CODE_ETH_CMD_CFG_ENABLE_RX, 0);
 
     return;
 }
@@ -182,19 +261,14 @@ __intrinsic void
 mac_eth_disable_tx_flush(unsigned int mac_isl, unsigned int mac_core,
                          unsigned int mac_core_port)
 {
-    uint32_t mac_conf;
-    uint32_t mac_conf_addr;
-
     /* Check the parameters */
     assert(mac_isl < MAX_MAC_ISLANDS_PER_NFP);
     assert(mac_core < MAX_MAC_CORES_PER_MAC_ISL);
     assert(mac_core_port < MAX_ETH_PORTS_PER_MAC_CORE);
 
     /* Clear the MAC TX flush enable for the port. */
-    mac_conf_addr  = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
-    mac_conf       = xpb_read(mac_conf_addr);
-    mac_conf      &= ~NFP_MAC_ETH_SEG_CMD_CONFIG_TX_FLUSH;
-    xpb_write(mac_conf_addr, mac_conf);
+    issue_sync_me_cmd(mac_isl, mac_core, mac_core_port,
+                      ARB_CODE_ETH_CMD_CFG_DISABLE_FLUSH, 0);
 
     return;
 }
@@ -204,19 +278,14 @@ __intrinsic void
 mac_eth_enable_tx_flush(unsigned int mac_isl, unsigned int mac_core,
                         unsigned int mac_core_port)
 {
-    uint32_t mac_conf;
-    uint32_t mac_conf_addr;
-
     /* Check the parameters */
     assert(mac_isl < MAX_MAC_ISLANDS_PER_NFP);
     assert(mac_core < MAX_MAC_CORES_PER_MAC_ISL);
     assert(mac_core_port < MAX_ETH_PORTS_PER_MAC_CORE);
 
     /* Set the MAC TX flush enable for the port. */
-    mac_conf_addr  = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
-    mac_conf       = xpb_read(mac_conf_addr);
-    mac_conf      |= NFP_MAC_ETH_SEG_CMD_CONFIG_TX_FLUSH;
-    xpb_write(mac_conf_addr, mac_conf);
+    issue_sync_me_cmd(mac_isl, mac_core, mac_core_port,
+                      ARB_CODE_ETH_CMD_CFG_ENABLE_FLUSH, 0);
 
     return;
 }
