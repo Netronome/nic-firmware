@@ -24,3 +24,7 @@ if ( [[ ${cmdline} != *"intel_iommu=on"* ]] || [[ ${cmdline} != *"iommu=pt"* ]] 
     echo "don't forget to run `update-grub` before rebooting."
     exit 1
 fi
+
+echo -n "Removing fw files from /lib/firmware/netronome..."
+rm -f /lib/firmware/netronome/*.nffw
+echo "..done"

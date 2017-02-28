@@ -127,20 +127,6 @@ function write_udev() {
     return 0
 }
 
-function clean_fw() {
-    log "Removing fw files from /lib/firmware/netronome..."
-    rm -f /lib/firmware/netronome/*.nffw
-}
-
-function process_platform() {
-    local selected_fw fw_path
-    fw_path=/opt/netronome/firmware/ns-agilio-core-nic/
-
-    log "Copying Firmware..."
-    mkdir -p /lib/firmware/netronome/
-    cp "$fw_path"/* "$fw_file"
-}
-
 function err47_check() {
     grep -wq quirk_nfp6000 /boot/System.map-"$(uname -r)"
     if [ $? -ne 0 ]; then
@@ -213,10 +199,6 @@ function setup_nic() {
     check_and_load_driver || return
     # remove udev file
     clean_udev
-    # remove nic firmware
-    clean_fw
-    # detect platform and copy new firmware
-    process_platform || return
     # write udev rules based on current platform
     write_udev || return
     # select nfp over nfp_uio
@@ -254,8 +236,6 @@ case "$1" in
     "clean")
         # remove udev file
         clean_udev
-        # remove nic firmware
-        clean_fw
         ;;
     "force")
         setup_nic || exit
