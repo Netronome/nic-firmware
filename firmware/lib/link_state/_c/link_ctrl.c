@@ -134,6 +134,8 @@ mac_csr_sync_start()
 {
     remote_csr_write(ARB_ME_ISLAND, ARB_ME_ID,
                      mailbox_addr(ARB_FW_KICKSTART_MBOX), ARB_FW_KICKSTART);
+    remote_csr_write(ARB_ME_ISLAND, ARB_ME_ID,
+                     mailbox_addr(ARB_FW_QUIESCE_MBOX), ARB_RESUME);
 }
 
 
