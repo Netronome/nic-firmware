@@ -92,11 +92,8 @@ proc_from_wire(int port)
     NIC_APP_DBG_APP(nic_app_dbg_journal, csum_prepend);
 
     /* Checksum checks. */
-    err = nic_rx_csum_checks(port, csum_prepend, app_meta);
-    /* If there was a checksum error don't parse
-     * the packet.  It might be garbage. */
-    if (err == NIC_RX_CSUM_BAD)
-        goto err_out;
+    nic_rx_csum_checks(port, csum_prepend, app_meta);
+
     vxlan_ports = nic_rx_vxlan_ports();
 
     /* Parse/Extract the header fields we are interested in */
@@ -108,11 +105,8 @@ proc_from_wire(int port)
     if (err)
         goto err_out;
 
-    ret = rx_check_inner_csum(port, &hdrs, &encap, plen + MAC_PREPEND_BYTES,
-                              app_meta, csum_prepend);
-    if (ret == NIC_RX_CSUM_BAD) {
-        goto err_out;
-    }
+    rx_check_inner_csum(port, &hdrs, &encap, plen + MAC_PREPEND_BYTES,
+                        app_meta, csum_prepend);
 
     /* Strip VLAN if present and configured.
      * Copy the Ethernet Type, move the Ethernet header by
