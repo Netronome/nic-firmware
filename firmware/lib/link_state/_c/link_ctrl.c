@@ -130,8 +130,10 @@ mac_csr_sync_recache(unsigned int mac_isl,
 
 
 __intrinsic void
-mac_csr_sync_start()
+mac_csr_sync_start(uint32_t disable_gpio_poll)
 {
+    remote_csr_write(ARB_ME_ISLAND, ARB_ME_ID,
+                     mailbox_addr(ARB_FW_GPIO_POLL_MBOX), disable_gpio_poll);
     remote_csr_write(ARB_ME_ISLAND, ARB_ME_ID,
                      mailbox_addr(ARB_FW_KICKSTART_MBOX), ARB_FW_KICKSTART);
     remote_csr_write(ARB_ME_ISLAND, ARB_ME_ID,

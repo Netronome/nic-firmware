@@ -29,8 +29,12 @@ __intrinsic void mac_csr_sync_recache(unsigned int mac_isl,
 
 /**
  * Start MAC CSR sync ME.
+ *
+ * @param disable_gpio_poll  Disables polling of the GPIO
+ *
+ * @note Polling of the GPIO should only be enabled for Carbon 2x25G
  */
-__intrinsic void mac_csr_sync_start();
+__intrinsic void mac_csr_sync_start(uint32_t disable_gpio_poll);
 
 
 /* *** MAC RX Enable/Disable Functions *** */
