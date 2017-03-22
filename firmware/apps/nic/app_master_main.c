@@ -159,6 +159,17 @@ __shared __gpr volatile int mac_reg_lock = 0;
     } while (0)
 
 
+#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
+
+#define DISABLE_GPIO_POLL 0
+
+#else /* NS_PLATFORM_TYPE != NS_PLATFORM_CARBON */
+
+#define DISABLE_GPIO_POLL 1
+
+#endif /* NS_PLATFORM_TYPE != NS_PLATFORM_CARBON */
+
+
 /* Translate port speed to link rate encoding */
 __intrinsic static unsigned int
 port_speed_to_link_rate(unsigned int port_speed)
@@ -615,7 +626,7 @@ main(void)
     switch (ctx()) {
     case APP_MASTER_CTX_CONFIG_CHANGES:
         init_catamaran_chan2port_table();
-        mac_csr_sync_start();
+        mac_csr_sync_start(DISABLE_GPIO_POLL);
         cfg_changes_loop();
         break;
     case APP_MASTER_CTX_MAC_STATS:

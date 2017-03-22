@@ -19,6 +19,8 @@
 #define ARB_ME_ISLAND      1
 #define ARB_ME_ID          3
 
+#define ARB_PORTS_STATS_BASE  0x25000
+
 #define ARB_CLS_BASE_ADDR  (ARB_CLS_ISLAND <<34)
 #define ARB_CLS_BASE_ADDR39_32  0x04
 #define ARB_CLS_BASE_ADDR_Hi32  0x04000000
