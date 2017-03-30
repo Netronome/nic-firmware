@@ -26,6 +26,7 @@ nfp_net_kmod_files = [
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp.h", nfp_net_kmod_src_dir + "/nfpcore/nfp.h"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_hwinfo.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_hwinfo.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_mip.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_mip.c"),
+    (nfp_net_kmod_dst_dir + "/nfpcore/nfp_mutex.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_mutex.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nbi.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_nbi.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nbi.h", nfp_net_kmod_src_dir + "/nfpcore/nfp_nbi.h"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nbi_mac_eth.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_nbi_mac_eth.c"),
