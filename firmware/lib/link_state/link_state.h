@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2015,  Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2015-2017,  Netronome Systems, Inc.  All rights reserved.
  *
  * @file          link_state.h
  * @brief         Code for checking the Ethernet link state.
@@ -42,9 +42,11 @@ enum link_state {
  * @param eth_port_mask    Bit mask to specify ports to check for each MAC
  * @param link_state_mask  Bit mask array to hold the link state for each MAC
  * @param num_mac_islands  Number of MAC islands to check
+ * @param is_1ge_mask      Bit mask array of which ports are 1 GE
  */
 __intrinsic void mac_eth_all_link_state(__lmem uint32_t eth_port_mask[],
                                         __lmem uint32_t link_state_mask[],
+                                        __lmem uint32_t is_1ge_mask[],
                                         unsigned int num_mac_islands);
 
 
@@ -53,19 +55,22 @@ __intrinsic void mac_eth_all_link_state(__lmem uint32_t eth_port_mask[],
  *
  * @param mac_isl        The MAC island to check
  * @param eth_port_mask  The bit mask for each port on the MAC island to check
+ * @param is_1ge_mask    The bit mask of which ports are 1 GE
  *
  * @return - The link state of the specified ports on the island
  *
  * @note 'mac_isl' range is from 0 to (MAX_MAC_ISLANDS_PER_NFP - 1)
  */
 __intrinsic uint32_t mac_eth_island_link_state(unsigned int mac_isl,
-                                               uint32_t eth_port_mask);
+                                               uint32_t eth_port_mask,
+                                               uint32_t is_1ge_mask);
 
 /**
  * Check the link state of the specified port on the MAC island
  *
  * @param mac_isl   The MAC island to check
  * @param eth_port  The port on the MAC island
+ * @param is_1ge    Indicates whether the port is 1 GE (1 = 1 GE, 0 = not 1 GE)
  *
  * @return - The link state of the specified port
  *
@@ -73,7 +78,8 @@ __intrinsic uint32_t mac_eth_island_link_state(unsigned int mac_isl,
  * @note 'eth_port' range is from 0 to (MAX_ETH_PORTS_PER_MAC_ISL - 1)
  */
 __intrinsic enum link_state mac_eth_port_link_state(unsigned int mac_isl,
-                                                    unsigned int eth_port);
+                                                    unsigned int eth_port,
+                                                    unsigned int is_1ge);
 
 
 #endif /* _LINK_STATE_H_ */
