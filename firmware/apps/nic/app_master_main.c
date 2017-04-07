@@ -377,9 +377,12 @@ cfg_changes_loop(void)
 
             /* Reflect the pci island and the vnic number to remote MEs */
             cfg_pci_vnic = (NIC_PCI << 16) | port;
+            
+#if 0
             /* Reset the configuration ack counter */
             synch_cnt_dram_reset(&nic_cfg_synch,
                                  sizeof(app_mes_ids)/sizeof(uint32_t));
+
             /* Signal all APP MEs about a config change */
             for(i = 0; i < sizeof(app_mes_ids)/sizeof(uint32_t); i++) {
                 ct_reflect_data(app_mes_ids[i], APP_ME_CONFIG_CTX,
@@ -387,6 +390,7 @@ cfg_changes_loop(void)
                                 APP_ME_CONFIG_SIGNAL_NUM,
                                 &cfg_pci_vnic, sizeof cfg_pci_vnic);
             }
+#endif
 
             /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
             if ((nic_control_word[port] ^ cfg_bar_data[0]) &
@@ -411,8 +415,10 @@ cfg_changes_loop(void)
                 app_config_port(port, control, update);
             }
 
+#if 0
             /* Wait for all APP MEs to ack the config change */
             synch_cnt_dram_wait(&nic_cfg_synch);
+#endif
 
             /* Complete the message */
             cfg_msg.msg_valid = 0;

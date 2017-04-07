@@ -83,7 +83,7 @@
 
 #define NFD_PCIE0_EMEM          emem0
 
-#define NFD_IN_DATA_OFFSET      64
+#define NFD_IN_DATA_OFFSET      128
 
 /* Number of credits allocated per VNIC queue */
 #ifndef NFD_QUEUE_CREDITS
@@ -97,21 +97,17 @@
     (NFP_NET_CFG_CTRL_ENABLE | NFP_NET_CFG_CTRL_PROMISC |       \
      NFP_NET_CFG_CTRL_L2BC | NFP_NET_CFG_CTRL_L2MC |            \
      NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
-     NFP_NET_CFG_CTRL_RXVLAN | NFP_NET_CFG_CTRL_TXVLAN |        \
      NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
      NFP_NET_CFG_CTRL_GATHER |      \
-     NFP_NET_CFG_CTRL_IRQMOD | NFP_NET_CFG_CTRL_LSO |           \
-     NFP_NET_CFG_CTRL_VXLAN  | NFP_NET_CFG_CTRL_NVGRE)
+     NFP_NET_CFG_CTRL_IRQMOD | NFP_NET_CFG_CTRL_LSO)
 
 #define NFD_CFG_PF_CAP                                          \
     (NFP_NET_CFG_CTRL_ENABLE | NFP_NET_CFG_CTRL_PROMISC |       \
      NFP_NET_CFG_CTRL_L2BC | NFP_NET_CFG_CTRL_L2MC |            \
      NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
-     NFP_NET_CFG_CTRL_RXVLAN | NFP_NET_CFG_CTRL_TXVLAN |        \
      NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
      NFP_NET_CFG_CTRL_GATHER |      \
-     NFP_NET_CFG_CTRL_IRQMOD | NFP_NET_CFG_CTRL_LSO |           \
-     NFP_NET_CFG_CTRL_VXLAN  | NFP_NET_CFG_CTRL_NVGRE)
+     NFP_NET_CFG_CTRL_IRQMOD | NFP_NET_CFG_CTRL_LSO)           
 
 #define NFD_CFG_RING_EMEM       emem0
 
@@ -148,6 +144,9 @@
 /* Optional defines */
 #define NFD_IN_ADD_SEQN
 #define NFD_IN_NUM_WQS          1
+
+#define NFD_IN_NUM_SEQRS        4
+#define NFD_IN_SEQR_QSHIFT      0
 
 /* PCI.OUT block defines */
 #define NFD_OUT_BLM_POOL_START  BLM_NBI8_BLQ0_EMU_QID

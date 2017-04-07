@@ -16,7 +16,7 @@
  * - Set the number of bytes the MAC prepends data into
  * - Configure RX checksum offload so the wire can validate checksums
  */
-#define PKT_NBI_OFFSET           64
+#define PKT_NBI_OFFSET           128 
 #define MAC_PREPEND_BYTES        8
 #define HOST_PREPEND_BYTES       0
 #define CFG_RX_CSUM_PREPEND
@@ -35,10 +35,10 @@
 #define NBI_DMA_BP6_BLQ_TARGET   0,0
 #define NBI_DMA_BP7_BLQ_TARGET   0,0
 /* We use 2 islands for RX. Configure their CTM buffers for RX */
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND0   0,0,0
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND1   0,0,0
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND2   1,256,127
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND3   1,256,127
+#define NBI0_DMA_BPE_CONFIG_ME_ISLAND0   1,255,63
+#define NBI0_DMA_BPE_CONFIG_ME_ISLAND1   1,255,63
+#define NBI0_DMA_BPE_CONFIG_ME_ISLAND2   1,255,63
+#define NBI0_DMA_BPE_CONFIG_ME_ISLAND3   1,255,63
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND4   0,0,0
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND5   0,0,0
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND6   0,0,0
@@ -677,7 +677,7 @@
  * Note: GRO_NUM_BLOCKS is expected to be passed in via a -D
  *       GRO_CTX_PER_BLOCK is computed based on GRO_NUM_BLOCKS
  */
-#define GRO_ISL					36
+#define GRO_ISL				48	
 
 /* Ingress sequencer numbers (1/2/3/4) for packets from the wire will be
    mapped to GRO CTX numbers 1/3/5/7; those for packets from NFD (0/1/2/3)
