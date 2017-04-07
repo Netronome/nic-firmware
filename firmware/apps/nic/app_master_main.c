@@ -84,8 +84,31 @@
 /* Address of the PF Control BAR */
 
 
+/* Number of PFs and VFs supported. */
+#define NUM_PFS_VFS (NFD_MAX_PFS + NFD_MAX_VFS)
+
 /* Current value of NFP_NET_CFG_CTRL (shared between all contexts) */
 __shared __lmem volatile uint32_t nic_control_word[NS_PLATFORM_NUM_PORTS];
+
+/* Current state of the link state and the pending interrupts. */
+#define LS_ARRAY_LEN           ((NUM_PFS_VFS + 31) >> 5)
+#define LS_IDX(_vnic)          ((_vnic) >> 5)
+#define LS_SHF(_vnic)          ((_vnic) & 0x1f)
+#define LS_MASK(_vnic)         (0x1 << LS_SHF(_vnic))
+#define LS_READ(_state, _vnic) ((_state[LS_IDX(_vnic)] >> LS_SHF(_vnic)) & 0x1)
+
+#define LS_CLEAR(_state, _vnic)                   \
+    do {                                          \
+        _state[LS_IDX(_vnic)] &= ~LS_MASK(_vnic); \
+    } while (0)
+#define LS_SET(_state, _vnic)                    \
+    do {                                         \
+        _state[LS_IDX(_vnic)] |= LS_MASK(_vnic); \
+    } while (0)
+
+__shared __lmem uint32_t ls_current[LS_ARRAY_LEN];
+__shared __lmem uint32_t pending[LS_ARRAY_LEN];
+
 
 /*
  * Global declarations for configuration change management
@@ -504,8 +527,8 @@ out:
 
 /* Check the Link state and try to generate an interrupt if it changed.
  * Return 0 if everything is fine, or 1 if there is pending interrupt. */
-__inline static int
-lsc_check(__gpr unsigned int *ls_current, int nic_intf)
+__inline static void
+lsc_check(int nic_intf)
 {
     __mem char *nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, nic_intf);
     __gpr enum link_state ls;
@@ -528,9 +551,13 @@ lsc_check(__gpr unsigned int *ls_current, int nic_intf)
     ls = mac_eth_port_link_state(NS_PLATFORM_MAC(nic_intf),
                                  NS_PLATFORM_MAC_SERDES_LO(nic_intf));
 
-    if (ls != *ls_current)
+    if (ls != LS_READ(ls_current, nic_intf)) {
         changed = 1;
-    *ls_current = ls;
+        if (ls)
+            LS_SET(ls_current, nic_intf);
+        else
+            LS_CLEAR(ls_current, nic_intf);
+    }
 
     if (changed) {
         if (ls == LINK_DOWN) {
@@ -559,28 +586,23 @@ skip_link_read:
     mem_write32(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
 
     /* If the link state changed, try to send in interrupt */
-    if (changed)
-        ret = lsc_send(nic_intf);
-
-out:
-    return ret;
+    if (changed || LS_READ(pending, nic_intf)) {
+        if (lsc_send(nic_intf))
+            LS_SET(pending, nic_intf);
+        else
+            LS_CLEAR(pending, nic_intf);
+    }
 }
 
 static void
 lsc_loop(void)
 {
     __gpr int port;
-    __gpr unsigned int temp_ls;
-    /* This is the per-port state information. */
-    __lmem unsigned int ls_current[NS_PLATFORM_NUM_PORTS];
-    __lmem unsigned int pending[NS_PLATFORM_NUM_PORTS];
     __gpr int lsc_count = 0;
 
     /* Set the initial port state. */
     for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
-        temp_ls = LINK_DOWN;
-        pending[port] = lsc_check(&temp_ls, port);
-        ls_current[port] = temp_ls;
+        lsc_check(port);
     }
 
     /* Need to handle pending interrupts more frequent than we need to
@@ -592,16 +614,18 @@ lsc_loop(void)
         ++lsc_count;
 
         for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
-            if (pending[port])
-                pending[port] = lsc_send(port);
+            if (LS_READ(pending, port)) {
+                if (lsc_send(port))
+                    LS_SET(pending, port);
+                else
+                    LS_CLEAR(pending, port);
+            }
         }
 
         if (lsc_count > 19) {
             lsc_count = 0;
             for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
-                temp_ls = ls_current[port];
-                pending[port] = lsc_check(&temp_ls, port);
-                ls_current[port] = temp_ls;
+                lsc_check(port);
             }
         }
     }
