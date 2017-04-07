@@ -560,8 +560,9 @@ lsc_check(int nic_intf)
 
     /* Read the current link state and if it changed set the bit in
      * the control BAR status */
-    ls = mac_eth_port_link_state(NS_PLATFORM_MAC(nic_intf),
-                                 NS_PLATFORM_MAC_SERDES_LO(nic_intf));
+    ls = mac_eth_port_link_state(
+             NS_PLATFORM_MAC(nic_intf), NS_PLATFORM_MAC_SERDES_LO(nic_intf),
+             (NS_PLATFORM_PORT_SPEED(nic_intf) > 1) ? 0 : 1);
 
     if (ls != LS_READ(ls_current, nic_intf)) {
         changed = 1;
