@@ -52,6 +52,7 @@
 #include <vnic/nfd_common.h>
 
 #include <infra_basic/infra_basic.h>
+#include <nic_basic/nic_basic.h>
 #include "app_config_tables.h"
 
 
@@ -99,8 +100,8 @@ enum {
 
 union debug_instr_journal {
     struct {
-        uint32_t event : 16;
-        uint32_t param: 16;
+        uint32_t event : 8;
+        uint32_t param: 24;
     };
     uint32_t value;
 };
@@ -150,7 +151,7 @@ typedef union ct_nn_write_format
         unsigned int reserved_2                         : 3;    /**< Reserved. */
         unsigned int master                             : 4;    /**< Master within specified island. See NFP-6xxx Pull IDs in 6xxx databook. */
         unsigned int signal_number                      : 7;    /**< If non-zero, signal number to send to the ME on completion. */
-        CLUSTER_TARGET_ADDRESS_MODE address_mode        : 1;    /**< Address mode where 0 = NN register FIFO mode, 1 = absolute mode.*/
+        CLUSTER_TARGET_ADDRESS_MODE address_mode        : 1;    /**< Address mode: 0 = NN register FIFO mode, 1 = absolute mode.*/
         unsigned int NN_register_number                 : 7;    /**< Next neighbour register number. */
         unsigned int reserved_1                         : 2;    /**< Reserved. */
     };
@@ -349,6 +350,24 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base)
     return;
 }
 
+/* Set RSS flags but matching what is used in the workers */
+__intrinsic uint32_t
+extract_rss_flags(uint32_t rss_ctrl)
+{
+    uint32_t rss_flags = (rss_ctrl &
+                        (NFP_NET_CFG_RSS_IPV4 | NFP_NET_CFG_RSS_IPV6));
+
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_TCP)
+        rss_flags |= (NIC_RSS_IP4 | NIC_RSS_TCP);
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_UDP)
+        rss_flags |= (NIC_RSS_IP4 | NIC_RSS_UDP);
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_TCP)
+        rss_flags |= (NIC_RSS_IP6 | NIC_RSS_TCP);
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_UDP)
+        rss_flags |= (NIC_RSS_IP6 | NIC_RSS_UDP);
+
+    return rss_flags;
+}
 
 
 __intrinsic void
@@ -362,7 +381,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
     __xwrite uint32_t xwr_instr[16];
     __gpr uint32_t instr[16];
-//     uint32_t i;
+    uint32_t rss_flags;
     uint32_t byte_off;
     uint32_t mask;
     uint32_t count;
@@ -417,18 +436,20 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     instr[count++] = (INSTR_MAC << 16) | (nic_mac[0] >> 16);
     instr[count++] = (nic_mac[0] << 16) | (nic_mac[1] >> 16);
 
-    if ((control & NFP_NET_CFG_CTRL_RSS)
-        && (update & NFP_NET_CFG_UPDATE_RSS)) {
+    if (control & NFP_NET_CFG_CTRL_RSS) {
 
-        /* First update the RSS table */
-        upd_rss_table(vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd, bar_base);
+        /* First update the RSS NN table but only if RSS has changed */
+        if (update & NFP_NET_CFG_UPDATE_RSS) {
+            upd_rss_table(vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd, bar_base);
+        }
 
         /* read rss_ctrl but only first word is used */
         mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
                 sizeof(rss_ctrl));
+        rss_flags = extract_rss_flags(rss_ctrl[0]);
         instr[count++] = (INSTR_EXTRACT_KEY_WITH_RSS << 16)
-                        | (rss_ctrl[0] >> 16);
-        instr[count++] = (rss_ctrl[0] << 16);
+                        | (rss_flags >> 16);
+        instr[count++] = (rss_flags << 16);
         mask = rss_ctrl[0];
 
         /* provide rss key with hash */
@@ -450,6 +471,24 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         instr[count++] = (INSTR_TX_HOST<<16) | PKT_HOST_PORT(NIC_PCI, vnic_port, 0);
         reg_cp(xwr_instr, instr, count << 2);
 
+#ifdef APP_CONFIG_DEBUG
+        {
+            union debug_instr_journal data;
+            data.value = 0x00;
+            data.event = RSS_HI;
+            data.param = rss_ctrl[0] >> 16;
+
+            /* Log the data to the ring */
+            JDBG(app_debug_jrn, data.value);
+
+            data.event = RSS_LO;
+            data.param = rss_ctrl[0];
+
+            /* Log the data to the ring */
+            JDBG(app_debug_jrn, data.value);
+        }
+#endif
+
     } else {
         instr[count++] = (INSTR_TX_HOST<<16) | PKT_HOST_PORT(NIC_PCI, vnic_port, 0);
         reg_cp(xwr_instr, (void *)instr, count<<2);
@@ -459,25 +498,6 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
     /* write TX instr to local table and to other islands too */
     upd_rx_wire_instr(xwr_instr, byte_off<<2, count);
-
-
-#ifdef APP_CONFIG_DEBUG
-    {
-        union debug_instr_journal data;
-        data.value = 0x00;
-        data.event = RSS_HI;
-        data.param = rss_ctrl[0] >> 16;
-
-        /* Log the data to the ring */
-        JDBG(app_debug_jrn, data.value);
-
-        data.event = RSS_LO;
-        data.param = rss_ctrl[0];
-
-        /* Log the data to the ring */
-        JDBG(app_debug_jrn, data.value);
-    }
-#endif
 
     return;
 }
