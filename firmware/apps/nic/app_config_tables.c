@@ -201,7 +201,7 @@ upd_rss_table_instr(__xwrite uint32_t *xwr_instr, uint32_t start_offset, uint32_
 
 /* Update RX wire instruction */
 __intrinsic void
-upd_rx_wire_instr (__xwrite uint32_t *xwr_instr,
+upd_rx_wire_instr(__xwrite uint32_t *xwr_instr,
                    uint32_t start_offset, uint32_t count)
 {
     __cls __addr32 void *nic_cfg_instr_tbl = (__cls __addr32 void*)
@@ -296,13 +296,13 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
     return;
 }
 
+#define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
 __intrinsic void
-upd_rss_table(__emem __addr40 uint8_t *bar_base)
+upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base)
 {
-    __xread uint32_t xrd_rss_tbl[(NFP_NET_CFG_RSS_ITBL_SZ / 2) / sizeof(uint32_t)];
-    __xwrite uint32_t xwr_nn_info[(NFP_NET_CFG_RSS_ITBL_SZ / 2) / sizeof(uint32_t)];
-    uint32_t count = (NFP_NET_CFG_RSS_ITBL_SZ / 2) / sizeof(uint32_t);
-    uint32_t start_offset = NN_RSS_TABLE;
+    __xread uint32_t xrd_rss_tbl[(NFP_NET_CFG_RSS_ITBL_SZ_wrd / 2)];
+    __xwrite uint32_t xwr_nn_info[(NFP_NET_CFG_RSS_ITBL_SZ_wrd / 2)];
+    uint32_t count = NFP_NET_CFG_RSS_ITBL_SZ_wrd/2;
 
     /*Update RSS table to NN registers of MEs */
 
@@ -312,10 +312,14 @@ upd_rss_table(__emem __addr40 uint8_t *bar_base)
                     sizeof(xrd_rss_tbl));
     reg_cp(xwr_nn_info, xrd_rss_tbl, sizeof(xrd_rss_tbl));
 
-    /* We can only write 16 words with NN write */
+    /* We can only write 16 words with NN write.
+     * If vnic_port 0, write at NN register offset 0,
+     * if vnic_port 1, write at NN register offset 1*RSS_table size (32)
+     */
     upd_rss_table_instr(xwr_nn_info, start_offset, count);
+
 #ifdef APP_CONFIG_DEBUG
-    mem_write32(xwr_nn_info, debug_rss_table, count<<2);
+    mem_write32(xwr_nn_info, debug_rss_table + start_offset, count<<2);
 #endif
 
     /* Read/write second half */
@@ -325,13 +329,14 @@ upd_rss_table(__emem __addr40 uint8_t *bar_base)
                     sizeof(xrd_rss_tbl));
 
     reg_cp(xwr_nn_info, xrd_rss_tbl, sizeof(xrd_rss_tbl));
-    upd_rss_table_instr(xwr_nn_info, NN_RSS_TABLE + start_offset, count);
+    upd_rss_table_instr(xwr_nn_info,  start_offset, count);
 #ifdef APP_CONFIG_DEBUG
     mem_write32(xwr_nn_info, debug_rss_table + start_offset, count<<2);
 #endif
 
     return;
 }
+
 
 
 __intrinsic void
@@ -345,11 +350,9 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
     __xwrite uint32_t xwr_instr[16];
     __gpr uint32_t instr[16];
-    uint32_t i;
+//     uint32_t i;
     uint32_t byte_off;
-    uint32_t isl;
     uint32_t mask;
-    SIGNAL last_sig;
     uint32_t count;
 
     __cls __addr32 void *nic_cfg_instr_tbl = (__cls __addr32 void*)
@@ -406,7 +409,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         && (update & NFP_NET_CFG_UPDATE_RSS)) {
 
         /* First update the RSS table */
-        upd_rss_table(bar_base);
+        upd_rss_table(vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd, bar_base);
 
         /* read rss_ctrl but only first word is used */
         mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
@@ -424,10 +427,14 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         instr[count++] = (rss_key[0] << 16) | (rss_key[1] >> 16);
         instr[count++] = (rss_key[1] << 16);
 
+        /* RSS table with NN register index as start offset */
+        instr[count++] = (INSTR_RSS_TABLE << 16) | (vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd);
+
         /* mask fits into 16 bits as rss_ctrl is masked with 0x7f) */
         mask = NFP_NET_CFG_RSS_MASK_of(mask);
         instr[count++] = (INSTR_SEL_RSS_QID_WITH_MASK << 16) | (mask);
 
+        instr[count++] = (INSTR_CHECKSUM_COMPLETE << 16);
         instr[count++] = (INSTR_TX_HOST<<16) | PKT_HOST_PORT(NIC_PCI, vnic_port, 0);
         reg_cp(xwr_instr, instr, count << 2);
 
