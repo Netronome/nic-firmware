@@ -36,7 +36,6 @@
 
 #include <std/synch.h>
 #include <std/reg_utils.h>
-
 #include "nfd_user_cfg.h"
 #include <vnic/shared/nfd_cfg.h>
 #include <vnic/pci_in.h>
@@ -48,6 +47,10 @@
 #include <link_state/link_state.h>
 
 #include <npfw/catamaran_app_utils.h>
+
+#include <vnic/nfd_common.h>
+
+#include "app_config_tables.h"
 
 /*
  * The application master runs on a single ME and performs a number of
@@ -99,6 +102,7 @@
 /* Current value of NFP_NET_CFG_CTRL (shared between all contexts) */
 __shared __lmem volatile uint32_t nic_control_word[NS_PLATFORM_NUM_PORTS];
 
+
 /*
  * Global declarations for configuration change management
  */
@@ -109,6 +113,7 @@ __shared __lmem volatile uint32_t nic_control_word[NS_PLATFORM_NUM_PORTS];
 #else
     __shared __lmem uint32_t app_mes_ids[] = {APP_MES_LIST};
 #endif
+
 
 __visible SIGNAL nfd_cfg_sig_app_master0;
 NFD_CFG_BASE_DECLARE(0);
@@ -366,6 +371,8 @@ cfg_changes_loop(void)
     volatile __xwrite uint32_t cfg_pci_vnic;
     __gpr int i;
     uint32_t port;
+    uint32_t update;
+    uint32_t control;
 
     /* Initialisation */
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
@@ -379,6 +386,9 @@ cfg_changes_loop(void)
             /* read in the first 64bit of the Control BAR */
             mem_read64(cfg_bar_data, NFD_CFG_BAR_ISL(NIC_PCI, port),
                        sizeof cfg_bar_data);
+
+            control = cfg_bar_data[0];  // control
+            update = cfg_bar_data[1];   // update
 
             /* Reflect the pci island and the vnic number to remote MEs */
             cfg_pci_vnic = (NIC_PCI << 16) | port;
@@ -403,11 +413,18 @@ cfg_changes_loop(void)
                 } else {
                     /* Inhibit and disable the MAC RX. */
                     mac_port_disable_rx(port);
+                    app_config_port_down(port);
                 }
             }
 
             /* Save the control word */
-            nic_control_word[port] = cfg_bar_data[0];
+            nic_control_word[port] = control;
+
+            /* Do configuration changes to each ME/island if up */
+            if ((control & NFP_NET_CFG_CTRL_ENABLE)
+                && (update & NFP_NET_CFG_UPDATE_GEN)) {
+                app_config_port(port, control, update);
+            }
 
             /* Wait for all APP MEs to ack the config change */
             synch_cnt_dram_wait(&nic_cfg_synch);
@@ -457,7 +474,7 @@ perq_stats_loop(void)
                     (NFD_MAX_PFS * NFD_MAX_PF_QUEUES));
              rxq++) {
             __nfd_in_push_pkt_cnt(NIC_PCI, rxq, ctx_swap, &rxq_sig);
-            sleep(PERQ_STATS_SLEEP);           
+            sleep(PERQ_STATS_SLEEP);
         }
     }
     /* NOTREACHED */
@@ -623,6 +640,7 @@ lsc_loop(void)
 int
 main(void)
 {
+
     switch (ctx()) {
     case APP_MASTER_CTX_CONFIG_CHANGES:
         init_catamaran_chan2port_table();

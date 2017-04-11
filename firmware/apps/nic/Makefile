@@ -63,7 +63,12 @@ $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLA
 define NIC_ISL_ME_DEST
 ((($(1) + 32) << 4) + ($(2) + 4))
 endef
-
+NIC_APP_ISLANDS := \
+	"$(call NIC_ISL_ME_DEST, 0, 0), \
+	$(call NIC_ISL_ME_DEST, 1, 0), \
+	$(call NIC_ISL_ME_DEST, 2, 0), \
+	$(call NIC_ISL_ME_DEST, 3, 0)"
+	
 NIC_APP_MES := \
         "$(call NIC_ISL_ME_DEST, 0, 0), \
         $(call NIC_ISL_ME_DEST, 0, 1), \
@@ -120,6 +125,7 @@ NIC_APP_MES := \
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_svc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,app_config_tables))
 $(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,ila0.me2,ila0.me3))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,nic_basic))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,link_state))
@@ -128,6 +134,7 @@ $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(NFD_DIR)/m
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnn_mode=1))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_WORKER_ISLAND_LIST=$(NIC_APP_ISLANDS)))
 
 # Add NFD for PCIE0
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))

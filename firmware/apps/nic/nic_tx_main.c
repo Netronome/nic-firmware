@@ -40,6 +40,7 @@
 
 #include "nfd_user_cfg.h"
 #include "nic.h"
+#include "app_config_tables.h"
 
 /* default options */
 #ifndef CFG_RX_CSUM_PREPEND
@@ -233,6 +234,9 @@ main()
         /* disable all other contexts */
         ctxs = local_csr_read(local_csr_ctx_enables);
         ctxs &= ~NFP_MECSR_CTX_ENABLES_CONTEXTS(0xfe);
+        /* enable NN receive config from CTM  */
+        ctxs &= ~0x000007;
+        ctxs |= 0x02;
         local_csr_write(local_csr_ctx_enables, ctxs);
 
         init_tx();
@@ -283,7 +287,6 @@ main()
         } else {
             __critical_path();
         }
-
 #if NS_PLATFORM_NUM_PORTS > 1
         port = PKT_PORT_QUEUE_of(Pkt.p_src) / NFD_MAX_PF_QUEUES;
 #else
