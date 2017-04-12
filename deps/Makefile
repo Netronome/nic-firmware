@@ -31,7 +31,7 @@ FLOWENV_INC = -I$(FLOWENV_DIR)/me/lib
 
 $(DEPS_DIR)/flowenv.hg:
 	hg clone -r $(FLOWENV_REV) \
-		ssh://hg//data/hg/repos/flowenv.hg $(FLOWENV_DIR)
+		ssh://$(HG_USERNAME)@hg//data/hg/repos/flowenv.hg $(FLOWENV_DIR)
 
 HG_DEPS += $(FLOWENV_DIR)
 HG_REVS += $(FLOWENV_REV)
@@ -52,7 +52,7 @@ GRO_INC = -I$(GRO_DIR)
 
 $(DEPS_DIR)/gro.hg:
 	hg clone -r $(GRO_REV) \
-		ssh://hg//data/hg/repos/gro.hg $(GRO_DIR)
+		ssh://$(HG_USERNAME)@hg//data/hg/repos/gro.hg $(GRO_DIR)
 
 HG_DEPS += $(GRO_DIR)
 HG_REVS += $(GRO_REV)
@@ -67,7 +67,7 @@ NFD_INC = -I$(NFD_DIR)/shared \
 
 $(DEPS_DIR)/ng-nfd.hg:
 	hg clone -r $(NFD_REV) \
-	       	ssh://hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
+	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
 
 HG_DEPS += $(NFD_DIR)
 HG_REVS += $(NFD_REV)

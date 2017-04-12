@@ -5,7 +5,7 @@
 #
 
 NFP_COMMON    := $(abspath $(CURDIR))
-NETRONOME = /opt/netronome
+NETRONOME ?= /opt/netronome
 
 DEPS_DIR      = $(NFP_COMMON)/deps
 FIRMWARE_DIR  = $(NFP_COMMON)/firmware
@@ -13,6 +13,8 @@ DOC_DIR       = $(NFP_COMMON)/docs
 TEST_DIR      = $(NFP_COMMON)/test
 
 Q ?= @
+
+HG_USERNAME ?= $(shell whoami)
 
 ALL: firmware_all
 
