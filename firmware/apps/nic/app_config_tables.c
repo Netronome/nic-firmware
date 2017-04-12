@@ -451,7 +451,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         mask = NFP_NET_CFG_RSS_MASK_of(mask);
         instr[count++] = (INSTR_SEL_RSS_QID_WITH_MASK << 16) | (mask);
 
-        instr[count++] = (INSTR_CHECKSUM_COMPLETE << 16);
+        /* calculate checksum and drop if mismatch (drop port is included) */
+        instr[count++] = (INSTR_CHECKSUM_COMPLETE << 16) | PKT_DROP_HOST;
         instr[count++] = (INSTR_TX_HOST<<16) | PKT_HOST_PORT(NIC_PCI, vnic_port, 0);
         reg_cp(xwr_instr, instr, count << 2);
 
@@ -472,12 +473,12 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
             JDBG(app_debug_jrn, data.value);
         }
 #endif
-
     } else {
         instr[count++] = (INSTR_TX_HOST<<16) | PKT_HOST_PORT(NIC_PCI, vnic_port, 0);
         reg_cp(xwr_instr, (void *)instr, count<<2);
     }
 
+    /* map vnic_port to NBI index in the instruction table */
     byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic_port) * NIC_MAX_INSTR;
 
     /* write TX instr to local table and to other islands too */
