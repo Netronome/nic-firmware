@@ -51,22 +51,21 @@
 /* Islands to configure. */
 
 #ifndef APP_WORKER_ISLAND_LIST
-    #error "The list of application Island IDd must be defined"
+    #error "The list of application Island IDs must be defined"
 #else
     __shared __lmem uint32_t app_isl_ids[] = {APP_WORKER_ISLAND_LIST};
 #endif
 
 
 #ifndef APP_MES_LIST
-    #error "The list of application MEs IDd must be defined"
+    #error "The list of application MEs IDs must be defined"
 #else
     __shared __lmem uint32_t cfg_mes_ids[] = {APP_MES_LIST};
 #endif
 
 
-#define MAX_NN_WRITE    14
+// #define APP_CONFIG_DEBUG
 
-#define APP_CONFIG_DEBUG
 
 #define NIC_NBI         0
 
@@ -120,6 +119,8 @@ __export __emem __addr40 uint32_t debug_rss_table[100];
  * NUM_PCIE*NUM_PCIE_Q .. NUM_PCIE*NUM_PCIE_Q + #NBI*#NBI channels.
  *
  */
+
+#define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
 
 /** Enum for addressing mode.  */
 typedef enum CLUSTER_TARGET_ADDRESS_MODE
@@ -183,19 +184,27 @@ void ct_nn_write(
 __intrinsic void
 upd_rss_table_instr(__xwrite uint32_t *xwr_instr, uint32_t start_offset, uint32_t count)
 {
-    SIGNAL sig;
+    SIGNAL sig1, sig2;
     uint32_t i;
-    ct_nn_write_format    command;
+    ct_nn_write_format command;
+
+    ctassert(count <= 32);
 
     command.value = 0;
     command.signal_number = 0x0;
     command.address_mode = CT_ADDRESS_MODE_ABSOLUTE;
     command.NN_register_number = start_offset;
 
+    /* ct_nn_write only writes max of 16 words, hence we split it */
     for(i = 0; i < sizeof(cfg_mes_ids)/sizeof(uint32_t); i++) {
         command.remote_island = cfg_mes_ids[i] >> 4;
         command.master = cfg_mes_ids[i] & 0x0f;
-        ct_nn_write(xwr_instr, &command, count, ctx_swap, &sig);
+        ct_nn_write(xwr_instr, &command, count/2, sig_done, &sig1);
+
+        command.NN_register_number = start_offset + count/2;
+        ct_nn_write(&xwr_instr[count/2], &command, count/2, sig_done, &sig2);
+
+        wait_for_all(&sig1, &sig2);
     }
 }
 
@@ -207,7 +216,7 @@ upd_rx_wire_instr(__xwrite uint32_t *xwr_instr,
 {
     __cls __addr32 void *nic_cfg_instr_tbl = (__cls __addr32 void*)
                                         __link_sym("NIC_CFG_INSTR_TBL");
-    SIGNAL last_sig;
+    SIGNAL sig;
     uint32_t addr_hi;
     uint32_t addr_lo;
     uint32_t isl;
@@ -219,9 +228,9 @@ upd_rx_wire_instr(__xwrite uint32_t *xwr_instr,
     __asm {
         alu[--, --, B, ind.__raw]
         cls[write, *xwr_instr, nic_cfg_instr_tbl, start_offset, \
-                __ct_const_val(count)], sig_done[last_sig], indirect_ref
+                __ct_const_val(count)], sig_done[sig], indirect_ref
     }
-    wait_for_all(&last_sig);
+    wait_for_all(&sig);
 
     for (isl= 0; isl< sizeof(app_isl_ids)/sizeof(uint32_t); isl++) {
         addr_lo = (uint32_t)nic_cfg_instr_tbl + start_offset;
@@ -235,10 +244,9 @@ upd_rx_wire_instr(__xwrite uint32_t *xwr_instr,
         __asm {
             alu[--, --, B, ind.__raw]
             cls[write, *xwr_instr, addr_hi, <<8, addr_lo, \
-                    __ct_const_val(count)], sig_done[last_sig], indirect_ref
+                    __ct_const_val(count)], sig_done[sig], indirect_ref
         }
-        wait_for_all(&last_sig);
-
+        wait_for_all(&sig);
     }
     return;
 }
@@ -259,14 +267,14 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
 
     for (i = 0; i < NUM_PCIE_Q_PER_PORT - 1; i++)
     {
-        /* write to CLS without a signal. We will wait for signal on the last
-         * write */
+        /* write multiple entries to our local CLS without a signal.
+         * We will wait for signal on the last write */
         __asm cls[write, *xwr_instr, nic_cfg_instr_tbl, byte_off, \
                     __ct_const_val(count)]
         byte_off += (NIC_MAX_INSTR<<2);
     }
 
-    /* last write */
+    /* last write to local CLS */
     __asm cls[write, *xwr_instr, nic_cfg_instr_tbl, byte_off, \
                 __ct_const_val(count)], sig_done[last_sig]
 
@@ -282,14 +290,14 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
 
         for (i = 0; i < NUM_PCIE_Q_PER_PORT - 1; i++)
         {
-            /* write to CLS without a signal. We will wait for signal on the last
-            * write */
+            /* write to multiple entries to remote CLS without a signal.
+             * We will wait for signal on the last write */
             __asm cls[write, *xwr_instr, addr_hi, <<8, addr_lo, \
                         __ct_const_val(count)]
             addr_lo += (NIC_MAX_INSTR<<2);
         }
 
-        /* last write */
+        /* last write to remote island */
         __asm cls[write, *xwr_instr, addr_hi, <<8, addr_lo, \
                     __ct_const_val(count)], sig_done[last_sig]
         wait_for_all(&last_sig);
@@ -297,42 +305,30 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
     return;
 }
 
-#define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
+
 __intrinsic void
 upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base)
 {
-    __xread uint32_t xrd_rss_tbl[(NFP_NET_CFG_RSS_ITBL_SZ_wrd / 2)];
-    __xwrite uint32_t xwr_nn_info[(NFP_NET_CFG_RSS_ITBL_SZ_wrd / 2)];
-    uint32_t count = NFP_NET_CFG_RSS_ITBL_SZ_wrd/2;
+    __xread uint32_t xrd_rss_tbl[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
+    __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
 
     /*Update RSS table to NN registers of MEs */
 
-    /* Read/write first half (16 words) */
+    /* Read/write all 32 words */
     mem_read32_swap(xrd_rss_tbl,
                     bar_base + NFP_NET_CFG_RSS_ITBL,
                     sizeof(xrd_rss_tbl));
-    reg_cp(xwr_nn_info, xrd_rss_tbl, sizeof(xrd_rss_tbl));
 
-    /* We can only write 16 words with NN write.
-     * If vnic_port 0, write at NN register offset 0,
+    reg_cp(xwr_nn_info, xrd_rss_tbl, sizeof(xrd_rss_tbl)/2);
+    reg_cp((void *)(&xwr_nn_info[16]), (void *)(&xrd_rss_tbl[16]), sizeof(xrd_rss_tbl)/2);
+
+    /* If vnic_port 0, write at NN register offset 0,
      * if vnic_port 1, write at NN register offset 1*RSS_table size (32)
      */
-    upd_rss_table_instr(xwr_nn_info, start_offset, count);
+    upd_rss_table_instr(xwr_nn_info,  start_offset, NFP_NET_CFG_RSS_ITBL_SZ_wrd);
 
 #ifdef APP_CONFIG_DEBUG
-    mem_write32(xwr_nn_info, debug_rss_table + start_offset, count<<2);
-#endif
-
-    /* Read/write second half */
-    start_offset += count;
-    mem_read32_swap(xrd_rss_tbl,
-                    bar_base + NFP_NET_CFG_RSS_ITBL + sizeof(xrd_rss_tbl),
-                    sizeof(xrd_rss_tbl));
-
-    reg_cp(xwr_nn_info, xrd_rss_tbl, sizeof(xrd_rss_tbl));
-    upd_rss_table_instr(xwr_nn_info,  start_offset, count);
-#ifdef APP_CONFIG_DEBUG
-    mem_write32(xwr_nn_info, debug_rss_table + start_offset, count<<2);
+    mem_write32(xwr_nn_info, debug_rss_table + start_offset, sizeof(xwr_nn_info));
 #endif
 
     return;
@@ -367,8 +363,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     __xread uint32_t mtu;
     __xread uint32_t nic_mac[2];
     __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
-    __xwrite uint32_t xwr_instr[16];
-    __gpr uint32_t instr[16];
+    __xwrite uint32_t xwr_instr[32];
+    __gpr uint32_t instr[32];
     uint32_t rss_flags;
     uint32_t byte_off;
     uint32_t mask;
@@ -499,7 +495,6 @@ app_config_port_down(uint32_t vnic_port)
     __gpr uint32_t instr;
     uint32_t i;
     uint32_t byte_off;
-    SIGNAL last_sig;
     __cls __addr32 void *nic_cfg_instr_tbl = (__cls __addr32 void*)
                                         __link_sym("NIC_CFG_INSTR_HOST_TBL");
     __cls __addr32 void *nic_cfg_instr_wire_tbl = (__cls __addr32 void*)
