@@ -27,10 +27,10 @@ define nffw.setup
 
 $1__NFAS_INC = -I$(FIRMWARE_DIR)/$2
 $1__NFCC_INC = -I$(FIRMWARE_DIR)/$2
-$1__DEFS = 
+$1__DEFS =
 $1__NFAS_FLAGS = -include config.h
 $1__NFCC_FLAGS = -FI config.h
-$1__NFCC_CLIBS = 
+$1__NFCC_CLIBS =
 $1__CHIP = nfp-4xxx-b0
 $1__AMDA = AMDA0081-0001   # hydrogen
 
@@ -84,7 +84,7 @@ endef
 
 #f nffw.add_includes
 #
-# Add a list of defines to a microcode assembly 
+# Add a list of defines to a microcode assembly
 #
 # @param $1 firmware name
 # @param $2 list of paths
@@ -103,7 +103,7 @@ endef
 # Assembler a microcode file into the firmware build directory
 #
 # @param $1 directory
-# 
+#
 define nffw.add_build_dir
 FW_BUILD_DIRS = $(if $(filter $(FW_BUILD_DIRS),$1),$(FW_BUILD_DIRS),$(FW_BUILD_DIRS) $1)
 endef
@@ -287,7 +287,7 @@ endef
 
 #f microcode.add_includes
 #
-# Add a list of include paths to a microcode assembly 
+# Add a list of include paths to a microcode assembly
 #
 # @param $1 firmware name
 # @param $2 object descriptor
@@ -331,7 +331,7 @@ endef
 
 #f microcode.add_fw_includes
 #
-# Add a list of defines to a microcode assembly 
+# Add a list of defines to a microcode assembly
 #
 # @param $1 firmware name
 # @param $2 list of paths
@@ -434,6 +434,51 @@ $$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS)
 endef
 
 #a Micro-c templates
+#f micro_c.compile.abspath
+#
+# Compile a micro-c file in 4 context mode into the firmware build directory
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 source directory as an absolute path
+# @param $4 source code
+#
+define micro_c.compile.abspath_4ctxmode
+
+$1__$2__INC   += $(NFCC_BASE_INC)
+$1__$2__INC   += $$($1__NFCC_INC)
+$1__$2__DEFS  += $(NFCC_BASE_DEFS)
+$1__$2__DEFS  += $$($1__DEFS)
+$1__$2__FLAGS += $(NFCC_BASE_FLAGS)
+$1__$2__FLAGS += $$($1__NFCC_FLAGS)
+$1__$2__FLAGS += -chip $$($1__CHIP)
+$1__$2__CLIBS += $(NFCC_BASE_CLIBS)
+$1__$2__CLIBS += $$($1__NFCC_CLIBS)
+$1__$2__LIST  = $(FW_BUILD)/$1/$2/$2.list
+$1__$2__MKDEP = $(FW_BUILD)/$1/$2/$2.d
+$1__$2__NCTX  = 4
+
+$(eval $(call nffw.add_build_dir,$(FW_BUILD)/$1))
+
+$1_$2.list: $$($1__$2__LIST)
+FW_LIST_TARGETS += $1_$2.list
+FW_MKDEP_TARGETS += $(FW_BUILD)/$1/$2/$2.d
+
+$$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS)
+	@echo Building $$($1__$2__LIST) ...
+	$(Q)mkdir -p $(FW_BUILD)/$1/$2
+	$(Q)$(NFCC) -QM $$($1__$2__FLAGS) \
+		-Qnctx_mode=$$($1__$2__NCTX) $$($1__$2__INC) $$($1__$2__DEFS) \
+		$$($1__$2__CLIBS) $$< > $$($1__$2__MKDEP)
+	$(Q)sed -ie 's|^.*\.o|$(FW_BUILD)/$1/$2/$2.list|' $$($1__$2__MKDEP)
+	$(Q)$(NFCC) -Fo$(FW_BUILD)/$1/$2/ -Fe$$@ $$($1__$2__FLAGS) \
+		-Qnctx_mode=$$($1__$2__NCTX) $$($1__$2__INC) $$($1__$2__DEFS) \
+		$$($1__$2__CLIBS) $$<
+
+endef
+
+
+#a Micro-c templates
 #f micro_c.compile
 #
 # Compile a micro-c file into the firmware build directory
@@ -445,6 +490,20 @@ endef
 #
 define micro_c.compile
 $(eval $(call micro_c.compile.abspath,$1,$2,$(FIRMWARE_DIR)/$3,$4))
+endef
+
+#a Micro-c templates
+#f micro_c.compile
+#
+# Compile a micro-c file into the firmware build directory
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 source directory relative to FIRMWARE_DIR
+# @param $4 source code
+#
+define micro_c.compile_4cntxmode
+$(eval $(call micro_c.compile.abspath_4ctxmode,$1,$2,$(FIRMWARE_DIR)/$3,$4))
 endef
 
 #a Micro-c templates
@@ -503,7 +562,7 @@ endef
 #
 define micro_c.add_fw_lib
 
-$1__$2__INC   += 
+$1__$2__INC   +=
 $1__$2__CLIBS += $(FIRMWARE_DIR)/lib/$3/lib$3.c
 
 endef
