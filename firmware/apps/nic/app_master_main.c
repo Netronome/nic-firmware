@@ -86,15 +86,12 @@
 #error "NFD_PCIE0_EMEM must be defined"
 #endif
 
-/* APP Master CTXs assignments */
+/* APP Master CTXs assignments - 4 context mode */
 #define APP_MASTER_CTX_CONFIG_CHANGES   0
-#define APP_MASTER_CTX_MAC_STATS        1
-#define APP_MASTER_CTX_PERQ_STATS       2
-#define APP_MASTER_CTX_LINK_STATE       3
-#define APP_MASTER_CTX_FREE0            4
-#define APP_MASTER_CTX_FREE1            5
-#define APP_MASTER_CTX_FREE2            6
-#define APP_MASTER_CTX_FREE3            7
+#define APP_MASTER_CTX_MAC_STATS        2
+#define APP_MASTER_CTX_PERQ_STATS       4
+#define APP_MASTER_CTX_LINK_STATE       6
+
 
 /* Address of the PF Control BAR */
 
