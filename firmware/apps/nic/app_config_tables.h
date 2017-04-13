@@ -39,7 +39,7 @@ enum {
 #define NUM_NBI_CHANNELS    64      // channels per NBI
 #define NUM_PCIE            1       // number of PCIe islands
 #define NUM_PCIE_Q          64      // number of queues configured per PCIe
-#define NUM_PCIE_Q_PER_PORT NFD_MAX_PF_QUEUES // nr queues configured per port
+#define NUM_PCIE_Q_PER_PORT 8 //NFD_MAX_PF_QUEUES // nr queues configured per port
 #define NIC_MAX_INSTR       32      // 128 bytes, 4B per instruction
 
 #define NIC_HOST_MAX_ENTRIES  (NUM_PCIE*NUM_PCIE_Q)
