@@ -2,7 +2,8 @@
  * Copyright 2014-2017 Netronome, Inc.
  *
  * @file          app_master_main.c
- * @brief         ME serving as the NFD NIC application master.
+ * @brief         Providing configuration information from PCIe to worker
+ *                MEs in a instruction table format.
  *
  * This implementation only handles one PCIe isl.
  */
@@ -16,31 +17,18 @@
 #include <platform.h>
 #include <nfp/me.h>
 #include <nfp/mem_bulk.h>
-#include <nfp/macstats.h>
-#include <nfp/remote_me.h>
-#include <nfp/xpb.h>
-#include <nfp6000/nfp_mac.h>
-#include <nfp6000/nfp_me.h>
 #include <nfp/cls.h>
+#include <nfp6000/nfp_me.h>
 
-#include <std/synch.h>
 #include <std/reg_utils.h>
-#include "nfd_user_cfg.h"
 #include <vnic/shared/nfd_cfg.h>
 #include <vnic/pci_in.h>
 #include <vnic/pci_out.h>
-
 #include <shared/nfp_net_ctrl.h>
-
-#include <link_state/link_ctrl.h>
-#include <link_state/link_state.h>
-
-#include <npfw/catamaran_app_utils.h>
-
-#include <vnic/nfd_common.h>
 
 #include <infra_basic/infra_basic.h>
 #include <nic_basic/nic_basic.h>
+
 #include "app_config_tables.h"
 
 
@@ -64,14 +52,14 @@
 #endif
 
 
-// #define APP_CONFIG_DEBUG
+#define APP_CONFIG_DEBUG
 
 
-#define NIC_NBI         0
+#define NIC_NBI 0
 
 /* use macros to map input VNIC port to index in table */
 #define NIC_PORT_TO_PCIE_INDEX(pcie, vport, queue) \
-        ((pcie << 6) | (NFD_BUILD_QID((vport), (queue)) & 0x3f))
+        ((pcie << 6) | (NFD_BUILD_QID((vport),(queue))&0x3f))
 
 #define NIC_PORT_TO_NBI_INDEX(nbi, vport) \
         (NIC_NBI_ENTRY_START + ((nbi << 6) | (vport & 0x3f)))
@@ -92,66 +80,47 @@ union debug_instr_journal {
     };
     uint32_t value;
 };
-
 MEM_RING_INIT_MU(app_debug_jrn,8192,emem0);
-#endif
 
-#ifdef APP_CONFIG_DEBUG
+/* RSS table written to NN is also written to emem */
 __export __emem __addr40 uint32_t debug_rss_table[100];
 #endif
 
-/*
- * Config change management.
- *
- * If port is up, write the instruction list for rx from host datapath and
- * rx from wire datapath. Anything received on the wire port is mapped to
- * the host port, and vice versa.
- * For instance NBI port 0 maps to VNIC port 0 and
- * NBI port 1 maps to VNIC port 1.
- * Each VNIC port has a number of queues (NFD_MAX_PF_QUEUES) which is
- * configured depending on the number of host ports configured.
- *
- * These instructions are configured in NIC_CFG_INSTR_TBL table.
- * This table contains both instructions for host rx and wire rx.
- * Host rx instructions are configured from index 0..number of PCIE islands *
- * number of PCIe queues. I.e. one PCIe island with 64 PCIe queues.
- * Wire rx instructions are configured from index
- * NUM_PCIE*NUM_PCIE_Q .. NUM_PCIE*NUM_PCIE_Q + #NBI*#NBI channels.
- *
- */
 
+/* RSS table length in words */
 #define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
 
-/** Enum for addressing mode.  */
-typedef enum CLUSTER_TARGET_ADDRESS_MODE
+
+/* Cluster target NN write defines and structures */
+typedef enum CT_ADDR_MODE
 {
-    CT_ADDRESS_MODE_INDEX               = 0x00,     /**< NN register FIFO mode is used. */
-    CT_ADDRESS_MODE_ABSOLUTE            = 0x01      /**< NN register number specified is the first to be written to.   */
-}  CLUSTER_TARGET_ADDRESS_MODE;
-
-
+    CT_ADDR_MODE_INDEX    = 0x00, /* NN reg FIFO mode is used. */
+    CT_ADDR_MODE_ABSOLUTE = 0x01  /* Use NN reg num as start (0..127) */
+};
 
 typedef union ct_nn_write_format
 {
     struct
     {
-        unsigned int reserved_3                         : 2;    /**< Reserved. */
-        unsigned int remote_island                      : 6;    /**< Island id of remote master. */
-        unsigned int reserved_2                         : 3;    /**< Reserved. */
-        unsigned int master                             : 4;    /**< Master within specified island. See NFP-6xxx Pull IDs in 6xxx databook. */
-        unsigned int signal_number                      : 7;    /**< If non-zero, signal number to send to the ME on completion. */
-        CLUSTER_TARGET_ADDRESS_MODE address_mode        : 1;    /**< Address mode: 0 = NN register FIFO mode, 1 = absolute mode.*/
-        unsigned int NN_register_number                 : 7;    /**< Next neighbour register number. */
-        unsigned int reserved_1                         : 2;    /**< Reserved. */
+        unsigned int reserved_3: 2;
+        unsigned int remote_isl: 6;     /* Island id of remote master. */
+        unsigned int reserved_2: 3;
+        unsigned int master: 4;         /* Master within specified island. */
+        unsigned int sig_num: 7;        /* If non-zero, sig number to
+                                           send to the ME on completion. */
+        enum CT_ADDR_MODE addr_mode: 1; /* Address mode:
+                                            0 = NN register FIFO mode,
+                                            1 = absolute mode.*/
+        unsigned int NN_reg_num: 7;     /*NN register number. */
+        unsigned int reserved_1: 2;
     };
-    unsigned int value;                                         /**< Accessor to entire lookup detail structure. */
-} ct_nn_write_format;
-
+    unsigned int value;
+};
 
 __intrinsic
 void ct_nn_write(
     __xwrite void *xfer,
-    volatile ct_nn_write_format *address,
+    volatile union ct_nn_write_format *address,
     unsigned int count,
     sync_t sync,
     SIGNAL *sig_ptr
@@ -168,40 +137,62 @@ void ct_nn_write(
         __asm
         {
             alu[--, --, B, ind.__raw]
-            ct[ctnn_write, *xfer, address_val, 0, __ct_const_val(count)], sig_done[*sig_ptr], indirect_ref
+            ct[ctnn_write, *xfer, address_val, 0, __ct_const_val(count)], \
+                sig_done[*sig_ptr], indirect_ref
         }
     } else {
         __asm
         {
             alu[--, --, B, ind.__raw]
-            ct[ctnn_write, *xfer, address_val, 0, __ct_const_val(count)], ctx_swap[*sig_ptr], indirect_ref
+            ct[ctnn_write, *xfer, address_val, 0, __ct_const_val(count)], \
+                ctx_swap[*sig_ptr], indirect_ref
         }
     }
 }
 
+/*
+ * Config change management.
+ *
+ * If port is up, write the instruction list for rx from host datapath and
+ * rx from wire datapath. Anything received on the wire port is mapped to
+ * the host port, and vice versa.
+ * For instance NBI port 0 maps to VNIC port 0 and
+ * NBI port 1 maps to VNIC port 1.
+ * Each VNIC port has a number of queues (NFD_MAX_PF_QUEUES) which is
+ * configured depending on the number of host ports configured.
+ *
+ * Worker instructions are configured in NIC_CFG_INSTR_TBL table.
+ * This table contains both instructions for host rx and wire rx.
+ * Host rx instructions are configured from index 0..num PCIE islands *
+ * num PCIe queues (NUM_PCIE*NUM_PCIE_Q).
+ * Wire rx instructions are configured from index
+ * NUM_PCIE*NUM_PCIE_Q .. NUM_PCIE*NUM_PCIE_Q + #NBI*#NBI channels.
+ */
+
 
 /* Write the RSS table to NN registers for all MEs */
 __intrinsic void
-upd_rss_table_instr(__xwrite uint32_t *xwr_instr, uint32_t start_offset, uint32_t count)
+upd_rss_table_instr(__xwrite uint32_t *xwr_instr, uint32_t start_offset,
+                    uint32_t count)
 {
     SIGNAL sig1, sig2;
     uint32_t i;
-    ct_nn_write_format command;
+    union ct_nn_write_format command;
 
     ctassert(count <= 32);
 
     command.value = 0;
-    command.signal_number = 0x0;
-    command.address_mode = CT_ADDRESS_MODE_ABSOLUTE;
-    command.NN_register_number = start_offset;
+    command.sig_num = 0x0;
+    command.addr_mode = CT_ADDR_MODE_ABSOLUTE;
+    command.NN_reg_num = start_offset;
 
     /* ct_nn_write only writes max of 16 words, hence we split it */
     for(i = 0; i < sizeof(cfg_mes_ids)/sizeof(uint32_t); i++) {
-        command.remote_island = cfg_mes_ids[i] >> 4;
+        command.remote_isl = cfg_mes_ids[i] >> 4;
         command.master = cfg_mes_ids[i] & 0x0f;
         ct_nn_write(xwr_instr, &command, count/2, sig_done, &sig1);
 
-        command.NN_register_number = start_offset + count/2;
+        command.NN_reg_num = start_offset + count/2;
         ct_nn_write(&xwr_instr[count/2], &command, count/2, sig_done, &sig2);
 
         wait_for_all(&sig1, &sig2);
@@ -209,7 +200,7 @@ upd_rss_table_instr(__xwrite uint32_t *xwr_instr, uint32_t start_offset, uint32_
 }
 
 
-/* Update RX wire instruction */
+/* Update RX wire instr -> one table entry per NBI queue/port */
 __intrinsic void
 upd_rx_wire_instr(__xwrite uint32_t *xwr_instr,
                    uint32_t start_offset, uint32_t count)
@@ -222,36 +213,35 @@ upd_rx_wire_instr(__xwrite uint32_t *xwr_instr,
     uint32_t isl;
     struct nfp_mecsr_prev_alu ind;
 
+    /* write to local CLS table */
     ind.__raw = 0;
     ind.ov_len = 1;
     ind.length = count - 1;
     __asm {
         alu[--, --, B, ind.__raw]
         cls[write, *xwr_instr, nic_cfg_instr_tbl, start_offset, \
-                __ct_const_val(count)], sig_done[sig], indirect_ref
+                __ct_const_val(count)], ctx_swap[sig], indirect_ref
     }
-    wait_for_all(&sig);
 
+    /* Propagate to all worker CLS islands */
     for (isl= 0; isl< sizeof(app_isl_ids)/sizeof(uint32_t); isl++) {
         addr_lo = (uint32_t)nic_cfg_instr_tbl + start_offset;
-        addr_hi = app_isl_ids[isl] >> 4; // only use island, mask out ME
-        addr_hi = (addr_hi << (40 - 8 - 6));
+        addr_hi = app_isl_ids[isl] >> 4; /* only use island, mask out ME */
+        addr_hi = (addr_hi << (34 - 8)); /* address shifted by 8 in instr */
 
-        /* last write */
         ind.__raw = 0;
         ind.ov_len = 1;
         ind.length = count - 1;
         __asm {
             alu[--, --, B, ind.__raw]
             cls[write, *xwr_instr, addr_hi, <<8, addr_lo, \
-                    __ct_const_val(count)], sig_done[sig], indirect_ref
+                    __ct_const_val(count)], ctx_swap[sig], indirect_ref
         }
-        wait_for_all(&sig);
     }
     return;
 }
 
-/* Update RX wire instruction */
+/* Update RX host instr -> multiple table entries (mult queues) per port */
 __intrinsic void
 upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
                    uint32_t start_offset, uint32_t count)
@@ -265,10 +255,10 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
     uint32_t isl;
     uint32_t i;
 
+    /* Write multiple entries (one for each host queue) to local CLS.
+     * All writes without a signal except last. */
     for (i = 0; i < NUM_PCIE_Q_PER_PORT - 1; i++)
     {
-        /* write multiple entries to our local CLS without a signal.
-         * We will wait for signal on the last write */
         __asm cls[write, *xwr_instr, nic_cfg_instr_tbl, byte_off, \
                     __ct_const_val(count)]
         byte_off += (NIC_MAX_INSTR<<2);
@@ -280,24 +270,20 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
 
     wait_for_all(&last_sig);
 
-    /* Propagate to all worker isls */
-
+    /* Propagate to all worker (remote) CLS islands */
     for (isl= 0; isl< sizeof(app_isl_ids)/sizeof(uint32_t); isl++) {
         addr_lo = (uint32_t)nic_cfg_instr_tbl + start_offset;
-        addr_hi = app_isl_ids[isl] >> 4; // only use island, mask out ME
-        addr_hi = (addr_hi << (40 - 8 - 6));
-
+        addr_hi = app_isl_ids[isl] >> 4; /* only use island, mask out ME */
+        addr_hi = (addr_hi << (34 - 8)); /* address shifted by 8 in instr */
 
         for (i = 0; i < NUM_PCIE_Q_PER_PORT - 1; i++)
         {
-            /* write to multiple entries to remote CLS without a signal.
-             * We will wait for signal on the last write */
             __asm cls[write, *xwr_instr, addr_hi, <<8, addr_lo, \
                         __ct_const_val(count)]
             addr_lo += (NIC_MAX_INSTR<<2);
         }
 
-        /* last write to remote island */
+        /* last write to remote CLS */
         __asm cls[write, *xwr_instr, addr_hi, <<8, addr_lo, \
                     __ct_const_val(count)], sig_done[last_sig]
         wait_for_all(&last_sig);
@@ -312,29 +298,28 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base)
     __xread uint32_t xrd_rss_tbl[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
     __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
 
-    /*Update RSS table to NN registers of MEs */
-
-    /* Read/write all 32 words */
+    /* Read all 32 words of RSS table */
     mem_read32_swap(xrd_rss_tbl,
                     bar_base + NFP_NET_CFG_RSS_ITBL,
                     sizeof(xrd_rss_tbl));
 
     reg_cp(xwr_nn_info, xrd_rss_tbl, sizeof(xrd_rss_tbl)/2);
-    reg_cp((void *)(&xwr_nn_info[16]), (void *)(&xrd_rss_tbl[16]), sizeof(xrd_rss_tbl)/2);
+    reg_cp((void *)(&xwr_nn_info[16]), (void *)(&xrd_rss_tbl[16]),
+           sizeof(xrd_rss_tbl)/2);
 
-    /* If vnic_port 0, write at NN register offset 0,
-     * if vnic_port 1, write at NN register offset 1*RSS_table size (32)
-     */
-    upd_rss_table_instr(xwr_nn_info,  start_offset, NFP_NET_CFG_RSS_ITBL_SZ_wrd);
+    /* Write at NN register start_offset for all worker MEs */
+    upd_rss_table_instr(xwr_nn_info,  start_offset,
+                        NFP_NET_CFG_RSS_ITBL_SZ_wrd);
 
 #ifdef APP_CONFIG_DEBUG
-    mem_write32(xwr_nn_info, debug_rss_table + start_offset, sizeof(xwr_nn_info));
+    mem_write32(xwr_nn_info, debug_rss_table + start_offset,
+                sizeof(xwr_nn_info));
 #endif
 
     return;
 }
 
-/* Set RSS flags but matching what is used in the workers */
+/* Set RSS flags by matching what is used in the workers */
 __intrinsic uint32_t
 extract_rss_flags(uint32_t rss_ctrl)
 {
@@ -357,7 +342,6 @@ extract_rss_flags(uint32_t rss_ctrl)
 __intrinsic void
 app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 {
-
     __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vnic_port);
     __xread uint32_t rss_ctrl[2];
     __xread uint32_t mtu;
@@ -370,17 +354,12 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     uint32_t mask;
     uint32_t count;
 
-    __cls __addr32 void *nic_cfg_instr_tbl = (__cls __addr32 void*)
-                                        __link_sym("NIC_CFG_INSTR_TBL");
-
 #ifdef APP_CONFIG_DEBUG
     {
         union debug_instr_journal data;
         data.value = 0x00;
         data.event = PORT_CFG;
         data.param = vnic_port;
-
-        /* Log the data to the ring */
         JDBG(app_debug_jrn, data.value);
     }
 #endif
@@ -393,8 +372,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     instr[1] = (INSTR_TX_WIRE << 16) | PKT_WIRE_PORT(NIC_NBI, vnic_port);
     reg_cp(xwr_instr, (void *)instr, count<<2);
 
-    byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0)
-            * NIC_MAX_INSTR * NUM_PCIE_Q_PER_PORT;
+    byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0) * NIC_MAX_INSTR;
 
      /* write TX instr to local table and to other islands too */
     upd_rx_host_instr (xwr_instr, byte_off<<2, count);
@@ -405,8 +383,6 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         data.value = 0x00;
         data.event = MTU;
         data.param = mtu;
-
-        /* Log the data to the ring */
         JDBG(app_debug_jrn, data.value);
     }
 #endif
@@ -422,7 +398,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
     if (control & NFP_NET_CFG_CTRL_RSS) {
 
-        /* First update the RSS NN table but only if RSS has changed */
+        /* Udate the RSS NN table but only if RSS has changed
+         * If vnic_port x write at x*32 NN register */
         if (update & NFP_NET_CFG_UPDATE_RSS) {
             upd_rss_table(vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd, bar_base);
         }
@@ -445,7 +422,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         instr[count++] = (rss_key[1] << 16);
 
         /* RSS table with NN register index as start offset */
-        instr[count++] = (INSTR_RSS_TABLE << 16) | (vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd);
+        instr[count++] = (INSTR_RSS_TABLE << 16)
+                        | (vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd);
 
         /* mask fits into 16 bits as rss_ctrl is masked with 0x7f) */
         mask = NFP_NET_CFG_RSS_MASK_of(mask);
@@ -453,7 +431,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
         /* calculate checksum and drop if mismatch (drop port is included) */
         instr[count++] = (INSTR_CHECKSUM_COMPLETE << 16) | PKT_DROP_HOST;
-        instr[count++] = (INSTR_TX_HOST<<16) | PKT_HOST_PORT(NIC_PCI, vnic_port, 0);
+        instr[count++] = (INSTR_TX_HOST<<16)
+                            | PKT_HOST_PORT(NIC_PCI, vnic_port, 0);
         reg_cp(xwr_instr, instr, count << 2);
 
 #ifdef APP_CONFIG_DEBUG
@@ -462,19 +441,17 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
             data.value = 0x00;
             data.event = RSS_HI;
             data.param = rss_ctrl[0] >> 16;
-
-            /* Log the data to the ring */
             JDBG(app_debug_jrn, data.value);
 
             data.event = RSS_LO;
             data.param = rss_ctrl[0];
-
-            /* Log the data to the ring */
             JDBG(app_debug_jrn, data.value);
         }
 #endif
+
     } else {
-        instr[count++] = (INSTR_TX_HOST<<16) | PKT_HOST_PORT(NIC_PCI, vnic_port, 0);
+        instr[count++] = (INSTR_TX_HOST<<16)
+                        | PKT_HOST_PORT(NIC_PCI, vnic_port, 0);
         reg_cp(xwr_instr, (void *)instr, count<<2);
     }
 
@@ -496,21 +473,17 @@ app_config_port_down(uint32_t vnic_port)
     __gpr uint32_t instr;
     uint32_t i;
     uint32_t byte_off;
-    __cls __addr32 void *nic_cfg_instr_tbl = (__cls __addr32 void*)
-                                        __link_sym("NIC_CFG_INSTR_HOST_TBL");
-    __cls __addr32 void *nic_cfg_instr_wire_tbl = (__cls __addr32 void*)
-                                        __link_sym("NIC_CFG_INSTR_WIRE_TBL");
 
     /* TX drop instr for host port lookup */
-    /* MTU */
     instr = (INSTR_TX_DROP << 16) | PKT_DROP_WIRE;
     xwr_instr[0] = instr;
     xwr_instr[1] = 0x00;
 
-    byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0)*NIC_MAX_INSTR*NUM_PCIE_Q_PER_PORT;
+    byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0) * NIC_MAX_INSTR;
 
     /* write drop instr to local host table */
     upd_rx_host_instr (&xwr_instr[0], byte_off << 2, 2);
+
 
     /* write drop instr to local wire table */
     instr = (INSTR_TX_DROP << 16) | PKT_DROP_HOST;
@@ -525,8 +498,6 @@ app_config_port_down(uint32_t vnic_port)
         data.value = 0x00;
         data.event = PORT_DOWN;
         data.param = vnic_port;
-
-        /* Log the data to the ring */
         JDBG(app_debug_jrn, data.value);
     }
 #endif
