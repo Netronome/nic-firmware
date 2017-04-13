@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * @file          apps/nic/nic.h
- * @brief         Header file for NIC local functions/declarations
+ * @file          apps/nic/app_config_tables.h
+ * @brief         Header file for App Config ME local functions/declarations
  */
 
 #ifndef _APP_CONFIG_TABLES_H_
@@ -22,24 +22,9 @@
 
 #include <nfp.h>
 #include <stdint.h>
-
-#include <net/eth.h>
-#include <net/gre.h>
-#include <net/ip.h>
-#include <net/tcp.h>
-#include <net/udp.h>
-#include <net/vxlan.h>
-#include <net/hdr_ext.h>
-
 #include <nfp_chipres.h>
-#include <nfp/mem_atomic.h>
-#include <nfp/mem_ring.h>
 
-#define WORKER_ISL0 32
-#define WORKER_ISL1 33
-#define WORKER_ISL2 34
-#define WORKER_ISL3 35
-#define WORKER_ISL4 36
+
 
 enum {
 
@@ -78,10 +63,6 @@ enum {
 #define NIC_CFG_INSTR_TBL_SIZE (((NIC_HOST_MAX_ENTRIES+NIC_WIRE_MAX_ENTRIES) \
                                 * NIC_MAX_INSTR)<<2)
 
-/* start of RSS table in NN registers */
-#define NN_RSS_TABLE    0
-
-
 /* For host ports, use 0 to MAX_VFS
  * For wire ports, use MIN_PFS .. MAX_PFS */
 __asm
@@ -94,8 +75,8 @@ __asm
 
 
 /**
- * Handle port config from PCIe. Configure the config instruction tables for wire
- * and host.
+ * Handle port config from PCIe. Configure the config instruction tables
+ * for wire and host.
  *
  * @vnic_port   VNIC port
  * @control     First word of the BAR data
@@ -106,8 +87,8 @@ void app_config_port(unsigned int vnic_port, unsigned int control,
 
 
 /**
- * Handle port down from PCIe. Configure the config instruction tables for wire
- * and host.
+ * Handle port down from PCIe. Configure the config instruction tables
+ * for wire and host.
  *
  * @vnic_port    VNIC port
  */
