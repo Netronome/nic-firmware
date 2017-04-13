@@ -11,7 +11,7 @@
 
 /* Global mandetory parameters */
 #ifndef GRO_NUM_BLOCKS
-    #define GRO_NUM_BLOCKS          4
+    #define GRO_NUM_BLOCKS          3
 #endif
 
 #ifndef GRO_CTX_PER_BLOCK
@@ -46,25 +46,17 @@
 
 #macro gro_config_block(BLOCKNUM, CALLER)
 
-    /* Set up the 8 GRO CTXs                        */
-    /* Using island GRO_ISL CTM for bitmaps              */
-    /* Using island 24 to hold the reorder queues   */
-    /* Size of each reorder queue is 8K             */
-        gro_declare_ctx(BLOCKNUM, CALLER, 0, GRO_ISL, 24, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 0, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 1, GRO_ISL, 24, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 1, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 2, GRO_ISL, 24, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 2, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 3, GRO_ISL, 24, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 3, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 4, GRO_ISL, 24, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 4, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 5, GRO_ISL, 24, 2048)
-
-        gro_declare_ctx(BLOCKNUM, CALLER, 6, GRO_ISL, 24, 2048)
-
-        gro_declare_ctx(BLOCKNUM, CALLER, 7, GRO_ISL, 24, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 5, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048)
 
 
     /* Netdev wire does not send to NBI, so no NBI dest         */

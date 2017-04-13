@@ -53,7 +53,7 @@ $(eval $(call fwdep.add_flowenv,$(PROJECT)))
 $(eval $(call fwdep.add_flowenv_nfp_init_flag,$(PROJECT),-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add GRO MEs
-$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei2.me11 mei3.me11,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei2.me11,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add 1 BLM ME
 $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
@@ -125,7 +125,7 @@ NIC_APP_MES := \
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_svc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,app_config_tables))
-$(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,ila0.me2,ila0.me3))
+$(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,mei4.me11,mei4.me10))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,nic_basic))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,link_state))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,npfw))
@@ -140,11 +140,11 @@ $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue0,-DNS_PLATFORM_TYPE=$
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue1,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_gather,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_notify,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call fwdep.add_nfd_in,$(PROJECT),0,ila0.me1)) # specify Notify ME
+$(eval $(call fwdep.add_nfd_in,$(PROJECT),0,mei3.me11)) # specify Notify ME
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_cache,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_sb,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_pd,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call fwdep.add_nfd_out,$(PROJECT),0,mei4.me0,mei4.me1 mei4.me2)) # Stage batch, then packet DMA MEs
+$(eval $(call fwdep.add_nfd_out,$(PROJECT),0,ila0.me1,ila0.me2 ila0.me3)) # Stage batch, then packet DMA MEs
 
 # Add microcode datapath
 $(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
@@ -161,6 +161,7 @@ $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
         mei1.me0 mei1.me1 mei1.me2 mei1.me3 \
         mei2.me0 mei2.me1 mei2.me2 mei2.me3 \
 	mei3.me0 mei3.me1 mei3.me2 mei3.me3 \
+	mei4.me0 mei4.me1 mei4.me2 mei4.me3 \
 	))
 
 # Add TM PM initialization (codeless)

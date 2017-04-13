@@ -510,7 +510,7 @@ max_cbs#:
     alu[BF_A(io_vec, PV_CTM_ADDR_bf), BF_A(io_vec, PV_CTM_ADDR_bf), OR, 1, <<BF_L(PV_CTM_ALLOCATED_bf)]
 
     // map NFD queues to sequencers 4, 5, 6, 7
-    alu[BF_A(io_vec, PV_SEQ_NO_bf), BF_A(in_nfd_desc, NFD_IN_SEQN_fld), AND~, 0xfc] ; PV_SEQ_NO_bf
+    alu[BF_A(io_vec, PV_SEQ_NO_bf), BF_A(in_nfd_desc, NFD_IN_SEQN_fld), AND~, 0xfe] ; PV_SEQ_NO_bf
     alu[BF_A(io_vec, PV_SEQ_CTX_bf), BF_A(io_vec, PV_SEQ_CTX_bf), +, 4] ; PV_SEQ_CTX_bf
     alu[BF_A(io_vec, PV_SEQ_CTX_bf), --, B, BF_A(io_vec, PV_SEQ_CTX_bf), <<BF_L(PV_SEQ_CTX_bf)] ; PV_SEQ_CTX_bf
     alu[BF_A(io_vec, PV_HOST_META_LENGTH_bf), BF_A(io_vec, PV_HOST_META_LENGTH_bf), OR, meta_len] ; PV_HOST_META_LENGTH_bf
