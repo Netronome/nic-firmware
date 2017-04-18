@@ -40,7 +40,7 @@
 #include <nic_basic/nic_basic.h>
 
 #include "app_config_tables.h"
-
+#include "app_config_instr.h"
 
 /*
  * Global declarations for configuration change management
@@ -61,6 +61,19 @@
     __shared __lmem uint32_t cfg_mes_ids[] = {APP_MES_LIST};
 #endif
 
+enum {
+
+    INSTR_MTU = 1,
+    INSTR_MAC,
+    INSTR_EXTRACT_KEY_WITH_RSS,
+    INSTR_RSS_CRC32_HASH_WITH_KEY,
+    INSTR_SEL_RSS_QID_WITH_MASK,
+    INSTR_RSS_TABLE,
+    INSTR_CHECKSUM_COMPLETE,
+    INSTR_TX_HOST,
+    INSTR_TX_WIRE,
+    INSTR_TX_DROP
+};
 
 #define APP_CONFIG_DEBUG
 
