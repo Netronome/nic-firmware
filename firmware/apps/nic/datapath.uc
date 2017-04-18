@@ -11,11 +11,21 @@
 
 #define PKT_COUNTER_ENABLE
 #include "pkt_counter.uc"
+#include "app_config_instr.h"
 
 pkt_counter_decl(drop)
 pkt_counter_decl(err_act)
 pkt_counter_decl(err_rx_nbi)
 pkt_counter_decl(err_rx_nfd)
+
+
+    /* enable NN receive config from CTM  */
+    .reg ctxs
+    local_csr_rd[CTX_ENABLES]
+    immed[ctxs, 0]
+    alu[ctxs, ctxs, AND~, 0x7]
+    alu[ctxs, ctxs, OR, 0x2]
+    local_csr_wr[CTX_ENABLES, ctxs]
 
 // cache the context bits for T_INDEX
 .reg volatile t_idx_ctx
