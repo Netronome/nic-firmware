@@ -5,7 +5,7 @@
 #include <ov.uc>
 
 #ifndef NFD_CC_BATCH_SIZE
-    #define NFD_CC_BATCH_SIZE   1 
+    #define NFD_CC_BATCH_SIZE   1
 #endif
 
 #define NFD_CC_ENTRIES          16
@@ -21,24 +21,24 @@
     .sig sig_credits
 
 #if isnum(in_pcie)
-    immed[addr_hi, (((NFD_PCIE_ISL_BASE + in_pcie) | __NFD_DIRECT_ACCESS) << 8), <<16] 
+    immed[addr_hi, (((NFD_PCIE_ISL_BASE + in_pcie) | __NFD_DIRECT_ACCESS) << 8), <<16]
 #else
     alu[addr_hi, (NFD_PCIE_ISL_BASE | __NFD_DIRECT_ACCESS), +, in_pcie]
-    alu[addr_hi, --, B, addr_hi, <<24]  
+    alu[addr_hi, --, B, addr_hi, <<24]
 #endif
 
 #if isnum(in_queue)
     immed[addr_lo, (in_queue <<  log2(NFD_OUT_ATOMICS_SZ))]
 #else
     alu[addr_lo, --, B, in_queue, <<(log2(NFD_OUT_ATOMICS_SZ))]
-#endif   
+#endif
 
     ov_start(OV_IMMED8)
     ov_set_use(OV_IMMED8, 1)
     ov_clean()
     mem[test_subsat_imm, $credits, addr_hi, <<8, addr_lo, 1], indirect_ref, sig_done[sig_credits]
     ctx_arb[sig_credits]
-    
+
     alu[--, --, B, $credits]
     beq[FAIL_LABEL]
 
@@ -56,7 +56,7 @@
 .begin
     .reg entry
     .reg value
-   
+
     immed[entry, 0]
     immed[value, 0xffffffff]
     .while (entry < 16)
@@ -96,24 +96,24 @@ retry#:
 
     alu[lm_addr, 0x3c, AND, result, >>1]
     local_csr_wr[ACTIVE_LM_ADDR_0, lm_addr]
-        br_bset[result, 8, busy#] 
+        br_bset[result, 8, busy#]
         br_bclr[result, 7, evict#], defer[1]
             alu[entry, 0xf, AND, result, >>3]
     alu[*l$index0, *l$index0, -, 1]
-    bge[done#]    
+    bge[done#]
 
     #if (isnum(in_pcie))
-        immed[addr_hi, (((NFD_PCIE_ISL_BASE | __NFD_DIRECT_ACCESS) + in_pcie) << 8), <<16] 
+        immed[addr_hi, (((NFD_PCIE_ISL_BASE | __NFD_DIRECT_ACCESS) + in_pcie) << 8), <<16]
     #else
         alu[addr_hi, (NFD_PCIE_ISL_BASE | __NFD_DIRECT_ACCESS), +, in_pcie]
-        alu[addr_hi, --, B, addr_hi, <<24]  
+        alu[addr_hi, --, B, addr_hi, <<24]
     #endif
 
     #if (isnum(in_queue))
         immed[addr_lo, (in_queue <<  log2(NFD_OUT_ATOMICS_SZ))]
     #else
         alu[addr_lo, --, B, in_queue, <<(log2(NFD_OUT_ATOMICS_SZ))]
-    #endif   
+    #endif
 
     ov_single(OV_IMMED8, NFD_CC_BATCH_SIZE)
     mem[test_subsat_imm, $credits, addr_hi, <<8, addr_lo, 1], indirect_ref, sig_done[sig_credits]
@@ -132,7 +132,7 @@ retry#:
         alu[addr_lo, --, B, addr_lo, <<(log2(NFD_OUT_ATOMICS_SZ))]
         ov_single(OV_IMMED8, *l$index0)
         mem[add_imm, --, addr_hi, <<8, addr_lo, 1], indirect_ref
-        br[fetch#] 
+        br[fetch#]
 
     small_batch#:
         br=byte[$credits, 0, 0, FAIL_LABEL#]
