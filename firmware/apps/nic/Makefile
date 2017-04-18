@@ -67,59 +67,33 @@ NIC_APP_ISLANDS := \
 	$(call NIC_ISL_ME_DEST, 1, 0), \
 	$(call NIC_ISL_ME_DEST, 2, 0), \
 	$(call NIC_ISL_ME_DEST, 3, 0)"
-	
+
 NIC_APP_MES := \
         "$(call NIC_ISL_ME_DEST, 0, 0), \
         $(call NIC_ISL_ME_DEST, 0, 1), \
         $(call NIC_ISL_ME_DEST, 0, 2), \
         $(call NIC_ISL_ME_DEST, 0, 3), \
-        $(call NIC_ISL_ME_DEST, 0, 4), \
-        $(call NIC_ISL_ME_DEST, 0, 5), \
-        $(call NIC_ISL_ME_DEST, 0, 6), \
-        $(call NIC_ISL_ME_DEST, 0, 7), \
-        $(call NIC_ISL_ME_DEST, 0, 8), \
-        $(call NIC_ISL_ME_DEST, 0, 9), \
-        $(call NIC_ISL_ME_DEST, 0, 10), \
-        $(call NIC_ISL_ME_DEST, 0, 11), \
         \
         $(call NIC_ISL_ME_DEST, 1, 0), \
         $(call NIC_ISL_ME_DEST, 1, 1), \
         $(call NIC_ISL_ME_DEST, 1, 2), \
         $(call NIC_ISL_ME_DEST, 1, 3), \
-        $(call NIC_ISL_ME_DEST, 1, 4), \
-        $(call NIC_ISL_ME_DEST, 1, 5), \
-        $(call NIC_ISL_ME_DEST, 1, 6), \
-        $(call NIC_ISL_ME_DEST, 1, 7), \
-        $(call NIC_ISL_ME_DEST, 1, 8), \
-        $(call NIC_ISL_ME_DEST, 1, 9), \
-        $(call NIC_ISL_ME_DEST, 1, 10), \
-        $(call NIC_ISL_ME_DEST, 1, 11), \
         \
         $(call NIC_ISL_ME_DEST, 2, 0), \
         $(call NIC_ISL_ME_DEST, 2, 1), \
         $(call NIC_ISL_ME_DEST, 2, 2), \
         $(call NIC_ISL_ME_DEST, 2, 3), \
-        $(call NIC_ISL_ME_DEST, 2, 4), \
-        $(call NIC_ISL_ME_DEST, 2, 5), \
-        $(call NIC_ISL_ME_DEST, 2, 6), \
-        $(call NIC_ISL_ME_DEST, 2, 7), \
-        $(call NIC_ISL_ME_DEST, 2, 8), \
-        $(call NIC_ISL_ME_DEST, 2, 9), \
-        $(call NIC_ISL_ME_DEST, 2, 10), \
-        $(call NIC_ISL_ME_DEST, 2, 11), \
         \
         $(call NIC_ISL_ME_DEST, 3, 0), \
         $(call NIC_ISL_ME_DEST, 3, 1), \
         $(call NIC_ISL_ME_DEST, 3, 2), \
         $(call NIC_ISL_ME_DEST, 3, 3), \
-        $(call NIC_ISL_ME_DEST, 3, 4), \
-        $(call NIC_ISL_ME_DEST, 3, 5), \
-        $(call NIC_ISL_ME_DEST, 3, 6), \
-        $(call NIC_ISL_ME_DEST, 3, 7), \
-        $(call NIC_ISL_ME_DEST, 3, 8), \
-        $(call NIC_ISL_ME_DEST, 3, 9), \
-        $(call NIC_ISL_ME_DEST, 3, 10), \
-        $(call NIC_ISL_ME_DEST, 3, 11)"
+	\
+        $(call NIC_ISL_ME_DEST, 4, 0), \
+        $(call NIC_ISL_ME_DEST, 4, 1), \
+        $(call NIC_ISL_ME_DEST, 4, 2), \
+        $(call NIC_ISL_ME_DEST, 4, 3)"
+
 
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
