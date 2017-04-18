@@ -31,7 +31,7 @@
 #define NUM_NBI_CHANNELS    64      // channels per NBI
 #define NUM_PCIE            1       // number of PCIe islands
 #define NUM_PCIE_Q          64      // number of queues configured per PCIe
-#define NUM_PCIE_Q_PER_PORT 8 //NFD_MAX_PF_QUEUES // nr queues configured per port
+#define NUM_PCIE_Q_PER_PORT 8 //NFD_MAX_PF_QUEUES // nr queues cfg per port
 #define NIC_MAX_INSTR       32      // 128 bytes, 4B per instruction
 
 #define NIC_HOST_MAX_ENTRIES  (NUM_PCIE*NUM_PCIE_Q)
@@ -43,6 +43,10 @@
 #define NIC_CFG_INSTR_TBL_SIZE (((NIC_HOST_MAX_ENTRIES+NIC_WIRE_MAX_ENTRIES) \
                                 * NIC_MAX_INSTR)<<2)
 
+/* For host ports,
+ *   use 0 to NIC_HOST_MAX_ENTRIES-1
+ * For wire ports,
+ *   use NIC_HOST_MAX_ENTRIES .. NIC_WIRE_MAX_ENTRIES+NIC_HOST_MAX_ENTRIES*/
 #if defined(__NFP_LANG_ASM)
 
     .alloc_mem NIC_CFG_INSTR_TBL cls+NIC_CFG_INSTR_TBL_ADDR \
@@ -51,14 +55,13 @@
 
 #elif defined(__NFP_LANG_MICROC)
 
-    /* For host ports, use 0 to MAX_VFS
-    * For wire ports, use MIN_PFS .. MAX_PFS */
     __asm
     {
         .alloc_mem NIC_CFG_INSTR_TBL cls + NIC_CFG_INSTR_TBL_ADDR \
                     island NIC_CFG_INSTR_TBL_SIZE addr40
         .init NIC_CFG_INSTR_TBL 0 0
     }
+    
 #endif
 
 
