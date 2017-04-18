@@ -25,7 +25,7 @@
     alu[pc, --, B, pc, >>15]
     alu[pc, pc, +, 7]
     local_csr_wr[MAILBOX_3, pc]
-    ctx_arb[kill] ; __LINE
+    ctx_arb[kill]
 .end
 #endm
 
