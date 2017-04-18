@@ -130,6 +130,7 @@ $(eval $(call microcode.add_define,$(PROJECT),datapath,SS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=4))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
 $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
         mei0.me0 mei0.me1 mei0.me2 mei0.me3 \
         mei1.me0 mei1.me1 mei1.me2 mei1.me3 \

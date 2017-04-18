@@ -6,6 +6,29 @@
 
 .num_contexts 4
 
+#macro fatal_error(REASON)
+.begin
+    .reg ctx
+    .reg pc
+    .reg sts
+    .reg time
+
+    local_csr_wr[MAILBOX_0, 0xfe]
+    local_csr_rd[TIMESTAMP_LOW]
+    immed[time, 0]
+    local_csr_wr[MAILBOX_1, time]
+    local_csr_rd[ACTIVE_CTX_STS]
+    immed[sts, 0]
+    alu[ctx, 7, AND, sts]
+    local_csr_wr[MAILBOX_2, ctx]
+    alu[pc, --, B, sts, <<7]
+    alu[pc, --, B, pc, >>15]
+    alu[pc, pc, +, 7]
+    local_csr_wr[MAILBOX_3, pc]
+    ctx_arb[kill] ; __LINE
+.end
+#endm
+
 #include "pkt_io.uc"
 #include "actions.uc"
 
@@ -18,14 +41,13 @@ pkt_counter_decl(err_act)
 pkt_counter_decl(err_rx_nbi)
 pkt_counter_decl(err_rx_nfd)
 
-
-    /* enable NN receive config from CTM  */
-    .reg ctxs
-    local_csr_rd[CTX_ENABLES]
-    immed[ctxs, 0]
-    alu[ctxs, ctxs, AND~, 0x7]
-    alu[ctxs, ctxs, OR, 0x2]
-    local_csr_wr[CTX_ENABLES, ctxs]
+// enable NN receive config from CTM
+.reg ctxs
+local_csr_rd[CTX_ENABLES]
+immed[ctxs, 0]
+alu[ctxs, ctxs, AND~, 0x7]
+alu[ctxs, ctxs, OR, 0x2]
+local_csr_wr[CTX_ENABLES, ctxs]
 
 // cache the context bits for T_INDEX
 .reg volatile t_idx_ctx
@@ -67,4 +89,5 @@ ingress#:
 
     actions_execute(pkt_vec, egress#, count_drop#, silent_drop#, error_act#)
 
-nop
+#pragma warning(disable: 4702)
+fatal_error("MAIN LOOP EXIT")

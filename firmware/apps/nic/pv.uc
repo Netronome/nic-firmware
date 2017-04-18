@@ -455,8 +455,7 @@ max_cbs#:
     // error checks after metadata is populated (will need for drop)
     #ifdef PARANOIA // should never happen, Catamaran is buggy if it does
        br_bset[BF_AL(in_nbi_desc, CAT_VALID_bf), valid#] ; CAT_VALID_bf
-           local_csr_wr[MAILBOX_0, 0xfe] // fatal error, can't safely drop without valid sequencer info
-           ctx_arb[bpt]
+           fatal_error("INVALID CATAMARAN METADATA") // fatal error, can't safely drop without valid sequencer info
        valid#:
     #endif
 
