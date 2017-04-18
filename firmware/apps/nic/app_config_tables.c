@@ -53,10 +53,8 @@ enum {
 
     INSTR_MTU = 1,
     INSTR_MAC,
-    INSTR_EXTRACT_KEY_WITH_RSS,
-    INSTR_RSS_CRC32_HASH_WITH_KEY,
+    INSTR_RSS,
     INSTR_SEL_RSS_QID_WITH_MASK,
-    INSTR_RSS_TABLE,
     INSTR_CHECKSUM_COMPLETE,
     INSTR_TX_HOST,
     INSTR_TX_WIRE,
@@ -371,6 +369,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
     __xwrite uint32_t xwr_instr[32];
     __gpr uint32_t instr[32];
+    SIGNAL sig1, sig2;
     uint32_t rss_flags;
     uint32_t byte_off;
     uint32_t mask;
@@ -428,26 +427,24 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
             upd_rss_table(vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd, bar_base);
         }
 
-        /* read rss_ctrl but only first word is used */
-        mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
-                sizeof(rss_ctrl));
+        /* RSS flags: read rss_ctrl but only first word is used */
+        __mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
+                sizeof(rss_ctrl), sizeof(rss_ctrl), sig_done, &sig1);
+        __mem_read64(rss_key, bar_base + NFP_NET_CFG_RSS_KEY,
+                NFP_NET_CFG_RSS_KEY_SZ, NFP_NET_CFG_RSS_KEY_SZ,
+                sig_done, &sig2);
+        wait_for_all(&sig1, &sig2);
+
         rss_flags = extract_rss_flags(rss_ctrl[0]);
-        instr[count++] = (INSTR_EXTRACT_KEY_WITH_RSS << 16)
-                        | (rss_flags >> 16);
-        instr[count++] = (rss_flags << 16);
+        instr[count++] = (INSTR_RSS << 16) | (rss_flags);
         mask = rss_ctrl[0];
 
-        /* provide rss key with hash */
-        mem_read64(rss_key, bar_base + NFP_NET_CFG_RSS_KEY,
-                NFP_NET_CFG_RSS_KEY_SZ);
-        instr[count++] = (INSTR_RSS_CRC32_HASH_WITH_KEY << 16)
-                        | (rss_key[0] >> 16);
-        instr[count++] = (rss_key[0] << 16) | (rss_key[1] >> 16);
-        instr[count++] = (rss_key[1] << 16);
+        /* RSS key: provide rss key with hash. Use only first word */
 
-        /* RSS table with NN register index as start offset */
-        instr[count++] = (INSTR_RSS_TABLE << 16)
-                        | (vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd);
+        instr[count++] = rss_key[0];
+
+        /* RSS remapping table with NN register index as start offset */
+        instr[count++] = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
 
         /* mask fits into 16 bits as rss_ctrl is masked with 0x7f) */
         mask = NFP_NET_CFG_RSS_MASK_of(mask);
