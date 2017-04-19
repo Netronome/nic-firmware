@@ -17,10 +17,10 @@
 #endif
 
 #define NUM_NBI_CHANNELS    64      // channels per NBI
-#define NUM_PCIE            1       // number of PCIe islands
+#define NUM_PCIE            2       // number of PCIe islands
 #define NUM_PCIE_Q          64      // number of queues configured per PCIe
-#define NUM_PCIE_Q_PER_PORT 8 //NFD_MAX_PF_QUEUES // nr queues cfg per port
-#define NIC_MAX_INSTR       32      // 128 bytes, 4B per instruction
+#define NUM_PCIE_Q_PER_PORT 8       // NFD_MAX_PF_QUEUES // nr queues cfg per port
+#define NIC_MAX_INSTR       16      // 64 bytes, 4B per instruction
 
 #define NIC_HOST_MAX_ENTRIES  (NUM_PCIE*NUM_PCIE_Q)
 #define NIC_NBI_ENTRY_START   NIC_HOST_MAX_ENTRIES
@@ -52,5 +52,7 @@
     
 #endif
 
+#define INSTR_PIPELINE_BIT 16
+#define INSTR_OPCODE_LSB   17
 
 #endif /* _APP_CONFIG_INSTR_H_ */
