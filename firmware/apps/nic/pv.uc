@@ -12,89 +12,13 @@
 
 #include "pkt_buf.uc"
 
+#include "protocols.h"
+
 #define BF_MASK(w, m, l) ((1 << (m + 1 - l)) - 1)
 
 #define NBI_IN_META_SIZE_LW 6
 
-/**
- * LSO defines
- *
- * IPv4 header format (only displaying up to words used or touched by LSO fixup)
- * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
- * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
- * Word  +-------+-------+-----------+---+-------------------------------+
- *    0  |version|  IHL  |    DSCP   |ECN|          Total Length         |
- *       +-------+-------+-----------+---+-----+-------------------------+
- *    1  |         Identification        |flags| Fragment Offset         |
- *       +---------------+---------------+-----+-------------------------+
- *    2  |     TTL       |   Protocol    |          Header Checksum      |
- *       +---------------+---------------+-------------------------------+
- *
- * IPv6 header format (only displaying up to words used or touched by LSO fixup)
- * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
- * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
- * Word  +-------+-------+-------+---+---+-------------------------------+
- *    0  |version| Traffic class |              Flow Label               |
- *       +-------+-------+-------+---+---+---------------+---------------+
- *    1  |         Payload Length        |  Next Header  | Hop Limit     |
- *       +---------------+---------------+---------------+---------------+
- *
- * TCP header format (only displaying up to words used or touched by LSO fixup)
- * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
- * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
- * Word  +-------------------------------+-------------------------------+
- *    0  |  Source port                  |  Destination port             |
- *       +-------------------------------+-------------------------------+
- *    1  |                          Sequence number                      |
- *       +-------------------------------+-------------------------------+
- *    2  |                      Acknowledgement number                   |
- *       +-------+-----+-+-+-+-+-+-+-+-+-+-------------------------------+
- *       |       |     |N|C|E|U|A|P|R|S|F|                               |
- *    3  |Data of|0 0 0|S|W|C|R|C|S|S|Y|I|          Window Size          |
- *       |       |     | |R|E|G|K|H|T|N|N|                               | 
- *       +-------+-----+-+-+-+-+-+-+-+-+-+-------------------------------+
- *
- * UDP header format (only displaying up to words used or touched by LSO fixup)
- * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
- * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
- * Word  +-------------------------------+-------------------------------+
- *    0  |          Source port          |      Destination port         |
- *       +-------------------------------+-------------------------------+
- *    1  |           Length              |      Checksum                 |
- *       +-------------------------------+-------------------------------+
- */
- 
-#define NFD_IN_LSO_L3_OFFS_fld      3, 7, 0
-#define NFD_IN_LSO_L4_OFFS_fld      3, 15, 8
-
-#define L3_VERSION_bf               0, 31, 28  /**< IPv4 and IPv6 have a version nibble as the first 4 bits. */
-#define IPV4_PROTOCOL_bf            2, 23, 16  /**< Protocol field */
-#define IPV6_NEXT_HEADER_bf         1, 15,  8  /**< Next Header field */
-#define IPV4_VER_VALUE              4
-#define IPV6_VER_VALUE              6
-
-#define IP_PROTOCOL_TCP             0x06 /**< Transmission Control Protocol */
-#define IP_PROTOCOL_UDP             0x11         /**< User Datagram Protocol */
-
-#define TCP_SEQ_bf                  1, 31, 0    /**< TCP sequence number */
-#define TCP_FLAGS_bf                3, 31, 16         /**< TCP flags and data offset*/
-
-#define UDP_SIZE_bf                 1, 31, 16         /**< UDP length of UDP header and data [byte] */
-
-#define IPV4_LEN_OFFS               2
-#define IPV4_PROTOCOL_BYTE          2
-
-#define IPV6_PAYLOAD_OFFS           4
-#define IPV6_NEXT_HEADER_BYTE       1
-
-#define TCP_SEQ_OFFS                4
-#define TCP_FLAGS_OFFS              8
-
-#define UDP_LEN_OFFS                4
-
-
 #define BF_AB(a, w, m, l) a[w], (l/8)    // Returns aggregate[word], byte. "byte" is the byte(0-3) wherein the MSB - LSB falls
-
 
 /**
  * Packet vector internal representation
@@ -221,6 +145,8 @@
 #define PV_QUEUE_OUT_bf                 PV_QUEUE_wrd, 9, 0
 
 #define_eval PV_NOT_PARSED              ((3 << BF_L(PV_PARSE_MPD_bf)) | (3 << BF_L(PV_PARSE_VLD_bf)))
+
+
 #macro pv_propagate_mac_csum_status(io_vec)
 .begin
     .reg shift
@@ -609,16 +535,16 @@ max_cbs#:
         alu_shf[pkt_len, --, b, BF_A(io_vec, PV_LENGTH_bf), <<(31 - BF_M(PV_LENGTH_bf))] ; PV_LENGTH_bf
         alu_shf[pkt_len, --, b, pkt_len, >>(31 - BF_M(PV_LENGTH_bf))] ; PV_LENGTH_bf
         
-    bitfield_extract__sz1(l3_version, BF_AML($l3_hdr, L3_VERSION_bf)) ; L3_VERSION_bf
+    bitfield_extract__sz1(l3_version, BF_AML($l3_hdr, IP_VERSION_bf)) ; IP_VERSION_bf
     
     immed[sig_mask_wr, 0]
     
-    br=byte[l3_version, 0, IPV4_VER_VALUE, process_ipv4#], defer[3] ; IPv4
+    br=byte[l3_version, 0, 4, process_ipv4#], defer[3] ; IPv4
         alu[l3_wr_off, l3_off, +, IPV4_LEN_OFFS]
         alu[tmp, pkt_len, -, l3_off]     
         alu[$l3_hdr_flush, --, b, tmp, <<16]
     
-    br=byte[l3_version, 0, IPV4_VER_VALUE, process_ipv6#], defer[3] ; IPv6
+    br=byte[l3_version, 0, 6, process_ipv6#], defer[3] ; IPv6
         alu[l3_wr_off, l3_off, +, IPV6_PAYLOAD_OFFS]
         alu[tmp, pkt_len, -, l3_off]
         alu[$l3_hdr_flush, --, b, tmp, <<16]
@@ -784,6 +710,10 @@ end#:
  *      S -> sp0 (spare)
  *    itf -> PCIe interface
  */
+
+#define NFD_IN_LSO_L3_OFFS_fld      3, 7, 0
+#define NFD_IN_LSO_L4_OFFS_fld      3, 15, 8
+
 #macro pv_init_nfd(out_vec, in_pkt_num, in_nfd_desc, FAIL_LABEL)
 .begin
     .reg addr_hi
@@ -832,19 +762,19 @@ end#:
     bitfield_extract__sz1(udp_csum, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
     alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_A(out_vec, PV_CSUM_OFFLOAD_bf), OR, udp_csum] ; PV_CSUM_OFFLOAD_bf
 
-    alu[BF_A(out_vec, PV_SEEK_BASE_bf), BF_A(out_vec, PV_SEEK_BASE_bf), OR, 0xff, <<BF_L(PV_SEEK_BASE_bf)] ; PV_SEEK_BASE_bf
-
-    immed[BF_A(out_vec, PV_PARSE_STS_bf), (PV_NOT_PARSED >> 16), <<16] ; PV_PARSE_STS_bf
-
-    alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(in_nfd_desc, NFD_IN_QID_fld), <<BF_L(PV_QUEUE_IN_bf)]
-
-    // error checks last to ensure consistent metadata and buffer allocation state in drop path
+    // error checks near end to ensure consistent metadata (fields written below excluded) and buffer allocation 
+    // state (contents of CTM also excluded) in drop path
     br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), FAIL_LABEL]
 
     pkt_buf_copy_mu_head_to_ctm(in_pkt_num, BF_A(out_vec, PV_MU_ADDR_bf), NFD_IN_DATA_OFFSET, 1)
 
-    // TODO: LSO fixups
-    br_bset[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), FAIL_LABEL]
+    br_bclr[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), skip_lso#], defer[3]
+        alu[BF_A(out_vec, PV_SEEK_BASE_bf), BF_A(out_vec, PV_SEEK_BASE_bf), OR, 0xff, <<BF_L(PV_SEEK_BASE_bf)] ; PV_SEEK_BASE_bf
+        immed[BF_A(out_vec, PV_PARSE_STS_bf), (PV_NOT_PARSED >> 16), <<16] ; PV_PARSE_STS_bf
+        alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(in_nfd_desc, NFD_IN_QID_fld), <<BF_L(PV_QUEUE_IN_bf)]
+
+    __pv_lso_fixup(out_vec, in_nfd_desc)
+skip_lso#:
 
     // update NFD stats
     move(addr_hi, (_nfd_stats_in_recv >> 8))
