@@ -70,23 +70,102 @@
 .end
 #endm
 
+#define ACTION_RSS_L3_BIT  0
+#define ACTION_RSS_TCP_BIT 1
+#define ACTION_RSS_UDP_BIT 2
+
+#define L4_PROTO_TCP       6
+#define L4_PROTO_UDP       17
 
 #macro __actions_rss(in_pkt_vec)
 .begin
-    .reg src_ip
+    .reg data
+    .reg ipv4_delta
+    .reg key
+    .reg offset
+    .reg opcode
+    .reg protocol
     .reg queue
+    .reg shift
+    .reg vlans
 
-    __actions_read(--, --, --)
-    __actions_read(--, --, --)
+    __actions_read(opcode, --, --)
+    __actions_read(key, --, --)
 
-    pv_seek(in_pkt_vec, 26, 4)
+    // skip RSS for unkown L3 or bad IPv4 checksum
+    br_bclr[BF_AL(in_pkt_vec, PV_PARSE_L3I_bf), skip_rss#]
+
+    // skip RSS for MPLS packets
+    bitfield_extract__sz1(--, BF_AML(in_pkt_vec, PV_PARSE_MPD_bf))
+    bne[skip_rss#]
+
+    // skip RSS for 3 or more VLAN tags
+    bitfield_extract__sz1(vlans, BF_AML(in_pkt_vec, PV_PARSE_VLD_bf))
+    br=byte[vlans, 0, 3, skip_rss#]
+
+    local_csr_wr[CRC_REMAINDER, key]
+
+    // seek to L3 protocol word
+    alu[offset, --, B, vlans, <<2]
+    alu[offset, offset, +, (14 - 4)]
+    alu[ipv4_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 2)]
+    alu[offset, offset, +, ipv4_delta]
+    pv_seek(in_pkt_vec, offset, 40)
+
     byte_align_be[--, *$index++]
-    byte_align_be[src_ip, *$index]
+    byte_align_be[protocol, *$index++]
+    alu[shift, (1 << 3), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 3)]
 
+    // skip CRC over L3 if not requested
+    br_bclr[opcode, ACTION_RSS_L3_BIT, skip_l3#], defer[3]
+        alu[shift, shift, +, 8]
+        alu[--, shift, OR, 0]
+        alu[protocol, 0xff, AND, protocol, >>indirect]
+
+    byte_align_be[data, *$index++]
+    br_bset[BF_A(in_pkt_vec, PV_PARSE_L3I_bf), BF_M(PV_PARSE_L3I_bf), skip_l3#], defer[3]
+        crc_be[crc_32, --, data]
+        byte_align_be[data, *$index++]
+        crc_be[crc_32, --, data]
+
+    #define_eval LOOP (0)
+    #while (LOOP < 6)
+        byte_align_be[data, *$index++]
+        crc_be[crc_32, --, data]
+        #define_eval LOOP (LOOP + 1)
+    #endloop
+    #undef LOOP
+
+skip_l3#:
+    alu[--, protocol, -, L4_PROTO_UDP]
+    beq[process_udp#], defer[1]
+        byte_align_be[data, *$index++]
+
+    alu[--, protocol, -, L4_PROTO_TCP]
+    bne[skip_l4#]
+
+process_tcp#:
+    br_bclr[opcode, ACTION_RSS_TCP_BIT, skip_l4#]
+    crc_be[crc_32, --, data]
+    nop
+    br[skip_l4#]
+
+process_udp#:
+    br_bclr[opcode, ACTION_RSS_UDP_BIT, skip_l4#]
+    crc_be[crc_32, --, data]
+    nop
+    nop
+    nop
+    nop
+
+skip_l4#:
     __actions_restore_t_idx()
-
-    alu[queue, src_ip, AND, 0x7]
+    local_csr_rd[CRC_REMAINDER]
+    immed[queue, 0]
+    alu[queue, queue, AND, 7]
     pv_set_egress_queue(in_pkt_vec, queue)
+
+skip_rss#:
 .end
 #endm
 
@@ -152,7 +231,7 @@ rss#:
     __actions_next()
 
 checksum_complete#:
-    __actions_nop(1)
+    pv_propagate_mac_csum_status(in_pkt_vec) // checksum unecessary for now
     __actions_next()
 
 tx_host#:
