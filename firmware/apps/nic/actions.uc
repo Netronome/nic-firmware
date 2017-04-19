@@ -70,12 +70,11 @@
 .end
 #endm
 
-#define ACTION_RSS_L3_BIT  0
-#define ACTION_RSS_TCP_BIT 1
-#define ACTION_RSS_UDP_BIT 2
+#define ACTION_RSS_CFG_L3_BIT 0
+#define ACTION_RSS_CFG_L4_BIT 1
 
-#define L4_PROTO_TCP       6
-#define L4_PROTO_UDP       17
+#define L4_PROTO_TCP          6
+#define L4_PROTO_UDP          17
 
 #macro __actions_rss(in_pkt_vec)
 .begin
@@ -110,14 +109,14 @@
     alu[offset, offset, +, (14 - 4)]
     alu[ipv4_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 2)]
     alu[offset, offset, +, ipv4_delta]
-    pv_seek(in_pkt_vec, offset, 40)
+    pv_seek(in_pkt_vec, offset, 44)
 
     byte_align_be[--, *$index++]
     byte_align_be[protocol, *$index++]
     alu[shift, (1 << 3), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 3)]
 
     // skip CRC over L3 if not requested
-    br_bclr[opcode, ACTION_RSS_L3_BIT, skip_l3#], defer[3]
+    br_bclr[opcode, ACTION_RSS_CFG_L3_BIT, skip_l3#], defer[3]
         alu[shift, shift, +, 8]
         alu[--, shift, OR, 0]
         alu[protocol, 0xff, AND, protocol, >>indirect]
@@ -137,21 +136,16 @@
     #undef LOOP
 
 skip_l3#:
+    br_bclr[opcode, ACTION_RSS_CFG_L4_BIT, skip_l4#]
+
     alu[--, protocol, -, L4_PROTO_UDP]
-    beq[process_udp#], defer[1]
+    beq[process_l4#], defer[1]
         byte_align_be[data, *$index++]
 
     alu[--, protocol, -, L4_PROTO_TCP]
     bne[skip_l4#]
 
-process_tcp#:
-    br_bclr[opcode, ACTION_RSS_TCP_BIT, skip_l4#]
-    crc_be[crc_32, --, data]
-    nop
-    br[skip_l4#]
-
-process_udp#:
-    br_bclr[opcode, ACTION_RSS_UDP_BIT, skip_l4#]
+process_l4#:
     crc_be[crc_32, --, data]
     nop
     nop
