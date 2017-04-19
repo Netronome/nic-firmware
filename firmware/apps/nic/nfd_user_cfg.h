@@ -99,7 +99,7 @@
      NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
      NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
      NFP_NET_CFG_CTRL_GATHER |      \
-     NFP_NET_CFG_CTRL_IRQMOD | NFP_NET_CFG_CTRL_LSO)
+     NFP_NET_CFG_CTRL_IRQMOD)
 
 #define NFD_CFG_PF_CAP                                          \
     (NFP_NET_CFG_CTRL_ENABLE | NFP_NET_CFG_CTRL_PROMISC |       \
@@ -107,7 +107,7 @@
      NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
      NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
      NFP_NET_CFG_CTRL_GATHER |      \
-     NFP_NET_CFG_CTRL_IRQMOD | NFP_NET_CFG_CTRL_LSO)           
+     NFP_NET_CFG_CTRL_IRQMOD)           
 
 #define NFD_CFG_RING_EMEM       emem0
 
