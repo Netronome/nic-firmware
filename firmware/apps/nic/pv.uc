@@ -181,14 +181,24 @@
 #endm
 
 
-#macro pv_get_length(out_length, in_vec, in_mask)
-    alu[out_length, BF_A(in_vec, PV_LENGTH_bf), AND, in_mask]
-#endm
-
-
 #macro pv_get_length(out_length, in_vec)
     alu[out_length, 0, +16, BF_A(PV_LENGTH_bf)] ; PV_LENGTH_bf
     alu[out_length, out_length, AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
+#endm
+
+
+#macro pv_check_mtu(in_vec, in_mtu, FAIL_LABEL)
+.begin
+    .reg max_vlan
+    .reg len
+
+    alu[max_vlan, (3 << 2), AND, BF_A(in_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)]
+    alu[len, BF_A(in_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)]
+    alu[len, len, -, in_mtu]
+    alu[len, len, -, max_vlan]
+    alu[len, len, -, 14] // Ethernet
+    br_bclr[len, BF_L(PV_BLS_bf), FAIL_LABEL]
+.end
 #endm
 
 

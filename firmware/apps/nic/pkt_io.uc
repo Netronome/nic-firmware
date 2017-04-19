@@ -27,8 +27,8 @@ timestamp_enable()
 
 
 #macro pkt_io_drop(in_pkt_vec)
-    pv_get_gro_drop_desc($__pkt_io_gro_meta, pkt_vec)
     pv_free_buffers(pkt_vec)
+    pv_get_gro_drop_desc($__pkt_io_gro_meta, pkt_vec)
 #endm
 
 
