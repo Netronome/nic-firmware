@@ -45,9 +45,7 @@
 
     immed[mask, 0x3fff]
     __actions_read(mtu, mask, --)
-    pv_get_length(pkt_len, in_pkt_vec, mask)
-    alu[--, mtu, -, pkt_len]
-    bmi[DROP_LABEL]
+    pv_check_mtu(in_pkt_vec, mtu, DROP_LABEL)
 .end
 #endm
 
@@ -139,7 +137,6 @@ next#:
         i6#: br[tx_wire#]
 
 drop#:
-    pkt_io_drop(in_pkt_vec)
     br[SILENT_DROP_LABEL]
 
 mtu#:
