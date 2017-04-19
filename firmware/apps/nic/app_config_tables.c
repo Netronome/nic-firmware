@@ -62,15 +62,13 @@
 #endif
 
 enum {
-
-    INSTR_MTU = 1,
+    INSTR_TX_DROP = 0,
+    INSTR_MTU,
     INSTR_MAC,
     INSTR_RSS,
-    INSTR_SEL_RSS_QID_WITH_MASK,
     INSTR_CHECKSUM_COMPLETE,
     INSTR_TX_HOST,
-    INSTR_TX_WIRE,
-    INSTR_TX_DROP
+    INSTR_TX_WIRE
 };
 
 #define APP_CONFIG_DEBUG
@@ -383,6 +381,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     __gpr uint32_t instr[32];
     SIGNAL sig1, sig2;
     uint32_t rss_flags;
+    uint32_t rss_tbl_nnidx;
     uint32_t byte_off;
     uint32_t mask;
     uint32_t count;
@@ -401,15 +400,14 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     /* mtu */
     mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
-    instr[0] = (INSTR_MTU << 16) | (mtu & 0xffff);
-    instr[1] = (INSTR_TX_WIRE << 16) |
-            BUILD_PORT(NIC_NBI, NS_PLATFORM_NBI_TM_QID_LO(vnic_port));
+    instr[0] = (INSTR_MTU << INSTR_OPCODE_LSB) | (mtu & 0xffff);
+    instr[1] = (INSTR_TX_WIRE << INSTR_OPCODE_LSB);
+      // | BUILD_PORT(NIC_NBI, NS_PLATFORM_NBI_TM_QID_LO(vnic_port));
 
     reg_cp(xwr_instr, (void *)instr, count<<2);
 
+    /* write TX instr to local table and to other islands too */
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0) * NIC_MAX_INSTR;
-
-     /* write TX instr to local table and to other islands too */
     upd_rx_host_instr (xwr_instr, byte_off<<2, count);
 
 #ifdef APP_CONFIG_DEBUG
@@ -428,8 +426,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     /* MAC address */
     mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
                 sizeof(nic_mac));
-    instr[count++] = (INSTR_MAC << 16) | (nic_mac[0] >> 16);
-    instr[count++] = (nic_mac[0] << 16) | (nic_mac[1] >> 16);
+    instr[count++] = (INSTR_MAC << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT) | (nic_mac[1] >> 16);
+    instr[count++] = (nic_mac[0]);
 
     if (control & NFP_NET_CFG_CTRL_RSS) {
 
@@ -448,24 +446,24 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         wait_for_all(&sig1, &sig2);
 
         rss_flags = extract_rss_flags(rss_ctrl[0]);
-        instr[count++] = (INSTR_RSS << 16) | (rss_flags);
+        
+        /* RSS remapping table with NN register index as start offset */
+        rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
+
+        instr[count++] = (INSTR_RSS << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT) | (rss_tbl_nnidx << 8) | (rss_flags);
         mask = rss_ctrl[0];
 
         /* RSS key: provide rss key with hash. Use only first word */
 
         instr[count++] = rss_key[0];
 
-        /* RSS remapping table with NN register index as start offset */
-        instr[count++] = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
-
         /* mask fits into 16 bits as rss_ctrl is masked with 0x7f) */
-        mask = NFP_NET_CFG_RSS_MASK_of(mask);
-        instr[count++] = (INSTR_SEL_RSS_QID_WITH_MASK << 16) | (mask & 0xffff);
+        //mask = NFP_NET_CFG_RSS_MASK_of(mask);
+        //instr[count++] = (INSTR_SEL_RSS_QID_WITH_MASK << 16) | (mask & 0xffff);
 
         /* calculate checksum and drop if mismatch (drop port is included) */
-        instr[count++] = (INSTR_CHECKSUM_COMPLETE << 16) | BUILD_PORT(0,0);
-        instr[count++] = (INSTR_TX_HOST<<16)
-                            | BUILD_HOST_PORT(NIC_PCI, vnic_port, 0);
+        instr[count++] = (INSTR_CHECKSUM_COMPLETE << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT);
+        instr[count++] = (INSTR_TX_HOST << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT);
         reg_cp(xwr_instr, instr, count << 2);
 
 #ifdef APP_CONFIG_DEBUG
@@ -483,8 +481,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #endif
 
     } else {
-        instr[count++] = (INSTR_TX_HOST<<16)
-                        | BUILD_HOST_PORT(NIC_PCI, vnic_port, 0);
+        instr[count++] = (INSTR_TX_HOST << INSTR_OPCODE_LSB);
         reg_cp(xwr_instr, (void *)instr, count<<2);
     }
 
@@ -502,27 +499,21 @@ __intrinsic void
 app_config_port_down(uint32_t vnic_port)
 {
 
-    __xwrite uint32_t xwr_instr[2];
-    __gpr uint32_t instr;
+    __xwrite uint32_t xwr_instr;
+    __gpr uint32_t instr[2];
     uint32_t i;
     uint32_t byte_off;
 
     /* TX drop instr for host port lookup */
-    instr = (INSTR_TX_DROP << 16) | BUILD_PORT(0,0);
-    xwr_instr[0] = instr;
-    xwr_instr[1] = 0x00;
-
-    byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0) * NIC_MAX_INSTR;
+    xwr_instr = (INSTR_TX_DROP << INSTR_OPCODE_LSB); 
 
     /* write drop instr to local host table */
-    upd_rx_host_instr (&xwr_instr[0], byte_off << 2, 2);
+    byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0) * NIC_MAX_INSTR;
+    upd_rx_host_instr (&xwr_instr, byte_off << 2, 1);
 
     /* write drop instr to local wire table */
-    instr = (INSTR_TX_DROP << 16) | BUILD_PORT(0,0);
-    xwr_instr[0] = instr;
     byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic_port) * NIC_MAX_INSTR;
-
-    upd_rx_wire_instr(&xwr_instr[0], byte_off << 2, 2);
+    upd_rx_wire_instr(&xwr_instr, byte_off << 2, 1);
 
 #ifdef APP_CONFIG_DEBUG
     {

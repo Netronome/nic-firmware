@@ -34,7 +34,6 @@
 
 #define PKT_COUNTER_ENABLE
 #include "pkt_counter.uc"
-#include "app_config_instr.h"
 
 pkt_counter_decl(drop)
 pkt_counter_decl(err_act)

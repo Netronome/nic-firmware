@@ -6,6 +6,7 @@
 #include <nfd_in.uc>
 #include <nfd_out.uc>
 #include <ov.uc>
+#include <passert.uc>
 #include <stdmac.uc>
 
 #include "pkt_buf.uc"
@@ -170,6 +171,24 @@
 
 #macro pv_get_ingress_queue(out_queue, in_vec)
     bitfield_extract__sz1(out_queue, BF_AML(in_vec, PV_QUEUE_IN_bf))
+#endm
+
+
+#macro pv_get_instr_addr(out_addr, in_vec, IN_LIST_SIZE)
+    passert(NIC_CFG_INSTR_TBL_ADDR, "EQ", 0)
+    passert(IN_LIST_SIZE, "POWER_OF_2")
+    alu[out_addr, --, B, BF_A(in_vec, PV_QUEUE_IN_bf), >>(BF_L(PV_QUEUE_IN_bf) - log2(IN_LIST_SIZE))]
+#endm
+
+
+#macro pv_get_length(out_length, in_vec, in_mask)
+    alu[out_length, BF_A(in_vec, PV_LENGTH_bf), AND, in_mask]
+#endm
+
+
+#macro pv_get_length(out_length, in_vec)
+    alu[out_length, 0, +16, BF_A(PV_LENGTH_bf)] ; PV_LENGTH_bf
+    alu[out_length, out_length, AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
 #endm
 
 

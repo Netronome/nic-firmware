@@ -33,8 +33,8 @@ timestamp_enable()
 
 
 #macro pkt_io_tx_host(in_pkt_vec, SUCCESS_LABEL, FAIL_LABEL)
-    pv_get_gro_host_desc($__pkt_io_gro_meta, in_pkt_vec)
     pv_acquire_nfd_credit(in_pkt_vec, FAIL_LABEL)
+    pv_get_gro_host_desc($__pkt_io_gro_meta, in_pkt_vec)
     br[SUCCESS_LABEL]
 #endm
 
