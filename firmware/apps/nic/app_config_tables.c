@@ -349,21 +349,27 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base)
     return;
 }
 
+#define ACTION_RSS_L3_BIT  0
+#define ACTION_RSS_TCP_BIT 1
+#define ACTION_RSS_UDP_BIT 2
+
 /* Set RSS flags by matching what is used in the workers */
 __intrinsic uint32_t
 extract_rss_flags(uint32_t rss_ctrl)
 {
-    uint32_t rss_flags = (rss_ctrl &
-                        (NFP_NET_CFG_RSS_IPV4 | NFP_NET_CFG_RSS_IPV6));
+    uint32_t rss_flags = 0; 
+
+    if ((rss_ctrl & NFP_NET_CFG_RSS_IPV4) | (rss_ctrl & NFP_NET_CFG_RSS_IPV6))
+        rss_flags = (1 << ACTION_RSS_L3_BIT);
 
     if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_TCP)
-        rss_flags |= (NIC_RSS_IP4 | NIC_RSS_TCP);
+        rss_flags |= ((1 << ACTION_RSS_L3_BIT) | (1 << ACTION_RSS_TCP_BIT));
     if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_UDP)
-        rss_flags |= (NIC_RSS_IP4 | NIC_RSS_UDP);
+        rss_flags |= ((1 << ACTION_RSS_L3_BIT) | (1 << ACTION_RSS_UDP_BIT));
     if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_TCP)
-        rss_flags |= (NIC_RSS_IP6 | NIC_RSS_TCP);
+        rss_flags |= ((1 << ACTION_RSS_L3_BIT) | (1 << ACTION_RSS_TCP_BIT));
     if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_UDP)
-        rss_flags |= (NIC_RSS_IP6 | NIC_RSS_UDP);
+        rss_flags |= ((1 << ACTION_RSS_L3_BIT) | (1 << ACTION_RSS_UDP_BIT));
 
     return rss_flags;
 }
