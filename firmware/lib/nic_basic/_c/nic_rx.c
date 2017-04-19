@@ -266,7 +266,7 @@ __nic_rx_rss_build_key(void *l3, void *l4, int flags, uint32_t rss_ctrl,
                  (rss_ctrl & NFP_NET_CFG_RSS_IPV6_TCP)) ||
                 ((flags & NIC_RSS_UDP) &&
                  (rss_ctrl & NFP_NET_CFG_RSS_IPV6_UDP)) ||
-                (rss_ctrl & NFP_NET_CFG_RSS_IPV4)) {
+                (rss_ctrl & NFP_NET_CFG_RSS_IPV6)) {
                 size2 = 2 * sizeof(struct in6_addr);
                 reg_cp(key, &((REGCST struct ip6_hdr *)l3)->src, size2);
                 *type = NFP_NET_RSS_IPV6;
