@@ -6,7 +6,7 @@ FLOWENV_REV=59c0f4f94bb4
 # GRO_REV  - Tip as of July 12 2016
 GRO_REV=25c868a8c724
 # NFD_REV - Tip of default branch as of 27 Oct 2016
-NFD_REV=8cea3d6f791d
+NFD_REV=98afbcd74ef6
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
@@ -68,6 +68,9 @@ NFD_INC = -I$(NFD_DIR)/shared \
 $(DEPS_DIR)/ng-nfd.hg:
 	hg clone -r $(NFD_REV) \
 	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
+	patch $(NFD_DIR)/dpdk/pmd/nfp_net.c $(NFD_DIR)/../nfp_net.c.patch
+	patch $(NFD_DIR)/kernel/nfp_net_ctrl.h $(NFD_DIR)/../nfp_net_ctrl.h.patch
+	patch $(NFD_DIR)/me/blocks/vnic/pci_in/issue_dma.c $(NFD_DIR)/../issue_dma.c.patch
 
 HG_DEPS += $(NFD_DIR)
 HG_REVS += $(NFD_REV)

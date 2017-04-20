@@ -1,0 +1,19 @@
+diff -r 98afbcd74ef6 dpdk/pmd/nfp_net.c
+--- a/dpdk/pmd/nfp_net.c	Wed Apr 05 14:23:10 2017 +0200
++++ b/dpdk/pmd/nfp_net.c	Thu Apr 20 15:21:32 2017 +0200
+@@ -2641,6 +2641,7 @@
+ 		     hw->cap & NFP_NET_CFG_CTRL_SCATTER ? "SCATTER " : "",
+ 		     hw->cap & NFP_NET_CFG_CTRL_GATHER  ? "GATHER "  : "",
+ 		     hw->cap & NFP_NET_CFG_CTRL_LSO     ? "TSO "     : "",
++             hw->cap & NFP_NET_CFG_CTRL_LSO2    ? "TSO2 "    : "",
+ 		     hw->cap & NFP_NET_CFG_CTRL_RSS     ? "RSS "     : "");
+ 
+ 	if (((hw->ver >> 16) & 0xff) != 0) {
+@@ -2856,6 +2857,7 @@
+ 		     hw->cap & NFP_NET_CFG_CTRL_SCATTER ? "SCATTER " : "",
+ 		     hw->cap & NFP_NET_CFG_CTRL_GATHER  ? "GATHER "  : "",
+ 		     hw->cap & NFP_NET_CFG_CTRL_LSO     ? "TSO "     : "",
++             hw->cap & NFP_NET_CFG_CTRL_LSO2    ? "TSO2 "    : "",
+ 		     hw->cap & NFP_NET_CFG_CTRL_RSS     ? "RSS "     : "");
+ 
+ 	pci_dev = eth_dev->pci_dev;

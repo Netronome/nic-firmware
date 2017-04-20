@@ -1,0 +1,14 @@
+diff -r 98afbcd74ef6 me/blocks/vnic/pci_in/issue_dma.c
+--- a/me/blocks/vnic/pci_in/issue_dma.c	Wed Apr 05 14:23:10 2017 +0200
++++ b/me/blocks/vnic/pci_in/issue_dma.c	Thu Apr 20 15:21:57 2017 +0200
+@@ -1419,8 +1419,8 @@
+ 
+ /* Setup _ISSUE_PROC_LSO_TEST, used to disable LSO if the capability
+  * is not advertised on either the PF or VFs. */
+-#if ((NFD_CFG_VF_CAP & NFP_NET_CFG_CTRL_LSO) || \
+-     (NFD_CFG_PF_CAP & NFP_NET_CFG_CTRL_LSO))
++#if ((NFD_CFG_VF_CAP & (NFP_NET_CFG_CTRL_LSO | NFP_NET_CFG_CTRL_LSO2)) || \
++     (NFD_CFG_PF_CAP & (NFP_NET_CFG_CTRL_LSO | NFP_NET_CFG_CTRL_LSO2)))
+ #define _ISSUE_PROC_LSO_TEST(_pkt)                                  \
+     ((tx_desc.pkt##_pkt##.__raw[2] &                                \
+       (PCIE_DESC_TX_LSO << NFD_IN_DMA_STATE_FLAGS_shf)) &&          \
