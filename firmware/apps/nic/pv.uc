@@ -203,7 +203,6 @@
     alu[len, BF_A(in_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)]
     alu[len, len, -, in_mtu]
     alu[len, len, -, max_vlan]
-    alu[len, len, -, 14] // Ethernet
     br_bclr[len, BF_L(PV_BLS_bf), FAIL_LABEL]
 .end
 #endm

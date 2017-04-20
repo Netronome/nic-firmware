@@ -400,7 +400,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     /* mtu */
     mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
-    instr[0] = (INSTR_MTU << INSTR_OPCODE_LSB) | (mtu & 0xffff);
+    instr[0] = (INSTR_MTU << INSTR_OPCODE_LSB) | ((mtu + 14) & 0xffff); // add ethernet header constant to save datapath cycle
     instr[1] = (INSTR_TX_WIRE << INSTR_OPCODE_LSB);
       // | BUILD_PORT(NIC_NBI, NS_PLATFORM_NBI_TM_QID_LO(vnic_port));
 
