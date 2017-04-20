@@ -159,6 +159,20 @@ __shared __gpr volatile int mac_reg_lock = 0;
 
 #endif /* NS_PLATFORM_TYPE != NS_PLATFORM_CARBON */
 
+/* Link rate */
+#define   NFP_NET_CFG_STS_LINK_RATE_SHIFT 1
+#define   NFP_NET_CFG_STS_LINK_RATE_MASK  0xF
+#define   NFP_NET_CFG_STS_LINK_RATE       \
+	(NFP_NET_CFG_STS_LINK_RATE_MASK << NFP_NET_CFG_STS_LINK_RATE_SHIFT)
+#define   NFP_NET_CFG_STS_LINK_RATE_UNSUPPORTED   0
+#define   NFP_NET_CFG_STS_LINK_RATE_UNKNOWN       1
+#define   NFP_NET_CFG_STS_LINK_RATE_1G            2
+#define   NFP_NET_CFG_STS_LINK_RATE_10G           3
+#define   NFP_NET_CFG_STS_LINK_RATE_25G           4
+#define   NFP_NET_CFG_STS_LINK_RATE_40G           5
+#define   NFP_NET_CFG_STS_LINK_RATE_50G           6
+#define   NFP_NET_CFG_STS_LINK_RATE_100G          7
+
 
 /* Translate port speed to link rate encoding */
 __intrinsic static unsigned int
