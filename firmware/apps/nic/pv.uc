@@ -199,10 +199,12 @@
     .reg max_vlan
     .reg len
 
-    alu[max_vlan, (3 << 2), AND, BF_A(in_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)]
     alu[len, BF_A(in_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)]
     alu[len, len, -, in_mtu]
+
+    alu[max_vlan, (3 << 2), AND, BF_A(in_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)]
     alu[len, len, -, max_vlan]
+
     br_bclr[len, BF_L(PV_BLS_bf), FAIL_LABEL]
 .end
 #endm
@@ -502,18 +504,18 @@ max_cbs#:
 
 #macro __pv_lso_fixup(io_vec, in_nfd_desc)
 .begin
-   
+
     .reg read $l3_hdr[3] //Whether IPv4 or IPv6 we only need the first 3 LW's
     .xfer_order $l3_hdr
     .sig l3_sig
-    
+
     .reg read $l4_hdr[4] //Whether TCP or UDP we only need the first 4 LW's
     .xfer_order $l4_hdr
     .sig l4_sig1_rd, l4_sig1_wr, l4_sig2_wr
-    
+
     .reg write $l3_hdr_flush
     .reg write $l4_hdr_flush1, $l4_hdr_flush2
-    
+
     .reg sig_mask_wr, sig_mask_rd
     .reg ctm_addr
     .reg pkt_len
@@ -524,105 +526,105 @@ max_cbs#:
     .reg lso_seq
     .reg tcp_seq_add
     .reg tcp_flags_mask, tcp_flags_wrd
-   
-    pv_get_ctm_base(ctm_addr, io_vec) 
-    bitfield_extract__sz1(l3_off, BF_AML(in_nfd_desc, NFD_IN_LSO_L3_OFFS_fld)) ; NFD_IN_LSO_L3_OFFS_fld 
-    alu[l3_rd_off, l3_off, +16, BF_A(io_vec, PV_OFFSET_bf)] 
-    
+
+    pv_get_ctm_base(ctm_addr, io_vec)
+    bitfield_extract__sz1(l3_off, BF_AML(in_nfd_desc, NFD_IN_LSO_L3_OFFS_fld)) ; NFD_IN_LSO_L3_OFFS_fld
+    alu[l3_rd_off, l3_off, +16, BF_A(io_vec, PV_OFFSET_bf)]
+
     //read the L3 header
     mem[read32, $l3_hdr[0], ctm_addr, <<8, l3_rd_off, 3], ctx_swap[l3_sig], defer[2]
         alu_shf[pkt_len, --, b, BF_A(io_vec, PV_LENGTH_bf), <<(31 - BF_M(PV_LENGTH_bf))] ; PV_LENGTH_bf
         alu_shf[pkt_len, --, b, pkt_len, >>(31 - BF_M(PV_LENGTH_bf))] ; PV_LENGTH_bf
-        
+
     bitfield_extract__sz1(l3_version, BF_AML($l3_hdr, IP_VERSION_bf)) ; IP_VERSION_bf
-    
+
     immed[sig_mask_wr, 0]
-    
+
     br=byte[l3_version, 0, 4, process_ipv4#], defer[3] ; IPv4
         alu[l3_wr_off, l3_off, +, IPV4_LEN_OFFS]
-        alu[tmp, pkt_len, -, l3_off]     
+        alu[tmp, pkt_len, -, l3_off]
         alu[$l3_hdr_flush, --, b, tmp, <<16]
-    
+
     br=byte[l3_version, 0, 6, process_ipv6#], defer[3] ; IPv6
         alu[l3_wr_off, l3_off, +, IPV6_PAYLOAD_OFFS]
         alu[tmp, pkt_len, -, l3_off]
         alu[$l3_hdr_flush, --, b, tmp, <<16]
-        
+
     //neither IPv4 nor IPv6, abort
     br[end#]
-    
+
     // If IPv4 header is present
     process_ipv4#:
 
         /* Setup IPv4 length field
-        IPV4_TOTAL_SIZE_bf = pkt_len - l3_off 
+        IPV4_TOTAL_SIZE_bf = pkt_len - l3_off
         calculation and setup of write xfer done in defer shadow above*/
-        
-        //Issue L3 header write 
+
+        //Issue L3 header write
         mem[write8, $l3_hdr_flush, ctm_addr, <<8, l3_wr_off, 2], sig_done[l3_sig]
         alu[sig_mask_wr, sig_mask_wr, OR, mask(l3_sig), <<(&l3_sig)]
-         
+
         // No need to setup ID field, leave whatever was sent in place
 
         // Make sure IPv4 header CSUM is calculated
         alu[BF_A(io_vec, PV_CSUM_OFFLOAD_L3_bf), BF_A(io_vec, PV_CSUM_OFFLOAD_L3_bf), OR, 1, <<BF_L(PV_CSUM_OFFLOAD_L3_bf)]
-        
+
         br=byte[BF_A($l3_hdr, IPV4_PROTOCOL_bf), IPV4_PROTOCOL_BYTE, IP_PROTOCOL_TCP, process_tcp#], defer[3] ; TCP
             bitfield_extract__sz1(lso_seq, BF_AML(in_nfd_desc, NFD_IN_LSO_SEQ_CNT_fld))
             bitfield_extract__sz1(l4_off, BF_AML(in_nfd_desc, NFD_IN_LSO_L4_OFFS_fld)) ; NFD_IN_LSO_L4_OFFS_fld
-            alu[l4_rd_off, l4_off, +16, BF_A(io_vec, PV_OFFSET_bf)] 
-            
+            alu[l4_rd_off, l4_off, +16, BF_A(io_vec, PV_OFFSET_bf)]
+
         br=byte[BF_A($l3_hdr, IPV4_PROTOCOL_bf), IPV4_PROTOCOL_BYTE, IP_PROTOCOL_UDP, process_udp#], defer[3] ; UDP
             bitfield_extract__sz1(l4_off, BF_AML(in_nfd_desc, NFD_IN_LSO_L4_OFFS_fld)) ; NFD_IN_LSO_L4_OFFS_fld
-            alu[l4_wr_off, l4_off, +16, BF_A(io_vec, PV_OFFSET_bf)] 
-            alu[l4_wr_off, l4_wr_off, +, UDP_LEN_OFFS]         
-        
-        //Neither TCP or UDP. Wait for outstanding signals and abort 
+            alu[l4_wr_off, l4_off, +16, BF_A(io_vec, PV_OFFSET_bf)]
+            alu[l4_wr_off, l4_wr_off, +, UDP_LEN_OFFS]
+
+        //Neither TCP or UDP. Wait for outstanding signals and abort
         br[wait_sig_mask_wr#]
-        
+
     //IPv6
     process_ipv6#:
 
         /* Setup IPv6 length field
-        IPV6_PAYLOAD_SIZE_bf = pkt_len - l3_off 
+        IPV6_PAYLOAD_SIZE_bf = pkt_len - l3_off
         calculation and setup of write xfer done in defer shadow above*/
- 
+
         //Issue header write to buffer
         mem[write8, $l3_hdr_flush, ctm_addr, <<8, l3_wr_off, 2], sig_done[l3_sig]
         alu[sig_mask_wr, sig_mask_wr, OR, mask(l3_sig), <<(&l3_sig)]
-        
+
         br=byte[BF_A($l3_hdr, IPV6_NEXT_HEADER_bf), IPV6_NEXT_HEADER_BYTE, IP_PROTOCOL_TCP, process_tcp#], defer[3] ; TCP
             bitfield_extract__sz1(lso_seq, BF_AML(in_nfd_desc, NFD_IN_LSO_SEQ_CNT_fld))
             bitfield_extract__sz1(l4_off, BF_AML(in_nfd_desc, NFD_IN_LSO_L4_OFFS_fld)) ; NFD_IN_LSO_L4_OFFS_fld
-            alu[l4_rd_off, l4_off, +16, BF_A(io_vec, PV_OFFSET_bf)] 
-        
+            alu[l4_rd_off, l4_off, +16, BF_A(io_vec, PV_OFFSET_bf)]
+
         br=byte[BF_A($l3_hdr, IPV6_NEXT_HEADER_bf), IPV6_NEXT_HEADER_BYTE, IP_PROTOCOL_UDP, process_udp#], defer[3] ; UDP
             bitfield_extract__sz1(l4_off, BF_AML(in_nfd_desc, NFD_IN_LSO_L4_OFFS_fld)) ; NFD_IN_LSO_L4_OFFS_fld
-            alu[l4_wr_off, l4_off, +16, BF_A(io_vec, PV_OFFSET_bf)] 
-            alu[l4_wr_off, l4_wr_off, +, UDP_LEN_OFFS]           
+            alu[l4_wr_off, l4_off, +16, BF_A(io_vec, PV_OFFSET_bf)]
+            alu[l4_wr_off, l4_wr_off, +, UDP_LEN_OFFS]
 
-        //Neither TCP or UDP. Wait for outstanding signals and abort 
+        //Neither TCP or UDP. Wait for outstanding signals and abort
         br[wait_sig_mask_wr#]
-        
+
     //If TCP header is present
     process_tcp#:
-        
+
         /* Setup TCP sequence number
            TCP_SEQ_bf += (mss * (lso_seq - 1))*/
         mem[read32, $l4_hdr[0], ctm_addr, <<8, l4_rd_off, 4], ctx_swap[l4_sig1_rd], defer[2]
             alu_shf[mss, --, b, BF_A(in_nfd_desc, NFD_IN_LSO_MSS_fld), <<(31 - BF_M(NFD_IN_LSO_MSS_fld))]; NFD_IN_LSO_MSS_fld
-            alu_shf[mss, --, b, mss, >>(31 - BF_M(NFD_IN_LSO_MSS_fld))]; NFD_IN_LSO_MSS_fld 
-        
+            alu_shf[mss, --, b, mss, >>(31 - BF_M(NFD_IN_LSO_MSS_fld))]; NFD_IN_LSO_MSS_fld
+
         alu[lso_seq, lso_seq, -, 1]
         multiply32(tcp_seq_add, mss, lso_seq, OP_SIZE_8X24)// Multiplier is 8 bits, multiplicand is 24 bits (8x24)
-        
+
         alu[$l4_hdr_flush1, $l4_hdr[BF_W(TCP_SEQ_bf)], +, tcp_seq_add]
-        
-        alu[l4_wr_off, l4_off, +16, BF_A(io_vec, PV_OFFSET_bf)] 
+
+        alu[l4_wr_off, l4_off, +16, BF_A(io_vec, PV_OFFSET_bf)]
         alu[l4_wr_off, l4_wr_off, +, TCP_SEQ_OFFS]
-        
+
         mem[write32, $l4_hdr_flush1, ctm_addr, <<8, l4_wr_off, 1], sig_done[l4_sig1_wr]
-        
+
         /* Setup TCP flags
             .if (BIT(in_nfd_lso_wrd, BF_L(NFD_IN_LSO_END_fld)))
                 tcp_flags_mask = 0xffffffff
@@ -633,26 +635,26 @@ max_cbs#:
          */
         /* TCP stores data offset and flags and in the same 16 bit word
            Flags are bits 8 to 0. Set to all F's to preserve upper bits */
-        
+
         br_bset[BF_AL(in_nfd_desc, NFD_IN_LSO_END_fld),tcp_flags_fix_done#], defer[2]
             alu[sig_mask_wr, sig_mask_wr, OR, mask(l4_sig1_wr), <<(&l4_sig1_wr)]
             alu[tcp_flags_mask, --, ~b, 0]
-        
+
         alu[tcp_flags_mask, tcp_flags_mask, and~, (NET_TCP_FLAG_FIN | NET_TCP_FLAG_RST | NET_TCP_FLAG_PSH), <<16]
     tcp_flags_fix_done#:
 
         alu[$l4_hdr_flush2, BF_A($l4_hdr, TCP_FLAGS_bf), and, tcp_flags_mask]
-        
+
         alu[l4_wr_off, l4_wr_off, +, TCP_FLAGS_OFFS]
         mem[write8, $l4_hdr_flush2, ctm_addr, <<8, l4_wr_off, 2], sig_done[l4_sig2_wr]
         alu[sig_mask_wr, sig_mask_wr, OR, mask(l4_sig2_wr), <<(&l4_sig2_wr)]
-        
+
         //Make sure L4 CSUM is calculated
-        alu[BF_A(io_vec, PV_CSUM_OFFLOAD_L4_bf), BF_A(io_vec, PV_CSUM_OFFLOAD_L4_bf), OR, 1, <<BF_L(PV_CSUM_OFFLOAD_L4_bf)] 
-        
+        alu[BF_A(io_vec, PV_CSUM_OFFLOAD_L4_bf), BF_A(io_vec, PV_CSUM_OFFLOAD_L4_bf), OR, 1, <<BF_L(PV_CSUM_OFFLOAD_L4_bf)]
+
         //Wait for outstanding signals and finish
         br[wait_sig_mask_wr#]
-        
+
     //If UDP header present
     process_udp#:
 
@@ -661,10 +663,10 @@ max_cbs#:
         //UDP_SIZE_bf = pkt_len - HE_DELTA_OFFSET_L4_bf
         mem[write8, $l4_hdr_flush1, ctm_addr, <<8, l4_wr_off, 2], sig_done[l4_sig1_wr]
         alu[sig_mask_wr, sig_mask_wr, OR, mask(l4_sig1_wr), <<(&l4_sig1_wr)]
-        
+
         // Make sure L4 CSUM is calculated
-        alu[BF_A(io_vec, PV_CSUM_OFFLOAD_L4_bf), BF_A(io_vec, PV_CSUM_OFFLOAD_L4_bf), OR, 1, <<BF_L(PV_CSUM_OFFLOAD_L4_bf)] 
-    
+        alu[BF_A(io_vec, PV_CSUM_OFFLOAD_L4_bf), BF_A(io_vec, PV_CSUM_OFFLOAD_L4_bf), OR, 1, <<BF_L(PV_CSUM_OFFLOAD_L4_bf)]
+
 wait_sig_mask_wr#:
     ctx_arb[--], defer[2]
     local_csr_wr[ACTIVE_CTX_WAKEUP_EVENTS, sig_mask_wr]
@@ -761,7 +763,7 @@ end#:
     bitfield_extract__sz1(udp_csum, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
     alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_A(out_vec, PV_CSUM_OFFLOAD_bf), OR, udp_csum] ; PV_CSUM_OFFLOAD_bf
 
-    // error checks near end to ensure consistent metadata (fields written below excluded) and buffer allocation 
+    // error checks near end to ensure consistent metadata (fields written below excluded) and buffer allocation
     // state (contents of CTM also excluded) in drop path
     br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), FAIL_LABEL]
 
