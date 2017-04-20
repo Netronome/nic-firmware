@@ -59,7 +59,7 @@ enum {
     INSTR_TX_WIRE
 };
 
-#define APP_CONFIG_DEBUG
+// #define APP_CONFIG_DEBUG
 
 
 #define NIC_NBI 0
@@ -344,7 +344,7 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base)
 __intrinsic uint32_t
 extract_rss_flags(uint32_t rss_ctrl)
 {
-    uint32_t rss_flags = 0; 
+    uint32_t rss_flags = 0;
 
     if ((rss_ctrl & NFP_NET_CFG_RSS_IPV4) | (rss_ctrl & NFP_NET_CFG_RSS_IPV6))
         rss_flags |= (1 << ACTION_RSS_L3_BIT);
@@ -434,7 +434,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         wait_for_all(&sig1, &sig2);
 
         rss_flags = extract_rss_flags(rss_ctrl[0]);
-        
+
         /* RSS remapping table with NN register index as start offset */
         rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
 
@@ -493,7 +493,7 @@ app_config_port_down(uint32_t vnic_port)
     uint32_t byte_off;
 
     /* TX drop instr for host port lookup */
-    xwr_instr = (INSTR_TX_DROP << INSTR_OPCODE_LSB); 
+    xwr_instr = (INSTR_TX_DROP << INSTR_OPCODE_LSB);
 
     /* write drop instr to local host table */
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0) * NIC_MAX_INSTR;
