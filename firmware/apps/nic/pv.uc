@@ -199,10 +199,12 @@
     .reg max_vlan
     .reg len
 
-    alu[max_vlan, (3 << 2), AND, BF_A(in_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)]
     alu[len, BF_A(in_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)]
     alu[len, len, -, in_mtu]
+
+    alu[max_vlan, (3 << 2), AND, BF_A(in_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)]
     alu[len, len, -, max_vlan]
+
     br_bclr[len, BF_L(PV_BLS_bf), FAIL_LABEL]
 .end
 #endm
