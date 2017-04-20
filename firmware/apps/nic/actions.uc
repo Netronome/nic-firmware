@@ -2,6 +2,7 @@
 #define _ACTIONS_UC
 
 #include "app_config_instr.h"
+#include "protocols.h"
 
 #include "pv.uc"
 #include "pkt_io.uc"
@@ -79,9 +80,6 @@ is_multicast#:
 #define ACTION_RSS_CFG_L3_BIT 0
 #define ACTION_RSS_CFG_L4_BIT 1
 
-#define L4_PROTO_TCP          6
-#define L4_PROTO_UDP          17
-
 #macro __actions_rss(in_pkt_vec)
 .begin
     .reg data
@@ -144,11 +142,11 @@ is_multicast#:
 skip_l3#:
     br_bclr[opcode, ACTION_RSS_CFG_L4_BIT, skip_l4#]
 
-    alu[--, protocol, -, L4_PROTO_UDP]
+    alu[--, protocol, -, IP_PROTOCOL_UDP]
     beq[process_l4#], defer[1]
         byte_align_be[data, *$index++]
 
-    alu[--, protocol, -, L4_PROTO_TCP]
+    alu[--, protocol, -, IP_PROTOCOL_TCP]
     bne[skip_l4#]
 
 process_l4#:
