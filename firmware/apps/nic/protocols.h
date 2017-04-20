@@ -1,6 +1,7 @@
 #ifndef _PROTOCOLS_H
 #define _PROTOCOLS_H
 
+#define MAC_MULTICAST_bf            0, 24, 24
 #define IP_VERSION_bf               0, 31, 28  // version field in same location for IPv4 and IPv6
 
 /**

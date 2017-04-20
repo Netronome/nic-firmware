@@ -59,6 +59,10 @@
     __actions_read(mac[0], --, --)
 
     pv_seek(in_pkt_vec, 0, 6)
+    
+    //Allow multicast addresses to pass
+    br_bset[*$index, BF_L(MAC_MULTICAST_bf), is_multicast#]
+    
     alu[--, mac[0], XOR, *$index++]
     bne[DROP_LABEL]
     alu[tmp, mac[1], XOR, *$index++]
@@ -67,6 +71,8 @@
 
     alu[--, --, B, tmp, >>16]
     bne[DROP_LABEL]
+    
+is_multicast#:
 .end
 #endm
 
