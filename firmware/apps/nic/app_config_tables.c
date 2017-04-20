@@ -218,6 +218,7 @@ upd_rss_table_instr(__xwrite uint32_t *xwr_instr, uint32_t start_offset,
 
     /* ct_nn_write only writes max of 16 words, hence we split it */
     for(i = 0; i < sizeof(cfg_mes_ids)/sizeof(uint32_t); i++) {
+        command.NN_reg_num = start_offset;
         command.remote_isl = cfg_mes_ids[i] >> 4;
         command.master = cfg_mes_ids[i] & 0x0f;
         ct_nn_write(xwr_instr, &command, count/2, sig_done, &sig1);
@@ -349,8 +350,10 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base)
     return;
 }
 
-#define ACTION_RSS_L3_BIT 0
-#define ACTION_RSS_L4_BIT 1
+#define ACTION_RSS_IPV6_TCP_BIT 0
+#define ACTION_RSS_IPV6_UDP_BIT 1
+#define ACTION_RSS_IPV4_TCP_BIT 2
+#define ACTION_RSS_IPV4_UDP_BIT 3
 
 /* Set RSS flags by matching what is used in the workers */
 __intrinsic uint32_t
@@ -358,12 +361,19 @@ extract_rss_flags(uint32_t rss_ctrl)
 {
     uint32_t rss_flags = 0;
 
-    if ((rss_ctrl & NFP_NET_CFG_RSS_IPV4) | (rss_ctrl & NFP_NET_CFG_RSS_IPV6))
-        rss_flags |= (1 << ACTION_RSS_L3_BIT);
+    // Our driver does L3 unconditionally, so we only care about L4 combinations
 
-    if ((rss_ctrl & NFP_NET_CFG_RSS_IPV4_TCP) | (rss_ctrl & NFP_NET_CFG_RSS_IPV4_UDP) |
-        (rss_ctrl & NFP_NET_CFG_RSS_IPV6_TCP) | (rss_ctrl & NFP_NET_CFG_RSS_IPV6_UDP))
-        rss_flags |= (1 << ACTION_RSS_L3_BIT) | (1 << ACTION_RSS_L4_BIT);
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_TCP)
+        rss_flags |= (1 << ACTION_RSS_IPV4_TCP_BIT);
+    
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_UDP) 
+        rss_flags |= (1 << ACTION_RSS_IPV4_UDP_BIT);
+
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_TCP) 
+        rss_flags |= (1 << ACTION_RSS_IPV6_TCP_BIT);
+    
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_UDP)
+        rss_flags |= (1 << ACTION_RSS_IPV6_UDP_BIT);
 
     return rss_flags;
 }
@@ -450,16 +460,12 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         /* RSS remapping table with NN register index as start offset */
         rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
 
-        instr[count++] = (INSTR_RSS << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT) | (rss_tbl_nnidx << 8) | (rss_flags);
+        instr[count++] = (INSTR_RSS << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT) | (rss_tbl_nnidx << 8) | (rss_flags & 0xf);
         mask = rss_ctrl[0];
 
         /* RSS key: provide rss key with hash. Use only first word */
 
         instr[count++] = rss_key[0];
-
-        /* mask fits into 16 bits as rss_ctrl is masked with 0x7f) */
-        //mask = NFP_NET_CFG_RSS_MASK_of(mask);
-        //instr[count++] = (INSTR_SEL_RSS_QID_WITH_MASK << 16) | (mask & 0xffff);
 
         /* calculate checksum and drop if mismatch (drop port is included) */
         instr[count++] = (INSTR_CHECKSUM_COMPLETE << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT);

@@ -66,7 +66,8 @@ NIC_APP_ISLANDS := \
 	"$(call NIC_ISL_ME_DEST, 0, 0), \
 	$(call NIC_ISL_ME_DEST, 1, 0), \
 	$(call NIC_ISL_ME_DEST, 2, 0), \
-	$(call NIC_ISL_ME_DEST, 3, 0)"
+	$(call NIC_ISL_ME_DEST, 3, 0), \
+	$(call NIC_ISL_ME_DEST, 4, 0)"
 
 NIC_APP_MES := \
         "$(call NIC_ISL_ME_DEST, 0, 0), \

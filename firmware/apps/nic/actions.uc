@@ -60,10 +60,10 @@
     __actions_read(mac[0], --, --)
 
     pv_seek(in_pkt_vec, 0, 6)
-    
+
     //Allow multicast addresses to pass
     br_bset[*$index, BF_L(MAC_MULTICAST_bf), is_multicast#]
-    
+
     alu[--, mac[0], XOR, *$index++]
     bne[DROP_LABEL]
     alu[tmp, mac[1], XOR, *$index++]
@@ -72,65 +72,59 @@
 
     alu[--, --, B, tmp, >>16]
     bne[DROP_LABEL]
-    
+
 is_multicast#:
 .end
 #endm
 
-#define ACTION_RSS_CFG_L3_BIT 0
-#define ACTION_RSS_CFG_L4_BIT 1
 
 #macro __actions_rss(in_pkt_vec)
 .begin
     .reg data
+    .reg hash
     .reg ipv4_delta
+    .reg idx
     .reg key
-    .reg offset
+    .reg l3_info
+    .reg l3_offset
+    .reg l4_offset
     .reg opcode
-    .reg protocol
+    .reg parse_status
+    .reg pkt_type // 0 - IPV6_TCP, 1 - IPV6_UDP, 2 - IPV4_TCP, 3 - IPV4_UDP
     .reg queue
-    .reg shift
-    .reg vlans
+    .reg queue_shf
+    .reg queue_off
 
-    __actions_read(opcode, --, --)
-    __actions_read(key, --, --)
+    // skip RSS for unkown L3
+    bitfield_extract__sz1(l3_info, BF_AML(in_pkt_vec, PV_PARSE_L3I_bf))
+    beq[skip_rss#]
 
-    // skip RSS for unkown L3 or bad IPv4 checksum
-    br_bclr[BF_AL(in_pkt_vec, PV_PARSE_L3I_bf), skip_rss#]
-
-    // skip RSS for MPLS packets
+    // skip RSS for MPLS
     bitfield_extract__sz1(--, BF_AML(in_pkt_vec, PV_PARSE_MPD_bf))
     bne[skip_rss#]
 
-    // skip RSS for 3 or more VLAN tags
-    bitfield_extract__sz1(vlans, BF_AML(in_pkt_vec, PV_PARSE_VLD_bf))
-    br=byte[vlans, 0, 3, skip_rss#]
+    // skip RSS for 2 or more VLANs
+    br_bset[BF_A(in_pkt_vec, PV_PARSE_VLD_bf), BF_M(PV_PARSE_VLD_bf), skip_rss#]
 
+    __actions_read(opcode, --, --)
+    __actions_read(key, --, --)
     local_csr_wr[CRC_REMAINDER, key]
 
-    // seek to L3 protocol word
-    alu[offset, --, B, vlans, <<2]
-    alu[offset, offset, +, (14 - 4)]
-    alu[ipv4_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 2)]
-    alu[offset, offset, +, ipv4_delta]
-    pv_seek(in_pkt_vec, offset, 44)
+    // seek to L3 source address
+    alu[l3_offset, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)] // 4 bytes for VLAN
+    alu[l3_offset, l3_offset, +, (14 + 8)] // 14 bytes for Ethernet, 8 bytes of IP header
+    alu[ipv4_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 2)] // 4 bytes extra for IPv4
+    alu[l3_offset, l3_offset, +, ipv4_delta]
+    pv_seek(in_pkt_vec, l3_offset, 32)
 
     byte_align_be[--, *$index++]
-    byte_align_be[protocol, *$index++]
-    alu[shift, (1 << 3), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 3)]
-
-    // skip CRC over L3 if not requested
-    br_bclr[opcode, ACTION_RSS_CFG_L3_BIT, skip_l3#], defer[3]
-        alu[shift, shift, +, 8]
-        alu[--, shift, OR, 0]
-        alu[protocol, 0xff, AND, protocol, >>indirect]
-
     byte_align_be[data, *$index++]
-    br_bset[BF_A(in_pkt_vec, PV_PARSE_L3I_bf), BF_M(PV_PARSE_L3I_bf), skip_l3#], defer[3]
+    br_bset[BF_A(in_pkt_vec, PV_PARSE_L3I_bf), BF_M(PV_PARSE_L3I_bf), process_l4#], defer[3] // branch if IPv4, 2 words hashed
         crc_be[crc_32, --, data]
         byte_align_be[data, *$index++]
         crc_be[crc_32, --, data]
 
+    // hash 6 more words for IPv6
     #define_eval LOOP (0)
     #while (LOOP < 6)
         byte_align_be[data, *$index++]
@@ -139,28 +133,45 @@ is_multicast#:
     #endloop
     #undef LOOP
 
-skip_l3#:
-    br_bclr[opcode, ACTION_RSS_CFG_L4_BIT, skip_l4#]
-
-    alu[--, protocol, -, IP_PROTOCOL_UDP]
-    beq[process_l4#], defer[1]
-        byte_align_be[data, *$index++]
-
-    alu[--, protocol, -, IP_PROTOCOL_TCP]
-    bne[skip_l4#]
-
 process_l4#:
+    // skip L4 if offset unknown
+    alu[l4_offset, 0xfe, AND, BF_A(in_pkt_vec, PV_PARSE_L4_OFFSET_bf), >>(BF_L(PV_PARSE_L4_OFFSET_bf) - 1)]
+    beq[skip_l4#] // zero for unsupported protocols or unparsable IP extention headers
+
+    // skip L4 if unknown
+    bitfield_extract__sz1(parse_status, BF_AML(in_pkt_vec, PV_PARSE_STS_bf))
+    beq[skip_l4#]
+
+    // skip L4 if packet is fragmented
+    br=byte[parse_status, 0, 7, skip_l4#]
+
+    // skip L4 if not configured
+    alu[pkt_type, l3_info, AND, 2]
+    alu[pkt_type, pkt_type, OR, parse_status, >>2]
+    alu[--, pkt_type, OR, 0]
+    alu[--, opcode, AND, 1, <<indirect]
+    beq[skip_l4#]
+
+    pv_seek(in_pkt_vec, l4_offset, 4)
+    byte_align_be[--, *$index++]
+    byte_align_be[data, *$index++]
     crc_be[crc_32, --, data]
-    nop
-    nop
-    nop
-    nop
+        nop
+        nop
+        nop
+        nop
 
 skip_l4#:
-    __actions_restore_t_idx()
+        alu[idx, 0x7f, AND, opcode, >>8]
     local_csr_rd[CRC_REMAINDER]
-    immed[queue, 0]
-    alu[queue, queue, AND, 7]
+    immed[hash, 0]
+    alu[queue_off, 0x1f, AND, hash, >>2]
+    alu[idx, idx, +, queue_off]
+    local_csr_wr[NN_GET, idx]
+        __actions_restore_t_idx()
+        alu[queue_shf, 0x18, AND, hash, <<3]
+        alu[--, queue_shf, OR, 0]
+    alu[queue, 0xf, AND, *n$index, >>indirect]
     pv_set_egress_queue(in_pkt_vec, queue)
 
 skip_rss#:

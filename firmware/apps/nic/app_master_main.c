@@ -401,10 +401,10 @@ cfg_changes_loop(void)
             control = cfg_bar_data[0];  // control
             update = cfg_bar_data[1];   // update
 
+#if 0
             /* Reflect the pci island and the vnic number to remote MEs */
             cfg_pci_vnic = (NIC_PCI << 16) | port;
             
-#if 0
             /* Reset the configuration ack counter */
             synch_cnt_dram_reset(&nic_cfg_synch,
                                  sizeof(app_mes_ids)/sizeof(uint32_t));
@@ -437,7 +437,7 @@ cfg_changes_loop(void)
 
             /* Do configuration changes to each ME/island if up */
             if ((control & NFP_NET_CFG_CTRL_ENABLE)
-                && (update & NFP_NET_CFG_UPDATE_GEN)) {
+                /*&& (update & NFP_NET_CFG_UPDATE_GEN)*/) {
                 app_config_port(port, control, update);
             }
 
