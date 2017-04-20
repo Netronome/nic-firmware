@@ -86,7 +86,7 @@ egress#:
 ingress#:
     pkt_io_rx(pkt_vec, error_rx_nbi#, error_rx_nfd#)
 
-    actions_execute(pkt_vec, egress#, count_drop#, silent_drop#, error_act#)
+actions_execute(pkt_vec, egress#, count_drop#, silent_drop#, error_act#)
 
 #pragma warning(disable: 4702)
 fatal_error("MAIN LOOP EXIT")
