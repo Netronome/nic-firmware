@@ -63,6 +63,30 @@
     }
 
 
+/* Instructions in the worker (actions.uc) should follow the exact same order
+ * as in enum used by app config below.
+ * The pipeline bit in the instruction_format is set when previous and
+ * current instruction follows each other. This eliminates a branch/jmp by the
+ * worker.
+ *      i0#: br[drop#]
+ *      i1#: br[mtu#]
+ *      i2#: br[mac#]
+ *      i3#: br[rss#]
+ *      i4#: br[checksum_complete#]
+ *      i5#: br[tx_host#]
+ *      i6#: br[tx_wire#]
+ */
+enum instruction_type {
+    INSTR_TX_DROP = 0,
+    INSTR_MTU,
+    INSTR_MAC,
+    INSTR_RSS,
+    INSTR_CHECKSUM_COMPLETE,
+    INSTR_TX_HOST,
+    INSTR_TX_WIRE
+};
+
+
 /* Instruction format of NIC_CFG_INSTR_TBL table. Some 32-bit words will
  * be parameter only i.e. MAC which is 48 bits. */
 union instruction_format {
