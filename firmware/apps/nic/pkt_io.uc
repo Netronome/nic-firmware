@@ -113,7 +113,7 @@ timestamp_enable()
     local_csr_wr[ACTIVE_FUTURE_COUNT_SIGNAL, &__pkt_io_sig_nfd_retry]
     local_csr_rd[TIMESTAMP_LOW]
     immed[future, 0]
-    alu[future, future, +, 8] // 128 cycles
+    alu[future, future, +, 250] // 4000 cycles
     local_csr_wr[ACTIVE_CTX_FUTURE_COUNT, future]
  .end
 #endm
@@ -145,17 +145,17 @@ listen_with_nfd_priority#:
     br_signal[__pkt_io_sig_nfd_retry, nfd_dispatch#]
     br_signal[__pkt_io_sig_nfd, rx_nfd#]
     br_signal[__pkt_io_sig_nbi, rx_nbi#]
-    ctx_arb[__pkt_io_sig_nbi, __pkt_io_sig_nfd, __pkt_io_sig_nfd_retry], any, br[listen_with_nfd_priority#]
+    ctx_arb[__pkt_io_sig_nbi, __pkt_io_sig_nfd, __pkt_io_sig_nfd_retry], any, br[listen_with_nbi_priority#]
 
 nfd_dispatch#:
     // previously processed packet was from NFD
     __pkt_io_dispatch_nfd()
 
 listen_with_nbi_priority#:
-    br_signal[__pkt_io_sig_nfd_retry, nfd_dispatch#]
     br_signal[__pkt_io_sig_nbi, rx_nbi#]
+    br_signal[__pkt_io_sig_nfd_retry, nfd_dispatch#]
     br_signal[__pkt_io_sig_nfd, rx_nfd#]
-    ctx_arb[__pkt_io_sig_nbi, __pkt_io_sig_nfd, __pkt_io_sig_nfd_retry], any, br[listen_with_nbi_priority#]
+    ctx_arb[__pkt_io_sig_nbi, __pkt_io_sig_nfd, __pkt_io_sig_nfd_retry], any, br[listen_with_nfd_priority#]
 
 rx_nbi#:
     pv_init_nbi(io_vec, $__pkt_io_nbi_desc, RX_NBI_ERROR_LABEL)
