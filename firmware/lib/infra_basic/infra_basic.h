@@ -5,8 +5,8 @@
  * @brief         Interface to the infrastructure blocks
  *
  */
-#ifndef _INFRA_H_
-#define _INFRA_H_
+#ifndef _INFRA_BASIC_H_
+#define _INFRA_BASIC_H_
 
 #include <nfp/mem_ring.h>
 #include <pkt/pkt.h>
@@ -215,4 +215,4 @@ void init_tx(void);
 __intrinsic void pkt_ptrs(unsigned int *frame_off, __addr40 void **ctm_ptr,
 			  __addr40 void **mem_ptr, const unsigned int offset);
 
-#endif /* _INFRA_H_ */
+#endif /* _INFRA_BASIC_H_ */
