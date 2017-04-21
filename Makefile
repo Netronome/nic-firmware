@@ -3,7 +3,7 @@
 # @file        Makefile
 # @brief       Top level makefile to set paths and include submakes
 #
-
+SHELL = /bin/bash
 NFP_COMMON    := $(abspath $(CURDIR))
 NETRONOME ?= /opt/netronome
 
@@ -15,6 +15,21 @@ TEST_DIR      = $(NFP_COMMON)/test
 Q ?= @
 
 HG_USERNAME ?= $(shell whoami)
+
+#Firmware name
+BPF ?= $(shell echo "bpf")
+#git SHA tag (first 7 characters)
+GIT_TAG = $(shell git rev-parse HEAD | cut -c1-7)
+#Add a "+" if building with un-committed/un-added changes
+GIT_DIFF_UNC=
+ifneq ($(shell git diff --name-only),)
+	GIT_DIFF_UNC="+"
+endif
+#Add a "+" if building with added (staged) but un-committed changes
+GIT_DIFF_UNS=
+ifneq ($(shell git diff --staged --name-only),)
+	GIT_DIFF_UNS="+"
+endif
 
 ALL: firmware_all
 
