@@ -49,18 +49,6 @@
     __shared __lmem uint32_t cfg_mes_ids[] = {APP_MES_LIST};
 #endif
 
-enum instruction_type {
-    INSTR_TX_DROP = 0,
-    INSTR_MTU,
-    INSTR_MAC,
-    INSTR_RSS,
-    INSTR_CHECKSUM_COMPLETE,
-    INSTR_TX_HOST,
-    INSTR_TX_WIRE
-};
-
-
-
 // #define APP_CONFIG_DEBUG
 
 
