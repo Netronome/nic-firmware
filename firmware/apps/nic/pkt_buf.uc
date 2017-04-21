@@ -6,11 +6,11 @@
 #include <timestamp.uc>
 
 #ifndef PKT_BUF_ME_CTM_PACKETS
-    #define PKT_BUF_ME_CTM_PACKETS 256
+    #define PKT_BUF_ME_CTM_PACKETS 64
 #endif
 
 #ifndef PKT_BUF_ME_CTM_BUFFERS
-    #define PKT_BUF_ME_CTM_BUFFERS 64
+    #define PKT_BUF_ME_CTM_BUFFERS 32
 #endif
 
 .alloc_mem _pkt_buf_ctm_credits cls island 8
@@ -86,7 +86,9 @@ retry_or_fail#:
     cls[test_subsat_imm, $buffer_credits, addr, _PKT_BUF_CTM_BUFFERS_OFFSET, 1], sig_done[sig_buffers]
     ctx_arb[sig_packets, sig_buffers], br[check_credits#]
 #else
+#if (! streq('FAIL_OPS', '--'))
     FAIL_OPS()
+#endif
     br[FAIL_LABEL]
 #endif
 

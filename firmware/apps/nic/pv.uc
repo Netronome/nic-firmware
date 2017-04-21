@@ -50,7 +50,7 @@
  *       +-+-----------------------------+-----+---------+-+-------------+
  *    3  |        Sequence Number        |  0  | Seq Ctx |0| Meta Length |
  *       +-------------------------------+---+-+---------+-+-+-------+-+-+
- *    4  |         TX Host Flags         | 0 |Seek (64B algn)|  Rsv  |3|4|
+ *    4  |         TX Host Flags         | 0 |Seek (64B algn)|  Rsv  |C|c|
  *       +-----+-------------+---+---+---+---+---------------+-------+-+-+
  *    5  |P_STS|  Reserved   |L3I|MPD|VLD|           Checksum            |
  *       +-----+---------+---+---+---+---+-----------+-------------------+
@@ -63,8 +63,8 @@
  * CBS   - CTM Buffer Size
  * BLS   - Buffer List
  * Q     - work Queue source (0 = NFD, 1 = NBI)
- * 3     - Enable MAC offload of L3 checksum
- * 4     - Enable MAC offload of L2 checksum
+ * C     - Enable MAC offload of L3 checksum
+ * c     - Enable MAC offload of L4 checksum
  * P_STS - Parse Status
  *         (0 = no data,
  *          1 = ESP,
