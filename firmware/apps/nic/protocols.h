@@ -122,7 +122,7 @@
 #define TCP_URGENT_PTR_bf           4, 15, 0
 
 #define TCP_SEQ_OFFS                4
-#define TCP_FLAGS_OFFS              8
+#define TCP_FLAGS_OFFS              12
 
  /*
  * UDP header
