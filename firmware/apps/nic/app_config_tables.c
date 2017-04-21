@@ -49,7 +49,7 @@
     __shared __lmem uint32_t cfg_mes_ids[] = {APP_MES_LIST};
 #endif
 
-enum {
+enum instruction_type {
     INSTR_TX_DROP = 0,
     INSTR_MTU,
     INSTR_MAC,
@@ -58,6 +58,8 @@ enum {
     INSTR_TX_HOST,
     INSTR_TX_WIRE
 };
+
+
 
 // #define APP_CONFIG_DEBUG
 
@@ -104,7 +106,6 @@ __export __emem __addr40 uint32_t debug_rss_table[100];
 
 /* RSS table length in words */
 #define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
-
 
 
 
@@ -366,6 +367,10 @@ extract_rss_flags(uint32_t rss_ctrl)
     return rss_flags;
 }
 
+#define SET_PIPELINE_BIT(prev, current) \
+    if (instr[current].instr - instr[prev].instr == 1) \
+        instr[current].pipeline = 1;
+
 
 __intrinsic void
 app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
@@ -375,14 +380,15 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     __xread uint32_t mtu;
     __xread uint32_t nic_mac[2];
     __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
-    __xwrite uint32_t xwr_instr[32];
-    __gpr uint32_t instr[32];
+    __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
+    __gpr union instruction_format instr[NIC_MAX_INSTR];
     SIGNAL sig1, sig2;
     uint32_t rss_flags;
     uint32_t rss_tbl_nnidx;
     uint32_t byte_off;
     uint32_t mask;
     uint32_t count;
+    uint32_t prev_instr = 0;
 
 #ifdef APP_CONFIG_DEBUG
     {
@@ -395,18 +401,26 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #endif
 
     count = 2;
+
     /* mtu */
     mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
-    instr[0] = (INSTR_MTU << INSTR_OPCODE_LSB) | ((mtu + 14) & 0xffff); // add ethernet header constant to save datapath cycle
-    instr[1] = (INSTR_TX_WIRE << INSTR_OPCODE_LSB);
-      // | BUILD_PORT(NIC_NBI, NS_PLATFORM_NBI_TM_QID_LO(vnic_port));
+    instr[0].instr = INSTR_MTU;
+    instr[0].param = mtu + NET_ETH_LEN; // add eth hdr len
+
+    /* tx wire */
+    instr[1].instr = INSTR_TX_WIRE;
+    instr[1].param = BUILD_PORT(NIC_NBI, NS_PLATFORM_NBI_TM_QID_LO(vnic_port));
+    SET_PIPELINE_BIT(0, 1);
+    prev_instr = 1;
 
     reg_cp(xwr_instr, (void *)instr, count<<2);
 
     /* write TX instr to local table and to other islands too */
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0) * NIC_MAX_INSTR;
     upd_rx_host_instr (xwr_instr, byte_off<<2, count);
+
+
 
 #ifdef APP_CONFIG_DEBUG
     {
@@ -418,15 +432,23 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     }
 #endif
 
+
+
     /* mtu already setup for update rx host */
     count = 1;
+    prev_instr = 0;
 
     /* MAC address */
     mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
                 sizeof(nic_mac));
-    instr[count++] = (INSTR_MAC << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT) | (nic_mac[1] >> 16);
-    instr[count++] = (nic_mac[0]);
+    instr[count].instr = INSTR_MAC;
+    instr[count].param = (nic_mac[1] >> 16);
+    SET_PIPELINE_BIT(prev_instr, count);
+    prev_instr = count;
+    count++;
+    instr[count++].value = nic_mac[0];
 
+    /* RSS */
     if (control & NFP_NET_CFG_CTRL_RSS) {
 
         /* Udate the RSS NN table but only if RSS has changed
@@ -448,16 +470,29 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         /* RSS remapping table with NN register index as start offset */
         rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
 
-        instr[count++] = (INSTR_RSS << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT) | (rss_tbl_nnidx << 8) | (rss_flags & 0xf);
+        instr[count].instr = INSTR_RSS;
+        instr[count].param = (rss_tbl_nnidx << 8) | (rss_flags & 0x0f);
+        SET_PIPELINE_BIT(prev_instr, count);
+        prev_instr = count;
+        count++;
+
         mask = rss_ctrl[0];
 
         /* RSS key: provide rss key with hash. Use only first word */
 
-        instr[count++] = rss_key[0];
+        instr[count++].value = rss_key[0];
 
         /* calculate checksum and drop if mismatch (drop port is included) */
-        instr[count++] = (INSTR_CHECKSUM_COMPLETE << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT);
-        instr[count++] = (INSTR_TX_HOST << INSTR_OPCODE_LSB) | (1 << INSTR_PIPELINE_BIT);
+        instr[count].instr = INSTR_CHECKSUM_COMPLETE;
+        SET_PIPELINE_BIT(prev_instr, count);
+        prev_instr = count;
+        count++;
+
+        instr[count].instr = INSTR_TX_HOST;
+        SET_PIPELINE_BIT(prev_instr, count);
+        prev_instr = count;
+        count++;
+
         reg_cp(xwr_instr, instr, count << 2);
 
 #ifdef APP_CONFIG_DEBUG
@@ -475,7 +510,11 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #endif
 
     } else {
-        instr[count++] = (INSTR_TX_HOST << INSTR_OPCODE_LSB);
+        instr[count].instr = INSTR_TX_HOST;
+        SET_PIPELINE_BIT(prev_instr, count);
+        prev_instr = count;
+        count++;
+
         reg_cp(xwr_instr, (void *)instr, count<<2);
     }
 
@@ -493,21 +532,23 @@ __intrinsic void
 app_config_port_down(uint32_t vnic_port)
 {
 
-    __xwrite uint32_t xwr_instr;
-    __gpr uint32_t instr[2];
+    __xwrite union instruction_format xwr_instr;
     uint32_t i;
     uint32_t byte_off;
 
-    /* TX drop instr for host port lookup */
-    xwr_instr = (INSTR_TX_DROP << INSTR_OPCODE_LSB);
+    /* TX drop instr
+     * Probably should use the instr field in union but cannot do that with
+     * xfer, must first do it in GPR and then copy to xfer which is an overkill
+     */
+    xwr_instr.value = (INSTR_TX_DROP << INSTR_OPCODE_LSB);
 
     /* write drop instr to local host table */
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0) * NIC_MAX_INSTR;
-    upd_rx_host_instr (&xwr_instr, byte_off << 2, 1);
+    upd_rx_host_instr (&xwr_instr.value, byte_off << 2, 1);
 
     /* write drop instr to local wire table */
     byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic_port) * NIC_MAX_INSTR;
-    upd_rx_wire_instr(&xwr_instr, byte_off << 2, 1);
+    upd_rx_wire_instr(&xwr_instr.value, byte_off << 2, 1);
 
 #ifdef APP_CONFIG_DEBUG
     {

@@ -19,8 +19,8 @@
 #define NUM_NBI_CHANNELS    64      // channels per NBI
 #define NUM_PCIE            2       // number of PCIe islands
 #define NUM_PCIE_Q          64      // number of queues configured per PCIe
-#define NUM_PCIE_Q_PER_PORT 8       // NFD_MAX_PF_QUEUES // nr queues cfg per port
-#define NIC_MAX_INSTR       16      // 64 bytes, 4B per instruction
+#define NUM_PCIE_Q_PER_PORT NFD_MAX_PF_QUEUES // nr queues cfg per port
+#define NIC_MAX_INSTR       16      // max number of instructions in table
 
 #define NIC_HOST_MAX_ENTRIES  (NUM_PCIE*NUM_PCIE_Q)
 #define NIC_NBI_ENTRY_START   NIC_HOST_MAX_ENTRIES
@@ -49,10 +49,22 @@
                     island NIC_CFG_INSTR_TBL_SIZE addr40
         .init NIC_CFG_INSTR_TBL 0 0
     }
-    
+
+
+/* Instruction format of NIC_CFG_INSTR_TBL table. Some 32-bit words will
+ * be parameter only i.e. MAC which is 48 bits. */
+union instruction_format {
+    struct {
+        uint32_t instr : 15;
+        uint32_t pipeline: 1;
+        uint32_t param: 16;
+    };
+    uint32_t value;
+};
 #endif
 
 #define INSTR_PIPELINE_BIT 16
 #define INSTR_OPCODE_LSB   17
+
 
 #endif /* _APP_CONFIG_INSTR_H_ */
