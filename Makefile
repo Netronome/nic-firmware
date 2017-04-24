@@ -38,9 +38,10 @@ ifneq ($(shell git diff --name-only),)
 	GIT_DIFF_UNC="+"
 endif
 #Add a "+" if building with added (staged) but un-committed changes
-GIT_DIFF_UNS=
 ifneq ($(shell git diff --staged --name-only),)
-	GIT_DIFF_UNS="+"
+	ifeq ($(GIT_DIFF_UNC),)
+		GIT_DIFF_UNC="+"
+	endif
 endif
 
 ALL: firmware_all
