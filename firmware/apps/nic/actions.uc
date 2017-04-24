@@ -171,7 +171,7 @@ skip_l4#:
         __actions_restore_t_idx()
         alu[queue_shf, 0x18, AND, hash, <<3]
         alu[--, queue_shf, OR, 0]
-    alu[queue, 0xf, AND, *n$index, >>indirect]
+    alu[queue, 0xff, AND, *n$index, >>indirect]
     pv_set_egress_queue(in_pkt_vec, queue)
 
 skip_rss#:
