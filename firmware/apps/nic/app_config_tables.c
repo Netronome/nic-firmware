@@ -38,13 +38,18 @@
 #include <vnic/pci_out.h>
 #include <shared/nfp_net_ctrl.h>
 #include <nic_basic/nic_basic.h>
-
+#include <nic_basic/nic_stats.h>
 #include "app_config_tables.h"
 #include "app_config_instr.h"
 
 /*
  * Global declarations for configuration change management
  */
+
+// #define APP_CONFIG_DEBUG
+
+// #define APP_CFG_STATS
+
 
 /* Islands to configure. */
 
@@ -61,7 +66,13 @@
     __shared __lmem uint32_t cfg_mes_ids[] = {APP_MES_LIST};
 #endif
 
-// #define APP_CONFIG_DEBUG
+#ifdef  APP_CFG_STATS
+/* Statistics */
+__import __shared __imem struct nic_port_stats_extra nic_stats_extra[NFD_MAX_PFS];
+#endif
+
+
+
 
 
 #define NIC_NBI 0
@@ -414,18 +425,33 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
     reg_zero(instr, sizeof(instr));
 
-    count = 2;
+    count = 0;
 
     /* mtu */
     mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
-    instr[0].instr = INSTR_MTU;
-    instr[0].param = mtu + NET_ETH_LEN; // add eth hdr len
+    instr[count].instr = INSTR_MTU;
+    instr[count].param = mtu + NET_ETH_LEN; // add eth hdr len
+    prev_instr = count;
+    count++;
+
+#ifdef APP_CFG_STATS
+    {
+        /* offset of TX discards */
+        uint32_t offset = (uint64_t)&nic_stats_extra[vnic_port].tx_discards
+                        - (uint64_t)&nic_stats_extra[0];
+        instr[count].value = (uint32_t)offset;
+        local_csr_write(local_csr_mailbox0, offset);
+        count++;
+    }
+#endif
 
     /* tx wire */
-    instr[1].instr = INSTR_TX_WIRE;
- //   instr[1].param = BUILD_PORT(NIC_NBI, NS_PLATFORM_NBI_TM_QID_LO(vnic_port));
-    SET_PIPELINE_BIT(0, 1);
+    instr[count].instr = INSTR_TX_WIRE;
+ //   instr[2].param = BUILD_PORT(NIC_NBI, NS_PLATFORM_NBI_TM_QID_LO(vnic_port));
+    SET_PIPELINE_BIT(prev_instr, count);
+    prev_instr = count;
+    count++;
 
     reg_cp(xwr_instr, (void *)instr, count<<2);
 
@@ -446,10 +472,20 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #endif
 
 
-
     /* mtu already setup for update rx host */
     count = 1;
     prev_instr = 0;
+
+#ifdef APP_CFG_STATS
+    {
+        /* offset of RX discards */
+        uint32_t offset = (uint64_t)&nic_stats_extra[vnic_port].rx_discards
+                        - (uint64_t)&nic_stats_extra[0];
+        instr[count].value = (uint32_t)offset;
+        count++;
+        local_csr_write(local_csr_mailbox1, offset);
+    }
+#endif
 
     /* MAC address */
     mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),

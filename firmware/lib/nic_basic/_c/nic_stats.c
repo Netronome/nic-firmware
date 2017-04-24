@@ -28,37 +28,10 @@
 
 #include <vnic/shared/nfd_cfg.h>
 #include <vnic/pci_out.h>
+#include "nic_stats.h"
 
 
-/*
- * Additional counters for the NIC application
- *
- * Most of the statistics for the NIC are directly based on stats
- * maintained by the MAC.  However, some required stats are either
- * derived counts or software based counts.  This structure defines
- * these additional stats.
- *
- * DO NOT CHANGE THE ORDER!
- */
-struct nic_port_stats_extra {
-    unsigned long long rx_discards;
-    unsigned long long rx_errors;
-    unsigned long long rx_uc_octets;
-    unsigned long long rx_mc_octets;
-    unsigned long long rx_bc_octets;
-    unsigned long long rx_uc_pkts;
-    unsigned long long rx_mc_pkts;
-    unsigned long long rx_bc_pkts;
 
-    unsigned long long tx_discards;
-    unsigned long long tx_errors;
-    unsigned long long tx_uc_octets;
-    unsigned long long tx_mc_octets;
-    unsigned long long tx_bc_octets;
-    unsigned long long tx_uc_pkts;
-    unsigned long long tx_mc_pkts;
-    unsigned long long tx_bc_pkts;
-};
 /* Export for debug visibility */
 __export __shared __imem struct nic_port_stats_extra nic_stats_extra[NVNICS];
 
