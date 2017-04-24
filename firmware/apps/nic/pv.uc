@@ -536,7 +536,6 @@ skip_l4_offset#:
 
 #macro __pv_lso_fixup(io_vec, in_nfd_desc)
 .begin
-
     .sig l3_sig
 
     .reg read $l4_hdr[4] //Whether TCP or UDP we only need the first 4 LW's
