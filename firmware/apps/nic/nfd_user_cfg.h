@@ -32,11 +32,18 @@
 #ifndef NFD_MAX_PF_QUEUES
 #define NFD_MAX_PF_QUEUES       4
 #endif
+#ifndef NFD_MAX_QUEUES
+#define NFD_MAX_QUEUES          4
+#endif
 
 #elif NS_PLATFORM_NUM_PORTS > 4  /* 4 < NS_PLATFORM_NUM_PORTS <= 8 */
 
 #ifndef NFD_MAX_PF_QUEUES
 #define NFD_MAX_PF_QUEUES       8
+#endif
+
+#ifndef NFD_MAX_QUEUES
+#define NFD_MAX_QUEUES          8
 #endif
 
 #elif NS_PLATFORM_NUM_PORTS > 2  /* 2 < NS_PLATFORM_NUM_PORTS <= 4 */
@@ -45,10 +52,17 @@
 #define NFD_MAX_PF_QUEUES       8
 #endif
 
+#ifndef NFD_MAX_QUEUES
+#define NFD_MAX_QUEUES          16
+#endif
+
 #else /* NS_PLATFORM_NUM_PORTS = 2 */
 
 #ifndef NFD_MAX_PF_QUEUES
 #define NFD_MAX_PF_QUEUES       8
+#endif
+#ifndef NFD_MAX_QUEUES
+#define NFD_MAX_QUEUES          32
 #endif
 
 #endif
@@ -73,6 +87,10 @@
 
 #ifndef NFD_MAX_PF_QUEUES
 #define NFD_MAX_PF_QUEUES       8
+#endif
+
+#ifndef NFD_MAX_QUEUES
+#define NFD_MAX_QUEUES          32
 #endif
 
 #ifndef NFD_MAX_PFS
@@ -119,7 +137,7 @@
      NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
      NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
      NFP_NET_CFG_CTRL_GATHER | NFP_NET_CFG_CTRL_LSO2 |          \
-     NFP_NET_CFG_CTRL_IRQMOD)           
+     NFP_NET_CFG_CTRL_IRQMOD)
 
 #define NFD_CFG_RING_EMEM       emem0
 
@@ -157,7 +175,7 @@
 #define NFD_IN_ADD_SEQN
 #define NFD_IN_NUM_WQS          1
 
-#define NFD_IN_NUM_SEQRS        2 
+#define NFD_IN_NUM_SEQRS        2
 #define NFD_IN_SEQR_QSHIFT      0
 
 /* PCI.OUT block defines */

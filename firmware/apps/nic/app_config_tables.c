@@ -211,11 +211,22 @@ upd_rss_table_instr(__xwrite uint32_t *xwr_instr, uint32_t start_offset,
         command.remote_isl = cfg_mes_ids[i] >> 4;
         command.master = cfg_mes_ids[i] & 0x0f;
         ct_nn_write(xwr_instr, &command, count/2, sig_done, &sig1);
+        wait_for_all(&sig1);
+
+#ifdef APP_CONFIG_DEBUG
+    mem_write32(xwr_instr, debug_rss_table + start_offset,
+                (count/2)<<2);
+#endif
 
         command.NN_reg_num = start_offset + count/2;
         ct_nn_write(&xwr_instr[count/2], &command, count/2, sig_done, &sig2);
+        wait_for_all(&sig2);
 
-        wait_for_all(&sig1, &sig2);
+#ifdef APP_CONFIG_DEBUG
+    mem_write32(xwr_instr, debug_rss_table + start_offset + count/2,
+                (count/2)<<2);
+#endif
+
     }
 }
 
@@ -313,28 +324,32 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
 
 
 __intrinsic void
-upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base)
+upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base,
+              uint32_t vnic_port)
 {
     __xread uint32_t xrd_rss_tbl[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
     __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
+    uint32_t abs_queue = (vnic_port * NFD_MAX_QUEUES) & 0xff;
+    uint32_t i;
 
     /* Read all 32 words of RSS table */
     mem_read32_swap(xrd_rss_tbl,
                     bar_base + NFP_NET_CFG_RSS_ITBL,
                     sizeof(xrd_rss_tbl));
 
-    reg_cp(xwr_nn_info, xrd_rss_tbl, sizeof(xrd_rss_tbl)/2);
-    reg_cp((void *)(&xwr_nn_info[16]), (void *)(&xrd_rss_tbl[16]),
-           sizeof(xrd_rss_tbl)/2);
+    /* RSS mapping table has queueid in every 8 bits, change offset of
+     * all of these :
+     * x00010203 --> x20212223
+     */
+    abs_queue = abs_queue << 24 | abs_queue << 16 | abs_queue << 8 | abs_queue;
+
+    for (i = 0; i < NFP_NET_CFG_RSS_ITBL_SZ_wrd; i++) {
+        xwr_nn_info[i] = xrd_rss_tbl[i] + abs_queue;
+    }
 
     /* Write at NN register start_offset for all worker MEs */
     upd_rss_table_instr(xwr_nn_info,  start_offset,
                         NFP_NET_CFG_RSS_ITBL_SZ_wrd);
-
-#ifdef APP_CONFIG_DEBUG
-    mem_write32(xwr_nn_info, debug_rss_table + start_offset,
-                sizeof(xwr_nn_info));
-#endif
 
     return;
 }
@@ -354,13 +369,13 @@ extract_rss_flags(uint32_t rss_ctrl)
 
     if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_TCP)
         rss_flags |= (1 << ACTION_RSS_IPV4_TCP_BIT);
-    
-    if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_UDP) 
+
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_UDP)
         rss_flags |= (1 << ACTION_RSS_IPV4_UDP_BIT);
 
-    if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_TCP) 
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_TCP)
         rss_flags |= (1 << ACTION_RSS_IPV6_TCP_BIT);
-    
+
     if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_UDP)
         rss_flags |= (1 << ACTION_RSS_IPV6_UDP_BIT);
 
@@ -397,6 +412,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     }
 #endif
 
+    reg_zero(instr, sizeof(instr));
+
     count = 2;
 
     /* mtu */
@@ -407,9 +424,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
     /* tx wire */
     instr[1].instr = INSTR_TX_WIRE;
-    instr[1].param = BUILD_PORT(NIC_NBI, NS_PLATFORM_NBI_TM_QID_LO(vnic_port));
+ //   instr[1].param = BUILD_PORT(NIC_NBI, NS_PLATFORM_NBI_TM_QID_LO(vnic_port));
     SET_PIPELINE_BIT(0, 1);
-    prev_instr = 1;
 
     reg_cp(xwr_instr, (void *)instr, count<<2);
 
@@ -448,10 +464,13 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     /* RSS */
     if (control & NFP_NET_CFG_CTRL_RSS) {
 
+        /* RSS remapping table with NN register index as start offset */
+        rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
+
         /* Udate the RSS NN table but only if RSS has changed
          * If vnic_port x write at x*32 NN register */
         if (update & NFP_NET_CFG_UPDATE_RSS) {
-            upd_rss_table(vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd, bar_base);
+            upd_rss_table(rss_tbl_nnidx, bar_base, vnic_port);
         }
 
         /* RSS flags: read rss_ctrl but only first word is used */
@@ -463,9 +482,6 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         wait_for_all(&sig1, &sig2);
 
         rss_flags = extract_rss_flags(rss_ctrl[0]);
-
-        /* RSS remapping table with NN register index as start offset */
-        rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
 
         instr[count].instr = INSTR_RSS;
         instr[count].param = (rss_tbl_nnidx << 8) | (rss_flags & 0x0f);
@@ -528,7 +544,6 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 __intrinsic void
 app_config_port_down(uint32_t vnic_port)
 {
-
     __xwrite union instruction_format xwr_instr;
     uint32_t i;
     uint32_t byte_off;
