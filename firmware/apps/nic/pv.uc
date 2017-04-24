@@ -536,44 +536,44 @@ skip_l4_offset#:
 
 #macro __pv_lso_fixup(io_vec, in_nfd_desc)
 .begin
-   
+
     .sig l3_sig
-    
+
     .reg read $l4_hdr[4] //Whether TCP or UDP we only need the first 4 LW's
     .xfer_order $l4_hdr
     .sig l4_sig1_rd, l4_sig1_wr, l4_sig2_wr
-    
+
     .reg write $l3_hdr_flush
     .reg write $l4_hdr_flush1, $l4_hdr_flush2
-    
+
     .reg pkt_len
     .reg l3_off, l4_off
     .reg mss, tmp
     .reg lso_seq
     .reg tcp_seq_add
     .reg tcp_flags_mask, tcp_flags_wrd
-   
+
 //Always assume TCP header is present
 tcp#:
     bitfield_extract__sz1(lso_seq, BF_AML(in_nfd_desc, NFD_IN_LSO_SEQ_CNT_fld))
-    bitfield_extract__sz1(l4_off, BF_AML(in_nfd_desc, NFD_IN_LSO2_L4_OFFS_fld)) ; NFD_IN_LSO2_L4_OFFS_fld  
+    bitfield_extract__sz1(l4_off, BF_AML(in_nfd_desc, NFD_IN_LSO2_L4_OFFS_fld)) ; NFD_IN_LSO2_L4_OFFS_fld
 
     mem[read32, $l4_hdr[0], BF_A(io_vec, PV_CTM_ADDR_bf), l4_off, 4], ctx_swap[l4_sig1_rd], defer[2]
         alu_shf[mss, --, b, BF_A(in_nfd_desc, NFD_IN_LSO_MSS_fld), <<(31 - BF_M(NFD_IN_LSO_MSS_fld))]; NFD_IN_LSO_MSS_fld
-        alu_shf[mss, --, b, mss, >>(31 - BF_M(NFD_IN_LSO_MSS_fld))]; NFD_IN_LSO_MSS_fld 
-    
+        alu_shf[mss, --, b, mss, >>(31 - BF_M(NFD_IN_LSO_MSS_fld))]; NFD_IN_LSO_MSS_fld
+
    /* Setup TCP sequence number
        TCP_SEQ_bf += (mss * (lso_seq - 1))*/
     alu[lso_seq, lso_seq, -, 1]
     multiply32(tcp_seq_add, mss, lso_seq, OP_SIZE_8X24)// Multiplier is 8 bits, multiplicand is 24 bits (8x24)
-    
+
     alu[$l4_hdr_flush1, $l4_hdr[BF_W(TCP_SEQ_bf)], +, tcp_seq_add]
     alu[tmp, $l4_hdr[BF_W(TCP_SEQ_bf)], +, tcp_seq_add]
-    
+
     alu[l4_off, l4_off, +, TCP_SEQ_OFFS]
-    
+
     mem[write32, $l4_hdr_flush1, BF_A(io_vec, PV_CTM_ADDR_bf), l4_off, 1], sig_done[l4_sig1_wr]
-    
+
     /* Setup TCP flags
         .if (BIT(in_nfd_lso_wrd, BF_L(NFD_IN_LSO_END_fld)))
             tcp_flags_mask = 0xffffffff
@@ -584,50 +584,50 @@ tcp#:
      */
     /* TCP stores data offset and flags and in the same 16 bit word
        Flags are bits 8 to 0. Set to all F's to preserve upper bits */
-    
+
     br_bset[BF_AL(in_nfd_desc, NFD_IN_LSO_END_fld),tcp_flags_fix_done#], defer[1]
         alu[tcp_flags_mask, --, ~b, 0]
-    
+
     alu[tcp_flags_mask, tcp_flags_mask, and~, (NET_TCP_FLAG_FIN | NET_TCP_FLAG_RST | NET_TCP_FLAG_PSH), <<16]
 tcp_flags_fix_done#:
-   
+
     alu[tmp, BF_A($l4_hdr, TCP_FLAGS_bf), and, tcp_flags_mask]
-    
+
     alu[$l4_hdr_flush2, BF_A($l4_hdr, TCP_FLAGS_bf), and, tcp_flags_mask]
-    
+
     alu[l4_off, l4_off, +, (TCP_FLAGS_OFFS - TCP_SEQ_OFFS)]
 
     mem[write8, $l4_hdr_flush2, BF_A(io_vec, PV_CTM_ADDR_bf), l4_off, 2], sig_done[l4_sig2_wr]
-            
+
     //Make sure L4 CSUM is calculated
     alu[BF_A(io_vec, PV_CSUM_OFFLOAD_L4_bf), BF_A(io_vec, PV_CSUM_OFFLOAD_L4_bf), OR, 1, <<BF_L(PV_CSUM_OFFLOAD_L4_bf)]
-   
-    bitfield_extract__sz1(l3_off, BF_AML(in_nfd_desc, NFD_IN_LSO2_L3_OFFS_fld)) ; NFD_IN_LSO2_L3_OFFS_fld 
-    
+
+    bitfield_extract__sz1(l3_off, BF_AML(in_nfd_desc, NFD_IN_LSO2_L3_OFFS_fld)) ; NFD_IN_LSO2_L3_OFFS_fld
+
     alu[pkt_len, --, b, BF_A(io_vec, PV_LENGTH_bf), <<(31 - BF_M(PV_LENGTH_bf))] ; PV_LENGTH_bf
-    
+
     br_bclr[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_IPV4_CSUM_fld), ipv6#], defer[3]
         /* Setup IPv4/IPv6 length field
         length = pkt_len - l3_off */
         alu[pkt_len, --, b, pkt_len, >>(31 - BF_M(PV_LENGTH_bf))] ; PV_LENGTH_bf
         alu[tmp, pkt_len, -, l3_off]
         alu[$l3_hdr_flush, --, b, tmp, <<16]
-    
+
 ipv4#:
     // Make sure IPv4 header CSUM is calculated
-    alu[BF_A(io_vec, PV_CSUM_OFFLOAD_L3_bf), BF_A(io_vec, PV_CSUM_OFFLOAD_L3_bf), OR, 1, <<BF_L(PV_CSUM_OFFLOAD_L3_bf)] 
-    
+    alu[BF_A(io_vec, PV_CSUM_OFFLOAD_L3_bf), BF_A(io_vec, PV_CSUM_OFFLOAD_L3_bf), OR, 1, <<BF_L(PV_CSUM_OFFLOAD_L3_bf)]
+
     br[l3_wr#], defer [1]
-        alu[l3_off, l3_off, +, IPV4_LEN_OFFS]    
-      
+        alu[l3_off, l3_off, +, IPV4_LEN_OFFS]
+
 ipv6#:
     alu[l3_off, l3_off, +, IPV6_PAYLOAD_OFFS]
 
 l3_wr#:
-    //Issue L3 header write 
+    //Issue L3 header write
     mem[write8, $l3_hdr_flush, BF_A(io_vec, PV_CTM_ADDR_bf), l3_off, 2], sig_done[l3_sig]
-    ctx_arb[l3_sig, l4_sig1_wr, l4_sig2_wr]   
- 
+    ctx_arb[l3_sig, l4_sig1_wr, l4_sig2_wr]
+
 .end
 #endm
 
