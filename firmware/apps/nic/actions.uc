@@ -95,7 +95,10 @@ is_multicast#:
     .reg queue_shf
     .reg queue_off
 
-    // skip RSS for unkown L3
+    __actions_read(opcode, --, --)
+    __actions_read(key, --, --)
+
+     // skip RSS for unkown L3
     bitfield_extract__sz1(l3_info, BF_AML(in_pkt_vec, PV_PARSE_L3I_bf))
     beq[skip_rss#]
 
@@ -106,8 +109,6 @@ is_multicast#:
     // skip RSS for 2 or more VLANs
     br_bset[BF_A(in_pkt_vec, PV_PARSE_VLD_bf), BF_M(PV_PARSE_VLD_bf), skip_rss#]
 
-    __actions_read(opcode, --, --)
-    __actions_read(key, --, --)
     local_csr_wr[CRC_REMAINDER, key]
 
     // seek to L3 source address
