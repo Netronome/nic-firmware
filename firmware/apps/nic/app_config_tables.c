@@ -367,10 +367,7 @@ extract_rss_flags(uint32_t rss_ctrl)
     return rss_flags;
 }
 
-#define SET_PIPELINE_BIT(prev, current) \
-    if (instr[current].instr - instr[prev].instr == 1) \
-        instr[current].pipeline = 1;
-
+#define SET_PIPELINE_BIT(prev, current) instr[current].pipeline = (instr[current].instr - instr[prev].instr == 1) ? 1 : 0;
 
 __intrinsic void
 app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
