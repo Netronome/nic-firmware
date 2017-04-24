@@ -567,7 +567,6 @@ tcp#:
     multiply32(tcp_seq_add, mss, lso_seq, OP_SIZE_8X24)// Multiplier is 8 bits, multiplicand is 24 bits (8x24)
 
     alu[$l4_hdr_flush1, $l4_hdr[BF_W(TCP_SEQ_bf)], +, tcp_seq_add]
-    alu[tmp, $l4_hdr[BF_W(TCP_SEQ_bf)], +, tcp_seq_add]
 
     alu[l4_off, l4_off, +, TCP_SEQ_OFFS]
 
@@ -589,8 +588,6 @@ tcp#:
 
     alu[tcp_flags_mask, tcp_flags_mask, and~, (NET_TCP_FLAG_FIN | NET_TCP_FLAG_RST | NET_TCP_FLAG_PSH), <<16]
 tcp_flags_fix_done#:
-
-    alu[tmp, BF_A($l4_hdr, TCP_FLAGS_bf), and, tcp_flags_mask]
 
     alu[$l4_hdr_flush2, BF_A($l4_hdr, TCP_FLAGS_bf), and, tcp_flags_mask]
 
