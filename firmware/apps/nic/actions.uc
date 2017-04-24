@@ -241,6 +241,7 @@ rss#:
     __actions_next()
 
 checksum_complete#:
+    __actions_read(--, --, --)
     pv_propagate_mac_csum_status(in_pkt_vec) // checksum unecessary for now
     __actions_next()
 
