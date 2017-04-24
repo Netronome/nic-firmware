@@ -68,12 +68,11 @@
     bne[DROP_LABEL]
     alu[tmp, mac[1], XOR, *$index++]
 
-    __actions_restore_t_idx()
-
     alu[--, --, B, tmp, >>16]
     bne[DROP_LABEL]
 
 is_multicast#:
+    __actions_restore_t_idx()
 .end
 #endm
 
