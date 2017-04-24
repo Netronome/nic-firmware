@@ -329,7 +329,7 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base,
 {
     __xread uint32_t xrd_rss_tbl[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
     __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
-    uint32_t abs_queue = (vnic_port * NFD_MAX_QUEUES) & 0xff;
+    uint32_t abs_queue = 0; //(vnic_port * NFD_MAX_QUEUES) & 0xff;
     uint32_t i;
 
     /* Read all 32 words of RSS table */
