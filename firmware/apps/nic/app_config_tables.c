@@ -46,7 +46,7 @@
  * Global declarations for configuration change management
  */
 
-// #define APP_CONFIG_DEBUG
+#define APP_CONFIG_DEBUG
 
 // #define APP_CFG_STATS
 
@@ -340,7 +340,7 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base,
 {
     __xread uint32_t xrd_rss_tbl[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
     __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
-    uint32_t abs_queue = 0; //(vnic_port * NFD_MAX_QUEUES) & 0xff;
+    uint32_t abs_queue = (vnic_port * NFD_MAX_PF_QUEUES) & 0xff;
     uint32_t i;
 
     /* Read all 32 words of RSS table */
@@ -441,7 +441,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         uint32_t offset = (uint64_t)&nic_stats_extra[vnic_port].tx_discards
                         - (uint64_t)&nic_stats_extra[0];
         instr[count].value = (uint32_t)offset;
-        local_csr_write(local_csr_mailbox0, offset);
+//         local_csr_write(local_csr_mailbox0, offset);
         count++;
     }
 #endif
@@ -483,7 +483,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
                         - (uint64_t)&nic_stats_extra[0];
         instr[count].value = (uint32_t)offset;
         count++;
-        local_csr_write(local_csr_mailbox1, offset);
+//         local_csr_write(local_csr_mailbox1, offset);
     }
 #endif
 
