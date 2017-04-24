@@ -189,7 +189,7 @@
 
 
 #macro pv_get_length(out_length, in_vec)
-    alu[out_length, 0, +16, BF_A(PV_LENGTH_bf)] ; PV_LENGTH_bf
+    alu[out_length, 0, +16, BF_A(in_vec, PV_LENGTH_bf)] ; PV_LENGTH_bf
     alu[out_length, out_length, AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
 #endm
 
