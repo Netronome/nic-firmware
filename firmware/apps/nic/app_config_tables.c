@@ -34,7 +34,7 @@
  * Global declarations for configuration change management
  */
 
-#define APP_CONFIG_DEBUG
+// #define APP_CONFIG_DEBUG
 
 // #define APP_CFG_STATS
 
@@ -212,16 +212,13 @@ upd_rss_table_instr(__xwrite uint32_t *xwr_instr, uint32_t start_offset,
         ct_nn_write(xwr_instr, &command, count/2, sig_done, &sig1);
         wait_for_all(&sig1);
 
-#ifdef APP_CONFIG_DEBUG
-    mem_write32(xwr_instr, debug_rss_table + start_offset,
-                (count/2)<<2);
-#endif
-
         command.NN_reg_num = start_offset + count/2;
         ct_nn_write(&xwr_instr[count/2], &command, count/2, sig_done, &sig2);
         wait_for_all(&sig2);
 
 #ifdef APP_CONFIG_DEBUG
+    mem_write32(xwr_instr, debug_rss_table + start_offset,
+                (count/2)<<2);
     mem_write32(xwr_instr, debug_rss_table + start_offset + count/2,
                 (count/2)<<2);
 #endif
