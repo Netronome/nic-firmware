@@ -361,15 +361,15 @@ skip_checksum_complete#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, i0#], targets[i0#, i1#, i2#, i3#, i4#, i5#, i6#]
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#] ;actions_jump
 
-        i0#: br[drop#]
-        i1#: br[mtu#]
-        i2#: br[mac#]
-        i3#: br[rss#]
-        i4#: br[checksum_complete#]
-        i5#: br[tx_host#]
-        i6#: br[tx_wire#]
+        ins_0#: br[drop#]
+        ins_1#: br[mtu#]
+        ins_2#: br[mac#]
+        ins_3#: br[rss#]
+        ins_4#: br[checksum_complete#]
+        ins_5#: br[tx_host#]
+        ins_6#: br[tx_wire#]
 
 drop#:
     br[SILENT_DROP_LABEL]
