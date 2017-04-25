@@ -58,6 +58,25 @@ $(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei2.me11,-DNS_P
 # Add 1 BLM ME
 $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
+# Add microcode datapath
+$(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
+$(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,$(BLM_DIR)))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,$(GRO_DIR)))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,SS=0))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=4))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
+$(eval $(call nffw.add_obj,$(PROJECT),datapath, \
+        mei0.me0 mei0.me1 mei0.me2 mei0.me3 \
+        mei1.me0 mei1.me1 mei1.me2 mei1.me3 \
+        mei2.me0 mei2.me1 mei2.me2 mei2.me3 \
+	mei3.me0 mei3.me1 mei3.me2 mei3.me3 \
+	mei4.me0 mei4.me1 mei4.me2 mei4.me3 \
+	))
+	
 # Custom config to give ME list to the app master
 define NIC_ISL_ME_DEST
 ((($(1) + 32) << 4) + ($(2) + 4))
@@ -121,24 +140,7 @@ $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_sb,-DNS_PLATFORM_TYPE=$(N
 $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_pd,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call fwdep.add_nfd_out,$(PROJECT),0,ila0.me1,ila0.me2 ila0.me3)) # Stage batch, then packet DMA MEs
 
-# Add microcode datapath
-$(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
-$(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
-$(eval $(call microcode.add_include,$(PROJECT),datapath,$(BLM_DIR)))
-$(eval $(call microcode.add_include,$(PROJECT),datapath,$(GRO_DIR)))
-$(eval $(call microcode.add_define,$(PROJECT),datapath,SS=0))
-$(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
-$(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
-$(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=4))
-$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
-$(eval $(call nffw.add_obj,$(PROJECT),datapath, \
-        mei0.me0 mei0.me1 mei0.me2 mei0.me3 \
-        mei1.me0 mei1.me1 mei1.me2 mei1.me3 \
-        mei2.me0 mei2.me1 mei2.me2 mei2.me3 \
-	mei3.me0 mei3.me1 mei3.me2 mei3.me3 \
-	mei4.me0 mei4.me1 mei4.me2 mei4.me3 \
-	))
+
 
 # Add TM PM initialization (codeless)
 $(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,lib/infra_basic,init_pms.uc,-DPMS_INIT_TM=1 -DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
