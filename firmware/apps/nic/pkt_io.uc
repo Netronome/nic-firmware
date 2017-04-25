@@ -22,7 +22,7 @@ nfd_out_send_init()
 
 timestamp_enable()
 
-.reg write $__pkt_io_gro_meta[GRO_META_SIZE_LW]
+.reg volatile write $__pkt_io_gro_meta[GRO_META_SIZE_LW]
 .xfer_order $__pkt_io_gro_meta
 
 
