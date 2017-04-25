@@ -419,7 +419,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
     instr[count].instr = INSTR_MTU;
-    instr[count].param = mtu + NET_ETH_LEN; // add eth hdr len
+    instr[count].param = mtu + NET_ETH_LEN + 1; // add eth hdr len, plus one to cause borrow on subtract of MTU from pkt len
     prev_instr = count;
     count++;
 
