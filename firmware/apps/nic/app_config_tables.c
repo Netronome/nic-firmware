@@ -392,7 +392,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     __xread uint32_t nic_mac[2];
     __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
     __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
-    __gpr union instruction_format instr[NIC_MAX_INSTR];
+    __lmem union instruction_format instr[NIC_MAX_INSTR];
     SIGNAL sig1, sig2;
     uint32_t rss_flags;
     uint32_t rss_tbl_nnidx;
@@ -473,61 +473,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     }
 #endif
 
-    if (control & NFP_NET_CFG_CTRL_PROMISC) {
-        /* RSS */
-        if (control & NFP_NET_CFG_CTRL_RSS) {
-
-            /* RSS remapping table with NN register index as start offset */
-            rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
-
-            /* Udate the RSS NN table but only if RSS has changed
-            * If vnic_port x write at x*32 NN register */
-            if (update & NFP_NET_CFG_UPDATE_RSS) {
-                upd_rss_table(rss_tbl_nnidx, bar_base, vnic_port);
-            }
-
-            /* RSS flags: read rss_ctrl but only first word is used */
-            __mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
-                    sizeof(rss_ctrl), sizeof(rss_ctrl), sig_done, &sig1);
-            __mem_read64(rss_key, bar_base + NFP_NET_CFG_RSS_KEY,
-                    NFP_NET_CFG_RSS_KEY_SZ, NFP_NET_CFG_RSS_KEY_SZ,
-                    sig_done, &sig2);
-            wait_for_all(&sig1, &sig2);
-
-            rss_flags = extract_rss_flags(rss_ctrl[0]);
-
-            instr[count].instr = INSTR_RSS;
-            instr[count].param = (rss_tbl_nnidx << 8) | (rss_flags & 0x0f);
-            SET_PIPELINE_BIT(prev_instr, count);
-            prev_instr = count;
-            count++;
-
-            /* RSS key: provide rss key with hash. Use only first word */
-            instr[count++].value = rss_key[0];
-
-            /* calculate checksum and drop if mismatch (drop port is included) */
-            instr[count].instr = INSTR_CHECKSUM_COMPLETE;
-            SET_PIPELINE_BIT(prev_instr, count);
-            prev_instr = count;
-            count++;
-
-            instr[count].instr = INSTR_TX_HOST;
-            SET_PIPELINE_BIT(prev_instr, count);
-            prev_instr = count;
-            count++;
-
-            reg_cp(xwr_instr, instr, count << 2);
-
-        } else {
-            instr[count].instr = INSTR_TX_HOST;
-            SET_PIPELINE_BIT(prev_instr, count);
-            prev_instr = count;
-            count++;
-
-            reg_cp(xwr_instr, (void *)instr, count<<2);
-        }
-    } else {
-
+    if (!(control & NFP_NET_CFG_CTRL_PROMISC)) {
         /* MAC address */
         mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
                     sizeof(nic_mac));
@@ -537,60 +483,61 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         prev_instr = count;
         count++;
         instr[count++].value = nic_mac[0];
-
-        /* RSS */
-        if (control & NFP_NET_CFG_CTRL_RSS) {
-
-            /* RSS remapping table with NN register index as start offset */
-            rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
-
-            /* Udate the RSS NN table but only if RSS has changed
-            * If vnic_port x write at x*32 NN register */
-            if (update & NFP_NET_CFG_UPDATE_RSS) {
-                upd_rss_table(rss_tbl_nnidx, bar_base, vnic_port);
-            }
-
-            /* RSS flags: read rss_ctrl but only first word is used */
-            __mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
-                    sizeof(rss_ctrl), sizeof(rss_ctrl), sig_done, &sig1);
-            __mem_read64(rss_key, bar_base + NFP_NET_CFG_RSS_KEY,
-                    NFP_NET_CFG_RSS_KEY_SZ, NFP_NET_CFG_RSS_KEY_SZ,
-                    sig_done, &sig2);
-            wait_for_all(&sig1, &sig2);
-
-            rss_flags = extract_rss_flags(rss_ctrl[0]);
-
-            instr[count].instr = INSTR_RSS;
-            instr[count].param = (rss_tbl_nnidx << 8) | (rss_flags & 0x0f);
-            SET_PIPELINE_BIT(prev_instr, count);
-            prev_instr = count;
-            count++;
-
-            /* RSS key: provide rss key with hash. Use only first word */
-            instr[count++].value = rss_key[0];
-
-            /* calculate checksum and drop if mismatch (drop port is included) */
-            instr[count].instr = INSTR_CHECKSUM_COMPLETE;
-            SET_PIPELINE_BIT(prev_instr, count);
-            prev_instr = count;
-            count++;
-
-            instr[count].instr = INSTR_TX_HOST;
-            SET_PIPELINE_BIT(prev_instr, count);
-            prev_instr = count;
-            count++;
-
-            reg_cp(xwr_instr, instr, count << 2);
-
-        } else {
-            instr[count].instr = INSTR_TX_HOST;
-            SET_PIPELINE_BIT(prev_instr, count);
-            prev_instr = count;
-            count++;
-
-            reg_cp(xwr_instr, (void *)instr, count<<2);
-        }
     }
+
+    /* RSS */
+    if (control & NFP_NET_CFG_CTRL_RSS) {
+
+        /* RSS remapping table with NN register index as start offset */
+        rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
+
+        /* Udate the RSS NN table but only if RSS has changed
+        * If vnic_port x write at x*32 NN register */
+        if (update & NFP_NET_CFG_UPDATE_RSS) {
+            upd_rss_table(rss_tbl_nnidx, bar_base, vnic_port);
+        }
+
+        /* RSS flags: read rss_ctrl but only first word is used */
+        __mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
+                sizeof(rss_ctrl), sizeof(rss_ctrl), sig_done, &sig1);
+        __mem_read64(rss_key, bar_base + NFP_NET_CFG_RSS_KEY,
+                NFP_NET_CFG_RSS_KEY_SZ, NFP_NET_CFG_RSS_KEY_SZ,
+                sig_done, &sig2);
+        wait_for_all(&sig1, &sig2);
+
+        rss_flags = extract_rss_flags(rss_ctrl[0]);
+
+        instr[count].instr = INSTR_RSS;
+        instr[count].param = (rss_tbl_nnidx << 8) | (rss_flags & 0x0f);
+        SET_PIPELINE_BIT(prev_instr, count);
+        prev_instr = count;
+        count++;
+
+        /* RSS key: provide rss key with hash. Use only first word */
+        instr[count++].value = rss_key[0];
+
+        /* calculate checksum and drop if mismatch (drop port is included) */
+        instr[count].instr = INSTR_CHECKSUM_COMPLETE;
+        SET_PIPELINE_BIT(prev_instr, count);
+        prev_instr = count;
+        count++;
+
+        instr[count].instr = INSTR_TX_HOST;
+        SET_PIPELINE_BIT(prev_instr, count);
+        prev_instr = count;
+        count++;
+
+        reg_cp(xwr_instr, instr, NIC_MAX_INSTR<<2);
+
+    } else {
+        instr[count].instr = INSTR_TX_HOST;
+        SET_PIPELINE_BIT(prev_instr, count);
+        prev_instr = count;
+        count++;
+
+        reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
+    }
+
 
     /* map vnic_port to NBI index in the instruction table */
     byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic_port) * NIC_MAX_INSTR;
