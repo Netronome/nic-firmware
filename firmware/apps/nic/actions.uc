@@ -398,6 +398,11 @@ tx_host#:
 tx_wire#:
     pkt_io_tx_wire(in_pkt_vec, EGRESS_LABEL, COUNT_DROP_LABEL)
 
+    #pragma warning(push)
+    #pragma warning(disable: 4702) // Disable warning "Unreachable Code"
+    aggregate_directive(.use, $actions, NIC_MAX_INSTR)
+    aggregate_directive(.use, $__pv_pkt_data, 32)
+    #pragma warning(pop)
 .end
 #endm
 
