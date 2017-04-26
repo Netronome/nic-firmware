@@ -71,7 +71,8 @@ enum instruction_type {
     INSTR_RSS,
     INSTR_CHECKSUM_COMPLETE,
     INSTR_TX_HOST,
-    INSTR_TX_WIRE
+    INSTR_TX_WIRE,
+	INSTR_CMSG
 };
 
 
