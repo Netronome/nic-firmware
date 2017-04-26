@@ -162,6 +162,6 @@
  * that might be issued at any time. */
 #define NFD_OUT_RING_SZ         (2 * 16 * 64 * NFD_QUEUE_CREDITS)
 
-#define NFD_OUT_RX_OFFSET       NFP_NET_RX_OFFSET
+#define NFD_OUT_RX_OFFSET       NFP_NET_CFG_RX_OFFSET_DYNAMIC
 
 #endif /* !_NFD_USER_CFG_H_ */
