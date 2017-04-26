@@ -64,7 +64,7 @@ multicast#:
     br[done#]
 
 check_mac#:
-    pv_seek(in_pkt_vec, 0, 6)
+    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
 
     br_bset[*$index, BF_L(MAC_MULTICAST_bf), multicast#]
 
@@ -96,7 +96,7 @@ done#:
     __actions_read(mac[1], --, <<16)
     __actions_read(mac[0], --, --)
 
-    pv_seek(in_pkt_vec, 0, 6)
+    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
 
     // permit multicast and broadcast addresses to pass
     br_bset[*$index, BF_L(MAC_MULTICAST_bf), pass#]
@@ -152,7 +152,7 @@ pass#:
     alu[l3_offset, l3_offset, +, (14 + 8)] // 14 bytes for Ethernet, 8 bytes of IP header
     alu[ipv4_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 2)] // 4 bytes extra for IPv4
     alu[l3_offset, l3_offset, +, ipv4_delta]
-    pv_seek(in_pkt_vec, l3_offset, 32)
+    pv_seek(in_pkt_vec, l3_offset, PV_SEEK_CTM_ONLY)
 
     byte_align_be[--, *$index++]
     byte_align_be[data, *$index++]
@@ -189,7 +189,7 @@ process_l4#:
     alu[--, opcode, AND, 1, <<indirect]
     beq[skip_l4#]
 
-    pv_seek(in_pkt_vec, l4_offset, 4)
+    pv_seek(in_pkt_vec, l4_offset, 4, PV_SEEK_CTM_ONLY)
     byte_align_be[--, *$index++]
     byte_align_be[data, *$index++]
     crc_be[crc_32, --, data]
