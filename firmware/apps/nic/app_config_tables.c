@@ -64,9 +64,6 @@
     __shared __lmem uint32_t cfg_mes_ids[] = {APP_MES_LIST};
 #endif
 
-/* Statistics */
-//__import __shared __imem struct nic_port_stats_extra nic_stats_extra[NFD_MAX_PFS];
-
 
 #define NIC_NBI 0
 
@@ -85,6 +82,10 @@
 #define BUILD_HOST_PORT(_pcie, _vf, _q) \
   BUILD_PORT(_pcie, NFD_BUILD_QID((_vf), (_q)))
 
+
+  /*
+   * Debug
+   */
 #ifdef APP_CONFIG_DEBUG
 enum {
     PORT_CFG    = 1,
@@ -108,10 +109,9 @@ __export __emem __addr40 uint32_t debug_rss_table[100];
 #endif
 
 
+
 /* RSS table length in words */
 #define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
-
-
 
 
 /* Cluster target NN write defines and structures */
@@ -366,7 +366,7 @@ extract_rss_flags(uint32_t rss_ctrl)
 {
     uint32_t rss_flags = 0;
 
-    // Our driver does L3 unconditionally, so we only care about L4 combinations
+    // Driver does L3 unconditionally, so we only care about L4 combinations
 
     if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_TCP)
         rss_flags |= (1 << ACTION_RSS_IPV4_TCP_BIT);
@@ -383,7 +383,9 @@ extract_rss_flags(uint32_t rss_ctrl)
     return rss_flags;
 }
 
-#define SET_PIPELINE_BIT(prev, current) instr[current].pipeline = (instr[current].instr - instr[prev].instr == 1) ? 1 : 0;
+#define SET_PIPELINE_BIT(prev, current) \
+    instr[current].pipeline = \
+    (instr[current].instr - instr[prev].instr == 1) ? 1 : 0;
 
 __intrinsic void
 app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
@@ -399,34 +401,28 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     uint32_t rss_flags;
     uint32_t rss_tbl_nnidx;
     uint32_t byte_off;
-    uint32_t mask;
     uint32_t count;
     uint32_t prev_instr = 0;
-    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
+    __imem struct nic_port_stats_extra *nic_stats_extra =
+        (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
 
-#ifdef APP_CONFIG_DEBUG
-    {
-        union debug_instr_journal data;
-        data.value = 0x00;
-        data.event = PORT_CFG;
-        data.param = vnic_port;
-        JDBG(app_debug_jrn, data.value);
-    }
-#endif
-
+    /*
+     * RX HOST --> TX WIRE
+     */
     reg_zero(instr, sizeof(instr));
-
     count = 0;
 
     instr[count].instr = INSTR_STATISTICS;
-    instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].tx_uc_octets - (uint64_t)&nic_stats_extra[0]) >> 3;
+    instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].tx_uc_octets
+                            - (uint64_t)&nic_stats_extra[0]) >> 3;
     prev_instr = count++;
 
     /* mtu */
     mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
     instr[count].instr = INSTR_MTU;
-    instr[count].param = mtu + NET_ETH_LEN + 1; // add eth hdr len, plus one to cause borrow on subtract of MTU from pkt len
+    // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
+    instr[count].param = mtu + NET_ETH_LEN + 1;
     SET_PIPELINE_BIT(prev_instr, count);
     prev_instr = count++;
 
@@ -442,25 +438,22 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     upd_rx_host_instr (xwr_instr, byte_off<<2, count);
 
 
-#ifdef APP_CONFIG_DEBUG
-    {
-        union debug_instr_journal data;
-        data.value = 0x00;
-        data.event = MTU;
-        data.param = mtu;
-        JDBG(app_debug_jrn, data.value);
-    }
-#endif
-
+    /*
+     * RX WIRE --> TX HOST
+     */
     count = 0;
 
+    reg_zero(instr, sizeof(instr));
+
     instr[count].instr = INSTR_STATISTICS;
-    instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].rx_uc_octets - (uint64_t)&nic_stats_extra[0]) >> 3;
+    instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].rx_uc_octets
+                            - (uint64_t)&nic_stats_extra[0]) >> 3;
     SET_PIPELINE_BIT(prev_instr, count);
     prev_instr = count++;
 
     instr[count].instr = INSTR_MTU;
-    instr[count].param = mtu + NET_ETH_LEN + 1; // add eth hdr len, plus one to cause borrow on subtract of MTU from pkt len
+    // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
+    instr[count].param = mtu + NET_ETH_LEN + 1;
     SET_PIPELINE_BIT(prev_instr, count);
     prev_instr = count++;
 
@@ -505,7 +498,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         /* RSS key: provide rss key with hash. Use only first word */
         instr[count++].value = rss_key[0];
 
-        /* calculate checksum and drop if mismatch (drop port is included) */
+        /* calculate checksum and drop if mismatch */
         instr[count].instr = INSTR_CHECKSUM_COMPLETE;
         SET_PIPELINE_BIT(prev_instr, count);
         prev_instr = count++;
@@ -530,6 +523,16 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
     /* write TX instr to local table and to other islands too */
     upd_rx_wire_instr(xwr_instr, byte_off<<2, count);
+
+#ifdef APP_CONFIG_DEBUG
+    {
+        union debug_instr_journal data;
+        data.value = 0x00;
+        data.event = PORT_CFG;
+        data.param = vnic_port;
+        JDBG(app_debug_jrn, data.value);
+    }
+#endif
 
     return;
 }
