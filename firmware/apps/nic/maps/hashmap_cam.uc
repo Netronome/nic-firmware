@@ -20,7 +20,7 @@
 /*
  *	addr_hi:		addr of hashmap table
  *  addr_lo:		offset to start of entry in hashmap table
- *	ov_cam_offset: 	offset to start of ov cam 
+ *	ov_cam_offset: 	offset to start of ov cam
  *  ov_entry_offset:offset to start of ov entries
  *  ov_offset:		offset to ov entry containing pool offset
  *  pool_offset		offset to freelist pool entry
@@ -30,7 +30,7 @@
 	struct mem_cam_24bit {
 		union {
 			struct {
-			unsigned int value;  Lower 24 bits valid 
+			unsigned int value;  Lower 24 bits valid
         } search;
 
         struct {
@@ -366,12 +366,12 @@ compare_key#:
 	br[FOUND_LABEL], defer[2]
 		alu[out_addr_hi, --, b, freelist_hi]
 		alu[out_addr_lo, --, b, pool_offset]
-	#undef __OV_IDX_SHFT__ 
+	#undef __OV_IDX_SHFT__
 
 comp_next_match#:
 	ffs[match_idx, match_bitmap]
 	bne[match#]
-	
+
 ret#:
 
 .end
@@ -400,7 +400,7 @@ ret#:
 
 	alu[ov_idx, --,b, io_state, >>__HASHMAP_DESC_OV_IDX]
 	br_bclr[io_state, __HASHMAP_DESC_OV_BIT, cont#], defer[1]
-	alu[ov_idx, ov_idx, and, 7] 
+	alu[ov_idx, ov_idx, and, 7]
 
 	alu[ov_idx, ov_idx, +, 1]
 

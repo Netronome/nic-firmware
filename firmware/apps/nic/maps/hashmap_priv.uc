@@ -199,7 +199,7 @@
 
 
 /*
- * T_INDEX: see DB  5.3.7.3.  
+ * T_INDEX: see DB  5.3.7.3.
  * T_INDEX is in class 1 of indices.  There is a single CSR which is read/written by all contexts
  */
 
@@ -246,7 +246,7 @@ cont#:
 	alu[o_tindex, (&$map_txfr[0] << 2), OR, my_act_ctx, <<7]
 
 	ctx_arb[read_sig]
-	
+
 ret#:
 .end
 #endm
@@ -260,7 +260,7 @@ ret#:
 	alu[--, io_tindex, -, 0]
 	beq[do_read#]
 
-	alu[start_tindex, (&$map_txfr[0] << 2), OR, my_act_ctx, <<7] 
+	alu[start_tindex, (&$map_txfr[0] << 2), OR, my_act_ctx, <<7]
 	alu[consumed, io_tindex, -, start_tindex]
 	alu[consumed, --, b, consumed, >>2]
 	alu[avail, HASHMAP_TXFR_COUNT, -, consumed]

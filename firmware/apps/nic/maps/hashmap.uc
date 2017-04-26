@@ -1,9 +1,9 @@
 /*
  * Copyright (C) 2014-2017,  Netronome Systems, Inc.  All rights reserved.
  *
- * @file        hashmap.uc 
+ * @file        hashmap.uc
  * @brief       basic lookup table implementation.
- * 
+ *
  */
 #ifndef __HASHMAP_UC__
 #define __HASHMAP_UC__
@@ -96,13 +96,13 @@
  */
 
 /*
- * typedef __packed struct { 
+ * typedef __packed struct {
  *   union {
  *       struct {
  *           uint32_t valid : 1;
  *           uint32_t reserved1: 10;
  *			 uint32_t reserved_ov_idx:4 bit 17..19
- *			 uint32_t reserved_ov:1;	bit 16 - use in state only, not in mem	
+ *			 uint32_t reserved_ov:1;	bit 16 - use in state only, not in mem
  *			 uint32_t spare: 1;
  *			 uint32_t lock_excl: 1;		bit 14
  *           uint32_t lock_cnt : 13;
@@ -140,9 +140,9 @@
 /*
  * typedef struct {
  *   __hashmap_descriptor_t  desc;	4 bytes (1 words)
- *   uint32_t                data[HASHMAP_MAX_KEY_VALUE_LW];	key=40,value=24,64 bytes 
- *   uint32_t				 ov_cam[8];  
- *   uint32_t				 ov_offset[8] 
+ *   uint32_t                data[HASHMAP_MAX_KEY_VALUE_LW];	key=40,value=24,64 bytes
+ *   uint32_t				 ov_cam[8];
+ *   uint32_t				 ov_offset[8]
  * } __hashmap_entry_t;
  */
 #define __HASHMAP_ENTRY_NDX_DESC	0
@@ -621,7 +621,7 @@ ret#:
 		#undef __DBG_HASH_MASK__
 		move(hash[1], 0xbeef)
 		alu[hash[1], hash[1], or, dbg_tmp, <<16]
-	#endif	
+	#endif
 #endm
 
 
