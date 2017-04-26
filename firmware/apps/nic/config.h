@@ -669,7 +669,7 @@
 /*
  * BLM configuration
  */
-#include <infra/blm_custom.h>
+#include "blm_custom.h"
 
 
 /*
