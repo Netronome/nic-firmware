@@ -109,6 +109,29 @@ __export __emem __addr40 uint32_t debug_rss_table[100];
 #endif
 
 
+// #define GEN_INSTRUCTION
+#ifdef GEN_INSTRUCTION
+/*
+ * By running py script, and generating array: instr_tbl from actions:
+ * targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#] ;actions_jump
+./parse_list.py --label_prefix=ins_ --jump_table_tag=instr_tbl datapath.list
+
+Also, it is expected that it matches:
+enum instruction_type {
+    INSTR_TX_DROP = 0,
+    INSTR_STATISTICS,
+    INSTR_MTU,
+    INSTR_MAC,
+    INSTR_RSS,
+    INSTR_CHECKSUM_COMPLETE,
+    INSTR_TX_HOST,
+    INSTR_TX_WIRE,
+    INSTR_CMSG
+};
+*/
+unsigned int instr_tbl[] = {0, 1, 2, 3, 4, 5, 6, 7};
+#endif
+
 
 /* RSS table length in words */
 #define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
@@ -412,7 +435,12 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     reg_zero(instr, sizeof(instr));
     count = 0;
 
+#ifdef GEN_INSTRUCTION
+    instr[count].instr = instr_tbl[INSTR_STATISTICS];
+#else
     instr[count].instr = INSTR_STATISTICS;
+#endif
+
     instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].tx_uc_octets
                             - (uint64_t)&nic_stats_extra[0]) >> 3;
     prev_instr = count++;
@@ -420,14 +448,23 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     /* mtu */
     mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
+#ifdef GEN_INSTRUCTION
+    instr[count].instr = instr_tbl[INSTR_MTU];
+#else
     instr[count].instr = INSTR_MTU;
+#endif
+
     // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
     instr[count].param = mtu + NET_ETH_LEN + 1;
     SET_PIPELINE_BIT(prev_instr, count);
     prev_instr = count++;
 
     /* tx wire */
+#ifdef GEN_INSTRUCTION
+    instr[count].instr = instr_tbl[INSTR_TX_WIRE];
+#else
     instr[count].instr = INSTR_TX_WIRE;
+#endif
     SET_PIPELINE_BIT(prev_instr, count);
     prev_instr = count++;
 
@@ -442,16 +479,25 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
      * RX WIRE --> TX HOST
      */
     count = 0;
+    prev_instr = 0;
 
     reg_zero(instr, sizeof(instr));
 
+#ifdef GEN_INSTRUCTION
+    instr[count].instr = instr_tbl[INSTR_STATISTICS];
+#else
     instr[count].instr = INSTR_STATISTICS;
+#endif
+
     instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].rx_uc_octets
                             - (uint64_t)&nic_stats_extra[0]) >> 3;
-    SET_PIPELINE_BIT(prev_instr, count);
     prev_instr = count++;
 
+#ifdef GEN_INSTRUCTION
+    instr[count].instr = instr_tbl[INSTR_MTU];
+#else
     instr[count].instr = INSTR_MTU;
+#endif
     // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
     instr[count].param = mtu + NET_ETH_LEN + 1;
     SET_PIPELINE_BIT(prev_instr, count);
@@ -461,7 +507,11 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         /* MAC address */
         mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
                     sizeof(nic_mac));
+#ifdef GEN_INSTRUCTION
+        instr[count].instr = instr_tbl[INSTR_MAC];
+#else
         instr[count].instr = INSTR_MAC;
+#endif
         instr[count].param = (nic_mac[1] >> 16);
         SET_PIPELINE_BIT(prev_instr, count);
         prev_instr = count++;
@@ -490,7 +540,11 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
         rss_flags = extract_rss_flags(rss_ctrl[0]);
 
+#ifdef GEN_INSTRUCTION
+        instr[count].instr = instr_tbl[INSTR_RSS];
+#else
         instr[count].instr = INSTR_RSS;
+#endif
         instr[count].param = (rss_tbl_nnidx << 8) | (rss_flags & 0x0f);
         SET_PIPELINE_BIT(prev_instr, count);
         prev_instr = count++;
@@ -499,18 +553,30 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         instr[count++].value = rss_key[0];
 
         /* calculate checksum and drop if mismatch */
+#ifdef GEN_INSTRUCTION
+        instr[count].instr = instr_tbl[INSTR_CHECKSUM_COMPLETE];
+#else
         instr[count].instr = INSTR_CHECKSUM_COMPLETE;
+#endif
         SET_PIPELINE_BIT(prev_instr, count);
         prev_instr = count++;
 
+#ifdef GEN_INSTRUCTION
+        instr[count].instr = instr_tbl[INSTR_TX_HOST];
+#else
         instr[count].instr = INSTR_TX_HOST;
+#endif
         SET_PIPELINE_BIT(prev_instr, count);
         prev_instr = count++;
 
         reg_cp(xwr_instr, instr, NIC_MAX_INSTR<<2);
 
     } else {
+#ifdef GEN_INSTRUCTION
+        instr[count].instr = instr_tbl[INSTR_TX_HOST];
+#else
         instr[count].instr = INSTR_TX_HOST;
+#endif
         SET_PIPELINE_BIT(prev_instr, count);
         prev_instr = count++;
 
@@ -549,7 +615,11 @@ app_config_port_down(uint32_t vnic_port)
      * Probably should use the instr field in union but cannot do that with
      * xfer, must first do it in GPR and then copy to xfer which is an overkill
      */
+#ifdef GEN_INSTRUCTION
+    xwr_instr.value = (instr_tbl[INSTR_TX_DROP] << INSTR_OPCODE_LSB);
+#else
     xwr_instr.value = (INSTR_TX_DROP << INSTR_OPCODE_LSB);
+#endif
 
     /* write drop instr to local host table */
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0) * NIC_MAX_INSTR;
