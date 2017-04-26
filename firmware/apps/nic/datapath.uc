@@ -62,12 +62,16 @@ pkt_io_init(pkt_vec)
 // kick off processing loop
 br[ingress#]
 
+error_rx_nbi#:
+    // TODO: no access to port info here, will always increment VNIC errors for VNIC zero
+    pv_stats_select(pkt_vec, PV_STATS_TX)
+    pv_stats_incr_error(pkt_vec)
+    pkt_io_drop(pkt_vec)
+    br[ingress#]
+
 error_rx_nfd#:
     // TODO: no access to port info here, will always increment VNIC errors for VNIC zero
     pv_stats_select(pkt_vec, PV_STATS_TX)
-
-error_rx_nbi#:
-    // TODO: no access to port info here, will always increment VNIC errors for VNIC zero
 
 error#:
     pv_stats_incr_error(pkt_vec)
