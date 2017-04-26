@@ -33,9 +33,19 @@ timestamp_enable()
 
 
 #macro pkt_io_tx_host(in_pkt_vec, SUCCESS_LABEL, FAIL_LABEL)
+.begin
+    .reg addr_hi
+    .reg addr_lo
+    .reg pkt_len
+
     pv_acquire_nfd_credit(in_pkt_vec, FAIL_LABEL)
+
+    pv_stats_update_nfd_sent(in_pkt_vec)
+    pv_stats_add_tx_octets(in_pkt_vec)
+
     pv_get_gro_host_desc($__pkt_io_gro_meta, in_pkt_vec)
     br[SUCCESS_LABEL]
+.end
 #endm
 
 
@@ -81,6 +91,8 @@ timestamp_enable()
 
     // ensure prepends have been written before releasing packet
     mem[read32, $tmp, ctm_addr, <<8, PMS_OFFSET, 1], sig_done[sig_rd_prepend]
+
+    pv_stats_add_tx_octets(in_pkt_vec)
 
     ctx_arb[sig_wr_nbi_meta, sig_wr_prepend, sig_rd_prepend], br[SUCCESS_LABEL]
 

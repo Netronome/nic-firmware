@@ -78,6 +78,7 @@
  */
 enum instruction_type {
     INSTR_TX_DROP = 0,
+    INSTR_STATISTICS,
     INSTR_MTU,
     INSTR_MAC,
     INSTR_RSS,

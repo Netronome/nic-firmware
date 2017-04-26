@@ -38,6 +38,43 @@
 #endm
 
 
+#macro __actions_statistics(in_pkt_vec)
+.begin
+    .reg stats_base
+    .reg tmp
+    .reg hi
+
+    __actions_read(stats_base, 0xff, --)
+    pv_stats_select(in_pkt_vec, stats_base)
+    br[check_mac#]
+
+broadcast#:
+    pv_stats_select(in_pkt_vec, PV_STATS_BC)
+    br[done#]
+
+multicast#:
+    alu[hi, --, B, *$index++]
+    alu[tmp, --, B, 1, <<16]
+    alu[--, *$index++, +, tmp]  // byte_align_be[] not necessary for MAC (word aligned)
+    alu[--, hi, +carry, 0]
+    __actions_restore_t_idx()
+    bcs[broadcast#]
+
+    pv_stats_select(in_pkt_vec, PV_STATS_MC)
+    br[done#]
+
+check_mac#:
+    pv_seek(in_pkt_vec, 0, 6)
+
+    br_bset[*$index, BF_L(MAC_MULTICAST_bf), multicast#]
+
+    __actions_restore_t_idx()
+
+done#:
+.end
+#endm
+
+
 #macro __actions_check_mtu(in_pkt_vec, DROP_LABEL)
 .begin
     .reg mask
@@ -61,17 +98,17 @@
 
     pv_seek(in_pkt_vec, 0, 6)
 
-    //Allow multicast addresses to pass
-    br_bset[*$index, BF_L(MAC_MULTICAST_bf), is_multicast#]
+    // permit multicast and broadcast addresses to pass
+    br_bset[*$index, BF_L(MAC_MULTICAST_bf), pass#]
 
-    alu[--, mac[0], XOR, *$index++]
+    alu[--, mac[0], XOR, *$index++] // byte_align_be[] not necessary for MAC (word aligned)
     bne[DROP_LABEL]
-    alu[tmp, mac[1], XOR, *$index++]
 
+    alu[tmp, mac[1], XOR, *$index++]
     alu[--, --, B, tmp, >>16]
     bne[DROP_LABEL]
 
-is_multicast#:
+pass#:
     __actions_restore_t_idx()
 .end
 #endm
@@ -336,13 +373,13 @@ skip_checksum_complete#:
 #endm
 
 
-#macro actions_execute(in_pkt_vec, EGRESS_LABEL, COUNT_DROP_LABEL, SILENT_DROP_LABEL, ERROR_LABEL)
+#macro actions_execute(in_pkt_vec, EGRESS_LABEL, DROP_LABEL, ERROR_LABEL)
 .begin
     .reg act_t_idx
     .reg addr
     .reg jump_idx
 
-    .reg read $actions[NIC_MAX_INSTR]
+    .reg volatile read $actions[NIC_MAX_INSTR]
     .xfer_order $actions
     .sig sig_actions
 
@@ -361,25 +398,27 @@ skip_checksum_complete#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#] ;actions_jump
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#] ;actions_jump
 
-        ins_0#: br[drop#]
-        ins_1#: br[mtu#]
-        ins_2#: br[mac#]
-        ins_3#: br[rss#]
-        ins_4#: br[checksum_complete#]
-        ins_5#: br[tx_host#]
-        ins_6#: br[tx_wire#]
+        ins_0#: br[DROP_LABEL]
+        ins_1#: br[statistics#]
+        ins_2#: br[mtu#]
+        ins_3#: br[mac#]
+        ins_4#: br[rss#]
+        ins_5#: br[checksum_complete#]
+        ins_6#: br[tx_host#]
+        ins_7#: br[tx_wire#]
 
-drop#:
-    br[SILENT_DROP_LABEL]
+statistics#:
+    __actions_statistics(in_pkt_vec)
+    __actions_next()
 
 mtu#:
-    __actions_check_mtu(in_pkt_vec, COUNT_DROP_LABEL)
+    __actions_check_mtu(in_pkt_vec, DROP_LABEL)
     __actions_next()
 
 mac#:
-    __actions_check_mac(in_pkt_vec, SILENT_DROP_LABEL)
+    __actions_check_mac(in_pkt_vec, DROP_LABEL)
     __actions_next()
 
 rss#:
@@ -393,16 +432,11 @@ checksum_complete#:
     __actions_next()
 
 tx_host#:
-    pkt_io_tx_host(in_pkt_vec, EGRESS_LABEL, COUNT_DROP_LABEL)
+    pkt_io_tx_host(in_pkt_vec, EGRESS_LABEL, DROP_LABEL)
 
 tx_wire#:
-    pkt_io_tx_wire(in_pkt_vec, EGRESS_LABEL, COUNT_DROP_LABEL)
+    pkt_io_tx_wire(in_pkt_vec, EGRESS_LABEL, DROP_LABEL)
 
-    #pragma warning(push)
-    #pragma warning(disable: 4702) // Disable warning "Unreachable Code"
-    aggregate_directive(.use, $actions, NIC_MAX_INSTR)
-    aggregate_directive(.use, $__pv_pkt_data, 32)
-    #pragma warning(pop)
 .end
 #endm
 
