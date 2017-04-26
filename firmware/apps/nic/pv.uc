@@ -877,29 +877,14 @@ skip_ctm_buffer#:
 #endm
 
 
-#macro __pv_seek_get_cursor(out_balance_lw, out_offset_lw, in_tibi)
-.begin
-    #if (streq('out_offset_lw', '--') && (! streq('out_balance_lw', '--')))
-        .reg offset_lw
-        alu[offset_lw, 0x3f, AND, in_tibi, >>2]
-        alu[out_balance_lw, 32, -, offset_lw]
-    #elif (! streq('out_offset_lw', '--'))
-        alu[out_offset_lw, 0x3f, AND, in_tibi, >>2]
-        #if (! streq('out_balance_lw', '--'))
-            alu[out_balance_lw, 32, -, out_offset_lw]
-        #endif
-    #endif
-.end
-#endm
-
-
+#define PV_SEEK_ANY          (0)
 #define PV_SEEK_CTM_ONLY     (1 << 0)
 #define PV_SEEK_T_INDEX_ONLY (1 << 1)
 
 .reg volatile read $__pv_pkt_data[32]
 .addr $__pv_pkt_data[0] 0
 .xfer_order $__pv_pkt_data
-#macro pv_seek(out_balance_lw, out_offset_lw, io_vec, in_offset, in_length, in_flags)
+#macro pv_seek(out_cache_idx, io_vec, in_offset, in_length, in_flags)
 .begin
     .reg tibi
 
@@ -996,17 +981,8 @@ read#:
     // if a length request is received, check if it can be satisfied by cached data
     #if (! streq('in_length', '--'))
         .reg balance
-        .reg balance_lw
-        #if (streq('out_balance_lw', '--'))
-            #if (streq('out_offset_lw', '--'))
-                __pv_seek_get_cursor(balance_lw, --, tibi)
-            #else
-                alu[balance_lw, 32, -, out_offset_lw]
-            #endif
-            alu[balance, --, B, balance_lw, <<2]
-        #else
-            alu[balance, --, B, out_balance_lw, <<2]
-        #endif
+        immed[balance, 256]
+        alu[balance, balance, -, tibi]
         alu[--, balance, -, in_length]
         bpl[end#]
     #endif
@@ -1032,8 +1008,10 @@ read#:
         alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), OR, pkt_off_aligned]
 
 check#:
-    __pv_seek_get_cursor(out_balance_lw, out_offset_lw, tibi)
-    alu[--, BF_MASK(PV_SEEK_BASE_bf), AND, outside, >>BF_L(PV_SEEK_BASE_bf)]
+    #if (! streq('out_cache_idx', '--'))
+        alu[out_cache_idx, 0x1f, AND, tibi, >>2]
+    #endif
+    alu[outside, BF_MASK(PV_SEEK_BASE_bf), AND, outside, >>BF_L(PV_SEEK_BASE_bf)]
     bne[read#]
 
 end#:
@@ -1043,17 +1021,17 @@ end#:
 
 
 #macro pv_seek(io_vec, in_offset)
-    pv_seek(--, --, io_vec, in_offset, --, 0)
+    pv_seek(--, io_vec, in_offset, --, 0)
 #endm
 
 
 #macro pv_seek(io_vec, in_offset, in_flags)
-    pv_seek(--, --, io_vec, in_offset, --, in_flags)
+    pv_seek(--, io_vec, in_offset, --, in_flags)
 #endm
 
 
 #macro pv_seek(io_vec, in_offset, in_length, in_flags)
-    pv_seek(--, --, io_vec, in_offset, in_length, in_flags)
+    pv_seek(--, io_vec, in_offset, in_length, in_flags)
 #endm
 
 #endif
