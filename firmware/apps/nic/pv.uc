@@ -836,7 +836,7 @@ skip_lso#:
         bitfield_extract__sz1(bls, BF_AML(in_pkt_vec, PV_BLS_bf)) ; PV_BLS_bf
         bitfield_extract__sz1(mu_addr, BF_AML(in_pkt_vec, PV_MU_ADDR_bf)) ; PV_MU_ADDR_bf
 
-    alu[--, --, B, BF_A(in_pkt_vec, PV_MU_ADDR_bf), <<(31-BF_M(PV_MU_ADDR_bf))]
+    alu[--, --, B, BF_A(in_pkt_vec, PV_MU_ADDR_bf), <<(31 - BF_M(PV_MU_ADDR_bf))]
     beq[skip_mu_buffer#]
     pkt_buf_free_mu_buffer(bls, mu_addr)
 skip_mu_buffer#:
@@ -874,48 +874,183 @@ skip_ctm_buffer#:
 #endm
 
 
+#macro __pv_seek_get_cursor(out_balance_lw, out_offset_lw, in_tibi)
+.begin
+    #if (streq('out_offset_lw', '--') && (! streq('out_balance_lw', '--')))
+        .reg offset_lw
+        alu[offset_lw, 0x3f, AND, in_tibi, >>2]
+        alu[out_balance_lw, 32, -, offset_lw]
+    #elif (! streq('out_offset_lw', '--'))
+        alu[out_offset_lw, 0x3f, AND, in_tibi, >>2]
+        #if (! streq('out_balance_lw', '--'))
+            alu[out_balance_lw, 32, -, out_offset_lw]
+        #endif
+    #endif
+.end
+#endm
+
+
+#define PV_SEEK_CTM_ONLY     (1 << 0)
+#define PV_SEEK_T_INDEX_ONLY (1 << 1)
+
 .reg volatile read $__pv_pkt_data[32]
 .addr $__pv_pkt_data[0] 0
 .xfer_order $__pv_pkt_data
-#macro pv_seek(io_vec, in_offset, in_length)
+#macro pv_seek(out_balance_lw, out_offset_lw, io_vec, in_offset, in_length, in_flags)
 .begin
-    .reg addr
-    .reg bottom
-    .reg cache_offset
     .reg tibi
-    .reg top
 
-    .sig sig_reload
-
-    alu[cache_offset, BF_A(io_vec, PV_SEEK_BASE_bf), AND, BF_MASK(PV_SEEK_BASE_bf), <<BF_L(PV_SEEK_BASE_bf)] ; PV_SEEK_BASE_bf
-    alu[bottom, in_offset, -, cache_offset]
-    bpl[cont#], defer[3]
-        alu[tibi, t_idx_ctx, +8, in_offset]
-        local_csr_wr[T_INDEX_BYTE_INDEX, tibi]
-        alu[top, 128, -, bottom]
-
-reload#:
-#if (isnum(in_offset))
-    immed[addr, (in_offset & 0xffc0)]
+#if (((in_flags) & PV_SEEK_T_INDEX_ONLY) != 0)
+    alu[tibi, t_idx_ctx, +8, in_offset]
+    local_csr_wr[T_INDEX_BYTE_INDEX, tibi]
+    nop
+    nop
+    nop
 #else
-    alu[addr, in_offset, AND~, 0x3f]
-#endif
+    .reg outside
+    .reg pkt_off_aligned
+    .sig sig_ctm
+
+    alu[tibi, t_idx_ctx, +8, in_offset]
+    br[check#], defer[2]
+        local_csr_wr[T_INDEX_BYTE_INDEX, tibi]
+        alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, in_offset]
+
+#if (((in_flags) & PV_SEEK_CTM_ONLY) == 0)
+    .reg buf_offset
+    .reg cbs
+    .reg data_ref
+    .reg mu_addr
+    .reg offset_wrd
+    .reg shift
+    .reg sig_mask
+    .reg split_wrd
+    .reg read_size
+    .reg words_read
+    .sig sig_mu
+ 
+split#:
+    // determine the split offset based on CTM buffer size
+    bitfield_extract__sz1(cbs, BF_AML(io_vec, PV_CBS_bf))
+    alu[shift, cbs, +, (8 - 2)] // will do calculations on word offsets
+    alu[words_read, shift, B, 0] // also init number of words read
+    alu[split_wrd, --, B, 1, <<indirect]
+
+    alu[buf_offset, pkt_off_aligned, +16, BF_A(io_vec, PV_OFFSET_bf)]
+    alu[offset_wrd, --, B, buf_offset, >>2]
+    alu[read_size, split_wrd, -, offset_wrd]
+    ble[read_mu#], defer[1]
+        immed[sig_mask, 0]
+
+    alu[--, 32, -, read_size]
+    bgt[read_ctm#] // branch only taken if read straddles CTM and MU
+
+    immed[read_size, 32]
+
+read_ctm#:
+    ov_start(OV_LENGTH)
+    ov_set_use(OV_LENGTH, read_size, OVF_SUBTRACT_ONE)
+    ov_clean()
+    mem[read32, $__pv_pkt_data[0], BF_A(io_vec, PV_CTM_ADDR_bf), <<8, pkt_off_aligned, max_32], indirect_ref, sig_done[sig_ctm]
+
+    br!=byte[read_size, 0, 32, straddle#] // branch only taken if read straddles CTM and MU
+
+    ctx_arb[sig_ctm]
+    local_csr_wr[T_INDEX_BYTE_INDEX, tibi] // reload T_INDEX after ctx_swap[]
+    br[end#], defer[2]
+        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), AND~, BF_MASK(PV_SEEK_BASE_bf), <<BF_L(PV_SEEK_BASE_bf)]
+        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), OR, pkt_off_aligned]
+
+straddle#:
+    alu[sig_mask, sig_mask, OR, mask(sig_ctm), <<&sig_ctm]
+    alu[words_read, words_read, +, read_size]
+
+read_mu#:
+    alu[read_size, (32 - 1), -, words_read] // subtract one for OV_LENGTH
+    alu[data_ref, t_idx_ctx, +, words_read]
+
+    alu[mu_addr, --, B, BF_A(io_vec, PV_MU_ADDR_bf), <<(31 - BF_M(PV_MU_ADDR_bf))]
+
+    ov_start((OV_LENGTH | OV_DATA_REF))
+    ov_set(OV_DATA_REF, data_ref)
+    ov_set_use(OV_LENGTH, read_size)
+    ov_clean()
+    mem[read32, $__pv_pkt_data[0], mu_addr, <<8, buf_offset, max_32], indirect_ref, sig_done[sig_mu]
+
+    ctx_arb[--], defer[2]
+    .io_completed sig_ctm, sig_mu
+        alu[sig_mask, sig_mask, OR, mask(sig_mu), <<&sig_mu]
+        local_csr_wr[ACTIVE_CTX_WAKEUP_EVENTS, sig_mask]
+
+    local_csr_wr[T_INDEX_BYTE_INDEX, tibi] // reload T_INDEX after ctx_swap[]
+    br[end#], defer[2]
+        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), AND~, BF_MASK(PV_SEEK_BASE_bf), <<BF_L(PV_SEEK_BASE_bf)]
+        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), OR, pkt_off_aligned]
+
+#endif // ((in_flags) & PV_SEEK_CTM_ONLY) == 0
+
+read#:
+    // if a length request is received, check if it can be satisfied by cached data
+    #if (! streq('in_length', '--'))
+        .reg balance
+        .reg balance_lw
+        #if (streq('out_balance_lw', '--'))
+            #if (streq('out_offset_lw', '--'))
+                __pv_seek_get_cursor(balance_lw, --, tibi)
+            #else
+                alu[balance_lw, 32, -, out_offset_lw]
+            #endif
+            alu[balance, --, B, balance_lw, <<2]
+        #else
+            alu[balance, --, B, out_balance_lw, <<2]
+        #endif
+        alu[--, balance, -, in_length]
+        bpl[end#]
+    #endif
+
+    #if (isnum(in_offset))
+        immed[pkt_off_aligned, (in_offset & 0xffc0)]
+    #else
+        alu[pkt_off_aligned, in_offset, AND~, 0x3f]
+    #endif
+
+    #if (((in_flags) & PV_SEEK_CTM_ONLY) == 0)
+        br_bset[BF_AL(io_vec, PV_SPLIT_bf), split#]
+    #endif
+
     ov_start(OV_LENGTH)
     ov_set_use(OV_LENGTH, 32, OVF_SUBTRACT_ONE)
     ov_clean()
-    mem[read32, $__pv_pkt_data[0], BF_A(io_vec, PV_CTM_ADDR_bf), addr, max_32], indirect_ref, defer[2], ctx_swap[sig_reload]
+    mem[read32, $__pv_pkt_data[0], BF_A(io_vec, PV_CTM_ADDR_bf), pkt_off_aligned, max_32], indirect_ref, ctx_swap[sig_ctm]
+
+    local_csr_wr[T_INDEX_BYTE_INDEX, tibi] // reload T_INDEX after ctx_swap[]
+    br[end#], defer[2]
         alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), AND~, BF_MASK(PV_SEEK_BASE_bf), <<BF_L(PV_SEEK_BASE_bf)]
-        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), OR, addr]
+        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), OR, pkt_off_aligned]
 
-    local_csr_wr[T_INDEX_BYTE_INDEX, tibi] // load T_INDEX after ctx_swap[]
-    br[end#] // branch fills the 3 cycle local_csr_wr[] latency
-
-cont#:
-    alu[--, top, -, in_length]
-    bmi[reload#]
+check#:
+    __pv_seek_get_cursor(out_balance_lw, out_offset_lw, tibi)
+    alu[--, BF_MASK(PV_SEEK_BASE_bf), AND, outside, >>BF_L(PV_SEEK_BASE_bf)]
+    bne[read#]
 
 end#:
+#endif // ((in_flags) & PV_SEEK_T_INDEX_ONLY) == 0
 .end
+#endm
+
+
+#macro pv_seek(io_vec, in_offset)
+    pv_seek(--, --, io_vec, in_offset, --, 0)
+#endm
+
+
+#macro pv_seek(io_vec, in_offset, in_flags)
+    pv_seek(--, --, io_vec, in_offset, --, in_flags)
+#endm
+
+
+#macro pv_seek(io_vec, in_offset, in_length, in_flags)
+    pv_seek(--, --, io_vec, in_offset, in_length, in_flags)
 #endm
 
 #endif
