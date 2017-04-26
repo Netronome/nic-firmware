@@ -117,7 +117,7 @@ enum instruction_type {
     INSTR_CMSG
 };
 */
-unsigned int instr_tbl[] = {0, 1, 2, 3, 4, 5, 6, 7};
+unsigned int instr_tbl[] = {0, 0x40, 0x50, 0x20, 0x30, 0x80, 0x60, 0x90};
 #endif
 
 
@@ -394,9 +394,10 @@ extract_rss_flags(uint32_t rss_ctrl)
     return rss_flags;
 }
 
+
 #define SET_PIPELINE_BIT(prev, current) \
-    instr[current].pipeline = \
-    (instr[current].instr - instr[prev].instr == 1) ? 1 : 0;
+    ((current) - (prev) == 1) ? 1 : 0;
+
 
 __intrinsic void
 app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
@@ -428,10 +429,11 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
     instr[count].instr = INSTR_STATISTICS;
 #endif
-
     instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].tx_uc_octets
                             - (uint64_t)&nic_stats_extra[0]) >> 3;
-    prev_instr = count++;
+    prev_instr = INSTR_STATISTICS;
+    count++;
+
 
     /* mtu */
     mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
@@ -441,11 +443,10 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
     instr[count].instr = INSTR_MTU;
 #endif
-
     // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
     instr[count].param = mtu + NET_ETH_LEN + 1;
-    SET_PIPELINE_BIT(prev_instr, count);
-    prev_instr = count++;
+    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_MTU);
+    prev_instr = INSTR_MTU;
 
     /* tx wire */
 #ifdef GEN_INSTRUCTION
@@ -453,8 +454,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
     instr[count].instr = INSTR_TX_WIRE;
 #endif
-    SET_PIPELINE_BIT(prev_instr, count);
-    prev_instr = count++;
+    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_WIRE);
+    prev_instr = INSTR_TX_WIRE;
 
     reg_cp(xwr_instr, (void *)instr, count<<2);
 
@@ -468,7 +469,6 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
      */
     count = 0;
     prev_instr = 0;
-
     reg_zero(instr, sizeof(instr));
 
 #ifdef GEN_INSTRUCTION
@@ -479,7 +479,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
     instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].rx_uc_octets
                             - (uint64_t)&nic_stats_extra[0]) >> 3;
-    prev_instr = count++;
+    prev_instr = INSTR_STATISTICS;
+    count++;
 
 #ifdef GEN_INSTRUCTION
     instr[count].instr = instr_tbl[INSTR_MTU];
@@ -488,8 +489,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #endif
     // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
     instr[count].param = mtu + NET_ETH_LEN + 1;
-    SET_PIPELINE_BIT(prev_instr, count);
-    prev_instr = count++;
+    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_MTU);
+    prev_instr = INSTR_MTU;
 
     if (!(control & NFP_NET_CFG_CTRL_PROMISC)) {
         /* MAC address */
@@ -501,8 +502,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         instr[count].instr = INSTR_MAC;
 #endif
         instr[count].param = (nic_mac[1] >> 16);
-        SET_PIPELINE_BIT(prev_instr, count);
-        prev_instr = count++;
+        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_MAC);
+        prev_instr = INSTR_MAC;
         instr[count++].value = nic_mac[0];
     }
 
@@ -534,8 +535,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         instr[count].instr = INSTR_RSS;
 #endif
         instr[count].param = (rss_tbl_nnidx << 8) | (rss_flags & 0x0f);
-        SET_PIPELINE_BIT(prev_instr, count);
-        prev_instr = count++;
+        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RSS);
+        prev_instr = INSTR_RSS;
 
         /* RSS key: provide rss key with hash. Use only first word */
         instr[count++].value = rss_key[0];
@@ -546,31 +547,27 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
         instr[count].instr = INSTR_CHECKSUM_COMPLETE;
 #endif
-        SET_PIPELINE_BIT(prev_instr, count);
-        prev_instr = count++;
+        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_CHECKSUM_COMPLETE);
+        prev_instr = INSTR_CHECKSUM_COMPLETE;
 
 #ifdef GEN_INSTRUCTION
         instr[count].instr = instr_tbl[INSTR_TX_HOST];
 #else
         instr[count].instr = INSTR_TX_HOST;
 #endif
-        SET_PIPELINE_BIT(prev_instr, count);
-        prev_instr = count++;
-
-        reg_cp(xwr_instr, instr, NIC_MAX_INSTR<<2);
-
+        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
+        prev_instr = INSTR_TX_HOST;
     } else {
 #ifdef GEN_INSTRUCTION
         instr[count].instr = instr_tbl[INSTR_TX_HOST];
 #else
         instr[count].instr = INSTR_TX_HOST;
 #endif
-        SET_PIPELINE_BIT(prev_instr, count);
-        prev_instr = count++;
-
-        reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
+        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
+        prev_instr = INSTR_TX_HOST;
     }
 
+    reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
 
     /* map vnic_port to NBI index in the instruction table */
     byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic_port) * NIC_MAX_INSTR;
