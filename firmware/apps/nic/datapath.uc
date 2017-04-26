@@ -33,14 +33,6 @@
 #include "pkt_io.uc"
 #include "actions.uc"
 
-#define PKT_COUNTER_ENABLE
-#include "pkt_counter.uc"
-
-pkt_counter_decl(drop)
-pkt_counter_decl(err_act)
-pkt_counter_decl(err_rx_nbi)
-pkt_counter_decl(err_rx_nfd)
-
 // enable NN receive config from CTM
 .reg ctxs
 local_csr_rd[CTX_ENABLES]
