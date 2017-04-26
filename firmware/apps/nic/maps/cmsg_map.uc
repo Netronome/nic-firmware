@@ -376,7 +376,7 @@ cmsg_exit#:
 .end
 #endm
 
-/* Format of the control message -- common to all 
+/* Format of the control message -- common to all
  * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  * Word  +---------------+---------------+---------------+---------------+
@@ -429,7 +429,7 @@ cmsg_exit#:
 	immed[addr_lo, __CMSG_DATA_OFFSET__]
 	#undef __CMSG_DATA_OFFSET__
 
-    // Read packet data 
+    // Read packet data
     ov_single(OV_LENGTH, CMSG_TXFR_COUNT, OVF_SUBTRACT_ONE) // Length in 32-bit LWs
     mem[read32, $pkt_data[0], in_addr_hi, <<8, addr_lo, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
 
@@ -495,7 +495,7 @@ cmsg_exit#:
 
 			cmsg_lm_handles_undef()
 
-			_cmsg_hashmap_op(in_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, out_pktlen) 
+			_cmsg_hashmap_op(in_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, out_pktlen)
 
 		.end
         br[cmsg_proc_ret#]
