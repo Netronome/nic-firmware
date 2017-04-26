@@ -18,6 +18,8 @@
  *
  * DO NOT CHANGE THE ORDER!
  */
+#if defined(__NFP_LANG_MICROC)
+
 struct nic_port_stats_extra {
     unsigned long long rx_discards;
     unsigned long long rx_errors;
@@ -37,5 +39,16 @@ struct nic_port_stats_extra {
     unsigned long long tx_mc_pkts;
     unsigned long long tx_bc_pkts;
 };
+
+__asm {
+    .alloc_mem _nic_stats_extra imem+0 global 1024 256
+}
+
+#elif defined(__NFP_LANG_ASM)
+
+.alloc_mem _nic_stats_extra imem+0 global 1024 256
+
+
+#endif
 
 #endif

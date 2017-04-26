@@ -9,6 +9,7 @@
 #include <passert.uc>
 #include <stdmac.uc>
 #include <net/tcp.h>
+#include <nic_basic/nic_stats.h>
 
 #include "pkt_buf.uc"
 
@@ -54,7 +55,7 @@
  *       +-----+-------------+---+---+---+---+---------------+-------+-+-+
  *    5  |P_STS|L4Offset (2B)|L3I|MPD|VLD|           Checksum            |
  *       +-----+---------+---+---+---+---+-----------+-------------------+
- *    6  | Ingress Queue |             0             |   Egress Queue    |
+ *    6  | Ingress Queue |  Stats Addr   |     0     |   Egress Queue    |
  *       +---------------+---------------------------+-------------------+
  *
  * 0/1   - Intentional constants for efficient extraction and manipulation
@@ -142,6 +143,7 @@
 #define PV_QUEUE_wrd                    6
 #define PV_QUEUE_IN_bf                  PV_QUEUE_wrd, 31, 24
 #define PV_QUEUE_IN_NBI_bf              PV_QUEUE_wrd, 31, 31
+#define PV_STAT_bf                      PV_QUEUE_wrd, 23, 16
 #define PV_QUEUE_OUT_bf                 PV_QUEUE_wrd, 9, 0
 
 #define_eval PV_NOT_PARSED              ((3 << BF_L(PV_PARSE_MPD_bf)) | (3 << BF_L(PV_PARSE_VLD_bf)))
@@ -170,9 +172,11 @@
 
 #macro pv_set_egress_queue(io_vec, in_queue)
     #ifdef PARANOIA
-        alu[BF_A(io_vec, PV_QUEUE_IN_bf), BF_A(io_vec, PV_QUEUE_IN_bf), AND, BF_MASK(PV_QUEUE_IN_bf), <<BF_L(PV_QUEUE_IN_bf)]
+        alu[BF_A(io_vec, PV_QUEUE_OUT_bf), --, B, BF_A(io_vec, PV_QUEUE_OUT_bf), >>(BF_M(PV_QUEUE_OUT_bf) + 1)]
+        alu[BF_A(io_vec, PV_QUEUE_OUT_bf), in_queue, OR, BF_A(io_vec, PV_QUEUE_OUT_bf), <<(BF_M(PV_QUEUE_OUT_bf) + 1)]
+    #else
+        alu[BF_A(io_vec, PV_QUEUE_OUT_bf), BF_A(io_vec, PV_QUEUE_OUT_bf), OR, in_queue]
     #endif
-    alu[BF_A(io_vec, PV_QUEUE_OUT_bf), BF_A(io_vec, PV_QUEUE_OUT_bf), +16, in_queue]
 #endm
 
 
@@ -184,7 +188,7 @@
 #macro pv_get_instr_addr(out_addr, in_vec, IN_LIST_SIZE)
     passert(NIC_CFG_INSTR_TBL_ADDR, "EQ", 0)
     passert(IN_LIST_SIZE, "POWER_OF_2")
-    alu[out_addr, --, B, BF_A(in_vec, PV_QUEUE_IN_bf), >>(BF_L(PV_QUEUE_IN_bf) - log2(IN_LIST_SIZE))]
+    alu[out_addr, (IN_LIST_SIZE - 1), ~AND, BF_A(in_vec, PV_QUEUE_IN_bf), >>(BF_L(PV_QUEUE_IN_bf) - log2(IN_LIST_SIZE))]
 #endm
 
 
@@ -193,6 +197,84 @@
     alu[out_length, out_length, AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
 #endm
 
+
+#define PV_STATS_DISCARD 0
+#define PV_STATS_ERROR   1
+#define PV_STATS_UC      2
+#define PV_STATS_MC      3
+#define PV_STATS_BC      4
+#define PV_STATS_TX      8
+#macro pv_stats_select(io_vec, in_stats)
+    alu[BF_A(io_vec, PV_STAT_bf), BF_A(io_vec, PV_STAT_bf), AND~, 0x7, <<BF_L(PV_STAT_bf)] ; PV_STAT_bf
+    alu[BF_A(io_vec, PV_STAT_bf), BF_A(io_vec, PV_STAT_bf), OR, in_stats, <<BF_L(PV_STAT_bf)] ; PV_STAT_bf
+#endm
+
+
+#macro pv_stats_add_tx_octets(io_vec)
+.begin
+    .reg addr
+    .reg isl
+    .reg octets
+
+    immed[isl, (_nic_stats_extra >> 24), <<16]
+    alu[addr, 0xff, AND, BF_A(io_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
+    alu[addr, --, B, addr, <<3]
+    alu[octets, BF_A(io_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)]
+    ov_start((OV_IMMED16 | OV_LENGTH))
+    ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
+    ov_set_use(OV_IMMED16, octets) // ov_set_use() will shift IMMED16 left 16 bits, no need to mask
+    ov_clean()
+    mem[add64_imm, --, isl, <<8, addr, 1], indirect_ref
+.end
+#endm
+
+
+#macro pv_stats_incr_error(io_vec)
+.begin
+    .reg addr
+    .reg isl
+
+    immed[isl, (_nic_stats_extra >> 24), <<16]
+    alu[addr, 0xf8, AND, BF_A(io_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
+    alu[addr, (PV_STATS_ERROR << 3), OR, addr, <<3]
+    mem[incr64, --, isl, <<8, addr, 1]
+.end
+#endm
+
+
+#macro pv_stats_incr_discard(io_vec)
+.begin
+    .reg addr
+    .reg isl
+
+    immed[isl, (_nic_stats_extra >> 24), <<16]
+    alu[addr, 0xf8, AND, BF_A(io_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
+    alu[addr, --, B, addr, <<3]
+    mem[incr64, --, isl, <<8, addr, 1]
+    alu[addr, addr, or, 0xff, <<24]
+.end
+#endm
+
+
+#macro pv_stats_update_nfd_sent(in_vec)
+.begin
+    .reg addr_hi
+    .reg addr_lo
+    .reg pkt_len
+
+    move(addr_hi, (_nfd_stats_out_sent >> 8))
+    alu[addr_lo, 0x3f, AND, BF_A(in_vec, PV_QUEUE_OUT_bf)]
+    alu[addr_lo, --, B, addr_lo, <<(log2(NFD_STAT_SIZE))]
+    mem[incr64, --, addr_hi, <<8, addr_lo]
+    alu[addr_lo, addr_lo, +, (NFD_STAT_SIZE / 2 )]
+    pv_get_length(pkt_len, in_vec)
+    ov_start((OV_IMMED16 | OV_LENGTH))
+    ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
+    ov_set_use(OV_IMMED16, pkt_len)
+    ov_clean()
+    mem[add64_imm_sat, --, addr_hi, <<8, addr_lo, 1], indirect_ref
+.end
+#endm
 
 #macro pv_check_mtu(in_vec, in_mtu, FAIL_LABEL)
 .begin
@@ -729,13 +811,14 @@ skip_lso#:
 
     // update NFD stats
     move(addr_hi, (_nfd_stats_in_recv >> 8))
-    alu[addr_lo, --, B, BF_A(out_vec, PV_QUEUE_IN_bf), >>(BF_L(PV_QUEUE_IN_bf) - log2(NFD_STAT_SIZE))]
+    alu[addr_lo, (NFD_STAT_SIZE - 1), ~AND, BF_A(out_vec, PV_QUEUE_IN_bf), >>(BF_L(PV_QUEUE_IN_bf) - log2(NFD_STAT_SIZE))]
     mem[incr64, --, addr_hi, <<8, addr_lo]
     alu[addr_lo, addr_lo, +, (NFD_STAT_SIZE / 2 )]
-    ov_start(OV_IMMED16)
+    ov_start((OV_IMMED16 | OV_LENGTH))
+    ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
     ov_set_use(OV_IMMED16, pkt_len)
     ov_clean()
-    mem[add64_imm, --, addr_hi, <<8, addr_lo], indirect_ref
+    mem[add64_imm_sat, --, addr_hi, <<8, addr_lo, 1], indirect_ref
 .end
 #endm
 

@@ -62,23 +62,18 @@ pkt_io_init(pkt_vec)
 // kick off processing loop
 br[ingress#]
 
-error_rx_nbi#:
-    pkt_counter_incr(err_rx_nbi)
-    br[count_drop#]
-
 error_rx_nfd#:
-    pkt_counter_incr(err_rx_nfd)
-    br[count_drop#]
+    // TODO: no access to port info here, will always increment VNIC errors for VNIC zero
+    pv_stats_select(pkt_vec, PV_STATS_TX)
 
-/*
-error_act#:
-    pkt_counter_incr(err_act)
-*/
+error_rx_nbi#:
+    // TODO: no access to port info here, will always increment VNIC errors for VNIC zero
 
-count_drop#:
-    pkt_counter_incr(drop)
+error#:
+    pv_stats_incr_error(pkt_vec)
 
-silent_drop#:
+drop#:
+    pv_stats_incr_discard(pkt_vec)
     pkt_io_drop(pkt_vec)
 
 egress#:
@@ -87,7 +82,7 @@ egress#:
 ingress#:
     pkt_io_rx(pkt_vec, error_rx_nbi#, error_rx_nfd#)
 
-actions_execute(pkt_vec, egress#, count_drop#, silent_drop#, error_act#)
+actions_execute(pkt_vec, egress#, drop#, error#)
 
 #pragma warning(disable: 4702)
 fatal_error("MAIN LOOP EXIT")

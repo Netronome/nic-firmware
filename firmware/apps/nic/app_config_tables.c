@@ -36,8 +36,6 @@
 
 // #define APP_CONFIG_DEBUG
 
-// #define APP_CFG_STATS
-
 
 /* Islands to configure. */
 
@@ -54,13 +52,8 @@
     __shared __lmem uint32_t cfg_mes_ids[] = {APP_MES_LIST};
 #endif
 
-#ifdef  APP_CFG_STATS
 /* Statistics */
-__import __shared __imem struct nic_port_stats_extra nic_stats_extra[NFD_MAX_PFS];
-#endif
-
-
-
+//__import __shared __imem struct nic_port_stats_extra nic_stats_extra[NFD_MAX_PFS];
 
 
 #define NIC_NBI 0
@@ -397,6 +390,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     uint32_t mask;
     uint32_t count;
     uint32_t prev_instr = 0;
+    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
 
 #ifdef APP_CONFIG_DEBUG
     {
@@ -412,37 +406,28 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
     count = 0;
 
+    instr[count].instr = INSTR_STATISTICS;
+    instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].tx_uc_octets - (uint64_t)&nic_stats_extra[0]) >> 3;
+    prev_instr = count++;
+
     /* mtu */
     mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
     instr[count].instr = INSTR_MTU;
     instr[count].param = mtu + NET_ETH_LEN + 1; // add eth hdr len, plus one to cause borrow on subtract of MTU from pkt len
-    prev_instr = count;
-    count++;
-
-#ifdef APP_CFG_STATS
-    {
-        /* offset of TX discards */
-        uint32_t offset = (uint64_t)&nic_stats_extra[vnic_port].tx_discards
-                        - (uint64_t)&nic_stats_extra[0];
-        instr[count].value = (uint32_t)offset;
-        count++;
-    }
-#endif
+    SET_PIPELINE_BIT(prev_instr, count);
+    prev_instr = count++;
 
     /* tx wire */
     instr[count].instr = INSTR_TX_WIRE;
- //   instr[2].param = BUILD_PORT(NIC_NBI, NS_PLATFORM_NBI_TM_QID_LO(vnic_port));
     SET_PIPELINE_BIT(prev_instr, count);
-    prev_instr = count;
-    count++;
+    prev_instr = count++;
 
     reg_cp(xwr_instr, (void *)instr, count<<2);
 
     /* write TX instr to local table and to other islands too */
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, vnic_port, 0) * NIC_MAX_INSTR;
     upd_rx_host_instr (xwr_instr, byte_off<<2, count);
-
 
 
 #ifdef APP_CONFIG_DEBUG
@@ -455,20 +440,17 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     }
 #endif
 
+    count = 0;
 
-    /* mtu already setup for update rx host */
-    count = 1;
-    prev_instr = 0;
+    instr[count].instr = INSTR_STATISTICS;
+    instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].rx_uc_octets - (uint64_t)&nic_stats_extra[0]) >> 3;
+    SET_PIPELINE_BIT(prev_instr, count);
+    prev_instr = count++;
 
-#ifdef APP_CFG_STATS
-    {
-        /* offset of RX discards */
-        uint32_t offset = (uint64_t)&nic_stats_extra[vnic_port].rx_discards
-                        - (uint64_t)&nic_stats_extra[0];
-        instr[count].value = (uint32_t)offset;
-        count++;
-    }
-#endif
+    instr[count].instr = INSTR_MTU;
+    instr[count].param = mtu + NET_ETH_LEN + 1; // add eth hdr len, plus one to cause borrow on subtract of MTU from pkt len
+    SET_PIPELINE_BIT(prev_instr, count);
+    prev_instr = count++;
 
     if (!(control & NFP_NET_CFG_CTRL_PROMISC)) {
         /* MAC address */
@@ -477,8 +459,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         instr[count].instr = INSTR_MAC;
         instr[count].param = (nic_mac[1] >> 16);
         SET_PIPELINE_BIT(prev_instr, count);
-        prev_instr = count;
-        count++;
+        prev_instr = count++;
         instr[count++].value = nic_mac[0];
     }
 
@@ -507,8 +488,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         instr[count].instr = INSTR_RSS;
         instr[count].param = (rss_tbl_nnidx << 8) | (rss_flags & 0x0f);
         SET_PIPELINE_BIT(prev_instr, count);
-        prev_instr = count;
-        count++;
+        prev_instr = count++;
 
         /* RSS key: provide rss key with hash. Use only first word */
         instr[count++].value = rss_key[0];
@@ -516,21 +496,18 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         /* calculate checksum and drop if mismatch (drop port is included) */
         instr[count].instr = INSTR_CHECKSUM_COMPLETE;
         SET_PIPELINE_BIT(prev_instr, count);
-        prev_instr = count;
-        count++;
+        prev_instr = count++;
 
         instr[count].instr = INSTR_TX_HOST;
         SET_PIPELINE_BIT(prev_instr, count);
-        prev_instr = count;
-        count++;
+        prev_instr = count++;
 
         reg_cp(xwr_instr, instr, NIC_MAX_INSTR<<2);
 
     } else {
         instr[count].instr = INSTR_TX_HOST;
         SET_PIPELINE_BIT(prev_instr, count);
-        prev_instr = count;
-        count++;
+        prev_instr = count++;
 
         reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
     }

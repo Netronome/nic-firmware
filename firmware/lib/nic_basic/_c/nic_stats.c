@@ -21,7 +21,7 @@
 
 
 /* Export for debug visibility */
-__export __shared __imem struct nic_port_stats_extra nic_stats_extra[NVNICS];
+//__export __shared __imem struct nic_port_stats_extra nic_stats_extra[NVNICS];
 
 /*
  * Global declarations for MAC Statistics
@@ -70,6 +70,8 @@ struct cfg_bar_cntrs {
 __intrinsic void
 nic_rx_cntrs(int port, void *da, int len)
 {
+    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
+
     if (NIC_IS_MC_ADDR(da)) {
 
         /* Broadcast addresses are Multicast addresses too */
@@ -89,6 +91,8 @@ nic_rx_cntrs(int port, void *da, int len)
 __intrinsic void
 nic_tx_cntrs(int port, void *da, int len)
 {
+    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
+
     if (NIC_IS_MC_ADDR(da)) {
 
         /* Broadcast addresses are Multicast addresses too */
@@ -132,24 +136,28 @@ nic_tx_ring_cntrs(void *meta, uint32_t port, uint32_t qid)
 __intrinsic
 void nic_rx_error_cntr(int port)
 {
+    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
     mem_incr64(&nic_stats_extra[port].rx_errors);
 }
 
 __intrinsic
 void nic_tx_error_cntr(int port)
 {
+    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
     mem_incr64(&nic_stats_extra[port].tx_errors);
 }
 
 __intrinsic
 void nic_rx_discard_cntr(int port)
 {
+    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
     mem_incr64(&nic_stats_extra[port].rx_discards);
 }
 
 __intrinsic
 void nic_tx_discard_cntr(int port)
 {
+    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
     mem_incr64(&nic_stats_extra[port].tx_discards);
 }
 
@@ -191,6 +199,7 @@ nic_stats_rx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
     __imem struct macstats_port_accum* port_stats;
     __xread uint64_t read_array[8];
     __xread uint64_t read_val;
+    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
 
 #ifdef ACC_MAC_STATS
     /* Retrieve the corresponding MAC port stats. */
@@ -240,6 +249,7 @@ nic_stats_tx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
     __imem struct macstats_port_accum* port_stats;
     __xread uint64_t read_array[8];
     __xread uint64_t read_val;
+    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
 
 #ifdef ACC_MAC_STATS
     /* Retrieve the corresponding MAC port stats. */
