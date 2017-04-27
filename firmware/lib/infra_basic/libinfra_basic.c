@@ -328,14 +328,6 @@ pkt_rx_host(void)
     Pkt.p_seq = nfd_in_get_seqn((__xread struct nfd_in_pkt_desc *)&nfd_rxd);
     Pkt.p_offset = NFD_IN_DATA_OFFSET;
 
-    if (nfd_rxd.invalid) {
-        INFRA_CNTR_INC(INFRA_CNTR_ERR_FROM_HOST);
-        ret = -1;
-        goto out;
-    } else {
-        __critical_path();
-    }
-
     /* TODO: handle LSO here */
     /* TODO: handle VLAN here */
 
@@ -345,6 +337,14 @@ pkt_rx_host(void)
     Pkt.p_orig_len = Pkt.p_len;
 
     Pkt.p_src = PKT_HOST_PORT_FROMQ(nfd_rxd.intf, NFD_BMQ2NATQ(nfd_rxd.q_num));
+
+    if (nfd_rxd.invalid) {
+        INFRA_CNTR_INC(INFRA_CNTR_ERR_FROM_HOST);
+        ret = -1;
+        goto out;
+    } else {
+        __critical_path();
+    }
 
     Pkt.app0 = nfd_rxd.__raw[2];
     Pkt.app1 = nfd_rxd.__raw[3];
