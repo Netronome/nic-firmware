@@ -29,7 +29,6 @@
 .end
 #endm
 
-#include <aggregate.uc>
 #include "pkt_io.uc"
 #include "actions.uc"
 
