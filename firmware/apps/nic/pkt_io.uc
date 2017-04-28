@@ -44,6 +44,7 @@ timestamp_enable()
     pv_stats_add_tx_octets(in_pkt_vec)
 
     pv_get_gro_host_desc($__pkt_io_gro_meta, in_pkt_vec)
+
     br[SUCCESS_LABEL]
 .end
 #endm

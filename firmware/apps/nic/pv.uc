@@ -10,6 +10,7 @@
 #include <stdmac.uc>
 #include <net/tcp.h>
 #include <nic_basic/nic_stats.h>
+#include <kernel/nfp_net_ctrl.h>
 
 #include "pkt_buf.uc"
 
@@ -56,7 +57,9 @@
  *    5  |P_STS|L4Offset (2B)|L3I|MPD|VLD|           Checksum            |
  *       +-----+---------+---+---+---+---+-----------+-------------------+
  *    6  | Ingress Queue |  Stats Addr   |     0     |   Egress Queue    |
- *       +---------------+---------------------------+-------------------+
+ *       +---------------+---------------+-----------+-------------------+
+ *    7  |                    Metadata Type Fields                       |
+ *       +---------------------------------------------------------------+
  *
  * 0/1   - Intentional constants for efficient extraction and manipulation
  * S     - Split packet
@@ -94,7 +97,7 @@
  * U   - UDP checksum is valid
  */
 
-#define PV_SIZE_LW                      7
+#define PV_SIZE_LW                      8
 
 #define PV_LENGTH_wrd                   0
 #define PV_NUMBER_bf                    PV_LENGTH_wrd, 25, 16
@@ -114,7 +117,7 @@
 #define PV_SEQ_wrd                      3
 #define PV_SEQ_NO_bf                    PV_SEQ_wrd, 31, 16
 #define PV_SEQ_CTX_bf                   PV_SEQ_wrd, 12, 8
-#define PV_HOST_META_LENGTH_bf          PV_SEQ_wrd, 6, 0
+#define PV_META_LENGTH_bf               PV_SEQ_wrd, 6, 0
 
 #define PV_FLAGS_wrd                    4
 #define PV_TX_FLAGS_bf                  PV_FLAGS_wrd, 31, 16
@@ -145,6 +148,9 @@
 #define PV_QUEUE_IN_NBI_bf              PV_QUEUE_wrd, 31, 31
 #define PV_STAT_bf                      PV_QUEUE_wrd, 23, 16
 #define PV_QUEUE_OUT_bf                 PV_QUEUE_wrd, 9, 0
+
+#define PV_META_TYPES_wrd               7
+#define PV_META_TYPES_bf                PV_META_TYPES_wrd, 31, 0
 
 #define_eval PV_NOT_PARSED              ((3 << BF_L(PV_PARSE_MPD_bf)) | (3 << BF_L(PV_PARSE_VLD_bf)))
 
@@ -195,6 +201,24 @@
 #macro pv_get_length(out_length, in_vec)
     alu[out_length, 0, +16, BF_A(in_vec, PV_LENGTH_bf)] ; PV_LENGTH_bf
     alu[out_length, out_length, AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
+#endm
+
+
+#macro pv_meta_push_type(io_vec, in_type)
+    alu[BF_A(io_vec, PV_META_TYPES_bf), in_type, OR, BF_A(io_vec, PV_META_TYPES_bf), <<4]
+#endm
+
+#macro pv_meta_prepend(io_vec, in_metadata, in_length)
+.begin
+    .reg addr
+    .reg meta_len
+    .sig sig_meta
+
+    alu[BF_A(io_vec, PV_META_LENGTH_bf), BF_A(io_vec, PV_META_LENGTH_bf), +, in_length]
+    bitfield_extract__sz1(meta_len, BF_AML(io_vec, PV_META_LENGTH_bf))
+    alu[addr, BF_A(io_vec, PV_CTM_ADDR_bf), -, meta_len]
+    mem[write32, in_metadata, addr, 0, (in_length >> 2)], ctx_swap[sig_meta]
+.end
 #endm
 
 
@@ -365,24 +389,45 @@
  */
 #macro pv_get_gro_host_desc(out_desc, in_vec)
 .begin
+    .reg addr
     .reg buf_list
     .reg ctm_buf_sz
     .reg ctm_only
     .reg desc
+    .reg meta_len
     .reg offset
     .reg pkt_len
+    .reg data_len
     .reg pkt_num
+    .reg write $meta_types
+    .sig sig_meta
 
     #if (NBI_COUNT != 1 || SS != 0)
         #error "Only targets PCIe = 0 and NFD_OUT_NBI_wrd assumes nbi = 0"
     #endif
 
+    bitfield_extract__sz1(meta_len, BF_AML(in_vec, PV_META_LENGTH_bf))
+    beq[skip_meta#], defer[3]
+        // Word 1
+        alu[desc, BF_A(in_vec, PV_MU_ADDR_bf), AND~, ((BF_MASK(PV_SPLIT_bf) << BF_WIDTH(PV_CBS_bf)) | BF_MASK(PV_CBS_bf)), <<BF_L(PV_CBS_bf)]
+        bitfield_extract__sz1(buf_list, BF_AML(in_vec, PV_BLS_bf)) ; PV_BLS_bf
+        alu[out_desc[NFD_OUT_BLS_wrd], desc, OR, buf_list, <<NFD_OUT_BLS_shf]
+
+        alu[meta_len, meta_len, +, 4]
+        alu[addr, BF_A(in_vec, PV_CTM_ADDR_bf), -, meta_len]
+        alu[$meta_types, --, B, BF_A(in_vec, PV_META_TYPES_bf)]
+        mem[write32, $meta_types, addr, 0, 1], ctx_swap[sig_meta], defer[2]
+skip_meta#:
+
     // Word 0
     alu[desc, BF_A(in_vec, PV_NUMBER_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_NUMBER_bf, PV_BLS_bf
     alu[pkt_len, 0, +16, desc]
     alu[desc, desc, -, pkt_len]
+    alu[data_len, pkt_len, +, meta_len]
     alu[desc, desc, OR, GRO_DTYPE_NFD]
-    alu[offset, 0x7f, AND, BF_A(in_vec, PV_OFFSET_bf), >>1] ; PV_OFFSET_bf
+    alu[offset, 0, +16, BF_A(in_vec, PV_OFFSET_bf)] ; PV_OFFSET_bf
+    alu[offset, offset, -, meta_len]
+    alu[offset, --, B, offset, >>1]
     alu[desc, desc, OR, offset, <<GRO_META_W0_META_START_BIT]
     alu[ctm_only, 1, AND~, BF_A(in_vec, PV_SPLIT_bf), >>BF_L(PV_SPLIT_bf)] ; PV_SPLIT_bf
     alu[desc, desc, OR, ctm_only, <<NFD_OUT_CTM_ONLY_shf]
@@ -390,15 +435,10 @@
     bitfield_extract__sz1(ctm_buf_sz, BF_AML(in_vec, PV_CBS_bf)) ; PV_CBS_bf
     alu[out_desc[NFD_OUT_SPLIT_wrd], desc, OR, ctm_buf_sz, <<NFD_OUT_SPLIT_shf]
 
-    // Word 1
-    alu[desc, BF_A(in_vec, PV_MU_ADDR_bf), AND~, ((BF_MASK(PV_SPLIT_bf) << BF_WIDTH(PV_CBS_bf)) | BF_MASK(PV_CBS_bf)), <<BF_L(PV_CBS_bf)]
-    bitfield_extract__sz1(buf_list, BF_AML(in_vec, PV_BLS_bf)) ; PV_BLS_bf
-    alu[out_desc[NFD_OUT_BLS_wrd], desc, OR, buf_list, <<NFD_OUT_BLS_shf]
-
     // Word 2
-    alu[desc, pkt_len, OR, BF_A(in_vec, PV_HOST_META_LENGTH_bf), <<NFD_OUT_METALEN_shf]
+    alu[desc, data_len, OR, meta_len, <<NFD_OUT_METALEN_shf]
     #ifndef GRO_EVEN_NFD_OFFSETS_ONLY
-       alu[desc, desc, OR, BF_A(in_vec, PV_OFFSET_bf), <<31]
+       alu[desc, desc, OR, BF_A(in_vec, PV_OFFSET_bf), <<31] // meta_len is always even, this is safe
     #endif
     alu[out_desc[NFD_OUT_QID_wrd], desc, OR, BF_A(in_vec, PV_QUEUE_OUT_bf), <<NFD_OUT_QID_shf]
 
@@ -610,6 +650,8 @@ skip_l4_offset#:
        valid#:
     #endif
 
+    immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
+
     alu[--, BF_MASK(CAT_SEQ_CTX_bf), AND, BF_A(in_nbi_desc, CAT_SEQ_CTX_bf), >>BF_L(CAT_SEQ_CTX_bf)] ; CAT_SEQ_CTX_bf
     beq[FAIL_LABEL] // drop without releasing sequence number for sequencer zero (errored packets are expected here)
 
@@ -791,7 +833,7 @@ l3_wr#:
     alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nfd_desc, NFD_IN_SEQN_fld), AND~, 0xfe] ; PV_SEQ_NO_bf
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), +, 4] ; PV_SEQ_CTX_bf
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), --, B, BF_A(out_vec, PV_SEQ_CTX_bf), <<BF_L(PV_SEQ_CTX_bf)] ; PV_SEQ_CTX_bf
-    alu[BF_A(out_vec, PV_HOST_META_LENGTH_bf), BF_A(out_vec, PV_HOST_META_LENGTH_bf), OR, meta_len] ; PV_HOST_META_LENGTH_bf
+    alu[BF_A(out_vec, PV_META_LENGTH_bf), BF_A(out_vec, PV_META_LENGTH_bf), OR, meta_len] ; PV_META_LENGTH_bf
 
     alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_MASK(PV_CSUM_OFFLOAD_bf), AND, \
         BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld), >>BF_L(NFD_IN_FLAGS_TX_TCP_CSUM_fld)]
@@ -811,6 +853,8 @@ l3_wr#:
 
     __pv_lso_fixup(out_vec, in_nfd_desc)
 skip_lso#:
+
+    immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
 
     // update NFD stats
     move(addr_hi, (_nfd_stats_in_recv >> 8))
