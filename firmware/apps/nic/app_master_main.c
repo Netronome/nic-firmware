@@ -379,60 +379,36 @@ cfg_changes_loop(void)
     for (;;) {
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
 
-        if (cfg_msg.msg_valid) {
+        if (cfg_msg.msg_valid) { 
 
             port = cfg_msg.vnic;
             /* read in the first 64bit of the Control BAR */
             mem_read64(cfg_bar_data, NFD_CFG_BAR_ISL(NIC_PCI, port),
                        sizeof cfg_bar_data);
 
-            control = cfg_bar_data[0];  // control
-            update = cfg_bar_data[1];   // update
-
-#if 0
-            /* Reflect the pci island and the vnic number to remote MEs */
-            cfg_pci_vnic = (NIC_PCI << 16) | port;
-            
-            /* Reset the configuration ack counter */
-            synch_cnt_dram_reset(&nic_cfg_synch,
-                                 sizeof(app_mes_ids)/sizeof(uint32_t));
-
-            /* Signal all APP MEs about a config change */
-            for(i = 0; i < sizeof(app_mes_ids)/sizeof(uint32_t); i++) {
-                ct_reflect_data(app_mes_ids[i], APP_ME_CONFIG_CTX,
-                                APP_ME_CONFIG_XFER_NUM,
-                                APP_ME_CONFIG_SIGNAL_NUM,
-                                &cfg_pci_vnic, sizeof cfg_pci_vnic);
-            }
-#endif
+            control = cfg_bar_data[0];
+            update = cfg_bar_data[1];
 
             /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
-            if ((nic_control_word[port] ^ cfg_bar_data[0]) &
-                    NFP_NET_CFG_CTRL_ENABLE) {
-
-                if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
-                    /* Enable the MAC RX. */
+            if ((nic_control_word[port] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
+                if (control & NFP_NET_CFG_CTRL_ENABLE) {
+                    app_config_port(port, control, update);
+                    sleep(100000);
                     mac_port_enable_rx(port);
                 } else {
-                    /* Inhibit and disable the MAC RX. */
                     mac_port_disable_rx(port);
+                    sleep(100000);
                     app_config_port_down(port);
                 }
             }
+         
 
             /* Save the control word */
             nic_control_word[port] = control;
 
-            /* Do configuration changes to each ME/island if up */
-            if ((control & NFP_NET_CFG_CTRL_ENABLE)
-                /*&& (update & NFP_NET_CFG_UPDATE_GEN)*/) {
-                app_config_port(port, control, update);
-            }
-
-#if 0
-            /* Wait for all APP MEs to ack the config change */
-            synch_cnt_dram_wait(&nic_cfg_synch);
-#endif
+            /* Wait for queues to drain */
+            for (i = 0; i < 100; ++i) 
+                sleep(1000000);
 
             /* Complete the message */
             cfg_msg.msg_valid = 0;

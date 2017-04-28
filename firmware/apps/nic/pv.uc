@@ -522,7 +522,7 @@
 #define MAC_PARSE_VLAN_bf               MAC_PARSE_wrd, 17, 16
 #define MAC_CSUM_bf                     MAC_PARSE_wrd, 15, 0
 
-#macro pv_init_nbi(out_vec, in_nbi_desc, FAIL_LABEL)
+#macro pv_init_nbi(out_vec, in_nbi_desc, DROP_LABEL, FAIL_LABEL)
 .begin
     .reg cbs
     .reg l4_type
@@ -610,8 +610,11 @@ skip_l4_offset#:
        valid#:
     #endif
 
+    alu[--, BF_MASK(CAT_SEQ_CTX_bf), AND, BF_A(in_nbi_desc, CAT_SEQ_CTX_bf), >>BF_L(CAT_SEQ_CTX_bf)] ; CAT_SEQ_CTX_bf
+    beq[FAIL_LABEL] // drop without releasing sequence number for sequencer zero (errored packets are expected here)
+
     alu[--, BF_MASK(CAT_ERRORS_bf), AND, BF_A(in_nbi_desc, CAT_ERRORS_bf), >>BF_L(CAT_ERRORS_bf)] ; CAT_ERRORS_bf
-    bne[FAIL_LABEL]
+    bne[DROP_LABEL] // catch any other errors we miss (these appear to have valid sequence numbers)
 
 .end
 #endm
@@ -928,7 +931,7 @@ skip_ctm_buffer#:
     .reg read_size
     .reg words_read
     .sig sig_mu
- 
+
 split#:
     // determine the split offset based on CTM buffer size
     bitfield_extract__sz1(cbs, BF_AML(io_vec, PV_CBS_bf))

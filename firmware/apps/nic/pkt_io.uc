@@ -144,7 +144,7 @@ skip_dispatch#:
 #endm
 
 
-#macro pkt_io_rx(io_vec, RX_NBI_ERROR_LABEL, RX_NFD_ERROR_LABEL)
+#macro pkt_io_rx(io_vec, DROP_LABEL, RX_NBI_ERROR_LABEL, RX_NFD_ERROR_LABEL)
 .begin
     .reg pkt_len
 
@@ -170,7 +170,7 @@ listen_with_nbi_priority#:
     ctx_arb[__pkt_io_sig_nbi, __pkt_io_sig_nfd, __pkt_io_sig_nfd_retry], any, br[listen_with_nfd_priority#]
 
 rx_nbi#:
-    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, RX_NBI_ERROR_LABEL)
+    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, DROP_LABEL, RX_NBI_ERROR_LABEL)
     br[end#]
 
 rx_nfd#:
