@@ -40,7 +40,6 @@ timestamp_enable()
 
     pv_acquire_nfd_credit(in_pkt_vec, FAIL_LABEL)
 
-    pv_stats_update_nfd_sent(in_pkt_vec)
     pv_stats_add_tx_octets(in_pkt_vec)
 
     pv_get_gro_host_desc($__pkt_io_gro_meta, in_pkt_vec)

@@ -280,26 +280,6 @@
 #endm
 
 
-#macro pv_stats_update_nfd_sent(in_vec)
-.begin
-    .reg addr_hi
-    .reg addr_lo
-    .reg pkt_len
-
-    move(addr_hi, (_nfd_stats_out_sent >> 8))
-    alu[addr_lo, 0x3f, AND, BF_A(in_vec, PV_QUEUE_OUT_bf)]
-    alu[addr_lo, --, B, addr_lo, <<(log2(NFD_STAT_SIZE))]
-    mem[incr64, --, addr_hi, <<8, addr_lo]
-    alu[addr_lo, addr_lo, +, (NFD_STAT_SIZE / 2 )]
-    pv_get_length(pkt_len, in_vec)
-    ov_start((OV_IMMED16 | OV_LENGTH))
-    ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
-    ov_set_use(OV_IMMED16, pkt_len)
-    ov_clean()
-    mem[add64_imm_sat, --, addr_hi, <<8, addr_lo, 1], indirect_ref
-.end
-#endm
-
 #macro pv_check_mtu(in_vec, in_mtu, FAIL_LABEL)
 .begin
     .reg max_vlan
@@ -856,16 +836,6 @@ skip_lso#:
 
     immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
 
-    // update NFD stats
-    move(addr_hi, (_nfd_stats_in_recv >> 8))
-    alu[addr_lo, (NFD_STAT_SIZE - 1), ~AND, BF_A(out_vec, PV_QUEUE_IN_bf), >>(BF_L(PV_QUEUE_IN_bf) - log2(NFD_STAT_SIZE))]
-    mem[incr64, --, addr_hi, <<8, addr_lo]
-    alu[addr_lo, addr_lo, +, (NFD_STAT_SIZE / 2 )]
-    ov_start((OV_IMMED16 | OV_LENGTH))
-    ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
-    ov_set_use(OV_IMMED16, pkt_len)
-    ov_clean()
-    mem[add64_imm_sat, --, addr_hi, <<8, addr_lo, 1], indirect_ref
 .end
 #endm
 
