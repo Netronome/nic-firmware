@@ -1,6 +1,8 @@
 #ifndef _ACTIONS_UC
 #define _ACTIONS_UC
 
+#include <kernel/nfp_net_ctrl.h>
+
 #include "app_config_instr.h"
 #include "protocols.h"
 
@@ -119,7 +121,9 @@ pass#:
 .begin
     .reg data
     .reg hash
+    .reg hash_type
     .reg ipv4_delta
+    .reg ipv6_delta
     .reg idx
     .reg key
     .reg l3_info
@@ -131,6 +135,8 @@ pass#:
     .reg queue
     .reg queue_shf
     .reg queue_off
+    .reg udp_delta
+    .reg write $metadata
 
     __actions_read(opcode, --, --)
     __actions_read(key, --, --)
@@ -147,6 +153,7 @@ pass#:
     br_bset[BF_A(in_pkt_vec, PV_PARSE_VLD_bf), BF_M(PV_PARSE_VLD_bf), skip_rss#]
 
     local_csr_wr[CRC_REMAINDER, key]
+    immed[hash_type, 1]
 
     // seek to L3 source address
     alu[l3_offset, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)] // 4 bytes for VLAN
@@ -171,6 +178,8 @@ pass#:
     #endloop
     #undef LOOP
 
+    alu[hash_type, hash_type, +, 1]
+
 process_l4#:
     // skip L4 if offset unknown
     alu[l4_offset, 0xfe, AND, BF_A(in_pkt_vec, PV_PARSE_L4_OFFSET_bf), >>(BF_L(PV_PARSE_L4_OFFSET_bf) - 1)]
@@ -194,16 +203,24 @@ process_l4#:
     byte_align_be[--, *$index++]
     byte_align_be[data, *$index++]
     crc_be[crc_32, --, data]
-        nop
-        nop
-        nop
-        nop
+
+        alu[hash_type, hash_type, +, 3]
+        alu[udp_delta, (1 << 1), AND, parse_status, >>1]
+        alu[udp_delta, udp_delta, OR, parse_status, >>2]
+        alu[hash_type, hash_type,  +, udp_delta]
 
 skip_l4#:
-        alu[idx, 0x7f, AND, opcode, >>8]
+    pv_meta_push_type(in_pkt_vec, hash_type)
+    pv_meta_push_type(in_pkt_vec, 1)
+
     local_csr_rd[CRC_REMAINDER]
     immed[hash, 0]
+
+    alu[$metadata, --, B, hash]
+    pv_meta_prepend(in_pkt_vec, $metadata, 4]
+
     alu[queue_off, 0x1f, AND, hash, >>2]
+    alu[idx, 0x7f, AND, opcode, >>8]
     alu[idx, idx, +, queue_off]
     local_csr_wr[NN_GET, idx]
         __actions_restore_t_idx()
@@ -232,18 +249,19 @@ skip_rss#:
     .reg pkt_length
     .reg pkt_words
     .reg shift
-   
+    .reg write $metadata
+
     __actions_read(--, --, --)
 
-    immed[carries, 0] 
+    immed[carries, 0]
     immed[checksum, 0]
     immed[next_offset, 0]
     pv_get_length(pkt_length, in_pkt_vec)
     alu[pkt_words, --, B, pkt_length, >>2]
 
 loop#:
-    pv_seek(jump_idx, in_pkt_vec, next_offset, --, PV_SEEK_ANY) 
-    
+    pv_seek(jump_idx, in_pkt_vec, next_offset, --, PV_SEEK_ANY)
+
     alu[iteration_words, 32, -, jump_idx]
     alu[--, pkt_words, -, iteration_words]
     bgt[consume_entire_cache#]
@@ -273,7 +291,7 @@ w/**/LOOP_UNROLL#:
 
     alu[pkt_words, pkt_words, -, iteration_words]
     bgt[loop#]
- 
+
     alu[last_bits, (3 << 3), AND, pkt_length, <<3]
     beq[fold#]
 
@@ -282,16 +300,21 @@ w/**/LOOP_UNROLL#:
     alu[mask, shift, ~B, 0]
     alu[mask, --, B, mask, <<indirect]
     alu[padded, mask, AND, *$index++]
-   
+
     alu[checksum, checksum, +, padded]
     alu[carries, carries, +carry, 0]
 
 fold#:
     alu[checksum, checksum, +, carries]
     alu[checksum, checksum, +carry, 0] // adding carries might cause another carry
-    alu[checksum, --, ~B, checksum]
+    alu[$metadata, --, ~B, checksum]
 
     __actions_restore_t_idx()
+
+#if 0
+    pv_meta_push_type(in_pkt_vec, 6)
+    pv_meta_prepend(in_pkt_vec, $metadata, 4)
+#endif
 .end
 #endm
 
