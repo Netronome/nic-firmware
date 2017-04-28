@@ -78,8 +78,8 @@ timestamp_enable()
     #if (NFD_IN_DATA_OFFSET != 128)
        #error "Packet modifier script hard coded for NFD_IN_DATA_OFFSET = 128"
     #endif
-    immed[$prepend[0], ((1 << 15) | (3 << 1)), <<16] // direct packet modifier script, delete 4 bytes
-    immed[$prepend[1], 0] // pad
+    immed[$prepend[0], ((1 << 8) | (6 << 0)), <<16] // indirect packet modifier script, delete 4 bytes, pad
+    immed[$prepend[1], 0] // offsets
     immed[$prepend[2], 0] // sop, to be deleted
     pv_get_mac_prepend($prepend[3], in_pkt_vec) // real sop
 
