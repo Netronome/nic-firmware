@@ -4,6 +4,47 @@
  * @file        hashmap.uc
  * @brief       basic lookup table implementation.
  *
+ * API calls
+ * 
+ *	  hashmap_alloc_fd(out_fd, in_key_size, in_value_size, in_max_entries, ERROR_LABEL)
+ *
+ * OP type defines:
+ *	HASHMAP_OP_LOOKUP
+ *  HASHMAP_OP_ADD
+ *	HASHMAP_OP_REMOVE
+ *	HASHMAP_OP_GETNEXT
+ *
+ * return type defines
+ *	HASHMAP_RTN_LMEM
+ *	HASHMAP_RTN_TINDEX
+ *	HASHMAP_RTN_ADDR
+ *
+ *	  hashmap_ops(	in_fd,				// fd returned from hashmap_alloc_fd()
+ *					in_lm_key_addr,		// LM offset for key, key must start of lm offset + 4
+ *					in_lm_value_addr, 	// LM offset for value
+ *					OP_TYPE, 			// HASHMAP_OP_xxx
+ *					INVALID_MAP_LABEL,	// label if in_fd is invalid
+ *					NOTFOUND_LABEL,		// label if entry is not found
+ *					RTN_OPT,			// HASHMAP_RTN_xxx
+ *					out_ent_lw,			// optional, length (in lw) of returned data
+ *					out_ent_tindex,		// optional, tindex of returned data
+ *					out_ent_addr		// optional, addr of returned data
+ *				)
+ *
+ * example use:
+ *#if USE_LM
+ *      hashmap_ops(fd, main_lm_key_offset, main_lm_value_offset, HASHMAP_OP_LOOKUP, 
+ *					error_map_fd#, lookup_not_found#,HASHMAP_RTN_LMEM,--,--,--)
+ *#elif USE_TINDEX
+ *       hashmap_ops(fd, main_lm_key_offset, main_lm_value_offset, HASHMAP_OP_LOOKUP, 
+ *					error_map_fd#, lookup_not_found#,HASHMAP_RTN_TINDEX,rtn_len,my_tindex,rtn_addr]
+ *       __hashmap_read_field(my_tindex, main_lm_value_offset, 
+ *					rtn_addr[0], rtn_addr[1],rtn_len,HASHMAP_RTN_LMEM, --, --)
+ *#elif USE_ADDR
+ *       hashmap_ops(fd, main_lm_key_offset, main_lm_value_offset, HASHMAP_OP_LOOKUP, 
+ *					error_map_fd#, lookup_not_found#,HASHMAP_RTN_ADDR,rtn_len,--,rtn_addr)
+ *#endif
+ *
  */
 #ifndef __HASHMAP_UC__
 #define __HASHMAP_UC__

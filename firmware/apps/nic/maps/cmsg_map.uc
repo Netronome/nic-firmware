@@ -1,9 +1,28 @@
 /*
  * Copyright (C) 2012-2017 Netronome Systems, Inc.  All rights reserved.
  *
- * File:        cmsg_if.uc
+ * File:        cmsg_map.uc
  * Description: Handles parsing and processing of control messages for ebpf maps
  *
+ * API calls:
+ *	 cmsg_init() - declare global and local resources
+ *	 cmsg_rx() - receive from workq and process cmsg
+ *	 cmsg_desc_workq() - create GRO descriptors destined for cmsg workq
+ *
+ * typical use
+ *	 from datapath action
+ *		cmsg_init()
+ *
+ *		to send to cmsg process ME
+ *			.reg $gro_meta[GRO_META_SIZE_LW]
+ *			.xfer_order $gro_meta
+ *			cmsg_desc_workq($gro_meta, in_pkt_vec, EGRESS_LABEL)
+ *			gro_cli_send(seq_ctx, seq_no, $gro_meta, 0)
+ *
+ *	from cmsg handler ME
+ *		cmsg_init()
+ *
+ *		cmsg_rx()
  */
 #ifndef _CMSG_MAP_
 #define _CMSG_MAP_
@@ -94,6 +113,10 @@
 
 	.alloc_mem LM_CMSG_BASE	lm me (NUM_CONTEXT * (CMSG_LM_FIELD_SZ * 2)) 4
 
+	// identity for ctrl vnic
+	//.alloc_mem _pf0_net_app_type imem global 4 4
+	//.init _pf0_net_app_type 0x32
+
 	nfd_out_send_init()
 
 #endif
@@ -151,7 +174,8 @@
 	.reg plen
 
 	immed[pcinum, 0]
-	bitfield_extract(nfd_q, BF_AML(in_nfd_out_desc, NFD_OUT_QID_fld))
+	move(nfd_q, NFD_CMSG_QUEUE)
+	//bitfield_extract(nfd_q, BF_AML(in_nfd_out_desc, NFD_OUT_QID_fld))
 
     immed[nfd_credit, 1]
 	nfd_cc_acquire(0, nfd_q, NO_CREDIT_LABEL)
@@ -246,7 +270,7 @@
     #ifndef GRO_EVEN_NFD_OFFSETS_ONLY
        alu[desc, desc, OR, BF_A(in_vec, PV_OFFSET_bf), <<31]
     #endif
-    alu[out_desc[3], desc, OR, BF_A(in_vec, PV_QUEUE_OUT_bf), <<NFD_OUT_QID_shf]
+    alu[out_desc[3], desc, OR, BF_A(in_vec, PV_QUEUE_IN_bf), <<NFD_OUT_QID_shf]
 
 .end
 
@@ -322,15 +346,17 @@
 	.reg nfd_meta_len
 	.reg c_offset
 	.reg req_fd
+	.reg read $cmsg_data[NFD_META_MAX_LW]
+	.xfer_order $cmsg_data
 
     // Fetch work from queue.
-#ifndef CMSG_UNITTEST_CODE
+//#ifndef CMSG_UNITTEST_CODE
 	#define_eval __CMSG_Q_BASE__	MAP_CMSG_Q_BASE
-	#define_eval __CMSG_Q_IX__		MAP_CMSG_Q_IDX
-#else
-	#define_eval __CMSG_Q_BASE__	MAP_CMSG_Q_DBG_BASE
-	#define_eval __CMSG_Q_IDX__		MAP_CMSG_Q_DBG_IDX
-#endif
+	#define_eval __CMSG_Q_IDX__		MAP_CMSG_Q_IDX
+//#else
+//	#define_eval __CMSG_Q_BASE__	MAP_CMSG_Q_DBG_BASE
+//	#define_eval __CMSG_Q_IDX__		MAP_CMSG_Q_DBG_IDX
+//#endif
     move(q_base_hi, (((__CMSG_Q_BASE__ >>32) & 0xff) <<24))
     immed[q_idx, __CMSG_Q_IDX__]
 #undef __CMSG_Q_BASE__
@@ -339,23 +365,42 @@
     mem[qadd_thread, $nfd_data[0], q_base_hi, <<8, q_idx, CMSG_DESC_LW], ctx_swap[q_sig]
 	pkt_counter_incr(cmsg_rx)
 
-	bitfield_extract(nfd_meta_len, BF_AML($nfd_data, NFD_OUT_METALEN_fld))
-	alu[--, nfd_meta_len, -, 0]
-	beq[cmsg_error#], defer[3]
+#if 0
+	//debug code & old cmsg with metadata length
+    __hashmap_dbg_print(0xc000,0, $nfd_data[0], $nfd_data[1], $nfd_data[2])
+   .reg nfd_q
+   bitfield_extract(nfd_q, BF_AML($nfd_data, NFD_OUT_QID_fld))
+   bitfield_extract(nfd_meta_len, BF_AML($nfd_data, NFD_OUT_METALEN_fld))
+
+   __hashmap_dbg_print(0xc001,0, nfd_q, NFD_CMSG_QUEUE, nfd_meta_len)
+
+	//  alu[c_offset, NFD_IN_DATA_OFFSET, -, nfd_meta_len]
+	//	alu[--, nfd_meta_len, -, 0]
+	//	beq[cmsg_error#], defer[3]
+#endif
+
 		alu[nfd_pkt_meta[0], --, b, $nfd_data[0]]
 		alu[nfd_pkt_meta[1], --, b, $nfd_data[1]]
 		alu[nfd_pkt_meta[2], --, b, $nfd_data[2]]
-	alu[c_offset, NFD_IN_DATA_OFFSET, -, nfd_meta_len]
 
 	// extract buffer address.
 	cmsg_get_mem_addr(mem_location, $nfd_data)
-	nfd_in_meta_parse($nfd_data, nfd_meta_len, mem_location, 4, cmsg_exit_free#)
 
+//	__hashmap_dbg_print(0xc001, 0, mem_location)
+
+
+//	nfd_in_meta_parse($nfd_data, $cmsg_data, nfd_meta_len, mem_location, 4, cmsg_exit_free#)
+//	alu[msg_type, --, b, *$index++]
+//	alu[req_fd, --, b, *$index++]
+    .sig read_sig
 	move(c_offset, NFD_IN_DATA_OFFSET)
+	mem[read32, $cmsg_data[0], c_offset, mem_location, <<8, 2], ctx_swap[read_sig]
+	alu[msg_type, --, b, $cmsg_data[0]]
+	alu[req_fd, --, b, $cmsg_data[1]]
 
-	alu[msg_type, --, b, *$index++]
-	alu[req_fd, --, b, *$index++]
 	cmsg_validate(msg_type, cmsg_error#)
+
+//	__hashmap_dbg_print(0xc002, 0, mem_location, c_offset, msg_type, req_fd)
 
     cmsg_proc(mem_location, reply_pktlen, msg_type, req_fd, cmsg_exit_free#)
 	cmsg_reply(nfd_pkt_meta, reply_pktlen, cmsg_no_credit#)
@@ -395,7 +440,7 @@ cmsg_exit#:
     .endif
 
 	ld_field_w_clr[version, 0001, io_msg_type]
-    .if(version > CMSG_VERSION)
+    .if(version > CMSG_MAP_VERSION)
 		br[ERROR_LABEL]
     .endif
 	alu[io_msg_type, --, b, tmp_type]
@@ -407,7 +452,7 @@ cmsg_exit#:
 	.reg v
 	.reg t
 
-	ld_field_w_clr[v, 0001, CMSG_VERSION]
+	ld_field_w_clr[v, 0001, CMSG_MAP_VERSION]
 	alu[t, --, b, cmsg_type]
 	alu[t, t, or, 1, <<CMSG_TYPE_MAP_REPLY_BIT]
 	alu[t, v, or, t, <<8]
