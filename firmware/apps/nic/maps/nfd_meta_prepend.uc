@@ -24,10 +24,8 @@
 	#define NFP_NET_META_REPR 5
 #endif
 
-#macro nfd_in_meta_parse(out_pkt_data, in_meta_len, in_addr, READ_LW, NOT_CTRL_MSG_LABEL)
+#macro nfd_in_meta_parse(out_pkt_data, prepend_meta, in_meta_len, in_addr, READ_LW, NOT_CTRL_MSG_LABEL)
 .begin
-    .reg read $prepend_meta[NFD_META_MAX_LW]
-    .xfer_order $prepend_meta
     .reg offset
     .reg xfer_addr
     .reg meta_field_types
@@ -39,11 +37,11 @@
     .if(meta_len > 0)
         alu[offset, NFD_IN_DATA_OFFSET, -, meta_len]
 
-        mem[read32, $prepend_meta[0], offset, in_addr, <<8, READ_LW], ctx_swap[read_sig]
+        mem[read32, prepend_meta[0], offset, in_addr, <<8, READ_LW], ctx_swap[read_sig]
 
-        move(meta_field_types, $prepend_meta[0])
+        move(meta_field_types, prepend_meta[0])
 
-        alu[xfer_addr, (&$prepend_meta[1] << 2), OR, ctx_num, <<7]
+        alu[xfer_addr, (&prepend_meta[1] << 2), OR, ctx_num, <<7]
         local_csr_wr[T_INDEX, xfer_addr]
         alu[meta_len, meta_len, -, 1]
 

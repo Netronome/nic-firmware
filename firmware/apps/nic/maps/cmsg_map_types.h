@@ -1,9 +1,7 @@
 #ifndef _MAP_CTL_MSG_TYPES_H_
 #define _MAP_CTL_MSG_TYPES_H_
 
-#ifndef CMSG_VERSION
-	#define CMSG_VERSION	1
-#endif 
+#define CMSG_MAP_VERSION	1
 
 #ifndef CMSG_PORT
 	#define CMSG_PORT		0xffffffff
@@ -185,5 +183,79 @@
 #define CMSG_RC_ERR_MAP_ERR			3
 #define CMSG_RC_ERR_MAP_PARSE		4
 
+#ifndef __NFP_LANG_ASM
+struct cmsg_req_map_alloc_tbl {
+	union {
+		struct {
+			uint32_t unused:16;
+			uint32_t type:8;
+			uint32_t ver:8; 
+			uint32_t key_size;		/* in bytes */
+			uint32_t value_size;	/* in bytes */
+			uint32_t max_entries;
+			uint32_t map_flags;		/* not used */
+		};
+		uint32_t __raw[5];
+	};
+};
+struct cmsg_reply_map_alloc_tbl {
+	union {
+		struct {
+			uint32_t unused:16;
+			uint32_t type:8;
+			uint32_t ver:8; 
+			uint32_t tid;		/* 0 if error */
+		};
+		uint32_t __raw[2];
+	};
+};
+struct cmsg_req_map_free_tbl {
+	union {
+		struct {
+			uint32_t unused:16;
+			uint32_t type:8;
+			uint32_t ver:8; 
+			uint32_t tid;
+		};
+		uint32_t __raw[2];
+	};
+};
+struct cmsg_reply_map_free_tbl {	
+	union {
+		struct {
+			uint32_t unused:16;
+			uint32_t type:8;
+			uint32_t ver:8; 
+			uint32_t rc;		/* 0 success */
+		};
+		uint32_t __raw[2];
+	};
+};
+struct cmsg_req_map_op {
+	union {
+		struct {
+			uint32_t unused:16;
+			uint32_t type:8;		/* CMSG_TYPE_MAP_xxx add, delete, lookup, getnext */
+			uint32_t ver:8;
+			uint32_t tid;
+			uint32_t key[CMSG_MAP_KEY_LW];
+			uint32_t value[CMSG_MAP_VALUE_LW];
+		};
+		uint32_t __raw[18];
+	};
+};
+struct cmsg_reply_map_op {
+	union {
+		struct {
+			uint32_t unused:16;
+			uint32_t type:8;
+			uint32_t ver:8; 
+			uint32_t rc;		/* 0 if success */
+			uint32_t data[CMSG_MAP_KEY_LW];
+		};
+		uint32_t __raw[12];
+	};
+};
+#endif /* __NFP_LANG_ASM */
 
 #endif	/* _MAP_CTL_MSG_TYPES_H_ */
