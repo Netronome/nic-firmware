@@ -34,7 +34,6 @@
 #define NBI_DMA_BP5_BLQ_TARGET   0,0
 #define NBI_DMA_BP6_BLQ_TARGET   0,0
 #define NBI_DMA_BP7_BLQ_TARGET   0,0
-/* We use 2 islands for RX. Configure their CTM buffers for RX */
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND0   1,64,32
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND1   1,64,32
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND2   1,64,32
