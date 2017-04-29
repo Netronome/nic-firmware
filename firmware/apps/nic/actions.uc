@@ -264,9 +264,11 @@ skip_rss#:
     pv_get_length(pkt_length, in_pkt_vec)
     alu[pkt_words, --, B, pkt_length, >>2]
 
-loop#:
-    pv_seek(jump_idx, in_pkt_vec, next_offset, --, PV_SEEK_ANY)
+    pv_seek(jump_idx, in_pkt_vec, next_offset, --, PV_SEEK_CTM_ONLY)
+    alu[checksum, --, B, *$index++, <<16]
+    alu[jump_idx, jump_idx, +, 1]
 
+loop#:
     alu[iteration_words, 32, -, jump_idx]
 
     alu[--, pkt_words, -, iteration_words]
@@ -304,13 +306,14 @@ w/**/LOOP_UNROLL#:
 
     alu[carries, carries, +carry, 0] // accumulate carries that would be lost to looping construct alu[]s
 
+    pv_seek(jump_idx, in_pkt_vec, next_offset, --, PV_SEEK_ANY)
+
     alu[pkt_words, pkt_words, -, iteration_words]
     bgt[loop#]
 
     alu[last_bits, (3 << 3), AND, pkt_length, <<3]
     beq[finalize#]
 
-    pv_seek(jump_idx, in_pkt_vec, next_offset, 4, PV_SEEK_ANY)
     alu[shift, 32, -, last_bits]
     alu[mask, shift, ~B, 0]
     alu[mask, --, B, mask, <<indirect]
@@ -321,15 +324,12 @@ w/**/LOOP_UNROLL#:
 
 finalize#:
     alu[checksum, checksum, +, carries]
-    alu[checksum, checksum, +carry, 0] // adding carries might cause another carry
-    alu[$metadata, --, ~B, checksum]
+    alu[$metadata, checksum, +carry, 0] // adding carries might cause another carry
 
-    __actions_restore_t_idx()
-
-#if 0
     pv_meta_push_type(in_pkt_vec, 6)
     pv_meta_prepend(in_pkt_vec, $metadata, 4)
-#endif
+
+    __actions_restore_t_idx()
 end#:
 .end
 #endm
