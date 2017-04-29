@@ -29,17 +29,8 @@
 .end
 #endm
 
-#include <aggregate.uc>
 #include "pkt_io.uc"
 #include "actions.uc"
-
-#define PKT_COUNTER_ENABLE
-#include "pkt_counter.uc"
-
-pkt_counter_decl(drop)
-pkt_counter_decl(err_act)
-pkt_counter_decl(err_rx_nbi)
-pkt_counter_decl(err_rx_nfd)
 
 // enable NN receive config from CTM
 .reg ctxs
@@ -64,7 +55,6 @@ br[ingress#]
 
 error_rx_nbi#:
     // TODO: no access to port info here, will always increment VNIC errors for VNIC zero
-    pv_stats_select(pkt_vec, PV_STATS_TX)
     pv_stats_incr_error(pkt_vec)
     pkt_io_drop(pkt_vec)
     br[ingress#]
@@ -84,7 +74,7 @@ egress#:
     pkt_io_reorder(pkt_vec)
 
 ingress#:
-    pkt_io_rx(pkt_vec, error_rx_nbi#, error_rx_nfd#)
+    pkt_io_rx(pkt_vec, drop#, error_rx_nbi#, error_rx_nfd#)
 
 actions_execute(pkt_vec, egress#, drop#, error#)
 

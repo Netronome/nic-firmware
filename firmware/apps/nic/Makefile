@@ -63,13 +63,14 @@ $(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
 $(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/lib))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,deps/ng-nfd.hg))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,$(BLM_DIR)))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,$(GRO_DIR)))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,SS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=5))
-$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
+#$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
 $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
         mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 \
         mei1.me0 mei1.me1 mei1.me2 mei1.me3 mei1.me4 \

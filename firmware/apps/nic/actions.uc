@@ -1,11 +1,14 @@
 #ifndef _ACTIONS_UC
 #define _ACTIONS_UC
 
+#include <kernel/nfp_net_ctrl.h>
+
 #include "app_config_instr.h"
 #include "protocols.h"
 
 #include "pv.uc"
 #include "pkt_io.uc"
+
 
 #macro __actions_read(out_data, in_mask, in_shf)
     #if (streq('in_mask', '--'))
@@ -64,7 +67,7 @@ multicast#:
     br[done#]
 
 check_mac#:
-    pv_seek(in_pkt_vec, 0, 6)
+    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
 
     br_bset[*$index, BF_L(MAC_MULTICAST_bf), multicast#]
 
@@ -96,7 +99,7 @@ done#:
     __actions_read(mac[1], --, <<16)
     __actions_read(mac[0], --, --)
 
-    pv_seek(in_pkt_vec, 0, 6)
+    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
 
     // permit multicast and broadcast addresses to pass
     br_bset[*$index, BF_L(MAC_MULTICAST_bf), pass#]
@@ -118,7 +121,9 @@ pass#:
 .begin
     .reg data
     .reg hash
+    .reg hash_type
     .reg ipv4_delta
+    .reg ipv6_delta
     .reg idx
     .reg key
     .reg l3_info
@@ -130,11 +135,13 @@ pass#:
     .reg queue
     .reg queue_shf
     .reg queue_off
+    .reg udp_delta
+    .reg write $metadata
 
     __actions_read(opcode, --, --)
     __actions_read(key, --, --)
 
-     // skip RSS for unkown L3
+    // skip RSS for unkown L3
     bitfield_extract__sz1(l3_info, BF_AML(in_pkt_vec, PV_PARSE_L3I_bf))
     beq[skip_rss#]
 
@@ -142,17 +149,18 @@ pass#:
     bitfield_extract__sz1(--, BF_AML(in_pkt_vec, PV_PARSE_MPD_bf))
     bne[skip_rss#]
 
-    // skip RSS for 2 or more VLANs
+    // skip RSS for 2 or more VLANs (Catamaran L4 offsets unreliable)
     br_bset[BF_A(in_pkt_vec, PV_PARSE_VLD_bf), BF_M(PV_PARSE_VLD_bf), skip_rss#]
 
     local_csr_wr[CRC_REMAINDER, key]
+    immed[hash_type, 1]
 
     // seek to L3 source address
     alu[l3_offset, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)] // 4 bytes for VLAN
     alu[l3_offset, l3_offset, +, (14 + 8)] // 14 bytes for Ethernet, 8 bytes of IP header
     alu[ipv4_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 2)] // 4 bytes extra for IPv4
     alu[l3_offset, l3_offset, +, ipv4_delta]
-    pv_seek(in_pkt_vec, l3_offset, 32)
+    pv_seek(in_pkt_vec, l3_offset, PV_SEEK_CTM_ONLY)
 
     byte_align_be[--, *$index++]
     byte_align_be[data, *$index++]
@@ -169,6 +177,8 @@ pass#:
         #define_eval LOOP (LOOP + 1)
     #endloop
     #undef LOOP
+
+    alu[hash_type, hash_type, +, 1]
 
 process_l4#:
     // skip L4 if offset unknown
@@ -189,20 +199,28 @@ process_l4#:
     alu[--, opcode, AND, 1, <<indirect]
     beq[skip_l4#]
 
-    pv_seek(in_pkt_vec, l4_offset, 4)
+    pv_seek(in_pkt_vec, l4_offset, 4, PV_SEEK_CTM_ONLY)
     byte_align_be[--, *$index++]
     byte_align_be[data, *$index++]
     crc_be[crc_32, --, data]
-        nop
-        nop
-        nop
-        nop
+
+        alu[hash_type, hash_type, +, 3]
+        alu[udp_delta, (1 << 1), AND, parse_status, >>1]
+        alu[udp_delta, udp_delta, OR, parse_status, >>2]
+        alu[hash_type, hash_type,  +, udp_delta]
 
 skip_l4#:
-        alu[idx, 0x7f, AND, opcode, >>8]
+    pv_meta_push_type(in_pkt_vec, hash_type)
+    pv_meta_push_type(in_pkt_vec, 1)
+
     local_csr_rd[CRC_REMAINDER]
     immed[hash, 0]
+
+    alu[$metadata, --, B, hash]
+    pv_meta_prepend(in_pkt_vec, $metadata, 4]
+
     alu[queue_off, 0x1f, AND, hash, >>2]
+    alu[idx, 0x7f, AND, opcode, >>8]
     alu[idx, idx, +, queue_off]
     local_csr_wr[NN_GET, idx]
         __actions_restore_t_idx()
@@ -215,161 +233,105 @@ skip_rss#:
 .end
 #endm
 
-#define ACTION_CHECKSUM_COMPLETE_CHUNK_SIZE_LW    32
-#define ACTION_CHECKSUM_COMPLETE_CHUNK_SIZE    (ACTION_CHECKSUM_COMPLETE_CHUNK_SIZE_LW << 2)
-#define ACTION_CHECKSUM_COMPLETE_CHUNK_MASK    ((ACTION_CHECKSUM_COMPLETE_CHUNK_SIZE_LW << 2)-1)
-
-/** __actions_checksum_block()
- * Calculate the accumulative checksum value over a chunk of packet data
- *
- * @io_sum    32-bit value containing the running checksum value for the current packet
- * @offset_start    32-bit offset of the first byte to process (ignored if this is not the first block)32-bit offset of the last byte to process
- * @offset_end    32-bit offset of the last byte to process
- * @in_pkt_vec    packet vector
- */
-#macro __actions_checksum_block(io_sum, offset_start, offset_end, in_pkt_vec)
-.begin
-    .reg chunk_start
-    .reg process_len
-    .reg temp_offset
-    .reg bytes_mask
-    .reg masked_word
-    .reg bytes_remaining
-    .reg word_count
-    .reg j_offset
-
-    // Determine which chunk of packet data to load
-    alu[chunk_start, offset_end, AND~, ACTION_CHECKSUM_COMPLETE_CHUNK_MASK]
-
-    pv_seek(in_pkt_vec, chunk_start, ACTION_CHECKSUM_COMPLETE_CHUNK_SIZE)
-    alu[process_len, offset_end, -, chunk_start]
-    alu[process_len, process_len, +, 1]
-
-    // If this is the first chunk, start processing at offset_start, and reduce length accordingly
-    .if (chunk_start == 0)
-        // T_INDEX += offset_start
-        local_csr_rd[T_INDEX]
-        immed[temp_offset, 0]
-        alu[temp_offset, temp_offset, +, offset_start]
-        local_csr_wr[T_INDEX, temp_offset] ; Usage latency = 3 cycles
-        alu[process_len, process_len, -, offset_start]
-
-        // TODO:  there must be better more clever ways to do the following masking using byte index etc
-        alu[bytes_remaining, offset_start, AND, 0x3]
-        alu[bytes_remaining, 4, -, bytes_remaining]
-        alu[process_len, process_len, -, bytes_remaining]
-        alu[bytes_remaining, 0x18, AND, offset_start, <<3]
-        immed[bytes_mask,0x8000,<<16]
-        alu[--, bytes_remaining, OR, bytes_mask] ;//a_op of this instr = shift amount, result bit 31 of this instr = sign extend
-        asr[bytes_mask, 0, >>indirect]; //shift >> shift amount & sign extend prev result which is 0x8000 0000
-        alu[masked_word, *$index++,AND~,bytes_mask]
-        alu[io_sum, io_sum, +, masked_word] // no +carry here yet, for it is the first one
-    .endif
-
-    #define_eval __LOOP 1
-    #define_eval __BASE (ACTION_CHECKSUM_COMPLETE_CHUNK_SIZE_LW-1)
-    #define_eval __TARGETS 'step_0#'
-    #while (__LOOP < ACTION_CHECKSUM_COMPLETE_CHUNK_SIZE_LW)
-        #define_eval __TARGETS '__TARGETS,step_/**/__LOOP#'
-        #define_eval __LOOP (__LOOP + 1)
-    #endloop
-
-    // Use a jump table to drop into the right amount of remaining words to process - requires jump tables to work!
-    alu[bytes_remaining, 0x18, AND, process_len, <<3]
-    alu[word_count, --, B, process_len, >>2]
-    alu[j_offset, (ACTION_CHECKSUM_COMPLETE_CHUNK_SIZE_LW-1), -, word_count]
-
-    jump[j_offset, step_/**/__BASE#], targets[__TARGETS], defer[3]
-        immed[bytes_mask,0x8000,<<16]
-        alu[--, bytes_remaining, OR, bytes_mask] ;//a_op of this instr = shift amount, result bit 31 of this instr = sign extend
-        asr[bytes_mask, 0, >>indirect]; //shift >> shift amount & sign extend prev result which is 0x8000 0000
-
-    #define_eval __LOOP ACTION_CHECKSUM_COMPLETE_CHUNK_SIZE_LW-1
-    #while (__LOOP > 0)
-        step_/**/__LOOP#:
-            #define_eval __IDX ( __LOOP)
-            alu[io_sum, io_sum, +carry, *$index++]
-            #define_eval __LOOP (__LOOP - 1)
-    #endloop
-
-step_0#:
-    alu[io_sum, io_sum, +carry, 0]
-    alu[masked_word, *$index++,AND,bytes_mask]
-    alu[io_sum, io_sum, +carry, masked_word]
-    alu[io_sum, io_sum, +carry, 0]
-
-    #undef __LOOP
-    #undef __TARGETS
-
-    // update offset end
-    alu[offset_end, chunk_start, -, 1]
-
-.end
-#endm // __actions_checksum_block()
-
-
-#define ACTION_CHECKSUM_COMPLETE_L2_SIZE 14
 
 #macro __actions_checksum_complete(in_pkt_vec)
 .begin
-    .reg ipv4_delta
-    .reg target_start
-    .reg target_end
-    .reg target_len
-    .reg vlan_count
-    .reg mpls_count
-    .reg calculated_checksum
-    .reg shift_down
+    .reg carries
+    .reg checksum
+    .reg folded
+    .reg iteration_bytes
+    .reg iteration_words
+    .reg jump_idx
+    .reg last_bits
+    .reg mask
+    .reg next_offset
+    .reg padded
+    .reg pkt_length
+    .reg pkt_words
+    .reg shift
+    .reg write $metadata
 
     __actions_read(--, --, --)
 
-    // skip checksum complete for unkown L3 or bad IPv4 checksum
-    br_bclr[BF_AL(in_pkt_vec, PV_PARSE_L3I_bf), skip_checksum_complete#]
+    immed[carries, 0]
+    immed[checksum, 0]
 
-    // Determine L3 start offset
-    bitfield_extract__sz1(vlan_count, BF_AML(in_pkt_vec, PV_PARSE_VLD_bf))
-    alu[target_start, --, B, vlan_count, <<2]
-    bitfield_extract__sz1(mpls_count, BF_AML(in_pkt_vec, PV_PARSE_MPD_bf))
-    alu[mpls_count, --, B, mpls_count, <<2]
-    alu[target_start, target_start, +, mpls_count]
-    alu[target_start, target_start, +, (ACTION_CHECKSUM_COMPLETE_L2_SIZE - 4)]
-    alu[ipv4_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 2)] // What is this about? I see no difference in IPv4 offsets for various L3I's
-    alu[target_start, target_start, +, ipv4_delta]
+    // checksum complete is calcualted over Ethernet payload
+    alu[next_offset, (3 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)] // 4 bytes per VLAN
+    br=byte[next_offset, 0, (3 << 2), too_many_vlans#]
+    alu[next_offset, next_offset, +, 14]
 
-    // TODO: investigate feasibility to use MAC data as shortcut to deduce checksum_complete when TCP/UDP CSUM OK (P_STS) & IPv4 OK (L3I)
+    pv_get_length(pkt_length, in_pkt_vec)
+    alu[pkt_words, --, B, pkt_length, >>2]
 
-    // Determine L3+payload length
-    pv_get_length(target_len, in_pkt_vec)
-    alu[target_end, target_len, -, 1]
+    pv_seek(jump_idx, in_pkt_vec, next_offset, --, PV_SEEK_CTM_ONLY)
+    alu[checksum, --, B, *$index++, <<16]
+    alu[jump_idx, jump_idx, +, 1]
 
-    immed[calculated_checksum, 0]
-    .while (target_end > 0)
-        __actions_checksum_block(calculated_checksum, target_start,target_end,in_pkt_vec)
-    .endw
+loop#:
+    alu[iteration_words, 32, -, jump_idx]
 
-    // fold into 16 bits
-    alu[shift_down, --, B, calculated_checksum, >>16]
-    alu[calculated_checksum, shift_down, +16, calculated_checksum]
-    alu[shift_down, --, B, calculated_checksum, >>16]
-    alu[calculated_checksum, shift_down, +16, calculated_checksum]
+    alu[--, pkt_words, -, iteration_words]
+    bgt[consume_cached#]
 
-    // 1's compliment
-    alu[calculated_checksum, --, ~B, calculated_checksum]
-    alu[calculated_checksum, 0, +16, calculated_checksum]
+    alu[jump_idx, 32, -, pkt_words]
+    jump[jump_idx, w0#], targets[w0#,  w1#,  w2#,  w3#,  w4#,  w5#,  w6#,   w7#, \
+                                 w8#,  w9#,  w10#, w11#, w12#, w13#, w14#, w15#, \
+                                 w16#, w17#, w18#, w19#, w20#, w21#, w22#, w23#, \
+                                 w24#, w25#, w26#, w27#, w28#, w29#, w30#, w31#], defer[3]
+       alu[iteration_words, --, B, pkt_words]
+       alu[iteration_bytes, --, B, iteration_words, <<2]
+       alu[next_offset, next_offset, +, iteration_bytes]
 
-    // TODO: OK, so now what? What should we do with this value?
+consume_cached#:
+    jump[jump_idx, w0#], targets[w0#,  w1#,  w2#,  w3#,  w4#,  w5#,  w6#,   w7#, \
+                                 w8#,  w9#,  w10#, w11#, w12#, w13#, w14#, w15#, \
+                                 w16#, w17#, w18#, w19#, w20#, w21#, w22#, w23#, \
+                                 w24#, w25#, w26#, w27#, w28#, w29#, w30#, w31#], defer[2]
+       alu[iteration_bytes, --, B, iteration_words, <<2]
+       alu[next_offset, next_offset, +, iteration_bytes]
 
-skip_checksum_complete#:
+too_many_vlans#:
+    // TODO: parse through VLANS to find payload offset, resort to checksum unnecessary for now
+    pv_propagate_mac_csum_status(in_pkt_vec)
+    br[end#]
+
+#define_eval LOOP_UNROLL (0)
+#while (LOOP_UNROLL < 32)
+w/**/LOOP_UNROLL#:
+    alu[checksum, checksum, +carry, *$index++]
+    #define_eval LOOP_UNROLL (LOOP_UNROLL + 1)
+#endloop
+#undef LOOP_UNROLL
+
+    alu[carries, carries, +carry, 0] // accumulate carries that would be lost to looping construct alu[]s
+
+    pv_seek(jump_idx, in_pkt_vec, next_offset, --, PV_SEEK_ANY)
+
+    alu[pkt_words, pkt_words, -, iteration_words]
+    bgt[loop#]
+
+    alu[last_bits, (3 << 3), AND, pkt_length, <<3]
+    beq[finalize#]
+
+    alu[shift, 32, -, last_bits]
+    alu[mask, shift, ~B, 0]
+    alu[mask, --, B, mask, <<indirect]
+    alu[padded, mask, AND, *$index++]
+
+    alu[checksum, checksum, +, padded]
+    alu[carries, carries, +carry, 0]
+
+finalize#:
+    alu[checksum, checksum, +, carries]
+    alu[$metadata, checksum, +carry, 0] // adding carries might cause another carry
+
+    pv_meta_push_type(in_pkt_vec, 6)
+    pv_meta_prepend(in_pkt_vec, $metadata, 4)
+
+    __actions_restore_t_idx()
+end#:
 .end
-#endm
-
-#macro __actions_nop(count)
-    #define_eval LOOP (count)
-    #while (LOOP > 0)
-        __actions_read(--, --, --)
-        #define_eval LOOP (LOOP - 1)
-    #endloop
-    #undef LOOP
 #endm
 
 
@@ -426,9 +388,7 @@ rss#:
     __actions_next()
 
 checksum_complete#:
-//    __actions_checksum_complete(in_pkt_vec)
-    __actions_read(--, --, --)
-    pv_propagate_mac_csum_status(in_pkt_vec) // checksum unecessary for now
+    __actions_checksum_complete(in_pkt_vec)
     __actions_next()
 
 tx_host#:

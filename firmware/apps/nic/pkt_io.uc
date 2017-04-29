@@ -40,10 +40,10 @@ timestamp_enable()
 
     pv_acquire_nfd_credit(in_pkt_vec, FAIL_LABEL)
 
-    pv_stats_update_nfd_sent(in_pkt_vec)
     pv_stats_add_tx_octets(in_pkt_vec)
 
     pv_get_gro_host_desc($__pkt_io_gro_meta, in_pkt_vec)
+
     br[SUCCESS_LABEL]
 .end
 #endm
@@ -78,8 +78,8 @@ timestamp_enable()
     #if (NFD_IN_DATA_OFFSET != 128)
        #error "Packet modifier script hard coded for NFD_IN_DATA_OFFSET = 128"
     #endif
-    immed[$prepend[0], ((1 << 15) | (3 << 1)), <<16] // direct packet modifier script, delete 4 bytes
-    immed[$prepend[1], 0] // pad
+    immed[$prepend[0], ((1 << 8) | (6 << 0)), <<16] // indirect packet modifier script, delete 4 bytes, pad
+    immed[$prepend[1], 0] // offsets
     immed[$prepend[2], 0] // sop, to be deleted
     pv_get_mac_prepend($prepend[3], in_pkt_vec) // real sop
 
@@ -144,7 +144,7 @@ skip_dispatch#:
 #endm
 
 
-#macro pkt_io_rx(io_vec, RX_NBI_ERROR_LABEL, RX_NFD_ERROR_LABEL)
+#macro pkt_io_rx(io_vec, DROP_LABEL, RX_NBI_ERROR_LABEL, RX_NFD_ERROR_LABEL)
 .begin
     .reg pkt_len
 
@@ -170,7 +170,7 @@ listen_with_nbi_priority#:
     ctx_arb[__pkt_io_sig_nbi, __pkt_io_sig_nfd, __pkt_io_sig_nfd_retry], any, br[listen_with_nfd_priority#]
 
 rx_nbi#:
-    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, RX_NBI_ERROR_LABEL)
+    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, DROP_LABEL, RX_NBI_ERROR_LABEL)
     br[end#]
 
 rx_nfd#:
