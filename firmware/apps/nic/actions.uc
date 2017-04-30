@@ -238,66 +238,65 @@ skip_rss#:
 .begin
     .reg carries
     .reg checksum
-    .reg folded
+    .reg data_len
     .reg iteration_bytes
     .reg iteration_words
     .reg jump_idx
     .reg last_bits
     .reg mask
-    .reg next_offset
+    .reg offset
     .reg padded
-    .reg pkt_length
-    .reg pkt_words
+    .reg pkt_len
+    .reg remaining_words
     .reg shift
     .reg write $metadata
+    .reg t_idx
+
+    .sig sig_read
 
     __actions_read(--, --, --)
 
-    immed[carries, 0]
+    // invalidate packet cache
+    alu[BF_A(in_pkt_vec, PV_SEEK_BASE_bf), BF_A(in_pkt_vec, PV_SEEK_BASE_bf), OR, 0xff, <<BF_L(PV_SEEK_BASE_bf)]
+
+    alu[offset, (3 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)] // 4 bytes per VLAN
+    br=byte[offset, 0, (3 << 2), too_many_vlans#]
+    alu[offset, offset, +, 14]
+
+    pv_get_length(pkt_len, in_pkt_vec)
+    alu[data_len, pkt_len, -, offset]
+    alu[remaining_words, --, B, data_len, >>2]
+
     immed[checksum, 0]
-
-    // checksum complete is calcualted over Ethernet payload
-    alu[next_offset, (3 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)] // 4 bytes per VLAN
-    br=byte[next_offset, 0, (3 << 2), too_many_vlans#]
-    alu[next_offset, next_offset, +, 14]
-
-    pv_get_length(pkt_length, in_pkt_vec)
-    alu[pkt_words, --, B, pkt_length, >>2]
-
-    pv_seek(jump_idx, in_pkt_vec, next_offset, --, PV_SEEK_CTM_ONLY)
-    alu[checksum, --, B, *$index++, <<16]
-    alu[jump_idx, jump_idx, +, 1]
+    immed[carries, 0]
 
 loop#:
-    alu[iteration_words, 32, -, jump_idx]
+    ov_start(OV_LENGTH)
+    ov_set_use(OV_LENGTH, 32, OVF_SUBTRACT_ONE)
+    ov_clean()
+    mem[read8, $__pv_pkt_data[0], BF_A(in_pkt_vec, PV_CTM_ADDR_bf), offset, max_32], indirect_ref, ctx_swap[sig_read]
 
-    alu[--, pkt_words, -, iteration_words]
-    bgt[consume_cached#]
+    local_csr_wr[T_INDEX, t_idx_ctx]
 
-    alu[jump_idx, 32, -, pkt_words]
-    jump[jump_idx, w0#], targets[w0#,  w1#,  w2#,  w3#,  w4#,  w5#,  w6#,   w7#, \
-                                 w8#,  w9#,  w10#, w11#, w12#, w13#, w14#, w15#, \
-                                 w16#, w17#, w18#, w19#, w20#, w21#, w22#, w23#, \
-                                 w24#, w25#, w26#, w27#, w28#, w29#, w30#, w31#], defer[3]
-       alu[iteration_words, --, B, pkt_words]
-       alu[iteration_bytes, --, B, iteration_words, <<2]
-       alu[next_offset, next_offset, +, iteration_bytes]
+    alu[jump_idx, 8, -, remaining_words]
+    ble[max#]
 
-consume_cached#:
-    jump[jump_idx, w0#], targets[w0#,  w1#,  w2#,  w3#,  w4#,  w5#,  w6#,   w7#, \
-                                 w8#,  w9#,  w10#, w11#, w12#, w13#, w14#, w15#, \
-                                 w16#, w17#, w18#, w19#, w20#, w21#, w22#, w23#, \
-                                 w24#, w25#, w26#, w27#, w28#, w29#, w30#, w31#], defer[2]
-       alu[iteration_bytes, --, B, iteration_words, <<2]
-       alu[next_offset, next_offset, +, iteration_bytes]
+    jump[jump_idx, w0#], targets[w0#,  w1#,  w2#,  w3#,  w4#,  w5#,  w6#, w7#], defer[3]
+       alu[iteration_words, --, B, remaining_words]
+       alu[iteration_bytes, --, B, remaining_words, <<2]
+       alu[offset, offset, +, iteration_bytes]
 
 too_many_vlans#:
     // TODO: parse through VLANS to find payload offset, resort to checksum unnecessary for now
     pv_propagate_mac_csum_status(in_pkt_vec)
     br[end#]
 
+max#:
+    alu[offset, offset, +, 32]
+    immed[iteration_words, 8]
+
 #define_eval LOOP_UNROLL (0)
-#while (LOOP_UNROLL < 32)
+#while (LOOP_UNROLL < 8)
 w/**/LOOP_UNROLL#:
     alu[checksum, checksum, +carry, *$index++]
     #define_eval LOOP_UNROLL (LOOP_UNROLL + 1)
@@ -306,24 +305,25 @@ w/**/LOOP_UNROLL#:
 
     alu[carries, carries, +carry, 0] // accumulate carries that would be lost to looping construct alu[]s
 
-    pv_seek(jump_idx, in_pkt_vec, next_offset, --, PV_SEEK_ANY)
-
-    alu[pkt_words, pkt_words, -, iteration_words]
+    alu[remaining_words, remaining_words, -, iteration_words]
     bgt[loop#]
 
-    alu[last_bits, (3 << 3), AND, pkt_length, <<3]
+    alu[last_bits, (3 << 3), AND, data_len, <<3]
     beq[finalize#]
 
+    mem[read8, $__pv_pkt_data[0], BF_A(in_pkt_vec, PV_CTM_ADDR_bf), offset, 4], ctx_swap[sig_read]
+
+    local_csr_wr[T_INDEX, t_idx_ctx]
     alu[shift, 32, -, last_bits]
     alu[mask, shift, ~B, 0]
     alu[mask, --, B, mask, <<indirect]
     alu[padded, mask, AND, *$index++]
-
     alu[checksum, checksum, +, padded]
     alu[carries, carries, +carry, 0]
 
 finalize#:
     alu[checksum, checksum, +, carries]
+    alu[checksum, checksum, +carry, 0]
     alu[$metadata, checksum, +carry, 0] // adding carries might cause another carry
 
     pv_meta_push_type(in_pkt_vec, 6)
