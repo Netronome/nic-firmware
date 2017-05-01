@@ -275,7 +275,6 @@
     alu[addr, 0xf8, AND, BF_A(io_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
     alu[addr, --, B, addr, <<3]
     mem[incr64, --, isl, <<8, addr, 1]
-    alu[addr, addr, or, 0xff, <<24]
 .end
 #endm
 
