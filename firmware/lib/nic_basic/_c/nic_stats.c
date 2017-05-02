@@ -351,7 +351,7 @@ nic_tmq_drops_accumulate(void)
         }
 
         /* Store the per-port NBI TM queue drop count. */
-        cnt_xw = tmq_port_drop_cnt;
+        cnt_xw = (tmq_port_drop_cnt << 32);
         mem_add64(&cnt_xw, &nic_tmq_drop_cntr_accum[port], sizeof(uint64_t));
     }
 }
