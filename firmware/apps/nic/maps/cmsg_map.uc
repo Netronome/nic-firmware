@@ -341,13 +341,15 @@
 	.sig cmsg_type_read_sig
 	.reg nfd_pkt_meta[CMSG_DESC_LW]		; need to save first 3 words of nfd meta
 	.reg mem_location
-	.reg msg_type
+	.reg cmsg_type
+	.reg cmsg_tag
 	.reg reply_pktlen
 	.reg nfd_meta_len
 	.reg c_offset
 	.reg req_fd
 	.reg read $cmsg_data[NFD_META_MAX_LW]
 	.xfer_order $cmsg_data
+	.reg cmsg_hdr_w0
 
     // Fetch work from queue.
 //#ifndef CMSG_UNITTEST_CODE
@@ -395,14 +397,14 @@
     .sig read_sig
 	move(c_offset, NFD_IN_DATA_OFFSET)
 	mem[read32, $cmsg_data[0], c_offset, mem_location, <<8, 2], ctx_swap[read_sig]
-	alu[msg_type, --, b, $cmsg_data[0]]
+	alu[cmsg_hdr_w0, --, b, $cmsg_data[0]]
 	alu[req_fd, --, b, $cmsg_data[1]]
 
-	cmsg_validate(msg_type, cmsg_error#)
+	cmsg_validate(cmsg_type, cmsg_tag, cmsg_hdr_w0, cmsg_error#)
 
 //	__hashmap_dbg_print(0xc002, 0, mem_location, c_offset, msg_type, req_fd)
 
-    cmsg_proc(mem_location, reply_pktlen, msg_type, req_fd, cmsg_exit_free#)
+    cmsg_proc(mem_location, reply_pktlen, cmsg_type, req_fd, cmsg_tag, cmsg_exit_free#)
 	cmsg_reply(nfd_pkt_meta, reply_pktlen, cmsg_no_credit#)
 	br[cmsg_exit#]
 
@@ -425,43 +427,42 @@ cmsg_exit#:
  * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  * Word  +---------------+---------------+---------------+---------------+
- *    0  |    padding    |     padding   |     type      |    version    |
+ *    0  |    type       |     version   |         tag                   |
  *       +---------------+---------------+-------------------------------+
 */
 
-#macro cmsg_validate(io_msg_type, ERROR_LABEL)
+#macro cmsg_validate(o_msg_type, o_tag, in_ctrl_w0, ERROR_LABEL)
 .begin
 	.reg version
-	.reg tmp_type
 
-	ld_field_w_clr[tmp_type, 0001, io_msg_type, >>8]
-    .if(tmp_type > CMSG_TYPE_MAP_MAX)
+	ld_field_w_clr[o_msg_type, 0001, in_ctrl_w0, >>24]
+    .if(o_msg_type > CMSG_TYPE_MAP_MAX)
 		br[ERROR_LABEL]
     .endif
 
-	ld_field_w_clr[version, 0001, io_msg_type]
+	ld_field_w_clr[version, 0001, in_ctrl_w0, >>16]
     .if(version > CMSG_MAP_VERSION)
 		br[ERROR_LABEL]
     .endif
-	alu[io_msg_type, --, b, tmp_type]
+	ld_field_w_clr[o_tag, 0011, in_ctrl_w0]
 .end
 #endm
 
-#macro cmsg_set_reply(out_cmsg, cmsg_type)
+#macro cmsg_set_reply(out_cmsg, in_cmsg_type, in_cmsg_tag)
 .begin
 	.reg v
 	.reg t
 
-	ld_field_w_clr[v, 0001, CMSG_MAP_VERSION]
-	alu[t, --, b, cmsg_type]
+	ld_field_w_clr[v, 0100, CMSG_MAP_VERSION, <<16]
+	ld_field[v, 0011, in_cmsg_tag]
+	alu[t, --, b, in_cmsg_type]
 	alu[t, t, or, 1, <<CMSG_TYPE_MAP_REPLY_BIT]
-	alu[t, v, or, t, <<8]
-	alu[out_cmsg, --, b, t]
+	alu[out_cmsg, v, or, t, <<24]
 .end
 #endm
 
 
-#macro cmsg_proc(in_addr_hi, out_pktlen, in_cmsg_type, in_fd, ERROR_LABEL)
+#macro cmsg_proc(in_addr_hi, out_pktlen, in_cmsg_type, in_fd, in_cmsg_tag, ERROR_LABEL)
 .begin
     .reg read $pkt_data[CMSG_TXFR_COUNT]
     .xfer_order $pkt_data
@@ -503,8 +504,7 @@ cmsg_exit#:
     #undef MAX_JUMP
 
     s/**/CMSG_TYPE_MAP_ALLOC#:
-			_cmsg_alloc_fd(in_fd, $pkt_data, in_addr_hi, out_pktlen)
-			cmsg_set_reply($cmsg_reply, in_cmsg_type)
+			_cmsg_alloc_fd(in_fd, $pkt_data, in_addr_hi, in_cmsg_tag, out_pktlen)
 			br[cmsg_proc_ret#]
 
 	s0#:
@@ -540,16 +540,15 @@ cmsg_exit#:
 
 			cmsg_lm_handles_undef()
 
-			_cmsg_hashmap_op(in_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, out_pktlen)
+			_cmsg_hashmap_op(in_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, in_cmsg_tag, out_pktlen)
 
 		.end
-        br[cmsg_proc_ret#]
 
 cmsg_proc_ret#:
 .end
 #endm
 
-#macro _cmsg_alloc_fd(in_key, in_data, in_addr_hi, out_len)
+#macro _cmsg_alloc_fd(in_key, in_data, in_addr_hi, in_cmsg_tag, out_len)
 .begin
 		.reg key_sz
 		.reg value_sz
@@ -577,7 +576,7 @@ cmsg_proc_ret#:
 		alu[$reply[1], --, b, fd]
 
 cont#:
-		cmsg_set_reply($reply[0], CMSG_TYPE_MAP_ALLOC)
+		cmsg_set_reply($reply[0], CMSG_TYPE_MAP_ALLOC, in_cmsg_tag)
 		immed[addr_lo, NFD_IN_DATA_OFFSET]
 		mem[write32, $reply[0], in_addr_hi, <<8, addr_lo, 2], sig_done[sig_reply_map_alloc]
 		immed[out_len, (2<<2)]
@@ -586,7 +585,7 @@ cont#:
 .end
 #endm
 
-#macro _cmsg_hashmap_op(in_op, in_fd, in_lm_key, in_lm_value, in_addr_hi, out_len)
+#macro _cmsg_hashmap_op(in_op, in_fd, in_lm_key, in_lm_value, in_addr_hi, in_cmsg_tag, out_len)
 .begin
 	.reg op
 	.reg r_addr[2]
@@ -689,7 +688,7 @@ not_found#:
 
 write_reply#:
 	.reg addr_lo
-	cmsg_set_reply($reply[0], in_op)
+	cmsg_set_reply($reply[0], in_op, in_cmsg_tag)
 	immed[addr_lo, NFD_IN_DATA_OFFSET]
 	ov_single(OV_LENGTH, reply_lw, OVF_SUBTRACT_ONE)
     mem[write32, $reply[0], in_addr_hi, <<8, addr_lo, max_/**/__CMSG_MAX_REPLY_LW__], indirect_ref, sig_done[sig_reply_map_ops]
