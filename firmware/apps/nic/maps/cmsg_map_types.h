@@ -16,7 +16,7 @@
  * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  * Word  +---------------+---------------+---------------+---------------+
- *    0  |    padding    |     padding   |   cmsg_type   |    version    | <- General cmsg header
+ *    0  |    cmsg_type  |     version   |            tag                | <- General cmsg header
  *       +---------------+---------------+---------------+---------------+
  *    1  |                         data                                  | <- specific to this msg
  *       +-------------------------------+---------------+---------------+
@@ -187,9 +187,9 @@
 struct cmsg_req_map_alloc_tbl {
 	union {
 		struct {
-			uint32_t unused:16;
 			uint32_t type:8;
 			uint32_t ver:8; 
+			uint32_t tag:16;
 			uint32_t key_size;		/* in bytes */
 			uint32_t value_size;	/* in bytes */
 			uint32_t max_entries;
@@ -201,9 +201,9 @@ struct cmsg_req_map_alloc_tbl {
 struct cmsg_reply_map_alloc_tbl {
 	union {
 		struct {
-			uint32_t unused:16;
 			uint32_t type:8;
 			uint32_t ver:8; 
+			uint32_t tag:16;
 			uint32_t tid;		/* 0 if error */
 		};
 		uint32_t __raw[2];
@@ -212,9 +212,9 @@ struct cmsg_reply_map_alloc_tbl {
 struct cmsg_req_map_free_tbl {
 	union {
 		struct {
-			uint32_t unused:16;
 			uint32_t type:8;
 			uint32_t ver:8; 
+			uint32_t tag:16;
 			uint32_t tid;
 		};
 		uint32_t __raw[2];
@@ -223,9 +223,9 @@ struct cmsg_req_map_free_tbl {
 struct cmsg_reply_map_free_tbl {	
 	union {
 		struct {
-			uint32_t unused:16;
 			uint32_t type:8;
 			uint32_t ver:8; 
+			uint32_t tag:16;
 			uint32_t rc;		/* 0 success */
 		};
 		uint32_t __raw[2];
@@ -234,9 +234,9 @@ struct cmsg_reply_map_free_tbl {
 struct cmsg_req_map_op {
 	union {
 		struct {
-			uint32_t unused:16;
 			uint32_t type:8;		/* CMSG_TYPE_MAP_xxx add, delete, lookup, getnext */
 			uint32_t ver:8;
+			uint32_t tag:16;
 			uint32_t tid;
 			uint32_t key[CMSG_MAP_KEY_LW];
 			uint32_t value[CMSG_MAP_VALUE_LW];
@@ -247,9 +247,9 @@ struct cmsg_req_map_op {
 struct cmsg_reply_map_op {
 	union {
 		struct {
-			uint32_t unused:16;
 			uint32_t type:8;
 			uint32_t ver:8; 
+			uint32_t tag:16;
 			uint32_t rc;		/* 0 if success */
 			uint32_t data[CMSG_MAP_KEY_LW];
 		};
