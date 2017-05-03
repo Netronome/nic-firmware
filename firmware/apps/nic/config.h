@@ -66,7 +66,7 @@
         ((NS_PLATFORM_PORT_SPEED(_port) * 100 * 1000 / NS_PLATFORM_PCLK) + PPM)
     #define NBI_TM_L2_SHAPER_THRESHOLD(_port) 7
     #define NBI_TM_L2_SHAPER_OVERSHOOT(_port) 7
-    #define NBI_TM_L2_SHAPER_RATE_ADJ(_port)  -24
+    #define NBI_TM_L2_SHAPER_RATE_ADJ(_port)  -20
 
     #define NBI_TM_L1_SHAPER_NUM(_port)                  \
         (128 + (NS_PLATFORM_MAC_CHANNEL_LO(_port) >> 3))
@@ -79,7 +79,7 @@
     #define NBI_TM_L0_SHAPER_NUM              144
     #define NBI_TM_L0_SHAPER_THRESHOLD        7
     #define NBI_TM_L0_SHAPER_OVERSHOOT        7
-    #define NBI_TM_L0_SHAPER_RATE_ADJ         -24
+    #define NBI_TM_L0_SHAPER_RATE_ADJ         -20
 
     #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 == 1
         #define NBI0_TM_L0_SHAPER_RATE (NBI_TM_L1_SHAPER_RATE(0))

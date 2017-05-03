@@ -6,7 +6,7 @@
 #include <timestamp.uc>
 
 #ifndef PKT_BUF_ME_CTM_PACKETS
-    #define PKT_BUF_ME_CTM_PACKETS 64
+    #define PKT_BUF_ME_CTM_PACKETS 36
 #endif
 
 #ifndef PKT_BUF_ME_CTM_BUFFERS
