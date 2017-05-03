@@ -392,8 +392,6 @@ cfg_changes_loop(void)
             /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
             if ((nic_control_word[port] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
                 if (control & NFP_NET_CFG_CTRL_ENABLE) {
-                    app_config_port(port, control, update);
-                    sleep(100000);
                     mac_port_enable_rx(port);
                 } else {
                     mac_port_disable_rx(port);
@@ -401,12 +399,15 @@ cfg_changes_loop(void)
                     app_config_port_down(port);
                 }
             }
-         
 
             /* Save the control word */
             nic_control_word[port] = control;
 
-            /* Wait for queues to drain */
+            if (control & NFP_NET_CFG_CTRL_ENABLE) {
+                app_config_port(port, control, update);
+            }
+ 
+            /* Wait for queues to drain / config to stabilize */
             for (i = 0; i < 100; ++i) 
                 sleep(1000000);
 

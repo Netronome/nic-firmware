@@ -253,7 +253,7 @@ check_status#:
 #if (WORKERS_PER_ISLAND > 4)
 retry_dma#:
     alu[@dma_semaphore, @dma_semaphore, -, 1]
-    bmi[yield_retry_dma#]
+    beq[yield_retry_dma#]
 #endif
 
     ov_start((OV_BYTE_MASK | OV_IMMED16 | OV_LENGTH))

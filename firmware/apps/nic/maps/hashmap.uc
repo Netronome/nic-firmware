@@ -5,7 +5,7 @@
  * @brief       basic lookup table implementation.
  *
  * API calls
- * 
+ *
  *	  hashmap_alloc_fd(out_fd, in_key_size, in_value_size, in_max_entries, ERROR_LABEL)
  *
  * OP type defines:
@@ -33,15 +33,15 @@
  *
  * example use:
  *#if USE_LM
- *      hashmap_ops(fd, main_lm_key_offset, main_lm_value_offset, HASHMAP_OP_LOOKUP, 
+ *      hashmap_ops(fd, main_lm_key_offset, main_lm_value_offset, HASHMAP_OP_LOOKUP,
  *					error_map_fd#, lookup_not_found#,HASHMAP_RTN_LMEM,--,--,--)
  *#elif USE_TINDEX
- *       hashmap_ops(fd, main_lm_key_offset, main_lm_value_offset, HASHMAP_OP_LOOKUP, 
+ *       hashmap_ops(fd, main_lm_key_offset, main_lm_value_offset, HASHMAP_OP_LOOKUP,
  *					error_map_fd#, lookup_not_found#,HASHMAP_RTN_TINDEX,rtn_len,my_tindex,rtn_addr]
- *       __hashmap_read_field(my_tindex, main_lm_value_offset, 
+ *       __hashmap_read_field(my_tindex, main_lm_value_offset,
  *					rtn_addr[0], rtn_addr[1],rtn_len,HASHMAP_RTN_LMEM, --, --)
  *#elif USE_ADDR
- *       hashmap_ops(fd, main_lm_key_offset, main_lm_value_offset, HASHMAP_OP_LOOKUP, 
+ *       hashmap_ops(fd, main_lm_key_offset, main_lm_value_offset, HASHMAP_OP_LOOKUP,
  *					error_map_fd#, lookup_not_found#,HASHMAP_RTN_ADDR,rtn_len,--,rtn_addr)
  *#endif
  *

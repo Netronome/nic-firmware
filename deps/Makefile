@@ -72,6 +72,8 @@ $(DEPS_DIR)/ng-nfd.hg:
 	patch $(NFD_DIR)/kernel/nfp_net_ctrl.h $(NFD_DIR)/../nfp_net_ctrl.h.patch
 	patch $(NFD_DIR)/me/blocks/vnic/pci_in/issue_dma.c $(NFD_DIR)/../issue_dma.c.patch
 	patch $(NFD_DIR)/me/blocks/vnic/nfd_in.uc $(NFD_DIR)/../nfd_in.uc.patch
+	patch $(NFD_DIR)/me/blocks/vnic/svc/msix_qmon.c $(NFD_DIR)/../msix_qmon.c.patch
+	patch $(NFD_DIR)/me/blocks/vnic/nfd_common.h $(NFD_DIR)/../nfd_common.h.patch
 
 HG_DEPS += $(NFD_DIR)
 HG_REVS += $(NFD_REV)
