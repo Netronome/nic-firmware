@@ -333,7 +333,6 @@ pkt_rx_host(void)
 
     Pkt.p_ctm_sz = MIN_CTM_TYPE;
     Pkt.p_ro_ctx = NFD_IN_SEQR_NUM(nfd_rxd.q_num) << 1;
-    Pkt.p_is_gro_sequenced = 1;
     Pkt.p_orig_len = Pkt.p_len;
 
     Pkt.p_src = PKT_HOST_PORT_FROMQ(nfd_rxd.intf, NFD_BMQ2NATQ(nfd_rxd.q_num));
