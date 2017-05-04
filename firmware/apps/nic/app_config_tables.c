@@ -353,7 +353,6 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base,
 {
     __xread uint32_t xrd_rss_tbl[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
     __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
-    uint32_t abs_queue = (vnic_port * NFD_MAX_PF_QUEUES) & 0xff;
     uint32_t i;
 
     /* Read all 32 words of RSS table */
@@ -361,14 +360,8 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base,
                     bar_base + NFP_NET_CFG_RSS_ITBL,
                     sizeof(xrd_rss_tbl));
 
-    /* RSS mapping table has queueid in every 8 bits, change offset of
-     * all of these :
-     * x00010203 --> x20212223
-     */
-    abs_queue = abs_queue << 24 | abs_queue << 16 | abs_queue << 8 | abs_queue;
-
     for (i = 0; i < NFP_NET_CFG_RSS_ITBL_SZ_wrd; i++) {
-        xwr_nn_info[i] = xrd_rss_tbl[i] + abs_queue;
+        xwr_nn_info[i] = xrd_rss_tbl[i];
     }
 
     /* Write at NN register start_offset for all worker MEs */
@@ -466,6 +459,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
     instr[count].instr = INSTR_TX_WIRE;
 #endif
+    instr[count].param = NS_PLATFORM_NBI_TM_QID_LO(vnic_port);
     instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_WIRE);
     prev_instr = INSTR_TX_WIRE;
 
@@ -567,6 +561,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
         instr[count].instr = INSTR_TX_HOST;
 #endif
+        instr[count].param = vnic_port * NFD_MAX_PF_QUEUES;
         instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
         prev_instr = INSTR_TX_HOST;
     } else {
@@ -575,6 +570,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
         instr[count].instr = INSTR_TX_HOST;
 #endif
+        instr[count].param = vnic_port * NFD_MAX_PF_QUEUES;
         instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
         prev_instr = INSTR_TX_HOST;
     }
