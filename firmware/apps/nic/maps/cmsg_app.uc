@@ -23,18 +23,27 @@ cmsg_init()
 .begin
     .reg ctx_num
 	.reg @cmsg_rx_cntr
+	.reg @cmsg_rx_init
 
-    local_csr_wr[MAILBOX0, 0]
-    local_csr_wr[MAILBOX1, 0]
-    local_csr_wr[MAILBOX2, 0]
-    local_csr_wr[MAILBOX3, 0]
+	.if (ctx() == 0)
+		local_csr_wr[MAILBOX0, 0xf]
+		local_csr_wr[MAILBOX1, 0xe]
+		local_csr_wr[MAILBOX2, 0xe]
+		local_csr_wr[MAILBOX3, 0xd]
+		move(@cmsg_rx_init, 0)
+		move(@cmsg_rx_cntr, 0)
+    .endif
 
     local_csr_rd[ACTIVE_CTX_STS]
     immed[ctx_num, 0]
     alu[ctx_num, ctx_num, and, 7]
 
     local_csr_wr[MAILBOX3, 1]
-	immed[@cmsg_rx_cntr, 0]
+	alu[@cmsg_rx_init, @cmsg_rx_init, +, 1]
+    local_csr_wr[MAILBOX2, @cmsg_rx_init]
+
+	local_csr_wr[MAILBOX0, 0]
+	local_csr_wr[MAILBOX1, 0]
 
 main_loop#:
     cmsg_rx()

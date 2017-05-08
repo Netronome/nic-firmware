@@ -17,7 +17,7 @@
     #define_eval _CAMP_HASH_LM_INDEX _LM_NEXT_INDEX
 #endm
 
-#macro camp_hash_init(MAX_KEY_LENGTH)
+#macro camp_hash_init(MAX_KEY_LENGTH, pad_xfer)
 .begin
 
     .init_csr mecsr:CtxEnables.NNreceiveConfig 0x2 const ; 0x2=NN path from CTM MiscEngine
@@ -51,8 +51,6 @@
     .reg offset
     .reg pad_base
     .reg reflect_base
-    .reg $pad[8]
-    .xfer_order $pad
     .sig sig_reflect
     .sig sig_reflected
     .sig sig_pad
@@ -73,10 +71,10 @@
         passert(CAMP_HASH_PAD_SIZE_LW, "MULTIPLE_OF", 8)
         move(offset, 0)
         .while (offset < (CAMP_HASH_PAD_SIZE_LW * 4))
-            mem[read32, $pad[0], pad_base, <<8, offset, 8], ctx_swap[sig_pad]
-            aggregate_copy($pad, $pad, 8)
+            mem[read32, pad_xfer[0], pad_base, <<8, offset, 8], ctx_swap[sig_pad]
+            aggregate_copy(pad_xfer, pad_xfer, 8)
             .set_sig sig_reflected
-            ct[ctnn_write, $pad[0], reflect_base, offset, 8], ctx_swap[sig_reflect]
+            ct[ctnn_write, pad_xfer[0], reflect_base, offset, 8], ctx_swap[sig_reflect]
             alu[offset, offset, +, (8 * 4)]
             ctx_arb[sig_reflected]
         .endw
@@ -98,17 +96,6 @@
     local_csr_wr[CRC_REMAINDER, _CAMP_HASH_INIT]
     alu[_CAMP_HASH_STATE[0], _CAMP_HASH_INIT, +, *n$index++]
     alu[_CAMP_HASH_STATE[1], _CAMP_HASH_INIT, XOR, *n$index++]
-#endm
-
-//MARY DELETE
-#macro _camp_hash_init_dbg()
-    local_csr_wr[CRC_REMAINDER, _CAMP_HASH_INIT]
-	nop
-	nop
-    alu[_CAMP_HASH_STATE[0], _CAMP_HASH_INIT, +, *n$index++]
-    alu[_CAMP_HASH_STATE[1], _CAMP_HASH_INIT, XOR, *n$index++]
-	alu[dbg_hash0, --, b, _CAMP_HASH_STATE[0]]
-	alu[dbg_hash1, --, b, _CAMP_HASH_STATE[1]]
 #endm
 
 #define _camp_hash_step_INSTRUCTIONS 5
