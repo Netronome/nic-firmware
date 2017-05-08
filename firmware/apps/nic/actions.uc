@@ -339,6 +339,8 @@ end#:
 .begin
     .reg act_t_idx
     .reg addr
+    .reg egress_q_base
+    .reg egress_q_mask
     .reg jump_idx
 
     .reg volatile read $actions[NIC_MAX_INSTR]
@@ -351,7 +353,7 @@ end#:
     ov_clean()
     cls[read, $actions[0], 0, addr, max_16], indirect_ref, defer[2], ctx_swap[sig_actions]
         alu[act_t_idx, t_idx_ctx, OR, &$actions[0], <<2]
-        nop
+        immed[egress_q_mask, BF_MASK(PV_QUEUE_OUT_bf)]
 
     local_csr_wr[T_INDEX, act_t_idx]
     nop
@@ -392,10 +394,12 @@ checksum_complete#:
     __actions_next()
 
 tx_host#:
-    pkt_io_tx_host(in_pkt_vec, EGRESS_LABEL, DROP_LABEL)
+    __actions_read(egress_q_base, egress_q_mask, --)
+    pkt_io_tx_host(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 tx_wire#:
-    pkt_io_tx_wire(in_pkt_vec, EGRESS_LABEL, DROP_LABEL)
+    __actions_read(egress_q_base, egress_q_mask, --)
+    pkt_io_tx_wire(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 .end
 #endm
