@@ -113,9 +113,9 @@
 
 	.alloc_mem LM_CMSG_BASE	lm me (NUM_CONTEXT * (CMSG_LM_FIELD_SZ * 2)) 4
 
-	// identity for ctrl vnic
-	//.alloc_mem _pf0_net_app_type imem global 4 4
-	//.init _pf0_net_app_type 0x32
+	// identity for ctrl vnic - should be define in ng-nfd.hg/me/blocks/vnic/shared/nfd_cfg_internal.c
+	.alloc_mem _pf0_net_app_id ctm global 8 8
+	.init _pf0_net_app_id+0 (NFD_NET_APP_TYPE)
 
 	nfd_out_send_init()
 
@@ -626,13 +626,15 @@ s2#:
 	br[error_map_parse#]
 
 s/**/HASHMAP_OP_LOOKUP#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_LOOKUP, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
+	hashmap_ops(in_fd, in_lm_key, --, HASHMAP_OP_LOOKUP, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
+	//hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_LOOKUP, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
 	alu[--, reply_lw, -, 0]				;error if 0
 	bne[cont_proc#]
 	br[error_map_function#]
 
 s/**/HASHMAP_OP_ADD#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,--, --, --)
+	//hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
 
 	alu[--, reply_lw, -, 0]				;add & delete returns 0
 	beq[success_reply#]
