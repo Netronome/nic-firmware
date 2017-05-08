@@ -321,7 +321,7 @@
  * Words 1 through 3 correspond to the arguments to the packet complete
  * command that will ultimately be used by GRO to send the packet.
  */
-#macro pv_get_gro_wire_desc(out_desc, in_vec, pms_offset)
+#macro pv_get_gro_wire_desc(out_desc, in_vec, base_queue, pms_offset)
 .begin
     .reg addr_lo
     .reg ctm_buf_sz
@@ -345,7 +345,8 @@
         alu[prev_alu, prev_alu, -, 1]
         alu[prev_alu, 0xcb, OR, prev_alu, <<8]
     #endif
-    alu[prev_alu, prev_alu, OR, BF_A(in_vec, PV_QUEUE_OUT_bf), <<16]
+    alu[queue, base_queue, +, BF_A(in_vec, PV_QUEUE_OUT_bf)]
+    alu[prev_alu, prev_alu, OR, queue, <<16]
     bitfield_extract__sz1(ctm_buf_sz, BF_AML(in_vec, PV_CBS_bf)) ; PV_CBS_bf
     alu[out_desc[GRO_META_NBI_PALU_wrd], prev_alu, OR, ctm_buf_sz, <<28]
 .end
@@ -366,7 +367,7 @@
  *    3  |             VLAN              |             Flags             |
  *       +-------------------------------+-------------------------------+
  */
-#macro pv_get_gro_host_desc(out_desc, in_vec)
+#macro pv_get_gro_host_desc(out_desc, in_vec, base_queue)
 .begin
     .reg addr
     .reg buf_list
@@ -378,6 +379,7 @@
     .reg pkt_len
     .reg data_len
     .reg pkt_num
+    .reg queue
     .reg write $meta_types
     .sig sig_meta
 
@@ -419,7 +421,8 @@ skip_meta#:
     #ifndef GRO_EVEN_NFD_OFFSETS_ONLY
        alu[desc, desc, OR, BF_A(in_vec, PV_OFFSET_bf), <<31] // meta_len is always even, this is safe
     #endif
-    alu[out_desc[NFD_OUT_QID_wrd], desc, OR, BF_A(in_vec, PV_QUEUE_OUT_bf), <<NFD_OUT_QID_shf]
+    alu[queue, base_queue, +, BF_A(in_vec, PV_QUEUE_OUT_bf)]
+    alu[out_desc[NFD_OUT_QID_wrd], desc, OR, queue, <<NFD_OUT_QID_shf]
 
     // Word 3
     alu[out_desc[NFD_OUT_FLAGS_wrd], --, B, BF_A(in_vec, PV_TX_FLAGS_bf), >>BF_L(PV_TX_FLAGS_bf)] ; PV_TX_FLAGS_bf
@@ -866,7 +869,7 @@ skip_ctm_buffer#:
 #endm
 
 
-#macro pv_acquire_nfd_credit(in_pkt_vec, FAIL_LABEL)
+#macro pv_acquire_nfd_credit(in_pkt_vec, in_queue_base, FAIL_LABEL)
 .begin
     .reg addr_hi
     .reg addr_lo
@@ -876,6 +879,7 @@ skip_ctm_buffer#:
 
     alu[addr_hi, --, B, (NFD_PCIE_ISL_BASE | __NFD_DIRECT_ACCESS), <<24] // PCIe = 0
     alu[addr_lo, BF_A(in_pkt_vec, PV_QUEUE_OUT_bf), AND, 0x3f]
+    alu[addr_lo, addr_lo, +, in_queue_base]
     alu[addr_lo, --, B, addr_lo, <<(log2(NFD_OUT_ATOMICS_SZ))]
 
     ov_start(OV_IMMED8)
