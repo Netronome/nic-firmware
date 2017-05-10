@@ -849,26 +849,24 @@ ret#:
 
 #macro htab_map_lookup_elem_subr(in_tid, in_lm_key_offset, out_value_addr)
 .begin
-	htab_subr_lookup_declare()
-
 	move(htab_g_tid_rc, in_tid)
 	move(htab_g_lm_key_offset, in_lm_key_offset)
 	balr(htab_g_return_addr, HTAB_MAP_LOOKUP_SUBROUTINE#)
-
 	alu[out_value_addr[0], --, b, htab_g_value_addr[0]]
 	alu[out_value_addr[1], --, b, htab_g_value_addr[1]]
 .end
 #endm
+
 #macro htab_map_lookup_subr_func()
 .subroutine
 .begin
-	htab_subr_lookup_declare()
-
-	move(htab_g_value_addr[0], 0)
-	move(htab_g_value_addr[1], 0)
 	hashmap_ops(htab_g_tid_rc, htab_g_lm_key_offset, --, HASHMAP_OP_LOOKUP, htab_lookup_error_map#, htab_lookup_not_found#, HASHMAP_RTN_ADDR, --, --, htab_g_value_addr)
+	rtn[htab_g_return_addr]
+
 htab_lookup_error_map#:
 htab_lookup_not_found#:
+	move(htab_g_value_addr[0], 0)
+	move(htab_g_value_addr[1], 0)
 	rtn[htab_g_return_addr]
 .end
 .endsub
@@ -876,8 +874,6 @@ htab_lookup_not_found#:
 
 #macro htab_map_update_elem_subr(in_tid, in_lm_key_offset, in_lm_value_offset, out_rc)
 .begin
-	htab_subr_update_declare()
-
 	move(htab_g_tid_rc, in_tid)
 	move(htab_g_lm_key_offset, in_lm_key_offset)
 	move(htab_g_lm_value_offset, in_lm_value_offset)
@@ -888,8 +884,6 @@ htab_lookup_not_found#:
 #macro htab_map_update_subr_func()
 .subroutine
 .begin
-	htab_subr_update_declare()
-
 	hashmap_ops(htab_g_tid_rc, htab_g_lm_key_offset, htab_g_lm_value_offset, HASHMAP_OP_ADD, htab_update_error_map#, htab_update_not_found#, HASHMAP_RTN_ADDR, --, --, --)
 	move(htab_g_tid_rc, 0)
 	rtn[htab_g_return_addr]
@@ -910,8 +904,6 @@ htab_update_not_found#:
 
 #macro htab_map_delete_elem_subr(in_tid, in_lm_key_offset, out_rc)
 .begin
-	htab_subr_declare()
-
 	move(htab_g_tid_rc, in_tid)
 	move(htab_g_lm_key_offset, in_lm_key_offset)
 	balr(htab_g_return_addr, HTAB_MAP_DELETE_SUBROUTINE#)
@@ -921,8 +913,6 @@ htab_update_not_found#:
 #macro htab_map_delete_subr_func()
 .subroutine
 .begin
-	htab_subr_declare()
-
 	hashmap_ops(htab_g_tid_rc, htab_g_lm_key_offset, --, HASHMAP_OP_REMOVE, htap_del_error_map#, htap_del_not_found#, HASHMAP_RTN_ADDR, --, --, --)
 	move(htab_g_tid_rc, 0)
 	rtn[htab_g_return_addr]
@@ -940,8 +930,12 @@ htap_del_not_found#:
 .endsub
 #endm
 
-br[__hashmap_subr_decl_end#]
 
+htab_subr_declare()
+htab_subr_update_declare()
+htab_subr_lookup_declare()
+
+br[__hashmap_subr_decl_end#]
 HTAB_MAP_LOOKUP_SUBROUTINE#:
 	htab_map_lookup_subr_func()
 
