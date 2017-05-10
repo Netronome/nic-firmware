@@ -36,7 +36,6 @@ nfp_net_kmod_files = [
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nffw.h", nfp_net_kmod_src_dir + "/nfpcore/nfp_nffw.h"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nsp.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_nsp.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nsp_eth.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_nsp_eth.c"),
-    (nfp_net_kmod_dst_dir + "/nfpcore/nfp_nsp_eth.h", nfp_net_kmod_src_dir + "/nfpcore/nfp_nsp_eth.h"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_platform.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_platform.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_resource.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_resource.c"),
     (nfp_net_kmod_dst_dir + "/nfpcore/nfp_rtsym.c", nfp_net_kmod_src_dir + "/nfpcore/nfp_rtsym.c"),
