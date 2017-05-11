@@ -1,0 +1,50 @@
+diff -r bc1fcbf2bbb6 kernel/nfp_net_ctrl.h
+--- a/kernel/nfp_net_ctrl.h	Mon May 01 22:31:58 2017 +0200
++++ b/kernel/nfp_net_ctrl.h	Thu May 11 11:01:12 2017 -0700
+@@ -96,7 +96,7 @@
+ #define   NFP_NET_CFG_CTRL_TXVLAN         (0x1 <<  7) /* Enable VLAN insert */
+ #define   NFP_NET_CFG_CTRL_SCATTER        (0x1 <<  8) /* Scatter DMA */
+ #define   NFP_NET_CFG_CTRL_GATHER         (0x1 <<  9) /* Gather DMA */
+-#define   NFP_NET_CFG_CTRL_LSO            (0x1 << 10) /* LSO/TSO */
++#define   NFP_NET_CFG_CTRL_LSO		  (0x1 << 10) /* LSO/TSO (version 1) */
+ #define   NFP_NET_CFG_CTRL_RINGCFG        (0x1 << 16) /* Ring runtime changes */
+ #define   NFP_NET_CFG_CTRL_RSS            (0x1 << 17) /* RSS */
+ #define   NFP_NET_CFG_CTRL_IRQMOD         (0x1 << 18) /* Interrupt moderation */
+@@ -109,6 +109,11 @@
+ #define   NFP_NET_CFG_CTRL_NVGRE	  (0x1 << 25) /* NVGRE tunnel support */
+ #define   NFP_NET_CFG_CTRL_MSIX_TX_OFF	  (0x1 << 26) /* MSIX TX off */
+ #define   NFP_NET_CFG_CTRL_BPF		  (0x1 << 27) /* BPF offload capable */
++#define   NFP_NET_CFG_CTRL_LSO2		  (0x1 << 28) /* LSO/TSO (version 2) */
++
++#define   NFP_NET_CFG_CTRL_LSO_ANY	(NFP_NET_CFG_CTRL_LSO | \
++					 NFP_NET_CFG_CTRL_LSO2)
++
+ #define NFP_NET_CFG_UPDATE              0x0004
+ #define   NFP_NET_CFG_UPDATE_GEN          (0x1 <<  0) /* General update */
+ #define   NFP_NET_CFG_UPDATE_RING         (0x1 <<  1) /* Ring config change */
+diff -r bc1fcbf2bbb6 me/blocks/vnic/nfd_in.uc
+--- a/me/blocks/vnic/nfd_in.uc	Mon May 01 22:31:58 2017 +0200
++++ b/me/blocks/vnic/nfd_in.uc	Thu May 11 11:01:12 2017 -0700
+@@ -150,6 +150,8 @@
+ #define NFD_IN_LSO_MSS_fld      2, 13, 0
+ #define NFD_IN_DATALEN_fld      3, 31, 16
+ #define NFD_IN_VLAN_fld         3, 15, 0
++#define NFD_IN_LSO2_L3_OFFS_fld 3, 7, 0
++#define NFD_IN_LSO2_L4_OFFS_fld 3, 15, 8
+ #define NFD_IN_META_SIZE        16
+ #define NFD_IN_META_SIZE_LW     4
+ 
+diff -r bc1fcbf2bbb6 me/blocks/vnic/pci_in/issue_dma.c
+--- a/me/blocks/vnic/pci_in/issue_dma.c	Mon May 01 22:31:58 2017 +0200
++++ b/me/blocks/vnic/pci_in/issue_dma.c	Thu May 11 11:01:12 2017 -0700
+@@ -1419,8 +1419,8 @@
+ 
+ /* Setup _ISSUE_PROC_LSO_TEST, used to disable LSO if the capability
+  * is not advertised on either the PF or VFs. */
+-#if ((NFD_CFG_VF_CAP & NFP_NET_CFG_CTRL_LSO) || \
+-     (NFD_CFG_PF_CAP & NFP_NET_CFG_CTRL_LSO))
++#if ((NFD_CFG_VF_CAP & NFP_NET_CFG_CTRL_LSO_ANY) || \
++     (NFD_CFG_PF_CAP & NFP_NET_CFG_CTRL_LSO_ANY))
+ #define _ISSUE_PROC_LSO_TEST(_pkt)                                  \
+     ((tx_desc.pkt##_pkt##.__raw[2] &                                \
+       (PCIE_DESC_TX_LSO << NFD_IN_DMA_STATE_FLAGS_shf)) &&          \
