@@ -1,12 +1,12 @@
-diff -r 98afbcd74ef6 me/blocks/vnic/nfd_common.h
---- a/me/blocks/vnic/nfd_common.h	Wed Apr 05 14:23:10 2017 +0200
-+++ b/me/blocks/vnic/nfd_common.h	Mon May 01 17:32:59 2017 -0700
+diff -r bc1fcbf2bbb6 me/blocks/vnic/nfd_common.h
+--- a/me/blocks/vnic/nfd_common.h	Mon May 01 22:31:58 2017 +0200
++++ b/me/blocks/vnic/nfd_common.h	Thu May 11 11:51:51 2017 -0700
 @@ -35,7 +35,7 @@
   * ABI change.  Increment minor version number for each compatible ABI change
   * (e.g. a new feature flag).  Reset minor version number to zero for each
   * major version number change. */
--#define NFD_CFG_MAJOR               3
+-#define NFD_CFG_MAJOR               4
 +#define NFD_CFG_MAJOR               5
- #define NFD_CFG_MINOR               0
+ #define NFD_CFG_MINOR               1
  #define NFD_CFG_CLASS_DEFAULT       0
  
