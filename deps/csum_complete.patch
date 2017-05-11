@@ -1,0 +1,19 @@
+diff -r 205b0e318e3a kernel/nfp_net_ctrl.h
+--- a/kernel/nfp_net_ctrl.h	Thu May 11 11:05:39 2017 -0700
++++ b/kernel/nfp_net_ctrl.h	Thu May 11 11:15:47 2017 -0700
+@@ -111,12 +111,14 @@
+ #define   NFP_NET_CFG_CTRL_BPF		  (0x1 << 27) /* BPF offload capable */
+ #define   NFP_NET_CFG_CTRL_LSO2		  (0x1 << 28) /* LSO/TSO (version 2) */
+ #define   NFP_NET_CFG_CTRL_RSS2		  (0x1 << 29) /* RSS (version 2) */
++#define   NFP_NET_CFG_CTRL_CSUM_COMPLETE  (0x1 << 30) /* Checksum complete */
+ 
+ #define   NFP_NET_CFG_CTRL_LSO_ANY	(NFP_NET_CFG_CTRL_LSO | \
+ 					 NFP_NET_CFG_CTRL_LSO2)
+ #define   NFP_NET_CFG_CTRL_RSS_ANY	(NFP_NET_CFG_CTRL_RSS | \
+ 					 NFP_NET_CFG_CTRL_RSS2)
+-#define   NFP_NET_CFG_CTRL_CHAIN_META	NFP_NET_CFG_CTRL_RSS2
++#define   NFP_NET_CFG_CTRL_CHAIN_META	(NFP_NET_CFG_CTRL_RSS2 \
++					 NFP_NET_CFG_CTRL_CSUM_COMPLETE)
+ 
+ #define NFP_NET_CFG_UPDATE              0x0004
+ #define   NFP_NET_CFG_UPDATE_GEN          (0x1 <<  0) /* General update */
