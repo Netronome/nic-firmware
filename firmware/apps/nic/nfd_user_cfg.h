@@ -105,21 +105,23 @@
 /* Configuration mechanism defines */
 #define NFD_CFG_MAX_MTU         9216
 
-#define NFD_CFG_VF_CAP                                          \
-    (NFP_NET_CFG_CTRL_ENABLE | NFP_NET_CFG_CTRL_PROMISC |       \
-     NFP_NET_CFG_CTRL_L2BC | NFP_NET_CFG_CTRL_L2MC |            \
-     NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
-     NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
-     NFP_NET_CFG_CTRL_GATHER | NFP_NET_CFG_CTRL_LSO2 |          \
+#define NFD_CFG_VF_CAP                                            \
+    (NFP_NET_CFG_CTRL_ENABLE   | NFP_NET_CFG_CTRL_PROMISC |       \
+     NFP_NET_CFG_CTRL_RXCSUM   | NFP_NET_CFG_CTRL_TXCSUM |        \
+     NFP_NET_CFG_CTRL_RSS      | NFP_NET_CFG_CTRL_RSS2 |          \
+     NFP_NET_CFG_CTRL_MSIXAUTO | NFP_NET_CFG_CTRL_CSUM_COMPLETE | \
+     NFP_NET_CFG_CTRL_GATHER   | NFP_NET_CFG_CTRL_LSO2 |          \
      NFP_NET_CFG_CTRL_IRQMOD)
 
-#define NFD_CFG_PF_CAP                                          \
-    (NFP_NET_CFG_CTRL_ENABLE | NFP_NET_CFG_CTRL_PROMISC |       \
-     NFP_NET_CFG_CTRL_L2BC | NFP_NET_CFG_CTRL_L2MC |            \
-     NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
-     NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
-     NFP_NET_CFG_CTRL_GATHER | NFP_NET_CFG_CTRL_LSO2 |          \
+#define NFD_CFG_PF_CAP                                            \
+    (NFP_NET_CFG_CTRL_ENABLE   | NFP_NET_CFG_CTRL_PROMISC |       \
+     NFP_NET_CFG_CTRL_RXCSUM   | NFP_NET_CFG_CTRL_TXCSUM |        \
+     NFP_NET_CFG_CTRL_RSS      | NFP_NET_CFG_CTRL_RSS2 |          \
+     NFP_NET_CFG_CTRL_MSIXAUTO | NFP_NET_CFG_CTRL_CSUM_COMPLETE | \
+     NFP_NET_CFG_CTRL_GATHER   | NFP_NET_CFG_CTRL_LSO2 |          \
      NFP_NET_CFG_CTRL_IRQMOD)
+
+#define NFD_RSS_HASH_FUNC NFP_NET_CFG_RSS_CRC32
 
 #define NFD_CFG_RING_EMEM       emem0
 
