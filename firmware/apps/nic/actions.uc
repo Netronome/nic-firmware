@@ -259,16 +259,13 @@ skip_rss#:
     // invalidate packet cache
     alu[BF_A(in_pkt_vec, PV_SEEK_BASE_bf), BF_A(in_pkt_vec, PV_SEEK_BASE_bf), OR, 0xff, <<BF_L(PV_SEEK_BASE_bf)]
 
-    alu[offset, (3 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)] // 4 bytes per VLAN
-    br=byte[offset, 0, (3 << 2), too_many_vlans#]
-    alu[offset, offset, +, 14]
+    immed[checksum, 0]
+    immed[carries, 0]
+    immed[offset, 14]
 
     pv_get_length(pkt_len, in_pkt_vec)
     alu[data_len, pkt_len, -, offset]
     alu[remaining_words, --, B, data_len, >>2]
-
-    immed[checksum, 0]
-    immed[carries, 0]
 
 loop#:
     ov_start(OV_LENGTH)
@@ -285,11 +282,6 @@ loop#:
        alu[iteration_words, --, B, remaining_words]
        alu[iteration_bytes, --, B, remaining_words, <<2]
        alu[offset, offset, +, iteration_bytes]
-
-too_many_vlans#:
-    // TODO: parse through VLANS to find payload offset, resort to checksum unnecessary for now
-    pv_propagate_mac_csum_status(in_pkt_vec)
-    br[end#]
 
 max#:
     alu[offset, offset, +, 32]
@@ -330,7 +322,6 @@ finalize#:
     pv_meta_prepend(in_pkt_vec, $metadata, 4)
 
     __actions_restore_t_idx()
-end#:
 .end
 #endm
 
