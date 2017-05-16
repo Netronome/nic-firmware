@@ -330,6 +330,16 @@ nic_local_reconfig(uint32_t *enable_changed)
         nic->rx_ring_en[vnic] = swapw64(ring_en[1]);
     }
 
+     /* Handle MAC address updates */
+    if (update & NFP_NET_CFG_UPDATE_MACADDR) {
+        /* MAC Address */
+        mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
+                   sizeof(nic_mac));
+
+        ptr = &(nic->mac[vnic]);
+        reg_cp(ptr, nic_mac, 8);
+    }
+
     /* Handle RSS re-config */
     if (update & NFP_NET_CFG_UPDATE_RSS &&
         nic->control[vnic] & NFP_NET_CFG_CTRL_RSS) {
