@@ -6,7 +6,7 @@ FLOWENV_REV=59c0f4f94bb4
 # GRO_REV  - Tip as of July 12 2016
 GRO_REV=25c868a8c724
 # NFD_REV - Tip of default branch as of 27 Oct 2016
-NFD_REV=bc1fcbf2bbb6
+NFD_REV=cbad0447831e
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
@@ -68,10 +68,6 @@ NFD_INC = -I$(NFD_DIR)/shared \
 $(DEPS_DIR)/ng-nfd.hg:
 	hg clone -r $(NFD_REV) \
 	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
-	(cd $(NFD_DIR) && patch -p1 < $(DEPS_DIR)/lso2.patch)
-	(cd $(NFD_DIR) && patch -p1 < $(DEPS_DIR)/rss2.patch)
-	(cd $(NFD_DIR) && patch -p1 < $(DEPS_DIR)/csum_complete.patch)
-	(cd $(NFD_DIR) && patch -p1 < $(DEPS_DIR)/nfd_major_5.patch)
 
 
 HG_DEPS += $(NFD_DIR)
