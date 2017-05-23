@@ -497,10 +497,10 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
         instr[count].instr = INSTR_MAC;
 #endif
-        instr[count].param = (nic_mac[1] >> 16);
+        instr[count].param = (nic_mac[0] >> 16);
         instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_MAC);
         prev_instr = INSTR_MAC;
-        instr[count++].value = nic_mac[0];
+        instr[count++].value = (nic_mac[0] << 16) | (nic_mac[1] >> 16);
     }
 
     /* RSS */
