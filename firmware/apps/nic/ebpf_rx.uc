@@ -116,7 +116,7 @@
  *  n$nnr0 = 0
  *
  *  OLD ebpf return
- *   A0 result - 
+ *   A0 result -
  *   B9 meta len
  *   B10 pkt len
  *   n$nnr1 = pkt mark
@@ -198,7 +198,7 @@ bpf_ret#:
 	aggregate_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW)
 
 
-	.if (stats_idx > 0)		
+	.if (stats_idx > 0)
 		/* only port 0 for now */
 		alu[stats_idx, stats_idx, -, 1]
 		alu[stats_offset, --, b, stats_idx, <<4]
@@ -208,10 +208,10 @@ bpf_ret#:
 		pv_get_length(pkt_length, in_vec)
 		ov_start((OV_IMMED16 | OV_LENGTH))
     	ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
-    	ov_set_use(OV_IMMED16, pkt_length) 
+    	ov_set_use(OV_IMMED16, pkt_length)
     	ov_clean()
 		mem[add64_imm, --, nic_stats_extra_hi, <<8, stats_offset, 1], indirect_ref
-	.endif	
+	.endif
 
 
 bpf_ret_code#:
