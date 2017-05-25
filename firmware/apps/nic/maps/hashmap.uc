@@ -689,16 +689,21 @@ ret#:
 #macro hashmap_ops(fd, lm_key_addr, lm_value_addr, OP, INVALID_MAP_LABEL, NOTFOUND_LABEL, RTN_OPT, out_ent_lw, out_ent_tindex, out_ent_addr)
 .begin
 	.reg ent_addr_hi
+	.set ent_addr_hi
 	.reg tbl_addr_hi
+	.set tbl_addr_hi
 	.reg ent_state
+	.set ent_state
 	.reg key_lwsz
 	.reg value_lwsz
 	.reg offset
+	.set offset
 	.reg key_mask
 	.reg value_mask
 	.reg hash[2]
 	.reg mu_partition
 	.reg ent_index
+	.set ent_index
 	.reg bytes
 	.reg keys_n_tid
 	.reg my_act_ctx
@@ -816,42 +821,94 @@ ret#:
  *
  */
 //#define EBPF_SUBROUTINE
-
+#define DO_NEW_REGS
 #ifdef EBPF_SUBROUTINE
+
+#ifdef DO_NEW_REGS
+	#define HTAB_MAP_DELETE_SUBROUTINE_addr	947
+	#define HTAB_MAP_LOOKUP_SUBROUTINE_addr 30
+	#define HTAB_MAP_UPDATE_SUBROUTINE_addr 361
+#endif
+
 #macro htab_subr_declare()
+	#define __GLOBAL__ volatile
+	//#define __GLOBAL__ global
 	#ifndef HASHMAP_GLOBALS_DECLARED
 		#define HASHMAP_GLOBALS_DECLARED
-		.reg global htab_g_tid_rc			/* input=tid, output=rc */
-		.reg global htab_g_lm_key_offset
-		.reg global htab_g_return_addr
+		.reg __GLOBAL__ htab_g_tid_rc			/* input=tid, output=rc */
+		.reg __GLOBAL__ htab_g_lm_key_offset
+		.reg __GLOBAL__ htab_g_return_addr
 		.set htab_g_tid_rc			/* input=tid, output=rc */
 		.set htab_g_lm_key_offset
 		.set htab_g_return_addr
 	#endif
+	#undef __GLOBAL__
 #endm
 #macro htab_subr_lookup_declare()
 	htab_subr_declare()
+	//#define __GLOBAL__ global
+	#define __GLOBAL__ volatile
 	#ifndef HASHMAP_LOOKUP_GLOBALS_DECLARED
 		#define HASHMAP_LOOKUP_GLOBALS_DECLARED
-		.reg global htab_g_value_addr[2]
+		.reg __GLOBAL__ htab_g_value_addr[2]
 		.set htab_g_value_addr[0]
 		.set htab_g_value_addr[1]
 	#endif
+	#undef __GLOBAL__
 #endm
 #macro htab_subr_update_declare()
 	htab_subr_declare()
+	//#define __GLOBAL__ global
+	#define __GLOBAL__ volatile
 	#ifndef HASHMAP_UPDATE_GLOBALS_DECLARED
 		#define HASHMAP_UPDATE_GLOBALS_DECLARED
-		.reg global htab_g_lm_value_offset
+		.reg __GLOBAL__ htab_g_lm_value_offset
 		.set htab_g_lm_value_offset
 	#endif
+	#undef __GLOBAL__
 #endm
+
+#macro xbalr(return_addr, SUBR_LABEL)
+#ifdef DO_NEW_REGS
+	/* SUBR_LABEL must be a constant */
+	#define_eval __SUBR_LABEL	'SUBR_LABEL/**/_addr'
+	#warning "br_addr for " SUBR_LABEL " is " __SUBR_LABEL
+	.set return_addr
+	.reg_addr return_addr	4 A
+	load_addr[return_addr, ret_label#]
+	br_addr[__SUBR_LABEL]
+	#undef __SUBR_LABEL
+  ret_label#:
+#else
+	#define_eval __SUBR_LABEL	'SUBR_LABEL/**/#'
+	balr(return_addr, __SUBR_LABEL)
+	#undef __SUBR_LABEL
+#endif
+#endm
+
 
 #macro htab_map_lookup_elem_subr(in_tid, in_lm_key_offset, out_value_addr)
 .begin
-	move(htab_g_tid_rc, in_tid)
-	move(htab_g_lm_key_offset, in_lm_key_offset)
-	balr(htab_g_return_addr, HTAB_MAP_LOOKUP_SUBROUTINE#)
+	#ifdef DO_NEW_REGS
+		.reg_addr htab_g_tid_rc		3 A
+		alu[htab_g_tid_rc, --, b, in_tid]
+		.reg_addr htab_g_lm_key_offset	0 B
+		alu[htab_g_lm_key_offset, --, b, in_lm_key_offset]
+		.reg_addr htab_g_value_addr[0] 5 A
+		alu[htab_g_value_addr[0], --, b, 0]
+		.reg_addr htab_g_value_addr[1] 2 B
+		alu[htab_g_value_addr[1], --, b, 0]
+	#else
+		move(htab_g_tid_rc, in_tid)
+		move(htab_g_lm_key_offset, in_lm_key_offset)
+	#endif
+	xbalr(htab_g_return_addr, HTAB_MAP_LOOKUP_SUBROUTINE)
+
+	#ifdef DO_NEW_REGS
+		.reentry
+	#endif
+	.set htab_g_value_addr[0]
+	.set htab_g_value_addr[1]
 	alu[out_value_addr[0], --, b, htab_g_value_addr[0]]
 	alu[out_value_addr[1], --, b, htab_g_value_addr[1]]
 .end
@@ -874,10 +931,24 @@ htab_lookup_not_found#:
 
 #macro htab_map_update_elem_subr(in_tid, in_lm_key_offset, in_lm_value_offset, out_rc)
 .begin
-	move(htab_g_tid_rc, in_tid)
-	move(htab_g_lm_key_offset, in_lm_key_offset)
-	move(htab_g_lm_value_offset, in_lm_value_offset)
-	balr(htab_g_return_addr, HTAB_MAP_UPDATE_SUBROUTINE#)
+	#ifdef DO_NEW_REGS
+		.reg_addr htab_g_tid_rc			3 A		/* input=tid, output=rc */
+		alu[htab_g_tid_rc, --, b, in_tid]
+		.reg_addr htab_g_lm_key_offset	0 B
+		alu[htab_g_lm_key_offset, --, b, in_lm_key_offset]
+		.reg_addr htab_g_lm_value_offset	1 B
+		alu[htab_g_lm_value_offset, --, b, in_lm_value_offset]
+	#else
+		move(htab_g_tid_rc, in_tid)
+		move(htab_g_lm_key_offset, in_lm_key_offset)
+		move(htab_g_lm_value_offset, in_lm_value_offset)
+	#endif
+	xbalr(htab_g_return_addr, HTAB_MAP_UPDATE_SUBROUTINE)
+	#ifdef DO_NEW_REGS
+		.reentry
+	#endif
+
+	.set htab_g_tid_rc
 	alu[out_rc, --, b, htab_g_tid_rc]
 .end
 #endm
@@ -904,9 +975,21 @@ htab_update_not_found#:
 
 #macro htab_map_delete_elem_subr(in_tid, in_lm_key_offset, out_rc)
 .begin
-	move(htab_g_tid_rc, in_tid)
-	move(htab_g_lm_key_offset, in_lm_key_offset)
-	balr(htab_g_return_addr, HTAB_MAP_DELETE_SUBROUTINE#)
+	#ifdef DO_NEW_REGS
+		.reg_addr htab_g_tid_rc		3 A		/* input=tid, output=rc */
+		alu[htab_g_tid_rc, --, b, in_tid]
+		.reg_addr htab_g_lm_key_offset	0 B
+		alu[htab_g_lm_key_offset, --, b, in_lm_key_offset]
+	#else
+		move(htab_g_tid_rc, in_tid)
+		move(htab_g_lm_key_offset, in_lm_key_offset)
+	#endif
+
+	xbalr(htab_g_return_addr, HTAB_MAP_DELETE_SUBROUTINE)
+	#ifdef DO_NEW_REGS
+		.reentry
+	#endif
+	.set htab_g_tid_rc
 	alu[out_rc, --, b, htab_g_tid_rc]
 .end
 #endm
@@ -925,11 +1008,9 @@ htap_del_not_found#:
 	#define  _RC_ENOENT_	(-2)
 	move(htab_g_tid_rc, _RC_ENOENT_)
 	#undef _RC_ENOENT_
-	rtn[htab_g_return_addr]
 .end
 .endsub
 #endm
-
 
 htab_subr_declare()
 htab_subr_update_declare()

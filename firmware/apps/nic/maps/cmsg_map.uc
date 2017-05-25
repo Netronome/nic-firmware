@@ -633,7 +633,7 @@ s/**/HASHMAP_OP_LOOKUP#:
 	br[error_map_function#]
 
 s/**/HASHMAP_OP_ADD#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,--, --, --)
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --)
 	//hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
 
 	alu[--, reply_lw, -, 0]				;add & delete returns 0

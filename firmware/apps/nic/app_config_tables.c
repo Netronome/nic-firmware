@@ -514,7 +514,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     }
 
     /* RSS */
-    if (control & NFP_NET_CFG_CTRL_RSS) {
+    if (control & NFP_NET_CFG_CTRL_RSS2) {
 
         /* RSS remapping table with NN register index as start offset */
         rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
@@ -546,7 +546,9 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
         /* RSS key: provide rss key with hash. Use only first word */
         instr[count++].value = rss_key[0];
+    }
 
+    if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {
         /* calculate checksum and drop if mismatch */
 #ifdef GEN_INSTRUCTION
         instr[count].instr = instr_tbl[INSTR_CHECKSUM_COMPLETE];
@@ -555,25 +557,16 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #endif
         instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_CHECKSUM_COMPLETE);
         prev_instr = INSTR_CHECKSUM_COMPLETE;
+    }
 
 #ifdef GEN_INSTRUCTION
-        instr[count].instr = instr_tbl[INSTR_TX_HOST];
+    instr[count].instr = instr_tbl[INSTR_TX_HOST];
 #else
-        instr[count].instr = INSTR_TX_HOST;
+    instr[count].instr = INSTR_TX_HOST;
 #endif
-        instr[count].param = vnic_port * NFD_MAX_PF_QUEUES;
-        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
-        prev_instr = INSTR_TX_HOST;
-    } else {
-#ifdef GEN_INSTRUCTION
-        instr[count].instr = instr_tbl[INSTR_TX_HOST];
-#else
-        instr[count].instr = INSTR_TX_HOST;
-#endif
-        instr[count].param = vnic_port * NFD_MAX_PF_QUEUES;
-        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
-        prev_instr = INSTR_TX_HOST;
-    }
+    instr[count].param = vnic_port * NFD_MAX_PF_QUEUES;
+    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
+    prev_instr = INSTR_TX_HOST;
 
     reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
 
