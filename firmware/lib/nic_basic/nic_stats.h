@@ -31,6 +31,16 @@
  * DO NOT CHANGE THE ORDER!
  */
 #if defined(__NFP_LANG_MICROC)
+struct nic_port_bpf_stats {
+    unsigned long long pass_pkts;
+    unsigned long long pass_bytes;
+    unsigned long long app1_pkts;		/* ebpf drop */
+    unsigned long long app1_bytes;
+    unsigned long long app2_pkts;		/* ebpf redir */
+    unsigned long long app2_bytes;
+    unsigned long long app3_pkts;		/* ebpf abort */
+    unsigned long long app3_bytes;
+};
 
 struct nic_port_stats_extra {
     unsigned long long rx_discards;
@@ -50,6 +60,8 @@ struct nic_port_stats_extra {
     unsigned long long tx_uc_pkts;
     unsigned long long tx_mc_pkts;
     unsigned long long tx_bc_pkts;
+
+    struct nic_port_bpf_stats ebpf;
 };
 
 __asm {
