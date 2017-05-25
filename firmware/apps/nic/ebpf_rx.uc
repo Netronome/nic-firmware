@@ -1,0 +1,223 @@
+#ifndef _EBPF_RX_UC
+#define _EBPF_RX_UC
+
+/* _nic_stats_extra -- add ebpf stats at end */
+/* firmware/lib/nic_basic/nic_stats.h */
+/* firmware/lib/nic_basic/_c/nic_stats.c */
+#include <nic_basic/nic_stats.h>
+#include "unroll.uc"
+#include "lm_handle.uc"
+
+#macro ebpf_lm_handles_define()
+    lm_handle_alloc(EBPF_META_PKT_LM_HANDLE)
+    #define_eval EBPF_META_PKT_LM_HANDLE    _LM_NEXT_HANDLE
+    #define_eval EBPF_META_PKT_LM_INDEX     _LM_NEXT_INDEX
+
+    lm_handle_alloc(EBPF_STACK_LM_HANDLE)
+    #define_eval EBPF_STACK_LM_HANDLE    _LM_NEXT_HANDLE
+    #define_eval EBPF_STACK_LM_INDEX     _LM_NEXT_INDEX
+#endm
+
+#macro ebpf_lm_handles_undef()
+    lm_handle_free(EBPF_META_PKT_LM_HANDLE)
+    #undef EBPF_META_PKT_LM_HANDLE
+    #undef EBPF_META_PKT_LM_INDEX
+    lm_handle_free(EBPF_STACK_LM_HANDLE)
+    #undef EBPF_STACK_LM_HANDLE
+    #undef EBPF_STACK_LM_INDEX
+#endm
+
+#define EBPF_LM_SIZE   64
+#define EBPF_LM_BASE   3840
+.alloc_mem ebpf_lm lmem+EBPF_LM_BASE me (EBPF_LM_SIZE*4)
+
+/* temp for now */
+#define EBPF_PROG_ADDR 3000
+
+
+#macro ebpf_lm_addr(out_addr)
+.begin
+    .reg lm_off
+    .reg ctx_num
+	.reg tmp
+
+	alu[ctx_num, --, b, t_idx_ctx, >>7]
+
+	local_csr_rd[ACTIVE_CTX_STS]
+    immed[tmp, 0]
+    alu_shf[tmp, tmp, and, 0x7]
+
+    #define_eval _LM_SIZE_ (EBPF_LM_SIZE/2)
+    immed[out_addr, EBPF_LM_BASE]
+    alu[lm_off, --, b, ctx_num, <<(LOG2(_LM_SIZE_, 1))]
+    alu[out_addr, out_addr, +, lm_off]
+    #undef _LM_SIZE_
+.end
+#endm
+/*
+ * OLD ebpf calling convection
+ *  n$nnr2 = [31]:1, [26:16]:pnum, [15:0]:offset + meta_len
+ *  n$nnr3 = packet length
+ *  n$nnr0 = 0
+ *
+ *  OLD ebpf return
+ *   A0 result - 
+ *   B9 meta len
+ *   B10 pkt len
+ *   n$nnr1 = pkt mark
+ *
+ *  Temp calling convenction: TO BE CHANGED
+ *		in  packet offset:  9 B
+ *		in  packet length: 10 B
+ *		out result:		    0 A
+ *
+ */
+/* return value bit field description */
+#define EBPF_RET_SKB_MARK		0
+#define EBPF_RET_IFE_MARK		1
+#define EBPF_RET_PASS			16
+#define EBPF_RET_DROP			17
+#define EBPF_RET_REDIR			18
+#define EBPF_RET_STATS_PASS		20
+#define EBPF_RET_STATS_DROP		21
+#define EBPF_RET_STATS_REDIR	22
+#define EBPF_RET_STATS_ABORT	23
+
+#define EBPF_RET_STATS_MASK		0xf
+#define EBPF_STATS_START_OFFSET 0x80
+
+/*
+ * to do:
+ *    - set upebpf stack
+ *    - save/reserved regs
+ *	  - fixed lm index
+ */
+
+#macro ebpf_func(in_vec, EGRESS_LABEL, DROP_LABEL)
+.begin
+	.reg lm_offset
+	.reg pkt_length
+	.reg pkt_offset
+	.reg ebpf_pkt_param
+	.reg ebpf_pkt_len
+	.reg ebpf_rc
+
+	ebpf_lm_addr(lm_offset)
+	ebpf_lm_handles_define()
+	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
+		pv_get_length(pkt_length, in_vec)
+
+	/* ebpf_rx: from NBI */
+	pv_get_ctm_base(pkt_offset, in_vec)
+
+	unroll_copy(EBPF_META_PKT_LM_INDEX, ++, in_vec, 0, PV_SIZE_LW, PV_SIZE_LW)
+
+	/* registers are trashed here */
+	.reg_addr ebpf_pkt_param 9 B
+	alu[ebpf_pkt_param, --, b, pkt_offset]
+	.reg_addr ebpf_pkt_len 10 B
+	alu[ebpf_pkt_len, --, b, pkt_length]
+	.reg_addr ebpf_rc 0 A
+	immed[ebpf_rc, 0]
+	br[loaded_bpf#]
+	//br_addr[EBPF_PROG_ADDR]
+
+bpf_ret#:
+	.reentry
+	.reg stats_idx
+	.reg stats_offset
+	.reg nic_stats_extra_hi
+	.reg egress_q_base
+	.reg_addr ebpf_rc 0 A
+	.set ebpf_rc
+	.reg rc
+
+	/* restore pkt meta data */
+	ebpf_lm_addr(lm_offset)
+	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
+		alu[rc, --, b, ebpf_rc]
+		alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
+		move(nic_stats_extra_hi, _nic_stats_extra >>8)
+
+	unroll_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW, PV_SIZE_LW)
+
+	.if (stats_idx > 0)
+		/* only port 0 for now */
+		alu[stats_idx, stats_idx, -, 1]
+		alu[stats_offset, --, b, stats_idx, <<4]
+		alu[stats_offset, EBPF_STATS_START_OFFSET, +, stats_offset]
+		mem[incr64, --, nic_stats_extra_hi, <<8, stats_offset]	;pkts count
+		alu[stats_offset, 8, +, stats_offset]					;bytes count
+		pv_get_length(pkt_length, in_vec)
+		ov_start((OV_IMMED16 | OV_LENGTH))
+    	ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
+    	ov_set_use(OV_IMMED16, pkt_length) 
+    	ov_clean()
+		mem[add64_imm, --, nic_stats_extra_hi, <<8, stats_offset, 1], indirect_ref
+	.endif
+
+bpf_ret_code#:
+	/* ignoring mark TBD  */
+	br_bset[rc, EBPF_RET_DROP, DROP_LABEL]
+	br_bclr[rc, EBPF_RET_REDIR, bpf_tx_host#]
+bpf_tx_wire#:
+	pv_get_ingress_queue(egress_q_base, in_vec)
+	pkt_io_tx_wire(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
+
+bpf_tx_host#:
+	alu[egress_q_base, BF_A(in_vec, PV_QUEUE_OUT_bf), and, 0x3f]
+	pkt_io_tx_host(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
+
+	ebpf_lm_handles_undef()
+/* should not get here */
+	br[ret#]
+	nop
+	nop
+	nop
+
+/* ebpf program  */
+loaded_bpf#:
+.begin
+	.reentry
+	.reg rc 
+	.reg pkt_len
+	.reg pkt_addr
+
+	/* test code */
+	.reg_addr ebpf_pkt_param 9 B
+	.set ebpf_pkt_param
+	alu[pkt_addr, --, b, ebpf_pkt_param]
+
+	.reg_addr ebpf_pkt_len 10 B
+	.set ebpf_pkt_len
+	alu[pkt_len, --, b, ebpf_pkt_len]
+
+	#define_eval __RC_DROP	((1<<EBPF_RET_STATS_DROP)+(1<<EBPF_RET_DROP))
+	#define_eval __RC_PASS	((1<<EBPF_RET_STATS_PASS)+(1<<EBPF_RET_PASS))
+	#define_eval __RC_REDIR	((1<<EBPF_RET_STATS_REDIR)+(1<<EBPF_RET_REDIR))
+
+	move(rc, __RC_DROP)
+
+	.if (pkt_len > 50)
+		move(rc, __RC_PASS)
+	.endif
+
+	.if (pkt_len > 256)
+		move(rc, __RC_REDIR)
+	.endif
+
+	#undef __RC_DROP
+	#undef __RC_PASS
+	#undef __RC_REDIR
+
+	.reg_addr ebpf_rc 0 A
+	alu[ebpf_rc, --, b, rc]
+	br[bpf_ret#]
+.end
+
+ret#:
+.end
+#endm
+
+
+#endif 	/*_EBPF_RX_UC */
