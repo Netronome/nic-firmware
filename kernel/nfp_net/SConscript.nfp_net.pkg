@@ -66,6 +66,10 @@ nfp_net_kmod_files = [
     (nfp_net_kmod_dst_dir + "/nfp_net_offload.c", nfp_net_kmod_src_dir + "/nfp_net_offload.c"),
     (nfp_net_kmod_dst_dir + "/nfp_netvf_main.c", nfp_net_kmod_src_dir + "/nfp_netvf_main.c"),
     (nfp_net_kmod_dst_dir + "/nfp_plat.c", nfp_net_kmod_src_dir + "/nfp_plat.c"),
+    (nfp_net_kmod_dst_dir + "/nfp_port.h", nfp_net_kmod_src_dir + "/nfp_port.h"),
+    (nfp_net_kmod_dst_dir + "/nfp_app.h", nfp_net_kmod_src_dir + "/nfp_app.h"),
+    (nfp_net_kmod_dst_dir + "/nfp_port.c", nfp_net_kmod_src_dir + "/nfp_port.c"),
+    (nfp_net_kmod_dst_dir + "/nfp_app.c", nfp_net_kmod_src_dir + "/nfp_app.c"),
 ]
 
 
