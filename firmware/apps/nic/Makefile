@@ -62,7 +62,11 @@ $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLA
 $(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
 $(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
+$(eval $(call microcode.add_flags, $(PROJECT),datapath,-d40))
+$(eval $(call microcode.add_flags, $(PROJECT),datapath,-verbose))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/lib))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/apps/nic/lib))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/apps/nic/maps))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,deps/ng-nfd.hg))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,$(BLM_DIR)))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,$(GRO_DIR)))
@@ -150,6 +154,7 @@ $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-DNS_PLATFORM_TYPE=$(N
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnn_mode=1))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_WORKER_ISLAND_LIST=$(NIC_APP_ISLANDS)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_BPF_MES_LIST=$(NIC_APP_MES)))
 
 # Add NFD for PCIE0
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
