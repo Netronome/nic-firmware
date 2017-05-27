@@ -5,6 +5,7 @@
 /* firmware/lib/nic_basic/nic_stats.h */
 /* firmware/lib/nic_basic/_c/nic_stats.c */
 #include <nic_basic/nic_stats.h>
+#include "nfd_user_cfg.h"
 #include "unroll.uc"
 #include "lm_handle.uc"
 
@@ -31,8 +32,13 @@
 #define EBPF_LM_BASE   3840
 .alloc_mem ebpf_lm lmem+EBPF_LM_BASE me (EBPF_LM_SIZE*4)
 
-/* temp for now */
-#define EBPF_PROG_ADDR 3000
+#define EBPF_PROG_ADDR NFD_BPF_START_OFF
+
+#define XDP_ABORTED 0		/* ebpf program error, drop packet */
+#define XDP_DROP	1
+#define XDP_PASS	2
+#define XDP_TX		3		/* redir */
+#define XDP_MAX		XDP_TX
 
 
 #macro ebpf_lm_addr(out_addr)
@@ -72,7 +78,7 @@
  *		out result:		    0 A
  *
  */
-/* return value bit field description */
+/* return value bit field description -- change lib/nic_basic/nic_stats.h to match*/
 #define EBPF_RET_SKB_MARK		0
 #define EBPF_RET_IFE_MARK		1
 #define EBPF_RET_PASS			16
@@ -136,14 +142,15 @@ bpf_ret#:
 	ebpf_lm_addr(lm_offset)
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 		alu[rc, --, b, ebpf_rc]
-		alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
+		//alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
+		alu[stats_idx, rc, -, 1]
 		move(nic_stats_extra_hi, _nic_stats_extra >>8)
 
 	unroll_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW, PV_SIZE_LW)
 
-	.if (stats_idx > 0)
+	//.if (stats_idx > 0)		
 		/* only port 0 for now */
-		alu[stats_idx, stats_idx, -, 1]
+		//alu[stats_idx, stats_idx, -, 1]
 		alu[stats_offset, --, b, stats_idx, <<4]
 		alu[stats_offset, EBPF_STATS_START_OFFSET, +, stats_offset]
 		mem[incr64, --, nic_stats_extra_hi, <<8, stats_offset]	;pkts count
@@ -154,16 +161,36 @@ bpf_ret#:
     	ov_set_use(OV_IMMED16, pkt_length) 
     	ov_clean()
 		mem[add64_imm, --, nic_stats_extra_hi, <<8, stats_offset, 1], indirect_ref
-	.endif
+
 
 bpf_ret_code#:
 	/* ignoring mark TBD  */
-	br_bset[rc, EBPF_RET_DROP, DROP_LABEL]
-	br_bclr[rc, EBPF_RET_REDIR, bpf_tx_host#]
+	#define_eval MAX_JUMP (XDP_MAX + 1)
+    preproc_jump_targets(j, MAX_JUMP)
+
+    #ifdef _XDP_LOOP
+        #error "_XDP_LOOP is already defined" (_XDP_LOOP)
+    #endif
+    #define_eval _XDP_LOOP 0
+    jump[rc, j0#], targets[PREPROC_LIST]
+    #while (_XDP_LOOP < MAX_JUMP)
+        j/**/_XDP_LOOP#:
+            br[s/**/_XDP_LOOP#]
+        #define_eval _XDP_LOOP (_XDP_LOOP + 1)
+    #endloop
+    #undef _XDP_LOOP
+    #undef MAX_JUMP
+
+s/**/XDP_ABORTED#:
+s/**/XDP_DROP#:
+	br[DROP_LABEL]
+
 bpf_tx_wire#:
+s/**/XDP_TX#:
 	pv_get_ingress_queue(egress_q_base, in_vec)
 	pkt_io_tx_wire(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
+s/**/XDP_PASS#:
 bpf_tx_host#:
 	alu[egress_q_base, BF_A(in_vec, PV_QUEUE_OUT_bf), and, 0x3f]
 	pkt_io_tx_host(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
@@ -192,9 +219,14 @@ loaded_bpf#:
 	.set ebpf_pkt_len
 	alu[pkt_len, --, b, ebpf_pkt_len]
 
+#if 0
 	#define_eval __RC_DROP	((1<<EBPF_RET_STATS_DROP)+(1<<EBPF_RET_DROP))
 	#define_eval __RC_PASS	((1<<EBPF_RET_STATS_PASS)+(1<<EBPF_RET_PASS))
 	#define_eval __RC_REDIR	((1<<EBPF_RET_STATS_REDIR)+(1<<EBPF_RET_REDIR))
+#endif
+	#define_eval __RC_DROP	XDP_DROP
+	#define_eval __RC_PASS	XDP_PASS
+	#define_eval __RC_REDIR	XDP_TX
 
 	move(rc, __RC_DROP)
 

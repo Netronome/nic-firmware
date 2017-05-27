@@ -174,14 +174,14 @@ nic_stats_bpf_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
 
     mem_read64(&ebpf_stats, &nic_stats_extra[port].ebpf, sizeof(ebpf_stats));
     /* Sorry but the names don't match */
-    write_bar_cntrs->discards = ebpf_stats.pass_pkts;
-    write_bar_cntrs->errors   = ebpf_stats.pass_bytes;
-    write_bar_cntrs->octets   = ebpf_stats.app1_pkts;
-    write_bar_cntrs->uc_octets = ebpf_stats.app1_bytes;
-    write_bar_cntrs->mc_octets = ebpf_stats.app2_pkts;
-    write_bar_cntrs->bc_octets = ebpf_stats.app2_bytes;
-    write_bar_cntrs->frames   = ebpf_stats.app3_pkts;
-    write_bar_cntrs->mc_frames = ebpf_stats.app3_bytes;
+    write_bar_cntrs->discards = ebpf_stats.abort_pkts;
+    write_bar_cntrs->errors   = ebpf_stats.abort_bytes;
+    write_bar_cntrs->octets   = ebpf_stats.drop_pkts;
+    write_bar_cntrs->uc_octets = ebpf_stats.drop_bytes;
+    write_bar_cntrs->mc_octets = ebpf_stats.pass_pkts;
+    write_bar_cntrs->bc_octets = ebpf_stats.pass_bytes;
+    write_bar_cntrs->frames   = ebpf_stats.tx_pkts;
+    write_bar_cntrs->mc_frames = ebpf_stats.tx_bytes;
 }
 
 __forceinline static void
