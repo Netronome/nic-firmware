@@ -390,6 +390,199 @@ nic_local_reconfig_done()
     synch_cnt_dram_ack(&nic_cfg_synch);
 }
 
+//===========
+#include "ebpf.h"
+
+M_CREATE_WQ(m_ebpf_wq0);
+M_CREATE_WQ(m_ebpf_wq1);
+
+__shared __lmem uint32_t bpf_mes_ids[] = {APP_BPF_MES_LIST};
+
+__intrinsic int
+nic_local_cfg_bpf_is_enabled()
+{
+    __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
+
+    return !!(nic->control[0] & NFP_NET_CFG_CTRL_BPF);
+}
+
+/* XXX Move to some sort of CT reflect library */
+static __intrinsic void
+ct_reflect_csr(unsigned int dst_me, unsigned int dst_csr,
+               volatile __xwrite void *src_xfer)
+{
+    SIGNAL sig;
+    unsigned int addr;
+
+    /* Where address[29:24] specifies the Island Id of remote ME
+     * to write to, address[16] is the XferCsrRegSel select bit (0:
+     * Transfer Registers, 1: CSR Registers), address[13:10] is
+     * the master number (= FPC + 4) within the island to write
+     * data to, address[9:2] is the first register address (Register
+     * depends upon XferCsrRegSel) to write to. */
+    addr = (1 << 16) | ((dst_me & 0x3F000)<<12 | ((dst_me & 0xF00)<<2 | (dst_csr & 0xFF)<<2));
+
+    __asm {
+        alu[--, --, b, 0];
+        ct[reflect_write_sig_init, *src_xfer, addr, 0, 1], ctx_swap[sig];
+    };
+}
+
+static __intrinsic void
+bpf_reflect_to_workers(unsigned int csr_no, __xwrite uint32_t *data_out)
+{
+    __gpr unsigned int i;
+
+    ctassert(__is_ct_const(csr_no));
+
+    for(i = 0; i < sizeof(bpf_mes_ids)/sizeof(uint32_t); i++)
+        ct_reflect_csr(bpf_mes_ids[i], csr_no / 4, data_out);
+}
+
+static __intrinsic void
+update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
+{
+    __xread uint32_t host_mem_bpf_cfg[3];
+    __xread uint32_t data[2];
+    __xwrite uint32_t data_out;
+    __gpr unsigned int addr_hi;
+    __gpr unsigned int addr_lo;
+    __gpr unsigned int i;
+
+    /* Disable the contexts */
+    data_out = 0;
+    bpf_reflect_to_workers(0x18, &data_out);
+
+#if 0
+    for (i = 0; i < 8; i++) {
+        /* Select the contexts for indirect access */
+        data_out = i;
+        bpf_reflect_to_workers(0x20, &data_out);
+
+        /* Set the PC to 0 */
+        data_out = 0;
+        bpf_reflect_to_workers(0x40, &data_out);
+
+        /* Clear the wake events (0x1 is volunatary swap). */
+        data_out = 1;
+        bpf_reflect_to_workers(0x50, &data_out);
+    }
+#endif
+
+    /* Set instr pointer to 'start' and enable writing. */
+    data_out = 0x80000000 + NFD_BPF_START_OFF;
+    bpf_reflect_to_workers(0x00, &data_out);
+
+    mem_read32(host_mem_bpf_cfg, bar_base + NFP_NET_CFG_BPF_SIZE - 2,
+               sizeof host_mem_bpf_cfg);
+
+    /* Note: data from the BAR comes in 4B-swapped; low is high, high is low */
+    i = host_mem_bpf_cfg[0] >> 16;
+    addr_lo = host_mem_bpf_cfg[1];
+    addr_hi = host_mem_bpf_cfg[2];
+
+    pcie_c2p_barcfg_set(4 /*pci_isl0*/, PCIE_CPP2PCIE_BPF_LOAD,
+                        addr_hi, addr_lo, 0);
+
+    addr_lo >>= 3;
+
+    while (i--) {
+        pcie_read(&data, 4, PCIE_CPP2PCIE_BPF_LOAD,
+                  addr_hi, addr_lo << 3, sizeof(data));
+
+        addr_lo++;
+        addr_hi += addr_lo >> 29;
+
+        data_out = data[0];
+        bpf_reflect_to_workers(0x04, &data_out);
+
+        data_out = data[1];
+        bpf_reflect_to_workers(0x08, &data_out);
+    }
+
+    data_out = 0;
+    bpf_reflect_to_workers(0x00, &data_out);
+
+#if 0
+    /* Re-enable contexts */
+    if (host_mem_bpf_cfg[1] & NFP_NET_CFG_BPF_CFG_8CTX) {
+        *ctx_mode = 1;
+        data_out = 0x0010ff01;
+    } else {
+        *ctx_mode = 0;
+        data_out = 0x80105501;
+    }
+
+    bpf_reflect_to_workers(0x18, &data_out);
+#endif
+
+    return;
+}
+
+static __intrinsic void
+nic_bpf_kill_threads(__gpr uint32_t *ctx_mode,
+                     unsigned int rnum, mem_ring_addr_t raddr)
+{
+    __xwrite uint32_t work[EBPF_WQ_E_N];
+    __xread uint32_t response[EBPF_WQ_E_N];
+    __gpr unsigned int wsize = sizeof(work);
+    __gpr unsigned int i;
+
+    work[0] = 0;
+    /* Hand out the "killer" work items */
+    for (i = 0; i < BPF_NUM_MES << (2 + *ctx_mode); i++) {
+        work[1] = i;
+        mem_workq_add_work(rnum, raddr, work, wsize);
+    }
+    i--;
+
+    /* 'i' is now max work id */
+    do {
+        i++;
+        work[1] = i;
+        mem_workq_add_work(rnum, raddr, work, wsize);
+
+        mem_workq_add_thread(rnum, raddr, response, wsize);
+    } while (response[1] != i);
+}
+
+__intrinsic void
+nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode)
+{
+    __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
+    __xread uint32_t tmp2[2];
+    __emem __addr40 uint8_t *bar_base;
+
+    /* Need to read the update word from the BAR */
+
+    /* Calculate the relevant configuration BAR base address */
+    switch (cfg_bar_change_info.pci) {
+    case 0:
+        bar_base = NFD_CFG_BAR_ISL(0, cfg_bar_change_info.vnic);
+        break;
+    default:
+        halt();
+    }
+
+    /* Read the ctrl(0) + update(1) words */
+    mem_read64(&tmp2, (__mem void*)(bar_base + NFP_NET_CFG_CTRL), sizeof(tmp2));
+
+    if (tmp2[1] & NFP_NET_CFG_UPDATE_BPF) {
+#if 0
+        nic_bpf_kill_threads(ctx_mode, _link_sym(m_ebpf_wq0_rnum),
+                             mem_ring_get_addr((__emem void *)_link_sym(m_ebpf_wq0_mem)));
+        nic_bpf_kill_threads(ctx_mode, _link_sym(m_ebpf_wq1_rnum),
+                             mem_ring_get_addr((__emem void *)_link_sym(m_ebpf_wq1_mem)));
+#endif
+
+        update_bpf_prog(ctx_mode, bar_base);
+    }
+
+    return;
+}
+
+
+//==========
 
 #endif /* _LIBNIC_NIC_INTERNAL_C_ */
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*- */

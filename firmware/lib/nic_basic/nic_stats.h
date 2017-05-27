@@ -32,14 +32,14 @@
  */
 #if defined(__NFP_LANG_MICROC)
 struct nic_port_bpf_stats {
+    unsigned long long abort_pkts;		/* ebpf abort */
+    unsigned long long abort_bytes;
+    unsigned long long drop_pkts;		/* ebpf drop */
+    unsigned long long drop_bytes;
     unsigned long long pass_pkts;
     unsigned long long pass_bytes;
-    unsigned long long app1_pkts;		/* ebpf drop */
-    unsigned long long app1_bytes;
-    unsigned long long app2_pkts;		/* ebpf redir */
-    unsigned long long app2_bytes;
-    unsigned long long app3_pkts;		/* ebpf abort */
-    unsigned long long app3_bytes;
+    unsigned long long tx_pkts;		/* ebpf redir */
+    unsigned long long tx_bytes;
 };
 
 struct nic_port_stats_extra {

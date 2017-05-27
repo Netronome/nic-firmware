@@ -384,9 +384,12 @@ cfg_changes_loop(void)
     uint32_t port;
     uint32_t update;
     uint32_t control;
+	__gpr uint32_t ctx_mode = 1;
 
     /* Initialisation */
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
+
+	nic_local_init(APP_ME_CONFIG_SIGNAL_NUM, APP_ME_CONFIG_XFER_NUM);	
 
     for (;;) {
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
@@ -428,6 +431,12 @@ cfg_changes_loop(void)
             nfd_cfg_app_complete_cfg_msg(NIC_PCI, &cfg_msg,
                                          NFD_CFG_BASE_LINK(NIC_PCI),
                                          &nfd_cfg_sig_app_master0);
+        }
+
+		if (nic_local_cfg_changed()) {
+            nic_local_bpf_reconfig(&ctx_mode);
+
+            nic_local_reconfig_done();
         }
 
         ctx_swap();
@@ -630,6 +639,30 @@ lsc_loop(void)
     }
     /* NOTREACHED */
 }
+
+#if 0
+__intrinsic void nic_local_bpf_reconfig();	/* in lib/nic_basic/_c/nic_internal.c */
+
+static void
+bpf_reload_loop(void)
+{
+    __gpr uint32_t ctx_mode = 1;
+
+    nic_local_init(APP_ME_CONFIG_SIGNAL_NUM, APP_ME_CONFIG_XFER_NUM);
+
+    for (;;) {
+        if (nic_local_cfg_changed()) {
+            nic_local_bpf_reconfig(&ctx_mode);
+
+            nic_local_reconfig_done();
+        }
+
+        ctx_swap();
+    }
+
+    /* NOTREACHED */
+}
+#endif
 
 int
 main(void)
