@@ -60,6 +60,7 @@ $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLA
 
 # Add microcode datapath
 $(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
+$(eval $(call microcode.add_tests,$(PROJECT),datapath))
 $(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/lib))

@@ -82,6 +82,7 @@ FW_BUILD_DIRS =
 FW_BUILD_TARGETS =
 FW_LOAD_TARGETS =
 FW_LIST_TARGETS =
+FW_TEST_TARGETS =
 FW_MKDEP_TARGETS =
 
 include $(FIRMWARE_DIR)/Makefile.templates
@@ -96,6 +97,11 @@ all_nffw:
 
 all_cat:
 
+test: FORCE_TESTS
+	@make `echo $(FW_TEST_TARGETS) | sed 's/\ .*//g'`
+
+FORCE_TESTS:
+ 
 firmware_help:
 	@echo "Global commands"
 	@echo "	firmware_show_listfiles -- show a list of .list targets"
@@ -114,6 +120,12 @@ firmware_show_listfiles:
 	@echo "Firmware .list build targets"
 	@for t in $(FW_LIST_TARGETS) ; do echo "	$$t" ; done
 	@echo
+
+firmware_show_tests:
+	@echo "Firmware test targets"
+	@for t in $(FW_TEST_TARGETS) ; do echo "	$$t" ; done
+	@echo
+
 
 firmware_clean:
 	@for d in $(FW_BUILD_DIRS) ; do \
