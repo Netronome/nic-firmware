@@ -4,6 +4,8 @@ BUILD_DIR=$1
 mkdir -p ${BUILD_DIR}
 shift
 #set -x
+PASSED=0
+FAILED=0
 for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
     FILE_BASE=`basename ${t%.*}`
     nfas -Itest/include -I test/lib $* -o ${BUILD_DIR}/${FILE_BASE}.list $t || exit 1
@@ -20,7 +22,8 @@ for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
     done
     RESULT=`nfp-reg mecsr:i32.me0.Mailbox0 | cut -d= -f2`
     if [[ ${RESULT} -eq "1" ]] ; then
-        echo ${FILE_BASE} : PASS
+        echo -e "${FILE_BASE} : \033[1;32mPASS" ; tput sgr0
+        PASSED=$(( ${PASSED} + 1 ))
     else
         if [[ ${RESULT} -eq "0xfc" ]] ; then
            TESTED=`nfp-reg mecsr:i32.me0.Mailbox2 | cut -d= -f2`
@@ -32,6 +35,16 @@ for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
         ISL=$(( (STS >> 25) & 0x3f ))
         ME=$(( ((STS >> 3) & 0xf) - 4 ))
         CTX=$(( STS & 0x7 ))
-        echo ${FILE_BASE} : FAIL @ i${ISL}.me${ME}.ctx${CTX}:${PC} ${DETAIL}
+        echo -en "${FILE_BASE} : \033[1;31mFAIL " ; tput sgr0
+        echo @ i${ISL}.me${ME}.ctx${CTX}:${PC} ${DETAIL}
+        tput sgr0
+        FAILED=$(( ${FAILED} + 1 ))
     fi 
 done
+if [[ ${FAILED} -eq 0 ]] ; then
+    echo -e "Summary : \033[1;32m${PASSED} passed, no failures" ; tput sgr0
+    exit 0
+else
+    echo -e "Summary : \033[1;33m${PASSED} passed, ${FAILED} failed" ; tput sgr0
+    exit 1
+fi
