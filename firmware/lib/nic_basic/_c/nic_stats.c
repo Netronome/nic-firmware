@@ -35,6 +35,7 @@
 /* The MAC stats in the Control BAR are only a subset of the stats
  * maintained by the MACs.  We accumulate the whole stats in MU space. */
 __export __shared __imem struct macstats_port_accum nic_mac_cntrs_accum[24];
+__export __shared __align8 __imem struct macstats_head_drop_accum nic_mac_head_drop_accum;
 
 /* TM Q drop counters. */
 __export __shared __align8 __imem uint64_t          \
@@ -77,6 +78,7 @@ mac_stats_accumulate(void)
             NS_PLATFORM_MAC(i), NS_PLATFORM_MAC_SERDES_LO(i),
             &nic_mac_cntrs_accum[NS_PLATFORM_MAC_SERDES_LO(i)]);
     }
+    macstats_head_drop_accum(0, 0, 0xfff, &nic_mac_head_drop_accum);
 }
 
 __forceinline static void
@@ -104,6 +106,8 @@ nic_stats_rx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
         mem_read64(&read_val, &port_stats->RxPIfInBroadCastPkts,
                    sizeof(read_val));
         bar_cntrs.bc_frames += read_val;
+        mem_read64(&read_val, &nic_mac_head_drop_accum.ports_drop[port], sizeof(uint64_t));
+        bar_cntrs.discards += read_val;
     }
 
     mem_read64(read_array, &nic_stats_extra[port].rx_discards,
