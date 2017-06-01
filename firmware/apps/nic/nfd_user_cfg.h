@@ -125,11 +125,11 @@
 
 
 /* PCI.IN block defines */
-#define NFD_IN_BLM_REG_BLS      0
-#define NFD_IN_BLM_REG_POOL     BLM_NBI8_BLQ0_EMU_QID
+#define NFD_IN_BLM_REG_BLS      1
+#define NFD_IN_BLM_REG_POOL     BLM_NBI8_BLQ1_EMU_QID
 #define NFD_IN_BLM_REG_SIZE     (10 * 1024)
-#define NFD_IN_BLM_JUMBO_BLS    0
-#define NFD_IN_BLM_JUMBO_POOL   BLM_NBI8_BLQ0_EMU_QID
+#define NFD_IN_BLM_JUMBO_BLS    1
+#define NFD_IN_BLM_JUMBO_POOL   BLM_NBI8_BLQ1_EMU_QID
 #define NFD_IN_BLM_JUMBO_SIZE   (10 * 1024)
 #define NFD_IN_BLM_RADDR        __LoadTimeConstant("__addr_emem0")
 #define NFD_IN_HAS_ISSUE0       1
