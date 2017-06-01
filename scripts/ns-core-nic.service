@@ -1,0 +1,8 @@
+[Unit]
+Description=Script to manage Netronome Core NIC firmware and udev rules
+
+[Service]
+ExecStart=/opt/netronome/bin/ns-core-nic-setup
+ExecStop=/opt/netronome/bin/ns-core-nic-setup clean
+[Install]
+WantedBy=multi-user.target

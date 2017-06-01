@@ -1,0 +1,26 @@
+%{?!version: %{error: You did not specify a module version (%%version)}}
+%{?!kernel_versions: %{error: You did not specify kernel versions (%%kernel_version)}}
+
+Name:           ns-agilio-core-nic
+Version:        __CORENIC_REV__
+Release:        __NIC_BUILD__
+Summary:        Netronome Agilio Core NIC
+
+License:        None
+URL:            http://netronome.com
+Requires:       dkms >= 1.95
+Requires:	nfp-bsp-6000-b0 >= 2017.1.30.1512-1
+AutoReqProv:    no
+
+%define debug_package %{nil}
+
+%description
+Kernel modules and firmware files for Netronome Agilio Core NIC.
+
+%prep
+
+%install
+
+%clean
+
+%changelog
