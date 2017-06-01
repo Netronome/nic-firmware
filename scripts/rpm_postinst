@@ -1,0 +1,146 @@
+#! /bin/bash
+
+NETRONOME_DIR=/opt/netronome
+NETRONOME_BIN=$NETRONOME_DIR/bin
+export PATH=$NETRONOME_BIN:$PATH
+DKMS_MODULE_NAME="nfp_net"
+DKMS_MODULE_VERSION="__CORENIC_REV__-__NIC_BUILD__"
+dkms add -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION"
+    ret=$?
+    if [ $ret -ne 0 ]; then
+        ret=$ERR_DKMS_ADD
+    else
+        kernel_count=0
+        for sm in `find /boot -nowarn -name "System.map*"`; do
+            kernel=${sm#"/boot/System.map-"}
+            grep -wq quirk_nfp6000 $sm
+            if [ $? -ne 0 ]; then
+                echo -n "ERR47 kernel patches not detected for version: "
+                echo $kernel
+                # TODO: instruct the user on how to apply them
+            else
+                echo -n $sm
+                echo " has ERR47 patch"
+                dkms build -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION" \
+                    -k $kernel
+                ret=$?
+                if [ $ret -ne 0 ]; then
+                    ret=$ERR_DKMS_BUILD
+                else
+                    dkms install -m "$DKMS_MODULE_NAME" -v \
+                        "$DKMS_MODULE_VERSION" -k $kernel
+                    ret=$?
+                    if [ $ret -ne 0 ]; then
+                        ret=$ERR_DKMS_INSTALL
+                    fi
+                    kernel_array[kernel_count]=$kernel
+                    let "kernel_count= $kernel_count + 1"
+                fi
+            fi
+        done
+
+   fi
+print_heading() {
+    echo "======== $1 ========"
+}
+dolog() {
+     # Use one of the following levels as $1
+     # alert, crit, debug, emerg, err, info, notice, warning
+     level="$1"
+     which logger >/dev/null 2>&1
+     ret=$?
+     if [ "$ret" -eq 0 ]; then
+         case $level in
+         alert) ;;
+         crit) ;;
+         debug) ;;
+         emerg) ;;
+         err) ;;
+         info) ;;
+         notice) ;;
+         warning) ;;
+         *)
+             echo "Unknown log level ($level) specified!"
+             exit 1
+         esac
+         while read -r line; do
+             logger -t "$LOG_APP" -p local0.$level -- "$line"
+         done <<< "$msg"
+     fi
+     echo "$2"
+ }
+verify_kmods() {
+     if ! lsmod|awk '{print $1}'|grep -qxE 'nfp|nfp_net'; then
+         if ! modprobe nfp; then
+             dolog "err" "nfp module cannot be loaded"
+             exit 50
+         fi
+     fi
+}
+check_flash_nic() {
+      local ret=0
+      verify_kmods
+      local flash_image="$1"
+      # Note, the sed below ifgnores nfp-media changes applied when configuring breakout cables
+      # VRT-825
+      local nfp_versions=$($NETRONOME_BIN/nfp-fis list -v | sed -e '/^hwinfo\.bin\.*$/d' -e '/^usinfo\.bin.*$/d')
+      local flash_versions=$($NETRONOME_BIN/nfp-fis --image=/opt/netronome/flash/flash-nic.bin list -v)
+      if [ "$flash_versions" = "$nfp_versions" ]; then
+          dolog "info" "NFP already has desired ARM flash image"
+          ret=0
+      else
+          dolog "info" "NFP requires a new ARM flash image"
+          ret=1
+      fi
+      return $ret
+ }
+check_flash() {
+    print_heading "Check flash version in the NFP NIC"
+
+    local NETRONOME_BIN="/opt/netronome/bin"
+    local flash_image=/opt/netronome/flash/flash-nic.bin
+    # Note, the sed below ifgnores nfp-media changes IE using a breakout cable
+    local nfp_versions=$($NETRONOME_BIN/nfp-fis list -v | sed '/^hwinfo.bin.*$/d')
+    local flash_versions=$($NETRONOME_BIN/nfp-fis --image=$flash_image list -v)
+
+    if [ "$flash_versions" = "$nfp_versions" ]; then
+        echo "NFP has desired flash image"
+    else
+        print_heading "NFP needs to be flashed. Please run the following commands:"
+        # TODO use newer BSP and nfp-flash flag '--preserve-media-overrides'
+        echo -n -e "\t"
+        echo "$NETRONOME_BIN/nfp-flash --i-accept-the-risk-of-overwriting-miniloader --preserve-media-overrides -w $flash_image"
+        # TODO change this when supporting SFs
+        echo -n -e "\t"
+        echo "$NETRONOME_BIN/nfp-one"
+        echo -n -e "\t"
+        echo "reboot"
+        print_heading
+    fi
+}
+
+# Backup netronome blacklist
+blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
+
+if [ -e "$blacklist_file" ]; then
+    cp "$blacklist_file" "$blacklist_file".corenic.bak
+fi
+
+#service ns-core-nic.autorun start
+systemctl enable --now ns-core-nic.service
+
+# Disable logging
+/opt/netronome/bin/ns-core-nic-setup log-disable
+
+echo "Core NIC's nfp_net driver succesfully installed for the following"
+echo "kernel versions:"
+echo -n -e "\t"
+count=0
+while [ $count -lt $kernel_count ]; do
+    echo -n ${kernel_array[${count}]}
+    echo -n " "
+    count=$(( $count + 1 ))
+done
+echo ""
+
+check_flash_nic
