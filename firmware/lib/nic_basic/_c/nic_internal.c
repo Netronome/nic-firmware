@@ -20,6 +20,11 @@
 #ifndef _LIBNIC_NIC_INTERNAL_C_
 #define _LIBNIC_NIC_INTERNAL_C_
 
+//MARY DBG
+#ifndef CFG_NIC_LIB_DBG_JOURNAL
+#define CFG_NIC_LIB_DBG_JOURNAL 1
+#endif
+
 #include <assert.h>
 #include <nfp.h>
 #include <stdint.h>
@@ -30,6 +35,7 @@
 #include <std/event.h>
 #include <std/reg_utils.h>
 #include <std/synch.h>
+#include <nfp/pcie.h>
 
 #include <nfp6000/nfp_cls.h>
 #include <nfp6000/nfp_event.h>
@@ -80,6 +86,9 @@ __export __dram uint64_t nic_cnt_tx_drop_mtu;
 #define NIC_LIB_CNTR(_me)
 #endif
 
+__export __dram uint64_t mary_dbg_update_bpf=0;
+__export __dram uint64_t mary_dbg_reflect_bpf=0;
+
 #define CREATE_JOURNAL(name)                                    \
     EMEM0_QUEUE_ALLOC(name##_rnum, global);                     \
     _NFP_CHIPRES_ASM(.alloc_mem name##_mem emem0 global         \
@@ -99,7 +108,7 @@ __export __dram uint64_t nic_cnt_tx_drop_mtu;
 #if defined(CFG_NIC_LIB_DBG_JOURNAL)
 
 #define NIC_LIB_DBG(name, _x)                                 \
-    mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _x);
+    mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _x)
 #define NIC_LIB_DBG4(name, _a, _b, _c, _d)                           \
     do {                                                                \
         mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _a); \
@@ -107,9 +116,12 @@ __export __dram uint64_t nic_cnt_tx_drop_mtu;
         mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _c); \
         mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _d); \
     } while (0)
+#define PRINTDBG(name, _a)                                 \
+    mem_ring_journal(dbg_##name##_rnum, dbg_##name##_mem, _a, 4)
 #else
 #define NIC_LIB_DBG(name, _x)
 #define NIC_LIB_DBG4(name, _a, _b, _c, _d)
+#define PRINTDBG(name, _a)
 #endif
 
 
@@ -242,8 +254,8 @@ swapw64(uint64_t val)
 __intrinsic void
 nic_local_init(int sig_num, int reg_num)
 {
-    __assign_relative_register((void *)&cfg_bar_change_sig, sig_num);
-    __assign_relative_register((void *)&cfg_bar_change_info, reg_num);
+    //__assign_relative_register((void *)&cfg_bar_change_sig, sig_num);
+    //__assign_relative_register((void *)&cfg_bar_change_info, reg_num);
 
 #if defined(CFG_NIC_LIB_DBG_JOURNAL)
     INIT_JOURNAL(libnic_dbg);
@@ -414,12 +426,13 @@ ct_reflect_csr(unsigned int dst_me, unsigned int dst_csr,
     SIGNAL sig;
     unsigned int addr;
 
-    /* Where address[29:24] specifies the Island Id of remote ME
-     * to write to, address[16] is the XferCsrRegSel select bit (0:
+    /* Where address[29:24] specifies the Island Id of remote ME to write to
+     * address[16] is the XferCsrRegSel select bit (0:
      * Transfer Registers, 1: CSR Registers), address[13:10] is
      * the master number (= FPC + 4) within the island to write
      * data to, address[9:2] is the first register address (Register
      * depends upon XferCsrRegSel) to write to. */
+	/* dst_me format:  dst(isl,me) =  ((((isl + 32) << 4) + (me + 4)) << 8) */
     addr = (1 << 16) | ((dst_me & 0x3F000)<<12 | ((dst_me & 0xF00)<<2 | (dst_csr & 0xFF)<<2));
 
     __asm {
@@ -428,15 +441,20 @@ ct_reflect_csr(unsigned int dst_me, unsigned int dst_csr,
     };
 }
 
+
 static __intrinsic void
 bpf_reflect_to_workers(unsigned int csr_no, __xwrite uint32_t *data_out)
 {
     __gpr unsigned int i;
+    __gpr unsigned int j;
+	__gpr uint32_t data_value;
 
     ctassert(__is_ct_const(csr_no));
 
-    for(i = 0; i < sizeof(bpf_mes_ids)/sizeof(uint32_t); i++)
+	mem_incr32(&mary_dbg_reflect_bpf);
+    for(i = 0; i < sizeof(bpf_mes_ids)/sizeof(uint32_t); i++) {
         ct_reflect_csr(bpf_mes_ids[i], csr_no / 4, data_out);
+	}
 }
 
 static __intrinsic void
@@ -448,30 +466,34 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
     __gpr unsigned int addr_hi;
     __gpr unsigned int addr_lo;
     __gpr unsigned int i;
+    __gpr unsigned int tmp;
 
+
+/* test dump to mailbox */
+    data_out = 0xbeef;
+    bpf_reflect_to_workers(0x170, &data_out);	/*Mailbox0*/
+
+#if 0
     /* Disable the contexts */
     data_out = 0;
-    bpf_reflect_to_workers(0x18, &data_out);
+    bpf_reflect_to_workers(0x18, &data_out);	/*CtxEnables.CtxEnables*/
+#endif
 
 #if 0
     for (i = 0; i < 8; i++) {
         /* Select the contexts for indirect access */
         data_out = i;
-        bpf_reflect_to_workers(0x20, &data_out);
+        bpf_reflect_to_workers(0x20, &data_out);	/* CSRCtxPtr.CtxSelect*/
 
         /* Set the PC to 0 */
         data_out = 0;
-        bpf_reflect_to_workers(0x40, &data_out);
+        bpf_reflect_to_workers(0x40, &data_out);	/* IndCtxStatus */
 
         /* Clear the wake events (0x1 is volunatary swap). */
         data_out = 1;
-        bpf_reflect_to_workers(0x50, &data_out);
+        bpf_reflect_to_workers(0x50, &data_out);	/* IndCtxWkpEvt */
     }
 #endif
-
-    /* Set instr pointer to 'start' and enable writing. */
-    data_out = 0x80000000 + NFD_BPF_START_OFF;
-    bpf_reflect_to_workers(0x00, &data_out);
 
     mem_read32(host_mem_bpf_cfg, bar_base + NFP_NET_CFG_BPF_SIZE - 2,
                sizeof host_mem_bpf_cfg);
@@ -481,10 +503,18 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
     addr_lo = host_mem_bpf_cfg[1];
     addr_hi = host_mem_bpf_cfg[2];
 
-    pcie_c2p_barcfg_set(4 /*pci_isl0*/, PCIE_CPP2PCIE_BPF_LOAD,
+    pcie_c2p_barcfg_set(0 /*pci_isl0*/, PCIE_CPP2PCIE_BPF_LOAD,
                         addr_hi, addr_lo, 0);
 
     addr_lo >>= 3;
+	NIC_LIB_DBG(libnic_dbg, i);
+
+    /* Set instr pointer to 'start' and enable writing. */
+    tmp = 0x80000000 + NFD_BPF_START_OFF;
+	data_out = tmp;
+    bpf_reflect_to_workers(0x00, &data_out);
+	NIC_LIB_DBG(libnic_dbg, tmp);
+
 
     while (i--) {
         pcie_read(&data, 4, PCIE_CPP2PCIE_BPF_LOAD,
@@ -494,26 +524,22 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
         addr_hi += addr_lo >> 29;
 
         data_out = data[0];
-        bpf_reflect_to_workers(0x04, &data_out);
+        bpf_reflect_to_workers(0x04, &data_out);	/* Ustore data lower */
 
         data_out = data[1];
-        bpf_reflect_to_workers(0x08, &data_out);
+        bpf_reflect_to_workers(0x08, &data_out);	/* Ustore data upper, write to control store, incr ustore addr*/
+
+		NIC_LIB_DBG(libnic_dbg, data[0]);
+		NIC_LIB_DBG(libnic_dbg, data[1]);
     }
 
     data_out = 0;
-    bpf_reflect_to_workers(0x00, &data_out);
+    bpf_reflect_to_workers(0x00, &data_out);		/* normal mode */
 
 #if 0
-    /* Re-enable contexts */
-    if (host_mem_bpf_cfg[1] & NFP_NET_CFG_BPF_CFG_8CTX) {
-        *ctx_mode = 1;
-        data_out = 0x0010ff01;
-    } else {
-        *ctx_mode = 0;
-        data_out = 0x80105501;
-    }
-
-    bpf_reflect_to_workers(0x18, &data_out);
+    *ctx_mode = 0;
+    data_out = 0x80105502;		/* InUseContexts=1,4 contexts, NNreceiveConfig=2 */
+    bpf_reflect_to_workers(0x18, &data_out);	/* CtxEnables */
 #endif
 
     return;
@@ -547,7 +573,7 @@ nic_bpf_kill_threads(__gpr uint32_t *ctx_mode,
 }
 
 __intrinsic void
-nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode)
+nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t port)
 {
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
     __xread uint32_t tmp2[2];
@@ -556,18 +582,8 @@ nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode)
     /* Need to read the update word from the BAR */
 
     /* Calculate the relevant configuration BAR base address */
-    switch (cfg_bar_change_info.pci) {
-    case 0:
-        bar_base = NFD_CFG_BAR_ISL(0, cfg_bar_change_info.vnic);
-        break;
-    default:
-        halt();
-    }
+    bar_base = NFD_CFG_BAR_ISL(NIC_PCI,port);
 
-    /* Read the ctrl(0) + update(1) words */
-    mem_read64(&tmp2, (__mem void*)(bar_base + NFP_NET_CFG_CTRL), sizeof(tmp2));
-
-    if (tmp2[1] & NFP_NET_CFG_UPDATE_BPF) {
 #if 0
         nic_bpf_kill_threads(ctx_mode, _link_sym(m_ebpf_wq0_rnum),
                              mem_ring_get_addr((__emem void *)_link_sym(m_ebpf_wq0_mem)));
@@ -575,8 +591,9 @@ nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode)
                              mem_ring_get_addr((__emem void *)_link_sym(m_ebpf_wq1_mem)));
 #endif
 
+		mem_incr32(&mary_dbg_update_bpf);
+
         update_bpf_prog(ctx_mode, bar_base);
-    }
 
     return;
 }
