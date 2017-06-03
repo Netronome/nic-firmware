@@ -38,3 +38,6 @@
         dbg_##lname##_mem =                                             \
             mem_ring_get_addr((__emem void *)_link_sym(name##_mem));    \
     } while(0)
+
+/* in lib/nic_basic/_c/nic_internal.c */
+__intrinsic void nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t port);
