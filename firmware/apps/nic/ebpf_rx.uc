@@ -9,6 +9,16 @@
 #include "unroll.uc"
 #include "lm_handle.uc"
 
+#if 1
+#define JOURNAL_ENABLE 1
+#define DEBUG_TRACE
+#include <journal.uc>
+#include "hashmap_priv.uc"
+#include "map_debug_config.h"
+__hashmap_journal_init()
+#endif
+
+
 #macro ebpf_lm_handles_define()
     lm_handle_alloc(EBPF_META_PKT_LM_HANDLE)
     #define_eval EBPF_META_PKT_LM_HANDLE    _LM_NEXT_HANDLE
@@ -118,6 +128,8 @@
 
 	unroll_copy(EBPF_META_PKT_LM_INDEX, ++, in_vec, 0, PV_SIZE_LW, PV_SIZE_LW)
 
+	__hashmap_dbg_print(0xe101, 0, pkt_offset, pkt_length)
+
 	/* registers are trashed here */
 	.reg_addr ebpf_pkt_param 9 B
 	alu[ebpf_pkt_param, --, b, pkt_offset]
@@ -125,8 +137,8 @@
 	alu[ebpf_pkt_len, --, b, pkt_length]
 	.reg_addr ebpf_rc 0 A
 	immed[ebpf_rc, 0]
-	br[loaded_bpf#]
-	//br_addr[EBPF_PROG_ADDR]
+	//br[loaded_bpf#]
+	br_addr[EBPF_PROG_ADDR]
 
 bpf_ret#:
 	.reentry
@@ -142,15 +154,17 @@ bpf_ret#:
 	ebpf_lm_addr(lm_offset)
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 		alu[rc, --, b, ebpf_rc]
-		//alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
-		alu[stats_idx, rc, -, 1]
+		alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
+		//alu[stats_idx, rc, -, 1]		; XDP rc?
 		move(nic_stats_extra_hi, _nic_stats_extra >>8)
+
+	__hashmap_dbg_print(0xe102, 0, rc)
 
 	unroll_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW, PV_SIZE_LW)
 
-	//.if (stats_idx > 0)		
+	.if (stats_idx > 0)		
 		/* only port 0 for now */
-		//alu[stats_idx, stats_idx, -, 1]
+		alu[stats_idx, stats_idx, -, 1]
 		alu[stats_offset, --, b, stats_idx, <<4]
 		alu[stats_offset, EBPF_STATS_START_OFFSET, +, stats_offset]
 		mem[incr64, --, nic_stats_extra_hi, <<8, stats_offset]	;pkts count
@@ -161,10 +175,17 @@ bpf_ret#:
     	ov_set_use(OV_IMMED16, pkt_length) 
     	ov_clean()
 		mem[add64_imm, --, nic_stats_extra_hi, <<8, stats_offset, 1], indirect_ref
+	.endif	
 
 
 bpf_ret_code#:
 	/* ignoring mark TBD  */
+	br_bset[rc, EBPF_RET_DROP, DROP_LABEL]
+    br_bclr[rc, EBPF_RET_REDIR, bpf_tx_host#]
+
+
+#if 0
+	// XDP style rc
 	#define_eval MAX_JUMP (XDP_MAX + 1)
     preproc_jump_targets(j, MAX_JUMP)
 
@@ -184,6 +205,8 @@ bpf_ret_code#:
 s/**/XDP_ABORTED#:
 s/**/XDP_DROP#:
 	br[DROP_LABEL]
+#endif
+
 
 bpf_tx_wire#:
 s/**/XDP_TX#:

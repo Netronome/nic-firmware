@@ -7,6 +7,7 @@
  * This implementation only handles one PCIe island.
  */
 
+
 #include <assert.h>
 #include <nfp.h>
 #include <nfp_chipres.h>
@@ -39,6 +40,7 @@
 #include <vnic/nfd_common.h>
 
 #include "app_config_tables.h"
+#include "ebpf.h"
 
 /*
  * The application master runs on a single ME and performs a number of
@@ -106,6 +108,8 @@ NFD_FLR_DECLARE;
 
 /* A global synchronization counter to check if all APP MEs has reconfigured */
 __export __dram struct synch_cnt nic_cfg_synch;
+__export __shared __emem uint32_t mary_dbg_bpf_load_req=0;
+__export __shared __emem uint32_t mary_dbg_bpf_loaded=0;
 
 
 /*
@@ -373,11 +377,11 @@ cfg_changes_loop(void)
     uint32_t update;
     uint32_t control;
 	__gpr uint32_t ctx_mode = 1;
+	__emem __addr40 uint8_t *bar_base;
 
     /* Initialisation */
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
-
-	nic_local_init(APP_ME_CONFIG_SIGNAL_NUM, APP_ME_CONFIG_XFER_NUM);	
+	nic_local_init(0, 0);		/* dummy regs right now */
 
     for (;;) {
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
@@ -409,7 +413,13 @@ cfg_changes_loop(void)
             if (control & NFP_NET_CFG_CTRL_ENABLE) {
                 app_config_port(port, control, update);
             }
- 
+			
+			if (update & NFP_NET_CFG_UPDATE_BPF) {
+				mem_incr32(&mary_dbg_bpf_load_req);
+            	nic_local_bpf_reconfig(&ctx_mode, port);
+				mem_incr32(&mary_dbg_bpf_loaded);
+			}
+
             /* Wait for queues to drain / config to stabilize */
             for (i = 0; i < 100; ++i) 
                 sleep(1000000);
@@ -419,12 +429,6 @@ cfg_changes_loop(void)
             nfd_cfg_app_complete_cfg_msg(NIC_PCI, &cfg_msg,
                                          NFD_CFG_BASE_LINK(NIC_PCI),
                                          &nfd_cfg_sig_app_master0);
-        }
-
-		if (nic_local_cfg_changed()) {
-            nic_local_bpf_reconfig(&ctx_mode);
-
-            nic_local_reconfig_done();
         }
 
         ctx_swap();
@@ -628,29 +632,6 @@ lsc_loop(void)
     /* NOTREACHED */
 }
 
-#if 0
-__intrinsic void nic_local_bpf_reconfig();	/* in lib/nic_basic/_c/nic_internal.c */
-
-static void
-bpf_reload_loop(void)
-{
-    __gpr uint32_t ctx_mode = 1;
-
-    nic_local_init(APP_ME_CONFIG_SIGNAL_NUM, APP_ME_CONFIG_XFER_NUM);
-
-    for (;;) {
-        if (nic_local_cfg_changed()) {
-            nic_local_bpf_reconfig(&ctx_mode);
-
-            nic_local_reconfig_done();
-        }
-
-        ctx_swap();
-    }
-
-    /* NOTREACHED */
-}
-#endif
 
 int
 main(void)
