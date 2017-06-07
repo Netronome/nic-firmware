@@ -161,7 +161,11 @@ function blacklist_nfp() {
     echo "blacklist nfp_uio" >> $blacklist_file
 
     echo "# default parameters for Netronome nfp module" > $mod_file
-    echo "options nfp nfp_dev_cpp=1" >> $mod_file
+    if `$NETRONOME_BIN/nfp-hwinfo | grep "^assembly.model" | grep -v "starfighter">/dev/null 2>&1`; then
+        echo "options nfp nfp_dev_cpp=1" >> $mod_file
+    else
+        echo "options nfp nfp_pf_netdev=0 nfp_dev_cpp=1" >> $mod_file
+    fi
 
     # TODO: edit blacklist file to remove options added by nfp-bsp pkg
 
