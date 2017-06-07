@@ -392,7 +392,7 @@ checksum_complete#:
 tx_host#:
 ebpf#:
 	/* p6p1 to p4p1 */
-	__hashmap_dbg_print(0x2000, 0, egress_q_base)
+	//__hashmap_dbg_print(0x2000, 0, egress_q_base)
 	ebpf_func(in_pkt_vec, EGRESS_LABEL, DROP_LABEL)
 #if 0
     __actions_read(egress_q_base, egress_q_mask, --)
