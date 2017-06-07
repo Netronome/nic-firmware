@@ -25,29 +25,30 @@ __hashmap_journal_init()
 #endm
 
 
+
 #macro ebpf_lm_handles_define()
-    lm_handle_alloc(EBPF_META_PKT_LM_HANDLE)
-    #define_eval EBPF_META_PKT_LM_HANDLE    _LM_NEXT_HANDLE
-    #define_eval EBPF_META_PKT_LM_INDEX     _LM_NEXT_INDEX
+    #define_eval EBPF_META_PKT_LM_HANDLE    1
+    #define_eval EBPF_META_PKT_LM_INDEX     *l$index1
 
     lm_handle_alloc(EBPF_STACK_LM_HANDLE)
-    #define_eval EBPF_STACK_LM_HANDLE    _LM_NEXT_HANDLE
-    #define_eval EBPF_STACK_LM_INDEX     _LM_NEXT_INDEX
+    #define_eval EBPF_STACK_LM_HANDLE    0
+    #define_eval EBPF_STACK_LM_INDEX     *l$index0
 #endm
 
 #macro ebpf_lm_handles_undef()
-    lm_handle_free(EBPF_META_PKT_LM_HANDLE)
     #undef EBPF_META_PKT_LM_HANDLE
     #undef EBPF_META_PKT_LM_INDEX
-    lm_handle_free(EBPF_STACK_LM_HANDLE)
     #undef EBPF_STACK_LM_HANDLE
     #undef EBPF_STACK_LM_INDEX
 #endm
 
 #define EBPF_LM_SIZE   256
 #define EBPF_LM_BASE   0
+#define_eval EBPF_LM_STACK_BASE (EBPF_LM_SIZE*4)
+#define EBPF_LM_STACK_SIZE 512
 
-.alloc_mem ebpf_lm lmem+EBPF_LM_BASE me (EBPF_LM_SIZE*4)
+.alloc_mem ebpf_lm    lmem+EBPF_LM_BASE me (EBPF_LM_SIZE*4)
+.alloc_mem ebpf_stack lmem+EBPF_LM_STACK_BASE me (EBPF_LM_STACK_SIZE*4)
 
 #define EBPF_PROG_ADDR NFD_BPF_START_OFF
 
@@ -59,7 +60,7 @@ __hashmap_journal_init()
 
 #define EBPF_BEFORE 0
 #define EBPF_AFTER  1
-#macro ebpf_lm_addr(STATUS, out_addr)
+#macro ebpf_lm_addr(STATUS, out_addr, stack_addr)
 .begin
     .reg lm_off
     .reg ctx_num
@@ -77,6 +78,12 @@ __hashmap_journal_init()
     immed[out_addr, EBPF_LM_BASE]
     alu[lm_off, --, b, ctx_num, <<(LOG2(_LM_SIZE_, 1))]
     alu[out_addr, out_addr, +, lm_off]
+    #undef _LM_SIZE_
+
+    #define_eval _LM_SIZE_ (EBPF_LM_STACK_SIZE/2)
+    immed[stack_addr, EBPF_LM_STACK_BASE]
+    alu[lm_off, --, b, ctx_num, <<(LOG2(_LM_SIZE_, 1))]
+    alu[stack_addr, stack_addr, +, lm_off]
     #undef _LM_SIZE_
 .end
 #endm
@@ -130,9 +137,10 @@ __hashmap_journal_init()
 	.reg pkt_offset
 	.reg ebpf_pkt_param
 	.reg ebpf_pkt_len
+	.reg lm_stack
 	//.reg ebpf_rc
 
-	ebpf_lm_addr(EBPF_BEFORE, lm_offset)
+	ebpf_lm_addr(EBPF_BEFORE, lm_offset, lm_stack)
 	ebpf_lm_handles_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 		pv_get_length(pkt_length, in_vec)
@@ -142,6 +150,10 @@ __hashmap_journal_init()
 
 	unroll_copy(EBPF_META_PKT_LM_INDEX, ++, in_vec, 0, PV_SIZE_LW, PV_SIZE_LW)
 	alu[EBPF_META_PKT_LM_INDEX++, --, B, t_idx_ctx]
+	alu[EBPF_META_PKT_LM_INDEX++, --, B, __pkt_io_ctm_pkt_no]
+
+	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
+	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_STACK_LM_HANDLE, lm_stack]
 
 	//__hashmap_dbg_print(0xe101, 0, pkt_offset, pkt_length)
 	//__hashmap_dbg_print(0xe001, 0, in_vec[0], in_vec[1], in_vec[2], in_vec[3])
@@ -209,7 +221,7 @@ dbg_loop#:
 
 
 	/* restore pkt meta data */
-	ebpf_lm_addr(EBPF_AFTER, lm_offset)
+	ebpf_lm_addr(EBPF_AFTER, lm_offset, lm_stack)
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 		alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
 		//alu[stats_idx, rc, -, 1]		; XDP rc?
@@ -217,6 +229,7 @@ dbg_loop#:
 
 	unroll_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW, PV_SIZE_LW)
 	alu[t_idx_ctx, --, b, EBPF_META_PKT_LM_INDEX++]
+	alu[__pkt_io_ctm_pkt_no, --, b, EBPF_META_PKT_LM_INDEX++]
 
 	//__hashmap_dbg_print(0xe011, 0, in_vec[0], in_vec[1], in_vec[2], in_vec[3])
 	//__hashmap_dbg_print(0xe012, 0, in_vec[4], in_vec[5], in_vec[6], in_vec[7])
@@ -246,37 +259,12 @@ bpf_ret_code#:
 	br_bset[rc, EBPF_RET_DROP, DROP_LABEL]
     br_bclr[rc, EBPF_RET_REDIR, bpf_tx_host#]
 
-
-#if 0
-	// XDP style rc
-	#define_eval MAX_JUMP (XDP_MAX + 1)
-    preproc_jump_targets(j, MAX_JUMP)
-
-    #ifdef _XDP_LOOP
-        #error "_XDP_LOOP is already defined" (_XDP_LOOP)
-    #endif
-    #define_eval _XDP_LOOP 0
-    jump[rc, j0#], targets[PREPROC_LIST]
-    #while (_XDP_LOOP < MAX_JUMP)
-        j/**/_XDP_LOOP#:
-            br[s/**/_XDP_LOOP#]
-        #define_eval _XDP_LOOP (_XDP_LOOP + 1)
-    #endloop
-    #undef _XDP_LOOP
-    #undef MAX_JUMP
-
-s/**/XDP_ABORTED#:
-s/**/XDP_DROP#:
-	br[DROP_LABEL]
-#endif
-
-
 bpf_tx_wire#:
-s/**/XDP_TX#:
-	pv_get_ingress_queue(egress_q_base, in_vec)
+	//pv_get_ingress_queue(egress_q_base, in_vec)
+	move(egress_q_base,0)
+	__hashmap_dbg_print(0xe105, 0, egress_q_base)
 	pkt_io_tx_wire(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
-s/**/XDP_PASS#:
 bpf_tx_host#:
 	//alu[egress_q_base, BF_A(in_vec, PV_QUEUE_OUT_bf), and, 0x3f]
 	//__hashmap_dbg_print(0xe104, 0, egress_q_base)
