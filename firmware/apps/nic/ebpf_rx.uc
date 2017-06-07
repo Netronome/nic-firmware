@@ -143,7 +143,7 @@ __hashmap_journal_init()
 	unroll_copy(EBPF_META_PKT_LM_INDEX, ++, in_vec, 0, PV_SIZE_LW, PV_SIZE_LW)
 	alu[EBPF_META_PKT_LM_INDEX++, --, B, t_idx_ctx]
 
-	__hashmap_dbg_print(0xe101, 0, pkt_offset, pkt_length)
+	//__hashmap_dbg_print(0xe101, 0, pkt_offset, pkt_length)
 	//__hashmap_dbg_print(0xe001, 0, in_vec[0], in_vec[1], in_vec[2], in_vec[3])
 	//__hashmap_dbg_print(0xe002, 0, in_vec[4], in_vec[5], in_vec[6], in_vec[7])
 
@@ -163,7 +163,7 @@ __hashmap_journal_init()
 			br[bpf_tx_host#]
 		.endif
 
-	__hashmap_dbg_print(0xe100, 0, ebpf_rc)
+	//__hashmap_dbg_print(0xe100, 0, ebpf_rc)
 	br_addr[EBPF_PROG_ADDR]
 
 	//br[loaded_bpf#]
@@ -183,10 +183,12 @@ bpf_ret#:
 
 	alu[rc, --, b, ebpf_rc]
 
+#if 0
  #define __MY_ID__ ((__ISLAND << 8) |(__MEID))
 	move(myid, __MY_ID__)
 	__hashmap_dbg_print(0xe102, 0,myid, rc, ebpf_rc)
  #undef __MY_ID__
+#endif
 
 #if 0
 	.reg dbg_val
