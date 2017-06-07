@@ -9,6 +9,7 @@
 #include "unroll.uc"
 #include "lm_handle.uc"
 
+
 #if 1
 #define JOURNAL_ENABLE 1
 #define DEBUG_TRACE
@@ -17,6 +18,11 @@
 #include "map_debug_config.h"
 __hashmap_journal_init()
 #endif
+
+#macro ebpf_init()
+.alloc_mem _pf0_net_app_id dram global 8 8
+.init _pf0_net_app_id+0 (NFD_NET_APP_TYPE)
+#endm
 
 
 #macro ebpf_lm_handles_define()
@@ -38,8 +44,9 @@ __hashmap_journal_init()
     #undef EBPF_STACK_LM_INDEX
 #endm
 
-#define EBPF_LM_SIZE   64
-#define EBPF_LM_BASE   3840
+#define EBPF_LM_SIZE   256
+#define EBPF_LM_BASE   0
+
 .alloc_mem ebpf_lm lmem+EBPF_LM_BASE me (EBPF_LM_SIZE*4)
 
 #define EBPF_PROG_ADDR NFD_BPF_START_OFF
@@ -50,18 +57,21 @@ __hashmap_journal_init()
 #define XDP_TX		3		/* redir */
 #define XDP_MAX		XDP_TX
 
-
-#macro ebpf_lm_addr(out_addr)
+#define EBPF_BEFORE 0
+#define EBPF_AFTER  1
+#macro ebpf_lm_addr(STATUS, out_addr)
 .begin
     .reg lm_off
     .reg ctx_num
 	.reg tmp
 
+#if (STATUS == EBPF_BEFORE)
 	alu[ctx_num, --, b, t_idx_ctx, >>7]
-
+#else
 	local_csr_rd[ACTIVE_CTX_STS]
-    immed[tmp, 0]
-    alu_shf[tmp, tmp, and, 0x7]
+    immed[ctx_num, 0]
+    alu_shf[ctx_num, ctx_num, and, 0x7]
+#endif
 
     #define_eval _LM_SIZE_ (EBPF_LM_SIZE/2)
     immed[out_addr, EBPF_LM_BASE]
@@ -109,6 +119,10 @@ __hashmap_journal_init()
  *	  - fixed lm index
  */
 
+.reg volatile ebpf_rc
+.reg_addr ebpf_rc 0 A
+.set ebpf_rc
+
 #macro ebpf_func(in_vec, EGRESS_LABEL, DROP_LABEL)
 .begin
 	.reg lm_offset
@@ -116,9 +130,9 @@ __hashmap_journal_init()
 	.reg pkt_offset
 	.reg ebpf_pkt_param
 	.reg ebpf_pkt_len
-	.reg ebpf_rc
+	//.reg ebpf_rc
 
-	ebpf_lm_addr(lm_offset)
+	ebpf_lm_addr(EBPF_BEFORE, lm_offset)
 	ebpf_lm_handles_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 		pv_get_length(pkt_length, in_vec)
@@ -127,21 +141,37 @@ __hashmap_journal_init()
 	pv_get_ctm_base(pkt_offset, in_vec)
 
 	unroll_copy(EBPF_META_PKT_LM_INDEX, ++, in_vec, 0, PV_SIZE_LW, PV_SIZE_LW)
+	alu[EBPF_META_PKT_LM_INDEX++, --, B, t_idx_ctx]
 
 	__hashmap_dbg_print(0xe101, 0, pkt_offset, pkt_length)
+	//__hashmap_dbg_print(0xe001, 0, in_vec[0], in_vec[1], in_vec[2], in_vec[3])
+	//__hashmap_dbg_print(0xe002, 0, in_vec[4], in_vec[5], in_vec[6], in_vec[7])
 
 	/* registers are trashed here */
 	.reg_addr ebpf_pkt_param 9 B
 	alu[ebpf_pkt_param, --, b, pkt_offset]
 	.reg_addr ebpf_pkt_len 10 B
 	alu[ebpf_pkt_len, --, b, pkt_length]
-	.reg_addr ebpf_rc 0 A
+	//.reg_addr ebpf_rc 0 A
 	immed[ebpf_rc, 0]
-	//br[loaded_bpf#]
+
+	.reg valid_bpf
+	.reg dbg_tmp
+		local_csr_rd[MAILBOX0]
+		immed[valid_bpf, 0]
+		.if (valid_bpf == 0)
+			br[bpf_tx_host#]
+		.endif
+
+	__hashmap_dbg_print(0xe100, 0, ebpf_rc)
 	br_addr[EBPF_PROG_ADDR]
 
+	//br[loaded_bpf#]
+	//br_addr[EBPF_PROG_ADDR]
+	
+
 bpf_ret#:
-	.reentry
+	//.reentry
 	.reg stats_idx
 	.reg stats_offset
 	.reg nic_stats_extra_hi
@@ -149,18 +179,45 @@ bpf_ret#:
 	.reg_addr ebpf_rc 0 A
 	.set ebpf_rc
 	.reg rc
+	.reg myid
+
+	alu[rc, --, b, ebpf_rc]
+
+ #define __MY_ID__ ((__ISLAND << 8) |(__MEID))
+	move(myid, __MY_ID__)
+	__hashmap_dbg_print(0xe102, 0,myid, rc, ebpf_rc)
+ #undef __MY_ID__
+
+#if 0
+	.reg dbg_val
+	.reg mb_val
+	.reg dbg_ctx
+	move(dbg_val, 0x00220203) 	;drop stats + drop
+	.if (rc != dbg_val)
+		local_csr_rd[ACTIVE_CTX_STS]
+    	immed[dbg_ctx, 0]
+    	alu_shf[dbg_ctx, dbg_ctx, and, 0x7]
+		local_csr_rd[MAILBOX1]
+		immed[mb_val, 0]
+		alu[mb_val, mb_val, or, dbg_ctx, <<4]
+dbg_loop#:
+		ctx_arb[voluntary], br[dbg_loop#]
+	.endif
+#endif
+
 
 	/* restore pkt meta data */
-	ebpf_lm_addr(lm_offset)
+	ebpf_lm_addr(EBPF_AFTER, lm_offset)
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
-		alu[rc, --, b, ebpf_rc]
 		alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
 		//alu[stats_idx, rc, -, 1]		; XDP rc?
 		move(nic_stats_extra_hi, _nic_stats_extra >>8)
 
-	__hashmap_dbg_print(0xe102, 0, rc)
-
 	unroll_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW, PV_SIZE_LW)
+	alu[t_idx_ctx, --, b, EBPF_META_PKT_LM_INDEX++]
+
+	//__hashmap_dbg_print(0xe011, 0, in_vec[0], in_vec[1], in_vec[2], in_vec[3])
+	//__hashmap_dbg_print(0xe012, 0, in_vec[4], in_vec[5], in_vec[6], in_vec[7])
 
 	.if (stats_idx > 0)		
 		/* only port 0 for now */
@@ -180,6 +237,10 @@ bpf_ret#:
 
 bpf_ret_code#:
 	/* ignoring mark TBD  */
+	pv_get_ctm_base(pkt_offset, in_vec)
+	pv_get_length(pkt_length, in_vec)
+	//__hashmap_dbg_print(0xe103, 0, pkt_offset, pkt_length)
+
 	br_bset[rc, EBPF_RET_DROP, DROP_LABEL]
     br_bclr[rc, EBPF_RET_REDIR, bpf_tx_host#]
 
@@ -215,7 +276,9 @@ s/**/XDP_TX#:
 
 s/**/XDP_PASS#:
 bpf_tx_host#:
-	alu[egress_q_base, BF_A(in_vec, PV_QUEUE_OUT_bf), and, 0x3f]
+	//alu[egress_q_base, BF_A(in_vec, PV_QUEUE_OUT_bf), and, 0x3f]
+	//__hashmap_dbg_print(0xe104, 0, egress_q_base)
+	move(egress_q_base,0)
 	pkt_io_tx_host(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 	ebpf_lm_handles_undef()

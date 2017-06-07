@@ -188,6 +188,7 @@ end#:
 
     pv_get_seq_ctx(seq_ctx, in_pkt_vec)
     pv_get_seq_no(seq_no, in_pkt_vec)
+
     gro_cli_send(seq_ctx, seq_no, $__pkt_io_gro_meta, 0)
 .end
 #endm
