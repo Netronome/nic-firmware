@@ -114,6 +114,9 @@ timestamp_enable()
 
 
 .reg volatile __pkt_io_ctm_pkt_no
+.reg_addr __pkt_io_ctm_pkt_no 29 B
+.set __pkt_io_ctm_pkt_no
+
 .sig volatile __pkt_io_sig_nfd
 .sig volatile __pkt_io_sig_nfd_retry
 .set_sig __pkt_io_sig_nfd_retry

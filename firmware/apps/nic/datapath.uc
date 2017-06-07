@@ -42,6 +42,9 @@ local_csr_wr[CTX_ENABLES, ctxs]
 
 // cache the context bits for T_INDEX
 .reg volatile t_idx_ctx
+.reg_addr t_idx_ctx 29 A
+.set t_idx_ctx
+
 local_csr_rd[ACTIVE_CTX_STS]
 immed[t_idx_ctx, 0]
 alu[t_idx_ctx, t_idx_ctx, AND, 7]
