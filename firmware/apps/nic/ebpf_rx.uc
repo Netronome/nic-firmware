@@ -5,6 +5,7 @@
 /* firmware/lib/nic_basic/nic_stats.h */
 /* firmware/lib/nic_basic/_c/nic_stats.c */
 #include <nic_basic/nic_stats.h>
+#include <aggregate.uc>
 #include "nfd_user_cfg.h"
 #include "unroll.uc"
 #include "lm_handle.uc"
@@ -158,7 +159,7 @@ __hashmap_journal_init()
 	/* ebpf_rx: from NBI */
 	pv_get_ctm_base(pkt_offset, in_vec)
 
-	unroll_copy(EBPF_META_PKT_LM_INDEX, ++, in_vec, 0, PV_SIZE_LW, PV_SIZE_LW)
+	aggregate_copy(EBPF_META_PKT_LM_INDEX, ++, in_vec, 0, PV_SIZE_LW)
 	alu[EBPF_META_PKT_LM_INDEX++, --, B, t_idx_ctx]
 	alu[EBPF_META_PKT_LM_INDEX++, --, B, __pkt_io_ctm_pkt_no]
 
@@ -211,7 +212,7 @@ bpf_ret#:
 		alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
 		move(nic_stats_extra_hi, _nic_stats_extra >>8)
 
-	unroll_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW, PV_SIZE_LW)
+	aggregate_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW)
 	alu[t_idx_ctx, --, b, EBPF_META_PKT_LM_INDEX++]
 	alu[__pkt_io_ctm_pkt_no, --, b, EBPF_META_PKT_LM_INDEX++]
 
