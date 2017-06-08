@@ -11,17 +11,27 @@
 
 
 #if 1
+#ifndef PKT_COUNTER_ENABLE
+    #define PKT_COUNTER_ENABLE
+#endif
+#include "pkt_counter.uc"
+pkt_counter_init()
+
 #define JOURNAL_ENABLE 1
 #define DEBUG_TRACE
 #include <journal.uc>
+#define _EBPF_RX_
+#include "hashmap.uc"
 #include "hashmap_priv.uc"
 #include "map_debug_config.h"
 __hashmap_journal_init()
 #endif
 
 #macro ebpf_init()
-.alloc_mem _pf0_net_app_id dram global 8 8
-.init _pf0_net_app_id+0 (NFD_NET_APP_TYPE)
+	.alloc_mem _pf0_net_app_id dram global 8 8
+	.init _pf0_net_app_id+0 (NFD_NET_APP_TYPE)
+
+	//hashmap_init()
 #endm
 
 
@@ -60,6 +70,7 @@ __hashmap_journal_init()
 
 #define EBPF_BEFORE 0
 #define EBPF_AFTER  1
+
 #macro ebpf_lm_addr(STATUS, out_addr, stack_addr)
 .begin
     .reg lm_off
@@ -138,7 +149,6 @@ __hashmap_journal_init()
 	.reg ebpf_pkt_param
 	.reg ebpf_pkt_len
 	.reg lm_stack
-	//.reg ebpf_rc
 
 	ebpf_lm_addr(EBPF_BEFORE, lm_offset, lm_stack)
 	ebpf_lm_handles_define()
@@ -155,11 +165,8 @@ __hashmap_journal_init()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_STACK_LM_HANDLE, lm_stack]
 
-	//__hashmap_dbg_print(0xe101, 0, pkt_offset, pkt_length)
-	//__hashmap_dbg_print(0xe001, 0, in_vec[0], in_vec[1], in_vec[2], in_vec[3])
-	//__hashmap_dbg_print(0xe002, 0, in_vec[4], in_vec[5], in_vec[6], in_vec[7])
-
 	/* registers are trashed here */
+	/* TBD: remove pkt_offset & pkt_length */
 	.reg_addr ebpf_pkt_param 9 B
 	alu[ebpf_pkt_param, --, b, pkt_offset]
 	.reg_addr ebpf_pkt_len 10 B
@@ -175,15 +182,11 @@ __hashmap_journal_init()
 			br[bpf_tx_host#]
 		.endif
 
-	//__hashmap_dbg_print(0xe100, 0, ebpf_rc)
 	br_addr[EBPF_PROG_ADDR]
 
-	//br[loaded_bpf#]
-	//br_addr[EBPF_PROG_ADDR]
 	
 
 bpf_ret#:
-	//.reentry
 	.reg stats_idx
 	.reg stats_offset
 	.reg nic_stats_extra_hi
@@ -202,37 +205,16 @@ bpf_ret#:
  #undef __MY_ID__
 #endif
 
-#if 0
-	.reg dbg_val
-	.reg mb_val
-	.reg dbg_ctx
-	move(dbg_val, 0x00220203) 	;drop stats + drop
-	.if (rc != dbg_val)
-		local_csr_rd[ACTIVE_CTX_STS]
-    	immed[dbg_ctx, 0]
-    	alu_shf[dbg_ctx, dbg_ctx, and, 0x7]
-		local_csr_rd[MAILBOX1]
-		immed[mb_val, 0]
-		alu[mb_val, mb_val, or, dbg_ctx, <<4]
-dbg_loop#:
-		ctx_arb[voluntary], br[dbg_loop#]
-	.endif
-#endif
-
-
 	/* restore pkt meta data */
 	ebpf_lm_addr(EBPF_AFTER, lm_offset, lm_stack)
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 		alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
-		//alu[stats_idx, rc, -, 1]		; XDP rc?
 		move(nic_stats_extra_hi, _nic_stats_extra >>8)
 
 	unroll_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW, PV_SIZE_LW)
 	alu[t_idx_ctx, --, b, EBPF_META_PKT_LM_INDEX++]
 	alu[__pkt_io_ctm_pkt_no, --, b, EBPF_META_PKT_LM_INDEX++]
 
-	//__hashmap_dbg_print(0xe011, 0, in_vec[0], in_vec[1], in_vec[2], in_vec[3])
-	//__hashmap_dbg_print(0xe012, 0, in_vec[4], in_vec[5], in_vec[6], in_vec[7])
 
 	.if (stats_idx > 0)		
 		/* only port 0 for now */
@@ -252,10 +234,6 @@ dbg_loop#:
 
 bpf_ret_code#:
 	/* ignoring mark TBD  */
-	pv_get_ctm_base(pkt_offset, in_vec)
-	pv_get_length(pkt_length, in_vec)
-	//__hashmap_dbg_print(0xe103, 0, pkt_offset, pkt_length)
-
 	br_bset[rc, EBPF_RET_DROP, DROP_LABEL]
     br_bclr[rc, EBPF_RET_REDIR, bpf_tx_host#]
 
@@ -266,62 +244,18 @@ bpf_tx_wire#:
 	pkt_io_tx_wire(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 bpf_tx_host#:
-	//alu[egress_q_base, BF_A(in_vec, PV_QUEUE_OUT_bf), and, 0x3f]
-	//__hashmap_dbg_print(0xe104, 0, egress_q_base)
 	move(egress_q_base,0)
 	pkt_io_tx_host(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 	ebpf_lm_handles_undef()
 /* should not get here */
-	br[ret#]
+	//br[ret#]
 	nop
 	nop
 	nop
-
-/* ebpf program  */
-loaded_bpf#:
-.begin
-	.reentry
-	.reg rc 
-	.reg pkt_len
-	.reg pkt_addr
-
-	/* test code */
-	.reg_addr ebpf_pkt_param 9 B
-	.set ebpf_pkt_param
-	alu[pkt_addr, --, b, ebpf_pkt_param]
-
-	.reg_addr ebpf_pkt_len 10 B
-	.set ebpf_pkt_len
-	alu[pkt_len, --, b, ebpf_pkt_len]
-
-#if 0
-	#define_eval __RC_DROP	((1<<EBPF_RET_STATS_DROP)+(1<<EBPF_RET_DROP))
-	#define_eval __RC_PASS	((1<<EBPF_RET_STATS_PASS)+(1<<EBPF_RET_PASS))
-	#define_eval __RC_REDIR	((1<<EBPF_RET_STATS_REDIR)+(1<<EBPF_RET_REDIR))
-#endif
-	#define_eval __RC_DROP	XDP_DROP
-	#define_eval __RC_PASS	XDP_PASS
-	#define_eval __RC_REDIR	XDP_TX
-
-	move(rc, __RC_DROP)
-
-	.if (pkt_len > 50)
-		move(rc, __RC_PASS)
-	.endif
-
-	.if (pkt_len > 256)
-		move(rc, __RC_REDIR)
-	.endif
-
-	#undef __RC_DROP
-	#undef __RC_PASS
-	#undef __RC_REDIR
-
-	.reg_addr ebpf_rc 0 A
-	alu[ebpf_rc, --, b, rc]
-	br[bpf_ret#]
-.end
+	nop
+	nop
+	nop
 
 ret#:
 .end
