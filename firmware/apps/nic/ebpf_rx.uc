@@ -7,11 +7,12 @@
 #include <nic_basic/nic_stats.h>
 #include <aggregate.uc>
 #include "nfd_user_cfg.h"
-#include "unroll.uc"
+//#include "unroll.uc"
 #include "lm_handle.uc"
 
+#undef EBPF_DEBUG
 
-#if 1
+#ifdef EBPF_DEBUG
 #ifndef PKT_COUNTER_ENABLE
     #define PKT_COUNTER_ENABLE
 #endif
@@ -150,6 +151,7 @@ __hashmap_journal_init()
 	.reg ebpf_pkt_param
 	.reg ebpf_pkt_len
 	.reg lm_stack
+	.reg myid
 
 	ebpf_lm_addr(EBPF_BEFORE, lm_offset, lm_stack)
 	ebpf_lm_handles_define()
@@ -168,11 +170,11 @@ __hashmap_journal_init()
 
 	/* registers are trashed here */
 	/* TBD: remove pkt_offset & pkt_length */
-	.reg_addr ebpf_pkt_param 9 B
-	alu[ebpf_pkt_param, --, b, pkt_offset]
-	.reg_addr ebpf_pkt_len 10 B
-	alu[ebpf_pkt_len, --, b, pkt_length]
-	//.reg_addr ebpf_rc 0 A
+	//.reg_addr ebpf_pkt_param 9 B
+	//alu[ebpf_pkt_param, --, b, pkt_offset]
+	//.reg_addr ebpf_pkt_len 10 B
+	//alu[ebpf_pkt_len, --, b, pkt_length]
+	.reg_addr ebpf_rc 0 A
 	immed[ebpf_rc, 0]
 
 	.reg valid_bpf
@@ -183,9 +185,20 @@ __hashmap_journal_init()
 			br[bpf_tx_host#]
 		.endif
 
+#ifdef EBPF_DEBUG
+ #define __MY_ID__ ((__ISLAND << 8) |(__MENUM))
+	move(myid, __MY_ID__)
+	__hashmap_dbg_print(0xe003, 0, myid )
+ #undef __MY_ID__
+#endif
+
 	br_addr[EBPF_PROG_ADDR]
 
-	
+	br[bpf_ret#]
+	nop
+	nop
+	nop
+
 
 bpf_ret#:
 	.reg stats_idx
@@ -195,16 +208,8 @@ bpf_ret#:
 	.reg_addr ebpf_rc 0 A
 	.set ebpf_rc
 	.reg rc
-	.reg myid
 
 	alu[rc, --, b, ebpf_rc]
-
-#if 0
- #define __MY_ID__ ((__ISLAND << 8) |(__MEID))
-	move(myid, __MY_ID__)
-	__hashmap_dbg_print(0xe102, 0,myid, rc, ebpf_rc)
- #undef __MY_ID__
-#endif
 
 	/* restore pkt meta data */
 	ebpf_lm_addr(EBPF_AFTER, lm_offset, lm_stack)
@@ -241,7 +246,6 @@ bpf_ret_code#:
 bpf_tx_wire#:
 	//pv_get_ingress_queue(egress_q_base, in_vec)
 	move(egress_q_base,0)
-	__hashmap_dbg_print(0xe105, 0, egress_q_base)
 	pkt_io_tx_wire(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 bpf_tx_host#:
