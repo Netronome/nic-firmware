@@ -64,6 +64,7 @@ $(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PL
 #$(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
 $(eval $(call microcode.add_flags, $(PROJECT),datapath,-d40))
 $(eval $(call microcode.add_flags, $(PROJECT),datapath,-verbose))
+$(eval $(call microcode.add_flags, $(PROJECT),datapath,-keep_unreachable_code))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/lib))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/apps/nic/lib))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/apps/nic/maps))
