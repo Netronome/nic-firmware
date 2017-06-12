@@ -120,8 +120,6 @@ NFD_FLR_DECLARE;
 
 /* A global synchronization counter to check if all APP MEs has reconfigured */
 __export __dram struct synch_cnt nic_cfg_synch;
-__export __shared __emem uint32_t mary_dbg_bpf_load_req=0;
-__export __shared __emem uint32_t mary_dbg_bpf_loaded=0;
 
 
 /*
@@ -419,18 +417,16 @@ cfg_changes_loop(void)
                 }
             }
 
+			if (update & NFP_NET_CFG_UPDATE_BPF) {
+				nic_local_bpf_reconfig(&ctx_mode, port);
+			}
+
             /* Save the control word */
             nic_control_word[port] = control;
 
             if (control & NFP_NET_CFG_CTRL_ENABLE) {
                 app_config_port(port, control, update);
             }
-			
-			if (update & NFP_NET_CFG_UPDATE_BPF) {
-				mem_incr32(&mary_dbg_bpf_load_req);
-            	nic_local_bpf_reconfig(&ctx_mode, port);
-				mem_incr32(&mary_dbg_bpf_loaded);
-			}
 
             /* Wait for queues to drain / config to stabilize */
             for (i = 0; i < 100; ++i) 
