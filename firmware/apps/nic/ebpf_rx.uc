@@ -10,8 +10,7 @@
 //#include "unroll.uc"
 #include "lm_handle.uc"
 
-#undef EBPF_DEBUG
-//#define EBPF_DEBUG
+//#undef EBPF_DEBUG
 
 #ifdef EBPF_DEBUG
 	#ifndef PKT_COUNTER_ENABLE
@@ -144,7 +143,7 @@
 .reg_addr ebpf_rc 0 A
 .set ebpf_rc
 
-#macro ebpf_func(in_vec, EGRESS_LABEL, DROP_LABEL)
+#macro ebpf_func(in_vec, egress_q,  EGRESS_LABEL, DROP_LABEL)
 .begin
 	.reg lm_offset
 	.reg pkt_length
@@ -158,6 +157,7 @@
 	ebpf_lm_handles_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 		pv_get_length(pkt_length, in_vec)
+		pv_set_egress_queue(in_vec, egress_q)
 
 	/* ebpf_rx: from NBI */
 	pv_get_ctm_base(pkt_offset, in_vec)
@@ -231,13 +231,12 @@ bpf_ret_code#:
     br_bclr[rc, EBPF_RET_REDIR, bpf_tx_host#]
 
 bpf_tx_wire#:
-	//pv_get_ingress_queue(egress_q_base, in_vec)
-	move(egress_q_base,0)
-	pkt_io_tx_wire(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
+	pv_get_ingress_queue(egress_q, in_vec)
+	pkt_io_tx_wire(in_vec, egress_q, EGRESS_LABEL, DROP_LABEL)
 
 bpf_tx_host#:
-	move(egress_q_base,0)
-	pkt_io_tx_host(in_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
+	alu[egress_q, BF_A(in_vec, PV_QUEUE_OUT_bf), and, 0x3f]
+	pkt_io_tx_host(in_vec, egress_q, EGRESS_LABEL, DROP_LABEL)
 
 	ebpf_lm_handles_undef()
 /* should not get here */

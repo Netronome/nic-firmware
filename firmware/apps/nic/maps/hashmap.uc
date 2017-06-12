@@ -272,13 +272,15 @@
 
 	.reg volatile $map_txfr[HASHMAP_TXFR_COUNT]
 	.xfer_order $map_txfr
+
 #endm
 
-
-hashmap_declare_block(HASHMAP_TOTAL_ENTRIES)
-__hashmap_freelist_init(HASHMAP_OVERFLOW_ENTRIES)
-camp_hash_init(HASHMAP_MAX_KEYS_LW, $map_txfr)
-__hashmap_journal_init()
+#macro hashmap_init()
+	hashmap_declare_block(HASHMAP_TOTAL_ENTRIES)
+	__hashmap_freelist_init(HASHMAP_OVERFLOW_ENTRIES)
+	camp_hash_init(HASHMAP_MAX_KEYS_LW, $map_txfr)
+	__hashmap_journal_init()
+#endm
 
 
 /* *************************************** */

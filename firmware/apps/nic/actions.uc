@@ -356,7 +356,7 @@ finalize#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#] ;actions_jump
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#] ;actions_jump
 
         ins_0#: br[DROP_LABEL] 
         ins_1#: br[statistics#]
@@ -390,24 +390,18 @@ checksum_complete#:
     __actions_next()
 
 tx_host#:
-ebpf#:
 	/* p6p1 to p4p1 */
-	//__hashmap_dbg_print(0x2000, 0, egress_q_base)
-	ebpf_func(in_pkt_vec, EGRESS_LABEL, DROP_LABEL)
-#if 0
     __actions_read(egress_q_base, egress_q_mask, --)
-	//__hashmap_dbg_print(0x2000, 0, egress_q_base)
     pkt_io_tx_host(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
-#endif
 
 tx_wire#:
     __actions_read(egress_q_base, egress_q_mask, --)
-	//__hashmap_dbg_print(0x1000, 0, egress_q_base)
     pkt_io_tx_wire(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
-//ebpf#:
-//	ebpf_func(in_pkt_vec, EGRESS_LABEL, DROP_LABEL)
-
+ebpf#:
+	/* p6p1 to p4p1 */
+    __actions_read(egress_q_base, egress_q_mask, --)
+	ebpf_func(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 .end
 #endm
 
