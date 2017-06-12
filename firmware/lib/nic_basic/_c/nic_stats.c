@@ -29,6 +29,7 @@
 #include <vnic/shared/nfd_cfg.h>
 #include <vnic/pci_out.h>
 
+extern __intrinsic uint64_t swapw64(uint64_t val);
 
 /*
  * Additional counters for the NIC application
@@ -301,7 +302,7 @@ nic_stats_tx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
 
         /* Accumulate the TM Q drops */
         mem_read64(&read_val, &nic_tmq_drop_cntr_accum[port], sizeof(uint64_t));
-        bar_cntrs.discards += read_val;
+        bar_cntrs.discards += swapw64(read_val);
     }
 #endif
 
