@@ -11,23 +11,24 @@
 #include "lm_handle.uc"
 
 #undef EBPF_DEBUG
+//#define EBPF_DEBUG
 
 #ifdef EBPF_DEBUG
-#ifndef PKT_COUNTER_ENABLE
-    #define PKT_COUNTER_ENABLE
-#endif
-#include "pkt_counter.uc"
-pkt_counter_init()
+	#ifndef PKT_COUNTER_ENABLE
+    	#define PKT_COUNTER_ENABLE
+	#endif
+	#include "pkt_counter.uc"
+	pkt_counter_init()
 
-#define JOURNAL_ENABLE 1
-#define DEBUG_TRACE
-#include <journal.uc>
-#define _EBPF_RX_
-#include "hashmap.uc"
-#include "hashmap_priv.uc"
-#include "map_debug_config.h"
-__hashmap_journal_init()
-#endif
+	#define JOURNAL_ENABLE 1
+	#define DEBUG_TRACE
+	#include <journal.uc>
+	#define _EBPF_RX_
+	#include "hashmap.uc"
+	#include "hashmap_priv.uc"
+	#include "map_debug_config.h"
+	__hashmap_journal_init()
+#endif	/* EBPF_DEBUG */
 
 #macro ebpf_init()
 	.alloc_mem _pf0_net_app_id dram global 8 8
@@ -168,22 +169,8 @@ __hashmap_journal_init()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_STACK_LM_HANDLE, lm_stack]
 
-	/* registers are trashed here */
-	/* TBD: remove pkt_offset & pkt_length */
-	//.reg_addr ebpf_pkt_param 9 B
-	//alu[ebpf_pkt_param, --, b, pkt_offset]
-	//.reg_addr ebpf_pkt_len 10 B
-	//alu[ebpf_pkt_len, --, b, pkt_length]
 	.reg_addr ebpf_rc 0 A
 	immed[ebpf_rc, 0]
-
-	.reg valid_bpf
-	.reg dbg_tmp
-		local_csr_rd[MAILBOX0]
-		immed[valid_bpf, 0]
-		.if (valid_bpf == 0)
-			br[bpf_tx_host#]
-		.endif
 
 #ifdef EBPF_DEBUG
  #define __MY_ID__ ((__ISLAND << 8) |(__MENUM))
@@ -254,7 +241,6 @@ bpf_tx_host#:
 
 	ebpf_lm_handles_undef()
 /* should not get here */
-	//br[ret#]
 	nop
 	nop
 	nop
