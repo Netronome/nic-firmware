@@ -86,8 +86,6 @@ __export __dram uint64_t nic_cnt_tx_drop_mtu;
 #define NIC_LIB_CNTR(_me)
 #endif
 
-__export __dram uint64_t mary_dbg_update_bpf=0;
-__export __dram uint64_t mary_dbg_reflect_bpf=0;
 
 #define CREATE_JOURNAL(name)                                    \
     EMEM0_QUEUE_ALLOC(name##_rnum, global);                     \
@@ -451,7 +449,6 @@ bpf_reflect_to_workers(unsigned int csr_no, __xwrite uint32_t *data_out)
 
     ctassert(__is_ct_const(csr_no));
 
-	mem_incr32(&mary_dbg_reflect_bpf);
     for(i = 0; i < sizeof(bpf_mes_ids)/sizeof(uint32_t); i++) {
         ct_reflect_csr(bpf_mes_ids[i], csr_no / 4, data_out);
 	}
@@ -468,32 +465,6 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
     __gpr unsigned int i;
     __gpr unsigned int tmp;
 
-
-/* test dump to mailbox */
-    data_out = 0xbeef;
-    bpf_reflect_to_workers(0x170, &data_out);	/*Mailbox0*/
-
-#if 0
-    /* Disable the contexts */
-    data_out = 0;
-    bpf_reflect_to_workers(0x18, &data_out);	/*CtxEnables.CtxEnables*/
-#endif
-
-#if 0
-    for (i = 0; i < 8; i++) {
-        /* Select the contexts for indirect access */
-        data_out = i;
-        bpf_reflect_to_workers(0x20, &data_out);	/* CSRCtxPtr.CtxSelect*/
-
-        /* Set the PC to 0 */
-        data_out = 0;
-        bpf_reflect_to_workers(0x40, &data_out);	/* IndCtxStatus */
-
-        /* Clear the wake events (0x1 is volunatary swap). */
-        data_out = 1;
-        bpf_reflect_to_workers(0x50, &data_out);	/* IndCtxWkpEvt */
-    }
-#endif
 
     mem_read32(host_mem_bpf_cfg, bar_base + NFP_NET_CFG_BPF_SIZE - 2,
                sizeof host_mem_bpf_cfg);
@@ -535,12 +506,6 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
 
     data_out = 0;
     bpf_reflect_to_workers(0x00, &data_out);		/* normal mode */
-
-#if 0
-    *ctx_mode = 0;
-    data_out = 0x80105502;		/* InUseContexts=1,4 contexts, NNreceiveConfig=2 */
-    bpf_reflect_to_workers(0x18, &data_out);	/* CtxEnables */
-#endif
 
     return;
 }
@@ -584,16 +549,7 @@ nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t port)
     /* Calculate the relevant configuration BAR base address */
     bar_base = NFD_CFG_BAR_ISL(NIC_PCI,port);
 
-#if 0
-        nic_bpf_kill_threads(ctx_mode, _link_sym(m_ebpf_wq0_rnum),
-                             mem_ring_get_addr((__emem void *)_link_sym(m_ebpf_wq0_mem)));
-        nic_bpf_kill_threads(ctx_mode, _link_sym(m_ebpf_wq1_rnum),
-                             mem_ring_get_addr((__emem void *)_link_sym(m_ebpf_wq1_mem)));
-#endif
-
-		mem_incr32(&mary_dbg_update_bpf);
-
-        update_bpf_prog(ctx_mode, bar_base);
+    update_bpf_prog(ctx_mode, bar_base);
 
     return;
 }
