@@ -17,7 +17,7 @@
 
 #define PKT_COUNTER_SUFFIX  __cntr__ //used to avoid the possibility of someone else using the word "counter" which will be picked up by a future script that searches the rtsym table
 
-
+#macro pkt_counter_init()
 #ifdef PKT_COUNTER_ENABLE
     passert(PKT_COUNTER_MAX, "MULTIPLE_OF", (128 / PKT_COUNTER_WIDTH))
     #define PKT_COUNTER_ALLOC_LOOP 0
@@ -34,6 +34,7 @@
     #undef PKT_COUNTER_IMEM
     #define PKT_COUNTER_POOL 0
 #endif
+#endm
 
 /** pkt_counter_decl
  *

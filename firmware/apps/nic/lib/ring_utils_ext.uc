@@ -2,8 +2,8 @@
  * Copyright (C) 2009-2015 Netronome Systems, Inc.  All rights reserved.
  */
 
-#ifndef __RING_UTILS_UC__
-#define __RING_UTILS_UC__
+#ifndef __RING_UTILS_EXT_UC__
+#define __RING_UTILS_EXT_UC__
 
 #ifndef NFP_LIB_ANY_NFAS_VERSION
     #if (!defined(__NFP_TOOL_NFAS) ||                       \

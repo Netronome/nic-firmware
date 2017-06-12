@@ -114,8 +114,9 @@
 	.alloc_mem LM_CMSG_BASE	lm me (NUM_CONTEXT * (CMSG_LM_FIELD_SZ * 2)) 4
 
 	// identity for ctrl vnic - should be define in ng-nfd.hg/me/blocks/vnic/shared/nfd_cfg_internal.c
-	.alloc_mem _pf0_net_app_id ctm global 8 8
-	.init _pf0_net_app_id+0 (NFD_NET_APP_TYPE)
+	// app_id is defined in ebpf_rx.uc
+	//.alloc_mem _pf0_net_app_id ctm global 8 8
+	//.init _pf0_net_app_id+0 (NFD_NET_APP_TYPE)
 
 	nfd_out_send_init()
 

@@ -85,7 +85,8 @@ enum instruction_type {
     INSTR_CHECKSUM_COMPLETE,
     INSTR_TX_HOST,
     INSTR_TX_WIRE,
-    INSTR_CMSG
+    INSTR_CMSG,
+	INSTR_EBPF
 };
 
 

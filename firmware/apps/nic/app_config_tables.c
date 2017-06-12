@@ -126,7 +126,8 @@ enum instruction_type {
     INSTR_CHECKSUM_COMPLETE,
     INSTR_TX_HOST,
     INSTR_TX_WIRE,
-    INSTR_CMSG
+    INSTR_CMSG,
+    INSTR_EBPF
 };
 */
 unsigned int instr_tbl[] = {0, 0x40, 0x50, 0x20, 0x30, 0x80, 0x60, 0x90};
@@ -423,6 +424,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     __imem struct nic_port_stats_extra *nic_stats_extra =
         (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
 
+
     /*
      * RX HOST --> TX WIRE
      */
@@ -559,14 +561,36 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         prev_instr = INSTR_CHECKSUM_COMPLETE;
     }
 
+    if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {
+        /* calculate checksum and drop if mismatch */
 #ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_TX_HOST];
+        instr[count].instr = instr_tbl[INSTR_CHECKSUM_COMPLETE];
 #else
-    instr[count].instr = INSTR_TX_HOST;
+        instr[count].instr = INSTR_CHECKSUM_COMPLETE;
 #endif
-    instr[count].param = vnic_port * NFD_MAX_PF_QUEUES;
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
-    prev_instr = INSTR_TX_HOST;
+        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_CHECKSUM_COMPLETE);
+        prev_instr = INSTR_CHECKSUM_COMPLETE;
+    }
+
+    if (control & NFP_NET_CFG_CTRL_BPF) {
+#ifdef GEN_INSTRUCTION
+        instr[count].instr = instr_tbl[INSTR_EBPF];
+#else
+        instr[count].instr = INSTR_EBPF;
+#endif
+   		instr[count++].param = vnic_port * NFD_MAX_PF_QUEUES;
+        prev_instr = INSTR_EBPF;
+    }
+else {
+#ifdef GEN_INSTRUCTION
+	instr[count].instr = instr_tbl[INSTR_TX_HOST];
+#else
+	instr[count].instr = INSTR_TX_HOST;
+#endif
+   	instr[count].param = vnic_port * NFD_MAX_PF_QUEUES;
+	instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
+	prev_instr = INSTR_TX_HOST;
+}
 
     reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
 
