@@ -114,6 +114,9 @@ timestamp_enable()
 
 
 .reg volatile __pkt_io_ctm_pkt_no
+//.reg_addr __pkt_io_ctm_pkt_no 29 B
+//.set __pkt_io_ctm_pkt_no
+
 .sig volatile __pkt_io_sig_nfd
 .sig volatile __pkt_io_sig_nfd_retry
 .set_sig __pkt_io_sig_nfd_retry
@@ -188,6 +191,7 @@ end#:
 
     pv_get_seq_ctx(seq_ctx, in_pkt_vec)
     pv_get_seq_no(seq_no, in_pkt_vec)
+
     gro_cli_send(seq_ctx, seq_no, $__pkt_io_gro_meta, 0)
 .end
 #endm

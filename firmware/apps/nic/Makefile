@@ -62,8 +62,13 @@ $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLA
 $(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
 $(eval $(call microcode.add_tests,$(PROJECT),datapath))
 $(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
+#$(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
+$(eval $(call microcode.add_flags, $(PROJECT),datapath,-d40))
+$(eval $(call microcode.add_flags, $(PROJECT),datapath,-verbose))
+$(eval $(call microcode.add_flags, $(PROJECT),datapath,-keep_unreachable_code))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/lib))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/apps/nic/lib))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/apps/nic/maps))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,deps/ng-nfd.hg))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,$(BLM_DIR)))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,$(GRO_DIR)))
@@ -84,6 +89,11 @@ $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
 define NIC_ISL_ME_DEST
 ((($(1) + 32) << 4) + ($(2) + 4))
 endef
+define BPF_ISL_ME_DEST
+(((($(1) + 32) << 4) + ($(2) + 4)) << 8)
+endef
+
+
 NIC_APP_ISLANDS := \
 	"$(call NIC_ISL_ME_DEST, 0, 0), \
 	$(call NIC_ISL_ME_DEST, 1, 0), \
@@ -137,6 +147,54 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 4, 6), \
         $(call NIC_ISL_ME_DEST, 4, 7)"
 
+BPF_APP_MES := \
+        "$(call BPF_ISL_ME_DEST, 0, 0), \
+        $(call BPF_ISL_ME_DEST, 0, 1), \
+        $(call BPF_ISL_ME_DEST, 0, 2), \
+        $(call BPF_ISL_ME_DEST, 0, 3), \
+        $(call BPF_ISL_ME_DEST, 0, 4), \
+        $(call BPF_ISL_ME_DEST, 0, 5), \
+        $(call BPF_ISL_ME_DEST, 0, 6), \
+        $(call BPF_ISL_ME_DEST, 0, 7), \
+        \
+        $(call BPF_ISL_ME_DEST, 1, 0), \
+        $(call BPF_ISL_ME_DEST, 1, 1), \
+        $(call BPF_ISL_ME_DEST, 1, 2), \
+        $(call BPF_ISL_ME_DEST, 1, 3), \
+        $(call BPF_ISL_ME_DEST, 1, 4), \
+        $(call BPF_ISL_ME_DEST, 1, 5), \
+        $(call BPF_ISL_ME_DEST, 1, 6), \
+        $(call BPF_ISL_ME_DEST, 1, 7), \
+        \
+        $(call BPF_ISL_ME_DEST, 2, 0), \
+        $(call BPF_ISL_ME_DEST, 2, 1), \
+        $(call BPF_ISL_ME_DEST, 2, 2), \
+        $(call BPF_ISL_ME_DEST, 2, 3), \
+        $(call BPF_ISL_ME_DEST, 2, 4), \
+        $(call BPF_ISL_ME_DEST, 2, 5), \
+        $(call BPF_ISL_ME_DEST, 2, 6), \
+        $(call BPF_ISL_ME_DEST, 2, 7), \
+        \
+        $(call BPF_ISL_ME_DEST, 3, 0), \
+        $(call BPF_ISL_ME_DEST, 3, 1), \
+        $(call BPF_ISL_ME_DEST, 3, 2), \
+        $(call BPF_ISL_ME_DEST, 3, 3), \
+        $(call BPF_ISL_ME_DEST, 3, 4), \
+        $(call BPF_ISL_ME_DEST, 3, 5), \
+        $(call BPF_ISL_ME_DEST, 3, 6), \
+        $(call BPF_ISL_ME_DEST, 3, 7), \
+	\
+        $(call BPF_ISL_ME_DEST, 4, 0), \
+        $(call BPF_ISL_ME_DEST, 4, 1), \
+        $(call BPF_ISL_ME_DEST, 4, 2), \
+        $(call BPF_ISL_ME_DEST, 4, 3), \
+        $(call BPF_ISL_ME_DEST, 4, 4), \
+        $(call BPF_ISL_ME_DEST, 4, 5), \
+        $(call BPF_ISL_ME_DEST, 4, 6), \
+        $(call BPF_ISL_ME_DEST, 4, 7)"
+
+
+
 
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
@@ -151,6 +209,8 @@ $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-DNS_PLATFORM_TYPE=$(N
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnn_mode=1))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_WORKER_ISLAND_LIST=$(NIC_APP_ISLANDS)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_BPF_MES_LIST=$(BPF_APP_MES)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,CFG_NIC_LIB_DBG_JOURNAL=1))
 
 # Add NFD for PCIE0
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))

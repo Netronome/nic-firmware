@@ -7,6 +7,7 @@
  * This implementation only handles one PCIe island.
  */
 
+
 #include <assert.h>
 #include <nfp.h>
 #include <nfp_chipres.h>
@@ -39,6 +40,7 @@
 #include <vnic/nfd_common.h>
 
 #include "app_config_tables.h"
+#include "ebpf.h"
 
 /*
  * The application master runs on a single ME and performs a number of
@@ -372,9 +374,12 @@ cfg_changes_loop(void)
     uint32_t port;
     uint32_t update;
     uint32_t control;
+	__gpr uint32_t ctx_mode = 1;
+	__emem __addr40 uint8_t *bar_base;
 
     /* Initialisation */
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
+	nic_local_init(0, 0);		/* dummy regs right now */
 
     for (;;) {
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
@@ -400,13 +405,17 @@ cfg_changes_loop(void)
                 }
             }
 
+			if (update & NFP_NET_CFG_UPDATE_BPF) {
+				nic_local_bpf_reconfig(&ctx_mode, port);
+			}
+
             /* Save the control word */
             nic_control_word[port] = control;
 
             if (control & NFP_NET_CFG_CTRL_ENABLE) {
                 app_config_port(port, control, update);
             }
- 
+
             /* Wait for queues to drain / config to stabilize */
             for (i = 0; i < 100; ++i) 
                 sleep(1000000);
@@ -618,6 +627,7 @@ lsc_loop(void)
     }
     /* NOTREACHED */
 }
+
 
 int
 main(void)

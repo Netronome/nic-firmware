@@ -6,13 +6,15 @@
 SHELL = /bin/bash
 NFP_COMMON    := $(abspath $(CURDIR))
 NETRONOME ?= /opt/netronome
+#NETRONOME ?= /opt/netronome/nfp-sdk-6-devel
 
 DEPS_DIR      = $(NFP_COMMON)/deps
 FIRMWARE_DIR  = $(NFP_COMMON)/firmware
 DOC_DIR       = $(NFP_COMMON)/docs
 TEST_DIR      = test
 
-Q ?= @
+#Q ?= @
+Q ?=
 
 HG_USERNAME ?= $(shell whoami)
 

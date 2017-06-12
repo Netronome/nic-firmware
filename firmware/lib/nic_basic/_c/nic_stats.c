@@ -171,6 +171,24 @@ nic_stats_tx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
 }
 
 __forceinline static void
+nic_stats_bpf_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
+{
+    __xread struct nic_port_bpf_stats ebpf_stats;
+    __imem struct nic_port_stats_extra *nic_stats_extra = (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
+
+    mem_read64(&ebpf_stats, &nic_stats_extra[port].ebpf, sizeof(ebpf_stats));
+    /* Sorry but the names don't match */
+    write_bar_cntrs->discards = ebpf_stats.abort_pkts;
+    write_bar_cntrs->errors   = ebpf_stats.abort_bytes;
+    write_bar_cntrs->octets   = ebpf_stats.drop_pkts;
+    write_bar_cntrs->uc_octets = ebpf_stats.drop_bytes;
+    write_bar_cntrs->mc_octets = ebpf_stats.pass_pkts;
+    write_bar_cntrs->bc_octets = ebpf_stats.pass_bytes;
+    write_bar_cntrs->frames   = ebpf_stats.tx_pkts;
+    write_bar_cntrs->mc_frames = ebpf_stats.tx_bytes;
+}
+
+__forceinline static void
 nic_stats_update_control_bar(void)
 {
     __mem char *vf_bar;
@@ -190,6 +208,10 @@ nic_stats_update_control_bar(void)
         nic_stats_tx_counters(i, &write_bar_cntrs);
         mem_write64(&write_bar_cntrs, vf_bar + NFP_NET_CFG_STATS_TX_DISCARDS,
                     sizeof(write_bar_cntrs));
+
+		nic_stats_bpf_counters(i, &write_bar_cntrs);
+        mem_write64(&write_bar_cntrs, vf_bar + NFP_NET_CFG_STATS_APP0_FRAMES,
+                    sizeof(struct nic_port_bpf_stats));
     }
 }
 
