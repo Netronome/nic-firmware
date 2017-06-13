@@ -175,6 +175,9 @@
 .end
 #endm
 
+#macro pv_set_tx_host_rx_bpf(io_vec)
+    alu[BF_A(io_vec, PV_TX_HOST_RX_BPF), BF_A(io_vec, PV_TX_HOST_RX_BPF), OR, 1, <<BF_L(PV_TX_HOST_RX_BPF)]
+#endm
 
 #macro pv_set_egress_queue(io_vec, in_queue)
     #ifdef PARANOIA
@@ -184,7 +187,6 @@
         alu[BF_A(io_vec, PV_QUEUE_OUT_bf), BF_A(io_vec, PV_QUEUE_OUT_bf), OR, in_queue]
     #endif
 #endm
-
 
 #macro pv_get_ingress_queue(out_queue, in_vec)
     bitfield_extract__sz1(out_queue, BF_AML(in_vec, PV_QUEUE_IN_bf))
