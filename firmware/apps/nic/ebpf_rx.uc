@@ -170,7 +170,7 @@
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_STACK_LM_HANDLE, lm_stack]
 
-	br_addr[EBPF_PROG_ADDR]
+	br_addr[EBPF_PROG_ADDR, bpf_ret#]
 
 	nop
 	nop
