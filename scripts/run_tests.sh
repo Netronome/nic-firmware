@@ -1,3 +1,5 @@
+FILTER=$1
+shift
 TEST_DIR=$1
 shift
 BUILD_DIR=$1
@@ -7,6 +9,9 @@ shift
 PASSED=0
 FAILED=0
 for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
+    if echo ${t} | grep -v ${FILTER} > /dev/null ; then
+        continue
+    fi
     FILE_BASE=`basename ${t%.*}`
     nfas -Itest/include -I test/lib $* -o ${BUILD_DIR}/${FILE_BASE}.list $t || exit 1
     nfld -chip nfp-4xxx-b0 -mip -rtsyms -u i32.me0 ${BUILD_DIR}/${FILE_BASE}.list || exit 1

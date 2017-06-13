@@ -159,11 +159,13 @@ $$($1__$2__LIST): $3/$4
 
 endef
 
+FILTER = test 
 
 define microcode.add_tests
 
+
 $1_$2_test: $$($1__$2__LIST)
-	scripts/run_tests.sh $(TEST_DIR)/$2 $(FW_BUILD)/$2 $$($1__$2__FLAGS) $$($1__$2__DEFS) $$($1__$2__INC) 
+	scripts/run_tests.sh $(FILTER) $(TEST_DIR)/$2 $(FW_BUILD)/$2 $$($1__$2__FLAGS) $$($1__$2__DEFS) $$($1__$2__INC) 
 
 FW_TEST_TARGETS += $1_$2_test
 
