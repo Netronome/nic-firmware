@@ -223,7 +223,7 @@ bpf_ret#:
 bpf_ret_code#:
 	/* ignoring mark TBD  */
 	br_bset[rc, EBPF_RET_DROP, DROP_LABEL]
-    br_bset[rc, EBPF_RET_REDIR, TX_HOST_LABEL]
+    br_bset[rc, EBPF_RET_REDIR, bpf_tx_wire#]
 
 	ld_field_w_clr[q_base, 0001, sav_q_base]
 	pv_set_tx_host_rx_bpf(in_vec)
