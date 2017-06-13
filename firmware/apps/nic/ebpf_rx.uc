@@ -7,14 +7,13 @@
 #include <nic_basic/nic_stats.h>
 #include <aggregate.uc>
 #include "nfd_user_cfg.h"
-//#include "unroll.uc"
 #include "lm_handle.uc"
 
 //#undef EBPF_DEBUG
 
 #ifdef EBPF_DEBUG
 	#ifndef PKT_COUNTER_ENABLE
-    	#define PKT_COUNTER_ENABLE
+		#define PKT_COUNTER_ENABLE
 	#endif
 	#include "pkt_counter.uc"
 	pkt_counter_init()
@@ -148,19 +147,7 @@
  *    - save/reserved regs
  *	  - fixed lm index
  */
-#if 0
-.reg volatile ebpf_rc
-.reg_addr ebpf_rc 0 A
-.set ebpf_rc
-
-.reg_addr t_idx_ctx 29 A
-.set t_idx_ctx
-
-.reg_addr __pkt_io_ctm_pkt_no 29 B
-.set __pkt_io_ctm_pkt_no
-#endif
-
-#macro ebpf_func(in_vec, egress_q,  EGRESS_LABEL, DROP_LABEL)
+#macro ebpf_func(in_vec, egress_q,  EGRESS_LABEL, DROP_LABEL, TX_HOST_LABEL, TX_WIRE_LABEL)
 .begin
 	.reg lm_offset
 	.reg pkt_length
@@ -173,32 +160,19 @@
 	ebpf_lm_addr(EBPF_BEFORE, lm_offset, lm_stack)
 	ebpf_lm_handles_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
-		pv_get_length(pkt_length, in_vec)
 		pv_set_egress_queue(in_vec, egress_q)
-
-	/* ebpf_rx: from NBI */
-	pv_get_ctm_base(pkt_offset, in_vec)
+		.reg_addr ebpf_rc 0 A
+		immed[ebpf_rc, 0]
+		nop
 
 	aggregate_copy(EBPF_META_PKT_LM_INDEX, ++, in_vec, 0, PV_SIZE_LW)
-	alu[EBPF_META_PKT_LM_INDEX++, --, B, t_idx_ctx]
-	alu[EBPF_META_PKT_LM_INDEX++, --, B, __pkt_io_ctm_pkt_no]
 
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_STACK_LM_HANDLE, lm_stack]
 
-	.reg_addr ebpf_rc 0 A
-	immed[ebpf_rc, 0]
-
-#ifdef EBPF_DEBUG
- #define __MY_ID__ ((__ISLAND << 8) |(__MENUM))
-	move(myid, __MY_ID__)
-	__hashmap_dbg_print(0xe003, 0, myid )
- #undef __MY_ID__
-#endif
-
 	br_addr[EBPF_PROG_ADDR]
 
-	br[bpf_ret#]
+	nop
 	nop
 	nop
 	nop
@@ -222,8 +196,6 @@ bpf_ret#:
 		move(nic_stats_extra_hi, _nic_stats_extra >>8)
 
 	aggregate_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW)
-	alu[t_idx_ctx, --, b, EBPF_META_PKT_LM_INDEX++]
-	alu[__pkt_io_ctm_pkt_no, --, b, EBPF_META_PKT_LM_INDEX++]
 
 
 	.if (stats_idx > 0)		
@@ -245,15 +217,11 @@ bpf_ret#:
 bpf_ret_code#:
 	/* ignoring mark TBD  */
 	br_bset[rc, EBPF_RET_DROP, DROP_LABEL]
-    br_bclr[rc, EBPF_RET_REDIR, bpf_tx_host#]
+    br_bclr[rc, EBPF_RET_REDIR, TX_HOST_LABEL]
 
 bpf_tx_wire#:
 	pv_get_ingress_queue(egress_q, in_vec)
-	pkt_io_tx_wire(in_vec, egress_q, EGRESS_LABEL, DROP_LABEL)
-
-bpf_tx_host#:
-	alu[egress_q, BF_A(in_vec, PV_QUEUE_OUT_bf), and, 0x3f]
-	pkt_io_tx_host(in_vec, egress_q, EGRESS_LABEL, DROP_LABEL)
+	br[TX_WIRE_LABEL]
 
 	ebpf_lm_handles_undef()
 /* should not get here */

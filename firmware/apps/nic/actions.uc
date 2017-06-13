@@ -390,18 +390,17 @@ checksum_complete#:
     __actions_next()
 
 tx_host#:
-	/* p6p1 to p4p1 */
     __actions_read(egress_q_base, egress_q_mask, --)
     pkt_io_tx_host(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 tx_wire#:
     __actions_read(egress_q_base, egress_q_mask, --)
+tx_wire_ebpf#:
     pkt_io_tx_wire(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 ebpf#:
-	/* p6p1 to p4p1 */
     __actions_read(egress_q_base, egress_q_mask, --)
-	ebpf_func(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
+	ebpf_func(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL, tx_host#, tx_wire_ebpf#)
 .end
 #endm
 
