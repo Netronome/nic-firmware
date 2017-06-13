@@ -145,6 +145,7 @@
 
 #define PV_QUEUE_wrd                    6
 #define PV_QUEUE_IN_bf                  PV_QUEUE_wrd, 31, 24
+#define PV_QUEUE_IN_NBI_CHAN_bf         PV_QUEUE_wrd, 30, 24
 #define PV_QUEUE_IN_NBI_bf              PV_QUEUE_wrd, 31, 31
 #define PV_STAT_bf                      PV_QUEUE_wrd, 23, 16
 #define PV_QUEUE_OUT_bf                 PV_QUEUE_wrd, 9, 0
