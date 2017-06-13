@@ -578,7 +578,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
         instr[count].instr = INSTR_EBPF;
 #endif
-   		instr[count++].param = vnic_port * NFD_MAX_PF_QUEUES;
+		instr[count++].param = ((NS_PLATFORM_NBI_TM_QID_LO(vnic_port) & 0xff) << 8) |
+								((vnic_port * NFD_MAX_PF_QUEUES) & 0xff);
         prev_instr = INSTR_EBPF;
     }
 else {

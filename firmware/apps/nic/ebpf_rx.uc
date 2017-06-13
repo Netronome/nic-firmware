@@ -10,6 +10,7 @@
 #include "lm_handle.uc"
 
 //#undef EBPF_DEBUG
+//#define EBPF_DEBUG
 
 #ifdef EBPF_DEBUG
 	#ifndef PKT_COUNTER_ENABLE
@@ -147,7 +148,7 @@
  *    - save/reserved regs
  *	  - fixed lm index
  */
-#macro ebpf_func(in_vec, egress_q,  EGRESS_LABEL, DROP_LABEL, TX_HOST_LABEL, TX_WIRE_LABEL)
+#macro ebpf_func(in_vec, q_base,  EGRESS_LABEL, DROP_LABEL, TX_HOST_LABEL, TX_WIRE_LABEL)
 .begin
 	.reg lm_offset
 	.reg pkt_length
@@ -160,15 +161,18 @@
 	ebpf_lm_addr(EBPF_BEFORE, lm_offset, lm_stack)
 	ebpf_lm_handles_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
-		pv_set_egress_queue(in_vec, egress_q)
 		.reg_addr ebpf_rc 0 A
 		immed[ebpf_rc, 0]
+		local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_STACK_LM_HANDLE, lm_stack]
 		nop
 
 	aggregate_copy(EBPF_META_PKT_LM_INDEX, ++, in_vec, 0, PV_SIZE_LW)
+	alu[EBPF_META_PKT_LM_INDEX++, --, B, q_base]
+	
 
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
-	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_STACK_LM_HANDLE, lm_stack]
+
+	//	__hashmap_dbg_print(0xe003, 0, q_base)
 
 	br_addr[EBPF_PROG_ADDR]
 
@@ -186,6 +190,7 @@ bpf_ret#:
 	.reg_addr ebpf_rc 0 A
 	.set ebpf_rc
 	.reg rc
+	.reg sav_q_base
 
 	alu[rc, --, b, ebpf_rc]
 
@@ -196,6 +201,7 @@ bpf_ret#:
 		move(nic_stats_extra_hi, _nic_stats_extra >>8)
 
 	aggregate_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW)
+	alu[sav_q_base, --, b, EBPF_META_PKT_LM_INDEX++]
 
 
 	.if (stats_idx > 0)		
@@ -217,11 +223,20 @@ bpf_ret#:
 bpf_ret_code#:
 	/* ignoring mark TBD  */
 	br_bset[rc, EBPF_RET_DROP, DROP_LABEL]
-    br_bclr[rc, EBPF_RET_REDIR, TX_HOST_LABEL]
+    br_bset[rc, EBPF_RET_REDIR, TX_HOST_LABEL]
+
+	ld_field_w_clr[q_base, 0001, sav_q_base]
+	pv_set_tx_host_rx_bpf(in_vec)
+		//__hashmap_dbg_print(0xe013, 0, q_base, in_vec[4], in_vec[6])
+
+	pkt_io_tx_host(in_vec, q_base, EGRESS_LABEL, DROP_LABEL)
+    //br[TX_HOST_LABEL]
 
 bpf_tx_wire#:
-	pv_get_ingress_queue(egress_q, in_vec)
-	br[TX_WIRE_LABEL]
+	/* to do: stats here */
+	//br[TX_WIRE_LABEL], defer[1]
+	ld_field_w_clr[q_base, 0001, sav_q_base, >>8]
+	pkt_io_tx_wire(in_vec, q_base, EGRESS_LABEL, DROP_LABEL)
 
 	ebpf_lm_handles_undef()
 /* should not get here */
