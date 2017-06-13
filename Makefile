@@ -18,7 +18,6 @@
 SHELL = /bin/bash
 NFP_COMMON    := $(abspath $(CURDIR))
 NETRONOME ?= /opt/netronome
-#NETRONOME ?= /opt/netronome/nfp-sdk-6-devel
 
 DEPS_DIR      = $(NFP_COMMON)/deps
 FIRMWARE_DIR  = $(NFP_COMMON)/firmware
