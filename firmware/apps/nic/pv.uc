@@ -189,10 +189,21 @@
     #endif
 #endm
 
+#macro pv_reset_egress_queue(io_vec)
+	.begin
+	.reg msk
+	immed[msk, (BF_MASK(PV_QUEUE_OUT_bf))]
+	alu[BF_A(io_vec, PV_QUEUE_OUT_bf), BF_A(io_vec, PV_QUEUE_OUT_bf), AND~, msk]
+	.end
+#endm
+
 #macro pv_get_ingress_queue(out_queue, in_vec)
     bitfield_extract__sz1(out_queue, BF_AML(in_vec, PV_QUEUE_IN_bf))
 #endm
 
+#macro pv_get_ingress_queue_nbi_chan(out_chan, in_vec)
+    bitfield_extract__sz1(out_chan, BF_AML(in_vec, PV_QUEUE_IN_NBI_CHAN_bf))
+#endm
 
 #macro pv_get_instr_addr(out_addr, in_vec, IN_LIST_SIZE)
     passert(NIC_CFG_INSTR_TBL_ADDR, "EQ", 0)

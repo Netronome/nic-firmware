@@ -181,7 +181,7 @@
 
 #define NFD_BPF_CAPABLE        1
 #define NFD_BPF_START_OFF   2000
-#define NFD_BPF_DONE_OFF     783
+#define NFD_BPF_DONE_OFF     799
 
 #define NFD_NET_APP_TYPE (2)
 
