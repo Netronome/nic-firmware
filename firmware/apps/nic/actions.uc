@@ -391,7 +391,6 @@ checksum_complete#:
 
 tx_host#:
     __actions_read(egress_q_base, egress_q_mask, --)
-tx_host_ebpf#:
     pkt_io_tx_host(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 tx_wire#:
@@ -400,9 +399,9 @@ tx_wire_ebpf#:
     pkt_io_tx_wire(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 ebpf#:
-    immed[egress_q_mask, ((1<<16)-1)]		; 0xff_ff (nbi-qbase_host-qbase)
-    __actions_read(egress_q_base, egress_q_mask, --)
-	ebpf_func(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL, tx_host_ebpf#, tx_wire_ebpf#)
+    __actions_read(--, --, --)
+	ebpf_func(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL, tx_wire_ebpf#)
+    __actions_next()
 .end
 #endm
 

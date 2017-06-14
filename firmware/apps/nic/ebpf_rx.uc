@@ -148,7 +148,7 @@
  *    - save/reserved regs
  *	  - fixed lm index
  */
-#macro ebpf_func(in_vec, q_base,  EGRESS_LABEL, DROP_LABEL, TX_HOST_LABEL, TX_WIRE_LABEL)
+#macro ebpf_func(in_vec, q_base,  EGRESS_LABEL, DROP_LABEL, TX_WIRE_LABEL)
 .begin
 	.reg lm_offset
 	.reg pkt_length
@@ -156,7 +156,6 @@
 	.reg ebpf_pkt_param
 	.reg ebpf_pkt_len
 	.reg lm_stack
-	.reg myid
 
 	ebpf_lm_addr(EBPF_BEFORE, lm_offset, lm_stack)
 	ebpf_lm_handles_define()
@@ -167,8 +166,7 @@
 		nop
 
 	aggregate_copy(EBPF_META_PKT_LM_INDEX, ++, in_vec, 0, PV_SIZE_LW)
-	alu[EBPF_META_PKT_LM_INDEX++, --, B, q_base]
-
+	alu[EBPF_META_PKT_LM_INDEX++, --, B, act_t_idx]
 
 	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_META_PKT_LM_HANDLE, lm_offset]
 
@@ -198,7 +196,7 @@ bpf_ret#:
 		move(nic_stats_extra_hi, _nic_stats_extra >>8)
 
 	aggregate_copy(in_vec, 0, EBPF_META_PKT_LM_INDEX, ++, PV_SIZE_LW)
-	alu[sav_q_base, --, b, EBPF_META_PKT_LM_INDEX++]
+	alu[act_t_idx, --, b, EBPF_META_PKT_LM_INDEX++]
 
 	.if (stats_idx > 0)
 		/* only port 0 for now */
@@ -218,29 +216,23 @@ bpf_ret#:
 
 bpf_ret_code#:
 	/* ignoring mark TBD  */
-	br_bset[rc, EBPF_RET_DROP, DROP_LABEL]
-    br_bset[rc, EBPF_RET_REDIR, bpf_tx_wire#]
+	br_bset[rc, EBPF_RET_DROP, DROP_LABEL], defer[1]
+	local_csr_wr[T_INDEX, act_t_idx]
 
-    br[TX_HOST_LABEL], defer[2]
-	ld_field_w_clr[q_base, 0001, sav_q_base]
-	pv_set_tx_host_rx_bpf(in_vec)
-
+    br_bclr[rc, EBPF_RET_REDIR, bpf_tx_host#]
 
 bpf_tx_wire#:
 	/* to do: stats here */
-	pv_get_ingress_queue_nbi_chan(q_base, in_vec)
 	pv_reset_egress_queue(in_vec)
-	br[TX_WIRE_LABEL]
+	br[TX_WIRE_LABEL], defer[1]
+	pv_get_ingress_queue_nbi_chan(q_base, in_vec)
+
+bpf_tx_host#:
+	pv_set_tx_host_rx_bpf(in_vec)
+	immed[egress_q_mask, BF_MASK(PV_QUEUE_OUT_bf)]	;restore
+	/* falls thru, continue with next actions  - ensure $actions[] is still live*/
 
 	ebpf_lm_handles_undef()
-/* should not get here */
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-
 ret#:
 .end
 #endm

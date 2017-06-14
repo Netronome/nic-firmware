@@ -578,11 +578,14 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
         instr[count].instr = INSTR_EBPF;
 #endif
+		count++;
+#if 0
 		instr[count++].param = ((NS_PLATFORM_NBI_TM_QID_LO(vnic_port) & 0xff) << 8) |
 								((vnic_port * NFD_MAX_PF_QUEUES) & 0xff);
+#endif
         prev_instr = INSTR_EBPF;
     }
-else {
+//else {
 #ifdef GEN_INSTRUCTION
 	instr[count].instr = instr_tbl[INSTR_TX_HOST];
 #else
@@ -591,7 +594,7 @@ else {
    	instr[count].param = vnic_port * NFD_MAX_PF_QUEUES;
 	instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
 	prev_instr = INSTR_TX_HOST;
-}
+//}
 
     reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
 
