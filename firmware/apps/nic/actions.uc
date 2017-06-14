@@ -59,10 +59,10 @@ broadcast#:
     br[done#]
 
 multicast#:
-    alu[hi, --, B, *$index++]
+    alu[hi, --, B, *$index++, <<16]
     alu[tmp, --, B, 1, <<16]
-    alu[--, *$index++, +, tmp]  // byte_align_be[] not necessary for MAC (word aligned)
-    alu[--, hi, +carry, 0]
+    alu[--, hi, +, tmp]  // byte_align_be[] not necessary for MAC (word aligned)
+    alu[--, *$index, +carry, 0]
     __actions_restore_t_idx()
     bcs[broadcast#]
 
@@ -99,19 +99,19 @@ done#:
     .reg mac[2]
     .reg tmp
 
-    __actions_read(mac[1], --, <<16)
     __actions_read(mac[0], --, --)
+    __actions_read(mac[1], --, --)
 
     pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
 
     // permit multicast and broadcast addresses to pass
     br_bset[*$index, BF_L(MAC_MULTICAST_bf), pass#]
 
-    alu[--, mac[0], XOR, *$index++] // byte_align_be[] not necessary for MAC (word aligned)
+    alu[tmp, mac[0], XOR, *$index++]
+    alu[--, --, B, tmp, <<16]
     bne[DROP_LABEL]
 
-    alu[tmp, mac[1], XOR, *$index++]
-    alu[--, --, B, tmp, >>16]
+    alu[--, mac[1], XOR, *$index++]
     bne[DROP_LABEL]
 
 pass#:
@@ -358,7 +358,7 @@ next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
     jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#] ;actions_jump
 
-        ins_0#: br[DROP_LABEL] 
+        ins_0#: br[DROP_LABEL]
         ins_1#: br[statistics#]
         ins_2#: br[mtu#]
         ins_3#: br[mac#]
