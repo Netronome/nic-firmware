@@ -4,7 +4,7 @@
  * @file        hashmap.uc
  * @brief       basic lookup table implementation.
  *
- * 
+ *
  *  Subroutine calls:
  *  htab_map_lookup_elem_subr(in_tid, in_lm_key_offset, out_value_addr)
  *  htab_map_update_elem_subr(in_tid, in_lm_key_offset, in_lm_value_offset, out_rc)

@@ -12,8 +12,8 @@ FIRMWARE_DIR  = $(NFP_COMMON)/firmware
 DOC_DIR       = $(NFP_COMMON)/docs
 TEST_DIR      = test
 
-#Q ?= @
-Q ?=
+Q ?= @
+#Q ?=
 
 HG_USERNAME ?= $(shell whoami)
 
