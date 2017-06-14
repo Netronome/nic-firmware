@@ -19,15 +19,17 @@ for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
     nfp-nffw load -S ${BUILD_DIR}/${FILE_BASE}.nffw || exit 1
     awk '$0~/;TEST_INIT_EXEC/{system(gensub(";TEST_INIT_EXEC ", "", 1))}' < ${BUILD_DIR}/${FILE_BASE}.list || exit 1
     nfp-nffw start
-    TIMEOUT=100
+    TIMEOUT=10
+    echo -n "${FILE_BASE} : "
     while [[ `nfp-reg mecsr:i32.me0.Mailbox0 | cut -d= -f2` -eq "0" ]] ; do
-       sleep 0.1
+       sleep 1
+       echo -n ". "
        TIMEOUT=$((TIMEOUT - 1))
        [[ ${TIMEOUT} -eq 0 ]] && break 
     done
     RESULT=`nfp-reg mecsr:i32.me0.Mailbox0 | cut -d= -f2`
     if [[ ${RESULT} -eq "1" ]] ; then
-        echo -e "${FILE_BASE} : \033[1;32mPASS" ; tput sgr0
+        echo -e "\033[1;32mPASS" ; tput sgr0
         PASSED=$(( ${PASSED} + 1 ))
     else
         if [[ ${RESULT} -eq "0xfc" ]] ; then
@@ -40,9 +42,12 @@ for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
         ISL=$(( (STS >> 25) & 0x3f ))
         ME=$(( ((STS >> 3) & 0xf) - 4 ))
         CTX=$(( STS & 0x7 ))
-        echo -en "${FILE_BASE} : \033[1;31mFAIL " ; tput sgr0
-        echo @ i${ISL}.me${ME}.ctx${CTX}:${PC} ${DETAIL}
-        tput sgr0
+        echo -en "\033[1;31mFAIL " ; tput sgr0
+        if [[ ${RESULT} -eq 0 ]] ; then
+            echo "(timed out)"
+        else
+            echo "@ i${ISL}.me${ME}.ctx${CTX}:${PC} ${DETAIL}"
+        fi
         FAILED=$(( ${FAILED} + 1 ))
     fi 
 done
