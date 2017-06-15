@@ -155,6 +155,32 @@
 
 #define_eval PV_NOT_PARSED              ((3 << BF_L(PV_PARSE_MPD_bf)) | (3 << BF_L(PV_PARSE_VLD_bf)))
 
+#define LM_PV_HANDLE  1
+#define LM_PV_INDEX   *l$index1
+#define pkt_vec       LM_PV_INDEX
+
+#define LM_PV_SIZE (16*4)
+.alloc_mem LM_PV_BASE lmem me (4 * LM_PV_SIZE)  LM_PV_SIZE
+
+#macro pv_set_lm_idx()
+.begin
+    .reg ctx_num
+    .reg lm_addr
+    .reg lm_off
+
+    alu[ctx_num, --, B, t_idx_ctx, >>7]
+    immed[lm_addr,LM_PV_BASE]
+        // 4 context mode
+    alu[lm_off, --, b, ctx_num, <<(LOG2((LM_PV_SIZE/2), 1))]
+    alu[lm_addr, lm_addr, +, lm_off]
+
+	local_csr_wr[ACTIVE_LM_ADDR_/**/LM_PV_HANDLE, lm_addr]
+	nop
+	nop
+	nop
+.end
+#endm
+
 
 #macro pv_propagate_mac_csum_status(io_vec)
 .begin

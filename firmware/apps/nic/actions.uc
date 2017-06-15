@@ -400,7 +400,7 @@ tx_wire_ebpf#:
 
 ebpf#:
     __actions_read(--, --, --)
-	ebpf_func(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL, tx_wire_ebpf#)
+	ebpf_func(in_pkt_vec, DROP_LABEL, tx_wire_ebpf#)
     __actions_next()
 .end
 #endm
