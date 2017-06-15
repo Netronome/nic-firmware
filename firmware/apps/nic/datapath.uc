@@ -2,7 +2,8 @@
 #include "pkt_io.uc"
 #include "actions.uc"
 
-.reg pkt_vec[PV_SIZE_LW]
+// alloc  pkt_vec[PV_SIZE_LW] in lm
+pv_set_lm_idx()
 pkt_io_init(pkt_vec)
 
 // kick off processing loop
