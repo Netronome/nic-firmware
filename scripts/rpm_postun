@@ -1,2 +1,2 @@
-cd /usr/src/nfp_net-__CORENIC_REV__-__NIC_BUILD__
-sudo dkms remove nfp_net/__CORENIC_REV__-__NIC_BUILD__ --all
+cd /usr/src/nfp-__CORENIC_REV__-__NIC_BUILD__
+sudo dkms remove nfp/__CORENIC_REV__-__NIC_BUILD__ --all
