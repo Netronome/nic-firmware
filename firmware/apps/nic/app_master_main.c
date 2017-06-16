@@ -419,6 +419,7 @@ cfg_changes_loop(void)
 
 			if (update & NFP_NET_CFG_UPDATE_BPF) {
 				nic_local_bpf_reconfig(&ctx_mode, port);
+				upd_slicc_hash_table();
 			}
 
             /* Save the control word */
