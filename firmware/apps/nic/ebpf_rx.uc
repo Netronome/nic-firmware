@@ -43,8 +43,6 @@
 	//hashmap_init()
 #endm
 
-
-
 #macro ebpf_lm_handles_define()
     #define_eval EBPF_STACK_LM_HANDLE    0
     #define_eval EBPF_STACK_LM_INDEX     *l$index0
@@ -59,6 +57,7 @@
 .alloc_mem ebpf_stack_base lmem me (EBPF_LM_STACK_SIZE*4) 64
 
 #define EBPF_LM_INDEX	PV_SIZE_LW
+#define EBPF_PORT_STATS_BLK	(8)		/* 8 u64 counters */
 
 #macro ebpf_lm_addr(stack_addr)
 .begin
@@ -125,8 +124,13 @@ bpf_ret#:
 	.reg stats_offset
 	.reg nic_stats_extra_hi
 	.reg pkt_length
+	.reg_addr ebpf_rc 0 A
+	.set ebpf_rc
+	.reg rc
 
-	alu[stats_idx, EBPF_RET_STATS_MASK, and, ebpf_rc, >>EBPF_RET_STATS_PASS]
+	alu[rc, --, b, ebpf_rc]
+
+	alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
 	move(nic_stats_extra_hi, _nic_stats_extra >>8)
 	alu[act_t_idx, --, b, LM_PV_INDEX[EBPF_LM_INDEX]]
 
@@ -148,16 +152,20 @@ bpf_ret#:
 
 bpf_ret_code#:
 	/* ignoring mark TBD  */
-	br_bset[ebpf_rc, EBPF_RET_DROP, DROP_LABEL], defer[1]
+	br_bset[rc, EBPF_RET_DROP, DROP_LABEL], defer[1]
 	local_csr_wr[T_INDEX, act_t_idx]
 
-    br_bclr[ebpf_rc, EBPF_RET_REDIR, bpf_tx_host#]
+    br_bclr[rc, EBPF_RET_REDIR, bpf_tx_host#]
 
 bpf_tx_wire#:
-	/* to do: stats here */
+	.reg stats_base
+	alu[stats_base, 0xff, AND, BF_A(in_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
+	alu[stats_base, stats_base, +, EBPF_PORT_STATS_BLK]
+	pv_stats_select(in_vec, stats_base)
 	pv_reset_egress_queue(in_vec)
 	br[TX_WIRE_LABEL], defer[1]
 	pv_get_ingress_queue_nbi_chan(egress_q_base, in_vec)
+
 
 bpf_tx_host#:
 	pv_set_tx_host_rx_bpf(in_vec)
