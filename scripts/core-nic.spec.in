@@ -1,7 +1,7 @@
 %{?!version: %{error: You did not specify a module version (%%version)}}
 %{?!kernel_versions: %{error: You did not specify kernel versions (%%kernel_version)}}
 
-Name:           ns-agilio-core-nic
+Name:           ns-agilio-core-nic-dkms
 Version:        __CORENIC_REV__
 Release:        __NIC_BUILD__
 Summary:        Netronome Agilio Core NIC
