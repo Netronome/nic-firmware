@@ -1,5 +1,6 @@
 #include <nfp_chipres.h>
 #include <nfp/mem_ring.h>
+#include "slicc_hash.h"
 
 /*
  * EBPF support
@@ -41,3 +42,4 @@
 
 /* in lib/nic_basic/_c/nic_internal.c */
 __intrinsic void nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t port);
+__intrinsic void upd_slicc_hash_table(void);
