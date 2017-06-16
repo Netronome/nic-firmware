@@ -62,7 +62,7 @@ $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLA
 $(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
 $(eval $(call microcode.add_tests,$(PROJECT),datapath))
 $(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-#$(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
+$(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
 #$(eval $(call microcode.add_flags, $(PROJECT),datapath,-d40))
 #$(eval $(call microcode.add_flags, $(PROJECT),datapath,-verbose))
 $(eval $(call microcode.add_flags, $(PROJECT),datapath,-keep_unreachable_code))
@@ -226,7 +226,7 @@ $(eval $(call fwdep.add_nfd_out,$(PROJECT),0,ila0.me1,ila0.me2 ila0.me3)) # Stag
 
 
 # Add TM PM initialization (codeless)
-$(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,lib/infra_basic,init_pms.uc,-DPMS_INIT_TM=1 -DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pms.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
 
 # Link

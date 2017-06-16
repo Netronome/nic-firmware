@@ -51,52 +51,15 @@ timestamp_enable()
 
 #macro pkt_io_tx_wire(in_pkt_vec, egress_q_base, SUCCESS_LABEL, FAIL_LABEL)
 .begin
-    #define PMS_OFFSET (128-16)
+    .reg pms_offset
 
-    .reg gro_prev_alu
-    .reg ctm_addr
-
-    .reg read $tmp
-
-    .reg write $nbi_meta[2]
-    .xfer_order $nbi_meta
-
-    .reg write $prepend[4]
-    .xfer_order $prepend
-
-    .sig sig_wr_nbi_meta
-    .sig sig_wr_prepend
-    .sig sig_rd_prepend
-
-    pv_get_ctm_base(ctm_addr, in_pkt_vec)
-
-    // write NBI metadata
-    pv_get_nbi_meta($nbi_meta, in_pkt_vec)
-    mem[write32, $nbi_meta[0], ctm_addr, <<8, 0, 2], sig_done[sig_wr_nbi_meta]
-
-    // build packet modifier script and MAC prepend
-    #if (NFD_IN_DATA_OFFSET != 128)
-       #error "Packet modifier script hard coded for NFD_IN_DATA_OFFSET = 128"
-    #endif
-    immed[$prepend[0], ((1 << 8) | (6 << 0)), <<16] // indirect packet modifier script, delete 4 bytes, pad
-    immed[$prepend[1], 0] // offsets
-    immed[$prepend[2], 0] // sop, to be deleted
-    pv_get_mac_prepend($prepend[3], in_pkt_vec) // real sop
-
-    // write prepends
-    mem[write32, $prepend[0], ctm_addr, <<8, PMS_OFFSET, 4], sig_done[sig_wr_prepend]
-
-    // build GRO descriptor for NBI transmission
-    pv_get_gro_wire_desc($__pkt_io_gro_meta, in_pkt_vec, egress_q_base, PMS_OFFSET)
-
-    // ensure prepends have been written before releasing packet
-    mem[read32, $tmp, ctm_addr, <<8, PMS_OFFSET, 1], sig_done[sig_rd_prepend]
+    pv_write_nbi_meta(pms_offset, in_pkt_vec, FAIL_LABEL)
 
     pv_stats_add_tx_octets(in_pkt_vec)
 
-    ctx_arb[sig_wr_nbi_meta, sig_wr_prepend, sig_rd_prepend], br[SUCCESS_LABEL]
+    pv_get_gro_wire_desc($__pkt_io_gro_meta, in_pkt_vec, egress_q_base, pms_offset)
 
-    #undef PMS_OFFSET
+    br[SUCCESS_LABEL]
 .end
 #endm
 

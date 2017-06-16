@@ -51,7 +51,7 @@ for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
         FAILED=$(( ${FAILED} + 1 ))
     fi 
 done
-if [[ ${FAILED} -eq 0 ]] ; then
+if [[ ${FAILED} -eq 0 ]] && [[ ${PASSED} -ge 1 ]] ; then
     echo -e "Summary : \033[1;32m${PASSED} passed, no failures" ; tput sgr0
     exit 0
 else
