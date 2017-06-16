@@ -1,6 +1,7 @@
 #ifndef __TEST_UC
 #define __TEST_UC
 
+#include <stdmac.uc>
 
 #macro test_pass()
     local_csr_wr[MAILBOX_0, 0x01]
@@ -26,11 +27,17 @@
 
 
 #macro test_assert_equal(tested, expected)
-    .if_unsigned(tested != expected)
-        local_csr_wr[MAILBOX_2, tested]
-        local_csr_wr[MAILBOX_3, expected]
+.begin
+    .reg lhs
+    .reg rhs
+    move(lhs, tested)
+    move(rhs, expected)
+    .if_unsigned(lhs != rhs)
+        local_csr_wr[MAILBOX_2, lhs]
+        local_csr_wr[MAILBOX_3, rhs]
         test_fail(0xfc)
     .endif
+.end
 #endm
 
 #endif

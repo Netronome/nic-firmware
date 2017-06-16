@@ -466,6 +466,7 @@ skip_meta#:
     // Word 3
     alu[out_desc[NFD_OUT_FLAGS_wrd], --, B, BF_A(in_vec, PV_TX_FLAGS_bf), >>BF_L(PV_TX_FLAGS_bf)] ; PV_TX_FLAGS_bf
 .end
+
 #endm
 
 
@@ -480,11 +481,6 @@ skip_meta#:
 #endm
 
 
-#macro pv_get_mac_prepend(out_prepend, in_vec)
-    alu[out_prepend, --, B, BF_A(in_vec, PV_CSUM_OFFLOAD_bf), <<30]
-#endm
-
-
 /**
  * Packet NBI metadata format:
  * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
@@ -495,9 +491,99 @@ skip_meta#:
  *    1  |S|Rsv|           MU Buffer Address [39:11]                     |
  *       +-+---+---------------------------------------------------------+
  */
-#macro pv_get_nbi_meta(out_nbi_meta, in_vec)
-    alu[out_nbi_meta[0], BF_A(in_vec, PV_NUMBER_bf), OR, __ISLAND, <<26] ; PV_NUMBER_bf
-    alu[out_nbi_meta[1], BF_A(in_vec, PV_MU_ADDR_bf), AND~, 0x3, <<29] ; PV_MU_ADDR_bf
+.reg volatile write $_pv_prepend_short[3]
+.reg volatile write $_pv_prepend_long[5]
+.xfer_order $_pv_prepend_short $_pv_prepend_long
+.addr $_pv_prepend_short[0] 48
+move($_pv_prepend_short[1], 0x04142434)
+move($_pv_prepend_long[1], 0x04142434)
+move($_pv_prepend_long[2], 0x44546474)
+move($_pv_prepend_long[3], 0)
+#macro pv_write_nbi_meta(out_pms_offset, in_vec, FAIL_LABEL)
+.begin
+    .reg ctm_addr
+    .reg delta
+    .reg max_pms_addr
+    .reg offsets
+    .reg script
+    .reg shift
+    .reg table
+
+    .reg write $nbi_meta[2]
+    .xfer_order $nbi_meta
+    .sig sig_wr_nbi_meta
+
+    .reg read $tmp
+    .sig sig_rd_prepend
+    .sig sig_wr_prepend
+
+    // write NBI metadata to base of packet buffer (offset zero)
+    pv_get_ctm_base(ctm_addr, in_vec)
+    alu[$nbi_meta[0], BF_A(in_vec, PV_NUMBER_bf), OR, __ISLAND, <<26] ; PV_NUMBER_bf
+    alu[$nbi_meta[1], BF_A(in_vec, PV_MU_ADDR_bf), AND~, 0x3, <<29] ; PV_MU_ADDR_bf
+    mem[write32, $nbi_meta[0], ctm_addr, <<8, 0, 2], sig_done[sig_wr_nbi_meta]
+
+    /* Lookup legal packet modifier script offset in 32-bit table
+     * Packet Offset | PMS Offset | Delete Delta (max_pms_addr - pms_offset)
+     * --------------+------------+-----------------------------------------
+     * [0;43]        | 120        | (illegal)
+     * [44;75]       | 32         | [0;31]
+     * [76;107]      | 56         | [8;39]
+     * [108;139]     | 96         | [0;31]
+     * [140;248]     | 120        | [8;116]
+     * (table stored as the >>4 shifted inverse to fit non-zeroes into an immed[] instruction)
+     */
+    immed[table, ((~((120 << 28) | (120 << 24) | (120 << 20) | (120 << 16) | \
+                  (96 << 12) | (56 << 8) | (32 << 4) | 120) >> 4) & 0xffff)]
+    alu[max_pms_addr, BF_A(in_vec, PV_OFFSET_bf), -, 12] // room for 8 byte PMS + 4 byte MAC prepend
+    alu[shift, 0x1c, AND, max_pms_addr, >>3]
+    alu[table, shift, B, table, <<4] // undo shift
+    alu[out_pms_offset, 0x78, AND~, table, >>indirect] // invert result
+
+    alu[delta, max_pms_addr, -, pms_offset] // interpret delta as bottom 16 bits
+    br_bset[delta, 15, illegal_offset#] // delta (16 bits) is negative for offsets < 44
+
+    alu[offsets, delta, +, (128 + 64 + 15)] // note (128 + 64 + 15) == (255 - 48)
+    br!=byte[offsets, 1, 0, more_offsets#] // max delete script is 48
+
+    alu[script, 0x3, AND, offsets, >>4] // offset_len = ((delta + 15) / 16) % 4
+    alu[script, (1 << 6), OR, script, <<24] // rdata_loc = 1
+
+less_offsets#:
+    #pragma warning(disable:5009)
+    #pragma warning(disable:4700)
+    mem[write32, $_pv_prepend_short[0], ctm_addr, <<8, out_pms_offset, 3], sig_done[sig_wr_prepend]
+    #pragma warning(default:4700)
+    mem[read32, $tmp, ctm_addr, <<8, out_pms_offset, 1], sig_done[sig_rd_prepend]
+    ctx_arb[sig_wr_nbi_meta, sig_wr_prepend, sig_rd_prepend], br[end#], defer[2]
+        alu[$_pv_prepend_short[0], script, OR, delta, <<16] // opcode index
+        alu[$_pv_prepend_short[2], --, B, BF_A(in_vec, PV_CSUM_OFFLOAD_bf), <<30] // mac prepend
+    #pragma warning(default:5009)
+
+more_offsets#:
+    alu[delta, delta, -, 8]
+    alu[offsets, delta, +, (128 + 15)] // note (128 + 15) == (255 - 112)
+    br!=byte[offsets, 1, 0, illegal_offset#] // max delete script is 112
+
+    alu[script, 0x7, AND, offsets, >>4] // offset_len = ((delta + 15) / 16)
+    br=byte[script, 0, 3, less_offsets#], defer[1]
+        alu[script, (1 << 6), OR, script, <<24] // rdata_loc = 1
+
+    #pragma warning(disable:5009)
+    #pragma warning(disable:4700)
+    mem[write32, $_pv_prepend_long[0], ctm_addr, <<8, pms_offset, 5], sig_done[sig_wr_prepend]
+    #pragma warning(default:4700)
+    mem[read32, $tmp, ctm_addr, <<8, pms_offset, 1], sig_done[sig_rd_prepend]
+    ctx_arb[sig_wr_nbi_meta, sig_wr_prepend, sig_rd_prepend], br[end#], defer[2]
+        alu[$_pv_prepend_long[0], script, OR, delta, <<16]
+        alu[$_pv_prepend_long[4], --, B, BF_A(in_vec, PV_CSUM_OFFLOAD_bf), <<30] // mac prepend
+    #pragma warning(default:5009)
+
+illegal_offset#:
+    ctx_arb[sig_wr_nbi_meta], br[FAIL_LABEL]
+
+end#:
+.end
 #endm
 
 
