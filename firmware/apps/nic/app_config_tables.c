@@ -592,17 +592,6 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         prev_instr = INSTR_CHECKSUM_COMPLETE;
     }
 
-    if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {
-        /* calculate checksum and drop if mismatch */
-#ifdef GEN_INSTRUCTION
-        instr[count].instr = instr_tbl[INSTR_CHECKSUM_COMPLETE];
-#else
-        instr[count].instr = INSTR_CHECKSUM_COMPLETE;
-#endif
-        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_CHECKSUM_COMPLETE);
-        prev_instr = INSTR_CHECKSUM_COMPLETE;
-    }
-
     if (control & NFP_NET_CFG_CTRL_BPF) {
 #ifdef GEN_INSTRUCTION
         instr[count].instr = instr_tbl[INSTR_EBPF];
@@ -610,10 +599,6 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         instr[count].instr = INSTR_EBPF;
 #endif
 		count++;
-#if 0
-		instr[count++].param = ((NS_PLATFORM_NBI_TM_QID_LO(vnic_port) & 0xff) << 8) |
-								((vnic_port * NFD_MAX_PF_QUEUES) & 0xff);
-#endif
         prev_instr = INSTR_EBPF;
     }
 //else {
