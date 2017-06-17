@@ -7,22 +7,30 @@
 
 #include "nfd_user_cfg.h"
 
-#ifdef EBPF_DEBUG
-	#ifndef PKT_COUNTER_ENABLE
-		#define PKT_COUNTER_ENABLE
-	#endif
-	#include "pkt_counter.uc"
-	pkt_counter_init()
+#include "slicc_hash.h"
 
-	#define JOURNAL_ENABLE 1
-	#define DEBUG_TRACE
-	#include <journal.uc>
-	#define _EBPF_RX_
-	#include "hashmap.uc"
-	#include "hashmap_priv.uc"
-	#include "map_debug_config.h"
-	__hashmap_journal_init()
-#endif	/* EBPF_DEBUG */
+//#undef EBPF_DEBUG
+//#define EBPF_DEBUG
+#define EBPF_MAPS
+
+#ifdef EBPF_DEBUG
+    #define JOURNAL_ENABLE 1
+    #define DEBUG_TRACE
+    #include <journal.uc>
+#endif
+#if defined(EBPF_MAPS) || defined(EBPF_DEBUG)
+    #ifndef PKT_COUNTER_ENABLE
+        #define PKT_COUNTER_ENABLE
+    #endif
+    #include "pkt_counter.uc"
+    pkt_counter_init()
+    #include "hashmap.uc"
+    #include "hashmap_priv.uc"
+#endif
+#ifdef EBPF_DEBUG
+    #include "map_debug_config.h"
+    __hashmap_journal_init()
+#endif  /* EBPF_DEBUG */
 
 #define EBPF_STACK_SIZE 64
 .alloc_mem EBPF_STACK_BASE lmem me (4 * (1 << log2(EBPF_STACK_SIZE, 1))) (1 << log2(EBPF_STACK_SIZE))
@@ -91,7 +99,8 @@
 
     br_bset[rc, EBPF_RET_DROP, drop#]
 
-    local_csr_wr[T_INDEX, __actions_t_idx]
+    //local_csr_wr[T_INDEX, __actions_t_idx]
+	__actions_restore_t_idx()
 
     pv_set_tx_host_rx_bpf(_ebpf_pkt_vec)
 
@@ -122,9 +131,31 @@
     alu[stack_addr, stack_addr, +, ctx_offset]
     local_csr_wr[ACTIVE_LM_ADDR_0, stack_addr]
 
+		//__hashmap_dbg_print(0xe003, 0, stack_addr)
+
     br_addr[NFD_BPF_START_OFF, ebpf_reentry#], live_regs[@dma_semaphore, t_idx_ctx, __actions_t_idx, __pkt_io_nfd_pkt_no, __pkt_io_quiescent]
 .end
 #endm
 
+
+#macro ebpf_init()
+	hashmap_init()
+#endm
+
+#macro ebpf_htab_entries()
+	#pragma warning(push)
+	#pragma warning(disable: 4702) // disable warning "unreachable code"
+
+HTAB_MAP_LOOKUP_SUBROUTINE#:
+	pv_invalidate_cache(_ebpf_pkt_vec)
+	htab_map_lookup_subr_func()
+HTAB_MAP_UPDATE_SUBROUTINE#:
+//	htab_map_update_subr_func()
+
+HTAB_MAP_DELETE_SUBROUTINE#:
+//	htab_map_delete_subr_func()
+
+	#pragma warning(pop)
+#endm
 
 #endif 	/*_EBPF_UC */

@@ -16,7 +16,8 @@
 #include <passert.uc>
 #include <ov.uc>
 #include <unroll.uc>
-#include <ring_utils_ext.uc>
+#include <ring_utils.uc>
+//#include <ring_utils_ext.uc>
 
 #ifndef PKT_COUNTER_ENABLE
 	#define PKT_COUNTER_ENABLE
@@ -26,13 +27,11 @@
 #define_eval __HASHMAP_CNTR_SUFFIX PKT_COUNTER_SUFFIX
 
 #macro __hashmap_lm_handles_define()
-    lm_handle_alloc(HASHMAP_LM_HANDLE)
-    #define_eval HASHMAP_LM_HANDLE    _LM_NEXT_HANDLE
-    #define_eval HASHMAP_LM_INDEX     _LM_NEXT_INDEX
+    #define_eval HASHMAP_LM_HANDLE    2
+    #define_eval HASHMAP_LM_INDEX     *l$index2
 #endm
 
 #macro __hashmap_lm_handles_undef()
-    lm_handle_free(HASHMAP_LM_HANDLE)
     #undef HASHMAP_LM_HANDLE
     #undef HASHMAP_LM_INDEX
 #endm
@@ -230,20 +229,20 @@
 	.reg bytes
 
 	alu[txfr_size_lw, --, b, buf_wlen]
-	alu[--, txfr_size_lw, -, HASHMAP_TXFR_COUNT]
+	alu[--, txfr_size_lw, -, HASHMAP_RXFR_COUNT]
 	blt[cont#]
-	immed[buf_wlen, HASHMAP_TXFR_COUNT]
-	alu[txfr_size_lw, --, b, HASHMAP_TXFR_COUNT]
+	immed[buf_wlen, HASHMAP_RXFR_COUNT]
+	alu[txfr_size_lw, --, b, HASHMAP_RXFR_COUNT]
 
 cont#:
-	alu[txfr_size_lw, --, b, HASHMAP_TXFR_COUNT]
+	alu[txfr_size_lw, --, b, HASHMAP_RXFR_COUNT]
 
 	ov_start(OV_LENGTH)
 	ov_set_use(OV_LENGTH, txfr_size_lw, OVF_SUBTRACT_ONE)	; length is in 32-bit LWs
 	ov_clean
-	mem[read32, $map_txfr[0], in_addr_hi, <<8, in_addr_lo, max_/**/HASHMAP_TXFR_COUNT], indirect_ref, sig_done[read_sig]
+	mem[read32, MAP_RDXR[0], in_addr_hi, <<8, in_addr_lo, max_/**/HASHMAP_RXFR_COUNT], indirect_ref, sig_done[read_sig]
 
-	alu[o_tindex, (&$map_txfr[0] << 2), OR, my_act_ctx, <<7]
+	alu[o_tindex, (&MAP_RDXR[0] << 2), OR, my_act_ctx, <<7]
 
 	ctx_arb[read_sig]
 
@@ -260,10 +259,10 @@ ret#:
 	alu[--, io_tindex, -, 0]
 	beq[do_read#]
 
-	alu[start_tindex, (&$map_txfr[0] << 2), OR, my_act_ctx, <<7]
+	alu[start_tindex, (&MAP_RDXR[0] << 2), OR, my_act_ctx, <<7]
 	alu[consumed, io_tindex, -, start_tindex]
 	alu[consumed, --, b, consumed, >>2]
-	alu[avail, HASHMAP_TXFR_COUNT, -, consumed]
+	alu[avail, HASHMAP_RXFR_COUNT, -, consumed]
 	alu[--, avail, -, buf_wlen]
 	bge[ret#]
 
@@ -296,7 +295,7 @@ do_read#:
 	local_csr_wr[T_INDEX, io_tindex]   ; global csr 3 cycles
 	alu[bytes_read, --, b, lw_read, <<2]
 
-	unroll_compare(*$index, ++, HASHMAP_LM_INDEX, ++, MISS_LABEL, lw_read, HASHMAP_TXFR_COUNT, --)
+	unroll_compare(*$index, ++, HASHMAP_LM_INDEX, ++, MISS_LABEL, lw_read, HASHMAP_RXFR_COUNT, --)
 
 compare_match#:
 	alu[comp_lw, comp_lw, +, lw_read]
@@ -343,7 +342,7 @@ do_read#:
 
 		local_csr_wr[T_INDEX, io_tindex]   ; global csr 3 cycles
 		alu[bytes, --, b, read_lw, <<2]
-		unroll_copy(HASHMAP_LM_INDEX, ++, *$index, ++, read_lw, HASHMAP_TXFR_COUNT, --)
+		unroll_copy(HASHMAP_LM_INDEX, ++, *$index, ++, read_lw, HASHMAP_RXFR_COUNT, --)
 		alu[off, off, +, bytes]
 		alu[copy_lw, copy_lw, +, read_lw]
 		alu[read_lw, copy_lw, B-A, in_wlen]
@@ -378,7 +377,7 @@ do_read#:
 	alu[off, off, -, 4]
 	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, off]
 
-	alu[wr_tindex, (&$map_txfr[0] << 2), OR, my_act_ctx, <<7]
+	alu[wr_tindex, (&MAP_TXFR[0] << 2), OR, my_act_ctx, <<7]
 	alu[write_lw, --, b, in_wlen]
 	immed[copied_lw, 0]
 	alu[off, --, b, in_addr_lo]
@@ -398,7 +397,7 @@ write_cont#:
 	ov_start(OV_LENGTH)
     ov_set_use(OV_LENGTH, write_lw, OVF_SUBTRACT_ONE)   ; length is in 32-bit LWs
     ov_clean
-    mem[write32, $map_txfr[0], in_addr_hi, <<8, off, max_/**/HASHMAP_TXFR_COUNT], indirect_ref, ctx_swap[write_sig]
+    mem[write32, MAP_TXFR[0], in_addr_hi, <<8, off, max_/**/HASHMAP_TXFR_COUNT], indirect_ref, ctx_swap[write_sig]
 
 	alu[wbytes, --, b, write_lw, <<2]
 	alu[copied_lw, copied_lw, +, write_lw]

@@ -1,0 +1,11 @@
+--- nfd_cfg_internal.c	2017-07-06 16:11:34.401702476 -0700
++++ nfd_cfg_internal.c.new	2017-07-06 16:27:27.089682990 -0700
+@@ -564,7 +564,7 @@
+ #endif
+ 
+     __xwrite unsigned int bpf_cfg[] =
+-        { NFD_BPF_ABI | (8 * 1024 - NFD_BPF_START_OFF) << 16,
++		{ NFD_BPF_ABI | (NFD_BPF_CAPS << 8) | (8 * 1024 - NFD_BPF_START_OFF) << 16,
+           NFD_BPF_START_OFF | NFD_BPF_DONE_OFF << 16,
+           30 << 8 /* CTM buf size / 64 */ };
+ #endif

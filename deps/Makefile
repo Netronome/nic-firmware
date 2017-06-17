@@ -69,9 +69,9 @@ NFD_INC = -I$(NFD_DIR)/shared \
 $(DEPS_DIR)/ng-nfd.hg:
 	hg clone -r $(NFD_REV) \
 	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
-	cd $(NFD_DIR) && patch -p1 < ../nfd-bpf-config.patch && cd -
-	cd $(NFD_DIR) && patch -p1 < ../fix-chain-meta.patch && cd -
-	#patch -d $(NFD_DIR) -p1 <$(DEPS_DIR)/disa_pending_tmp6.txt
+	patch -d $(NFD_DIR) -p1 <$(DEPS_DIR)/disa_pending_tmp6.txt
+	patch -d $(NFD_DIR)/me/blocks/vnic/shared <$(DEPS_DIR)/nfd-bpf-config-v2.patch
+	patch -d $(NFD_DIR)/kernel <$(DEPS_DIR)/fix-chain-meta-v2.patch
 
 
 HG_DEPS += $(NFD_DIR)
