@@ -8,10 +8,9 @@
 #ifndef _LIBNIC_NIC_INTERNAL_C_
 #define _LIBNIC_NIC_INTERNAL_C_
 
-//MARY DBG
-#ifndef CFG_NIC_LIB_DBG_JOURNAL
-#define CFG_NIC_LIB_DBG_JOURNAL 1
-#endif
+//#ifndef CFG_NIC_LIB_DBG_JOURNAL
+//#define CFG_NIC_LIB_DBG_JOURNAL 1
+//#endif
 
 #include <assert.h>
 #include <nfp.h>
@@ -557,7 +556,7 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
 }
 
 __intrinsic void
-nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t port)
+nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t vid_port)
 {
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
     __xread uint32_t tmp2[2];
@@ -566,7 +565,7 @@ nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t port)
     /* Need to read the update word from the BAR */
 
     /* Calculate the relevant configuration BAR base address */
-    bar_base = NFD_CFG_BAR_ISL(NIC_PCI,port);
+    bar_base = NFD_CFG_BAR_ISL(NIC_PCI,vid_port);
 
     update_bpf_prog(ctx_mode, bar_base);
 

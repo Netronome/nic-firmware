@@ -51,6 +51,8 @@
 #endif
 
 #define CMSG_TXFR_COUNT 16
+#define HASHMAP_TXFR_COUNT 16
+#define	HASHMAP_RXFR_COUNT 16
 #define CMSG_DESC_LW	3
 
 #macro cmsg_lm_handles_define()
@@ -117,6 +119,16 @@
 	// app_id is defined in ebpf_rx.uc
 	//.alloc_mem _pf0_net_app_id ctm global 8 8
 	//.init _pf0_net_app_id+0 (NFD_NET_APP_TYPE)
+
+	.reg volatile read $map_rxfr[HASHMAP_RXFR_COUNT]
+	.xfer_order $map_rxfr
+	.reg write $map_txfr[HASHMAP_TXFR_COUNT]
+	.xfer_order $map_rxfr
+
+	#define MAP_RDXR $map_rxfr
+	#define MAP_TXFR $map_txfr
+
+	__hashmap_set($map_txfr)
 
 	nfd_out_send_init()
 

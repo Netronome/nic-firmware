@@ -10,6 +10,7 @@
 
 #include <nfp_chipres.h>
 #include <ring_utils.uc>
+#include <ring_ext.uc>
 
 #define __HASHMAP_OV_SIG_BIT__	31
 
@@ -203,8 +204,8 @@ ret#:
 	.sig cam_add_sig
 	.reg match_bm
 	.reg tmp
-	.reg $cam_addr[8]
-	.xfer_order $cam_addr
+	//.reg $cam_addr[8]		;MAX_RXCAM
+	//.xfer_order $cam_addr
 	.sig cam_read_sig
     .reg ctx_tindex
 	.reg ov_idx
@@ -223,10 +224,10 @@ ret#:
 		alu[out_ov_offset, idx, +, HASHMAP_OV_ENTRY_OFFSET]
 
 	/* hash collision  - find an empty slot */
-	mem[read32, $cam_addr[0], in_addr_hi, <<8, in_addr_lo, 8], sig_done[cam_read_sig]
+	mem[read32, MAP_RXCAM, in_addr_hi, <<8, in_addr_lo, 8], sig_done[cam_read_sig]
 		immed[ov_idx, 0]
 		immed[idx, 0]
-		alu[ctx_tindex, (&$cam_addr[0] << 2), or, my_act_ctx, <<7]
+		alu[ctx_tindex, (&MAP_RXCAM << 2), or, my_act_ctx, <<7]
 	ctx_arb[cam_read_sig]
 	local_csr_wr[T_INDEX, ctx_tindex]
 next_entry#:

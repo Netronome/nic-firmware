@@ -374,6 +374,8 @@ cfg_changes_loop(void)
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
 	nic_local_init(0, 0);		/* dummy regs right now */
 
+   upd_slicc_hash_table();
+
     for (;;) {
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
 
@@ -420,8 +422,8 @@ cfg_changes_loop(void)
                     }
                 }
 
-				if (update & NFP_NET_CFG_UPDATE_BPF) {
-					nic_local_bpf_reconfig(&ctx_mode, vid);
+			    if (update & NFP_NET_CFG_UPDATE_BPF) {
+				   nic_local_bpf_reconfig(&ctx_mode, vid);
 			    }
 
                 /* Save the control word */
@@ -432,12 +434,11 @@ cfg_changes_loop(void)
                 }
 
                 /* Wait for queues to drain / config to stabilize */
-                for (i = 0; i < 100; ++i)
-                    sleep(1000000);
+                sleep(100000);
 
-                } else {
+            } else {
                     /* This is an error, VFs aren't supported yet */
-                }
+            }
 
             /* Complete the message */
             cfg_msg.msg_valid = 0;
