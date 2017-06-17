@@ -41,7 +41,6 @@
 #include <nic_basic/nic_stats.h>
 #include "app_config_tables.h"
 #include "app_config_instr.h"
-#include "ebpf.h"
 
 /*
  * Global declarations for configuration change management
@@ -372,34 +371,6 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base,
     upd_nn_table_instr(xwr_nn_info,  start_offset,
                         NFP_NET_CFG_RSS_ITBL_SZ_wrd);
 
-    return;
-}
-
-__intrinsic void
-upd_slicc_hash_table(void)
-{
-    __xwrite uint32_t xwr_nn_info[SLICC_HASH_PAD_SIZE_LW/2];
-    __xread uint32_t xrd_data[SLICC_HASH_PAD_SIZE_LW/2];
-    uint32_t i;
-	uint32_t t;
-	uint32_t start_offset = SLICC_HASH_PAD_NN_IDX;
-	__imem uint32_t *slicc_hash_data =
-		(__imem uint32_t *) __link_sym("SLICC_HASH_PAD_DATA");
-
-
-	for (t=0; t<SLICC_HASH_PAD_SIZE_LW; t+=(sizeof(xrd_data)/4)) {
-		mem_read32(xrd_data, slicc_hash_data, sizeof(xrd_data));
-
-		for (i = 0; i < (sizeof(xrd_data)/4); i++) {
-			xwr_nn_info[i] = xrd_data[i];
-		}
-
-	    /* Write at NN register start_offset for all worker MEs */
-		upd_nn_table_instr(xwr_nn_info,  start_offset, (sizeof(xrd_data)/4));
-
-		start_offset += sizeof(xrd_data)/4;
-		slicc_hash_data += sizeof(xrd_data)/4; 
-	}
     return;
 }
 
