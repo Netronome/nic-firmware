@@ -155,30 +155,28 @@
 
 #define_eval PV_NOT_PARSED              ((3 << BF_L(PV_PARSE_MPD_bf)) | (3 << BF_L(PV_PARSE_VLD_bf)))
 
-#define LM_PV_HANDLE  1
-#define LM_PV_INDEX   *l$index1
-#define pkt_vec       LM_PV_INDEX
-
-#define LM_PV_SIZE (16*4)
-.alloc_mem LM_PV_BASE lmem me (4 * LM_PV_SIZE)  LM_PV_SIZE
-
-#macro pv_set_lm_idx()
+#macro pv_init(io_vec, PACKET_ID)
+#if (strstr('io_vec', '*l$index') == 1)
+    .alloc_mem _PKT_IO_PKT_VEC_/**/PACKET_ID lmem me (4 * (1 << log2((PV_SIZE_LW * 4), 1))) (1 << log2((PV_SIZE_LW * 4), 1))
 .begin
-    .reg ctx_num
-    .reg lm_addr
-    .reg lm_off
+    .reg addr
+    .reg offset
 
-    alu[ctx_num, --, B, t_idx_ctx, >>7]
-    immed[lm_addr,LM_PV_BASE]
-        // 4 context mode
-    alu[lm_off, --, b, ctx_num, <<(LOG2((LM_PV_SIZE/2), 1))]
-    alu[lm_addr, lm_addr, +, lm_off]
-
-	local_csr_wr[ACTIVE_LM_ADDR_/**/LM_PV_HANDLE, lm_addr]
-	nop
-	nop
-	nop
+#if (log2((PV_SIZE_LW * 4), 1) <= 7)
+    alu[offset, --, B, t_idx_ctx, >>(7 - log2((PV_SIZE_LW * 4), 1))]
+#else
+    alu[offset, --, B, t_idx_ctx, <<(log2((PV_SIZE_LW * 4), 1) - 7)]
+#endif
+    immed[addr, _PKT_IO_PKT_VEC_/**/PACKET_ID]
+    alu[addr, addr, +, offset]
+    #define_eval _PV_INIT_LM_HANDLE strright('io_vec', 1)
+    local_csr_wr[ACTIVE_LM_ADDR_/**/_PV_INIT_LM_HANDLE, addr]
+    #undef _PV_INIT_LM_HANDLE
+    nop
+    nop
+    nop
 .end
+#endif
 #endm
 
 
@@ -247,6 +245,7 @@
 #macro pv_meta_push_type(io_vec, in_type)
     alu[BF_A(io_vec, PV_META_TYPES_bf), in_type, OR, BF_A(io_vec, PV_META_TYPES_bf), <<4]
 #endm
+
 
 #macro pv_meta_prepend(io_vec, in_metadata, in_length)
 .begin
