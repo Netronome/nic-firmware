@@ -43,18 +43,9 @@
 	//hashmap_init()
 #endm
 
-#macro ebpf_lm_handles_define()
-    #define_eval EBPF_STACK_LM_HANDLE    0
-    #define_eval EBPF_STACK_LM_INDEX     *l$index0
-#endm
 
-#macro ebpf_lm_handles_undef()
-    #undef EBPF_STACK_LM_HANDLE
-    #undef EBPF_STACK_LM_INDEX
-#endm
-
-#define EBPF_LM_STACK_SIZE 64
-.alloc_mem ebpf_stack_base lmem me (EBPF_LM_STACK_SIZE*4) 64
+#define EBPF_STACK_SIZE 64
+.alloc_mem EBPF_STACK_BASE lmem me (4 * (1 << log2(EBPF_STACK_SIZE, 1))) (1 << log2(EBPF_STACK_SIZE))
 
 #define EBPF_LM_INDEX	PV_SIZE_LW
 #define EBPF_PORT_STATS_BLK	(8)		/* 8 u64 counters */
@@ -100,23 +91,22 @@
  */
 #macro ebpf_func(in_vec, DROP_LABEL, TX_WIRE_LABEL)
 .begin
-	.reg lm_stack
+    .reg ctx_offset
+    .reg stack_addr
 
-	ebpf_lm_handles_define()
+#if (log2(EBPF_STACK_SIZE, 1) <= 7)
+    alu[ctx_offset, --, B, t_idx_ctx, >>(7 - log2(EBPF_STACK_SIZE, 1))]
+#else
+    alu[ctx_offset, --, B, t_idx_ctx, <<(log2(EBPF_STACK_SIZE, 1) - 7)]
+#endif
+    immed[stack_addr, EBPF_STACK_BASE]
+    alu[stack_addr, stack_addr, +, ctx_offset]
+    local_csr_wr[ACTIVE_LM_ADDR_0, stack_addr]
 
-	ebpf_lm_addr(lm_stack)
-	local_csr_wr[ACTIVE_LM_ADDR_/**/EBPF_STACK_LM_HANDLE, lm_stack]
+    br_addr[NFD_BPF_START_OFF, bpf_ret#], live_regs[ebpf_rc, t_idx_ctx, act_t_idx, __pkt_io_ctm_pkt_no], defer[1]
+        .reg_addr ebpf_rc 0 A
+        immed[ebpf_rc, 0]
 
-	.reg_addr ebpf_rc 0 A
-	immed[ebpf_rc, 0]
-
-	alu[LM_PV_INDEX[EBPF_LM_INDEX], --, B, act_t_idx]
-
-	br_addr[NFD_BPF_START_OFF, bpf_ret#],live_regs[ebpf_rc,t_idx_ctx, __pkt_io_ctm_pkt_no]
-
-	nop
-	nop
-	nop
 
 
 bpf_ret#:
@@ -132,7 +122,6 @@ bpf_ret#:
 
 	alu[stats_idx, EBPF_RET_STATS_MASK, and, rc, >>EBPF_RET_STATS_PASS]
 	move(nic_stats_extra_hi, _nic_stats_extra >>8)
-	alu[act_t_idx, --, b, LM_PV_INDEX[EBPF_LM_INDEX]]
 
 	.if (stats_idx > 0)
 		/* only port 0 for now */
@@ -172,7 +161,6 @@ bpf_tx_host#:
 	immed[egress_q_mask, BF_MASK(PV_QUEUE_OUT_bf)]	;restore
 	/* falls thru, continue with next actions  - ensure $actions[] is still live*/
 
-	ebpf_lm_handles_undef()
 ret#:
 .end
 #endm

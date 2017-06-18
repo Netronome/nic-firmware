@@ -2,11 +2,12 @@
 #include "pkt_io.uc"
 #include "actions.uc"
 
-// alloc  pkt_vec[PV_SIZE_LW] in lm
-pv_set_lm_idx()
-pkt_io_init(pkt_vec)
+// initialize primary packet context (in LMEM)
+#define pkt_vec *l$index1
+pv_init(pkt_vec, 0)
 
 // kick off processing loop
+pkt_io_init(pkt_vec)
 br[ingress#]
 
 error_rx_nbi#:
