@@ -8,10 +8,11 @@
 
 #include "pv.uc"
 #include "pkt_io.uc"
-#include "ebpf_rx.uc"
+#include "ebpf.uc"
 
-ebpf_init()
-
+.reg volatile read $__actions[NIC_MAX_INSTR]
+.xfer_order $__actions
+.reg volatile __actions_t_idx
 
 #macro __actions_read(out_data, in_mask, in_shf)
     #if (streq('in_mask', '--'))
@@ -27,12 +28,12 @@ ebpf_init()
             alu[out_data, in_mask, AND, *$index++, in_shf]
         #endif
     #endif
-    alu[act_t_idx, act_t_idx, +, 4]
+    alu[__actions_t_idx, __actions_t_idx, +, 4]
 #endm
 
 
 #macro __actions_restore_t_idx()
-    local_csr_wr[T_INDEX, act_t_idx]
+    local_csr_wr[T_INDEX, __actions_t_idx]
     nop
     nop
     nop
@@ -329,45 +330,50 @@ finalize#:
 #endm
 
 
-#macro actions_execute(in_pkt_vec, EGRESS_LABEL, DROP_LABEL, ERROR_LABEL)
-.begin
-    .reg act_t_idx
-    .reg addr
-    .reg egress_q_base
-    .reg egress_q_mask
-    .reg jump_idx
 
-    .reg volatile read $actions[NIC_MAX_INSTR]
-    .xfer_order $actions
+#macro actions_load(in_pkt_vec)
+.begin
+    .reg addr
     .sig sig_actions
 
     pv_get_instr_addr(addr, in_pkt_vec, (NIC_MAX_INSTR * 4))
     ov_start(OV_LENGTH)
     ov_set_use(OV_LENGTH, 16, OVF_SUBTRACT_ONE)
     ov_clean()
-    cls[read, $actions[0], 0, addr, max_16], indirect_ref, defer[2], ctx_swap[sig_actions]
-        alu[act_t_idx, t_idx_ctx, OR, &$actions[0], <<2]
-        immed[egress_q_mask, BF_MASK(PV_QUEUE_OUT_bf)]
+    cls[read, $__actions[0], 0, addr, max_16], indirect_ref, defer[2], ctx_swap[sig_actions]
+        .reg_addr __actions_t_idx 28 B
+        alu[__actions_t_idx, t_idx_ctx, OR, &$__actions[0], <<2]
+        nop
 
-    local_csr_wr[T_INDEX, act_t_idx]
+    local_csr_wr[T_INDEX, __actions_t_idx]
     nop
     nop
     nop
+.end
+#endm
+
+
+#macro actions_execute(in_pkt_vec, EGRESS_LABEL, DROP_LABEL, ERROR_LABEL)
+.begin
+    .reg jump_idx
+    .reg egress_q_base
+    .reg egress_q_mask
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#] ;actions_jump
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#], defer[1] ;actions_jump
+        immed[egress_q_mask, BF_MASK(PV_QUEUE_OUT_bf)]
 
-        ins_0#: br[DROP_LABEL]
-        ins_1#: br[statistics#]
-        ins_2#: br[mtu#]
-        ins_3#: br[mac#]
-        ins_4#: br[rss#]
-        ins_5#: br[checksum_complete#]
-        ins_6#: br[tx_host#]
-        ins_7#: br[tx_wire#]
-        ins_8#: br[DROP_LABEL]
-        ins_9#: br[ebpf#]
+    ins_0#: br[DROP_LABEL]
+    ins_1#: br[statistics#]
+    ins_2#: br[mtu#]
+    ins_3#: br[mac#]
+    ins_4#: br[rss#]
+    ins_5#: br[checksum_complete#]
+    ins_6#: br[tx_host#]
+    ins_7#: br[tx_wire#]
+    ins_8#: br[DROP_LABEL]
+    ins_9#: br[ebpf#]
 
 statistics#:
     __actions_statistics(in_pkt_vec)
@@ -395,15 +401,21 @@ tx_host#:
 
 tx_wire#:
     __actions_read(egress_q_base, egress_q_mask, --)
-tx_wire_ebpf#:
     pkt_io_tx_wire(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
 ebpf#:
     __actions_read(--, --, --)
-	ebpf_func(in_pkt_vec, DROP_LABEL, tx_wire_ebpf#)
-    __actions_next()
+    ebpf_call(in_pkt_vec, DROP_LABEL, tx_wire_ebpf#)
+
 .end
 #endm
+
+
+.if (0)
+    ebpf_reentry#:
+    ebpf_reentry()
+.endif
+
 
 #endif
 
