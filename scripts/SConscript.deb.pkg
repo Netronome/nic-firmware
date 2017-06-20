@@ -8,6 +8,7 @@ deb_FileList = env['PKG_FILE_LISTS']['ns-agilio-core-nic_deb']
 deb_files = [
     ("opt/netronome/bin/ns-core-nic-setup", "#nfp-nic/scripts/ns-core-nic-setup"),
     ("etc/init.d/ns-core-nic.autorun", "#nfp-nic/scripts/ns-core-nic.autorun"),
+    ("etc/systemd/system/ns-core-nic.service", "#nfp-nic/scripts/ns-core-nic.service"),
 ]
 
 deb_FileList.add_files(deb_files)

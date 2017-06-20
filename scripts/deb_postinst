@@ -104,13 +104,18 @@ if [ -e "$blacklist_file" ]; then
 fi
 
 # Enable start script
-update-rc.d ns-core-nic.autorun defaults
-update-rc.d ns-core-nic.autorun enable
+if `readlink /proc/1/exe | grep -qi systemd`; then
+    systemctl enable ns-core-nic.service
+else
+    update-rc.d ns-core-nic.autorun defaults
+    update-rc.d ns-core-nic.autorun enable
+fi
 
 # Clear any old config
-service ns-core-nic.autorun clean
+/opt/netronome/bin/ns-core-nic-setup clean
+
 # Generate new config
-service ns-core-nic.autorun start
+/opt/netronome/bin/ns-core-nic-setup force
 
 # Disable logging
 /opt/netronome/bin/ns-core-nic-setup log-disable

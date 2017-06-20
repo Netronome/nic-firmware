@@ -126,8 +126,14 @@ if [ -e "$blacklist_file" ]; then
     cp "$blacklist_file" "$blacklist_file".corenic.bak
 fi
 
-#service ns-core-nic.autorun start
-systemctl enable --now ns-core-nic.service
+# Enable start script
+systemctl enable ns-core-nic.service
+
+# Clear any old config
+/opt/netronome/bin/ns-core-nic-setup clean
+
+# Generate new config
+/opt/netronome/bin/ns-core-nic-setup force
 
 # Disable logging
 /opt/netronome/bin/ns-core-nic-setup log-disable
