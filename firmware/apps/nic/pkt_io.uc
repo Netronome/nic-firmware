@@ -77,8 +77,8 @@ timestamp_enable()
 
 
 .reg volatile __pkt_io_ctm_pkt_no
-//.reg_addr __pkt_io_ctm_pkt_no 29 B
-//.set __pkt_io_ctm_pkt_no
+.reg_addr __pkt_io_ctm_pkt_no 29 B
+.set __pkt_io_ctm_pkt_no
 
 .sig volatile __pkt_io_sig_nfd
 .sig volatile __pkt_io_sig_nfd_retry
@@ -105,6 +105,7 @@ skip_dispatch#:
 
 
 #macro pkt_io_init(out_pkt_vec)
+    pv_init(out_pkt_vec, 0)
     alu[BF_A(out_pkt_vec, PV_QUEUE_IN_NBI_bf), --, B, 0, <<BF_L(PV_QUEUE_IN_NBI_bf)]
     __pkt_io_dispatch_nbi()
 #endm

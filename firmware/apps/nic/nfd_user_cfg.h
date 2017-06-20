@@ -179,10 +179,10 @@
 
 #define NFD_OUT_RX_OFFSET       NFP_NET_CFG_RX_OFFSET_DYNAMIC
 
-#define NFD_BPF_CAPABLE        1
-#define NFD_BPF_START_OFF   2000
-#define NFD_BPF_DONE_OFF     791
+#define NFD_BPF_CAPABLE         1
+#define NFD_BPF_START_OFF       2000
+#define NFD_BPF_DONE_OFF        1
 
-#define NFD_NET_APP_TYPE (2)
+#define NFD_NET_APP_TYPE        (2)
 
 #endif /* !_NFD_USER_CFG_H_ */

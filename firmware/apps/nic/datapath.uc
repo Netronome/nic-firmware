@@ -1,8 +1,8 @@
 #include "global.uc"
-#include "pkt_io.uc"
-#include "actions.uc"
 
-// initialize primary packet context (in LMEM)
+#include "actions.uc"
+#include "pkt_io.uc"
+
 #define pkt_vec *l$index1
 pv_init(pkt_vec, 0)
 
@@ -32,8 +32,10 @@ egress#:
 
 ingress#:
     pkt_io_rx(pkt_vec, drop#, error_rx_nbi#, error_rx_nfd#)
+    actions_load(pkt_vec)
 
-actions_execute(pkt_vec, egress#, drop#, error#)
+actions#:
+    actions_execute(pkt_vec, egress#, drop#, error#)
 
 #pragma warning(disable: 4702)
 fatal_error("MAIN LOOP EXIT")

@@ -1,3 +1,4 @@
+
 /* Optimization and simplifying assumptions */
 // - 4 CTX mode
 // - LM Index 0 is reserved for local use (code that does not call into other code)
@@ -29,6 +30,11 @@
 .end
 #endm
 
+// eBPF trampoline (must be first instruction)
+br[start#]
+br[ebpf_reentry#]
+start#:
+
 // enable NN receive config from CTM
 .reg ctxs
 local_csr_rd[CTX_ENABLES]
@@ -42,4 +48,5 @@ local_csr_wr[CTX_ENABLES, ctxs]
 local_csr_rd[ACTIVE_CTX_STS]
 immed[t_idx_ctx, 0]
 alu[t_idx_ctx, t_idx_ctx, AND, 7]
+.reg_addr t_idx_ctx 29 A
 alu[t_idx_ctx, --, B, t_idx_ctx, <<7]

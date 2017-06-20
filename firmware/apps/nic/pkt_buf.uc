@@ -192,7 +192,7 @@ recycle#:
 #endm
 
 #if (WORKERS_PER_ISLAND > 4)
-    .reg @dma_semaphore // per ME lock, permit one outstanding DMA per ME for now (12 per island)
+    .reg volatile @dma_semaphore // per ME lock, permit one outstanding DMA per ME for now (12 per island)
     immed[@dma_semaphore, (16 / WORKERS_PER_ISLAND)] // implicit init on #include
 #endif
 
@@ -252,6 +252,7 @@ check_status#:
 
 #if (WORKERS_PER_ISLAND > 4)
 retry_dma#:
+    .reg_addr @dma_semaphore 28 A
     alu[@dma_semaphore, @dma_semaphore, -, 1]
     beq[yield_retry_dma#]
 #endif

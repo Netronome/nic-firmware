@@ -40,5 +40,12 @@
 .end
 #endm
 
+
+#ifndef EBPF_REENTRY_DEFINED
+.if (0)
+    ebpf_reentry#:
+.endif
+#endif
+
 #endif
 
