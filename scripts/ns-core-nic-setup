@@ -109,20 +109,28 @@ function write_udev() {
     log "Writing udev header..."
     write_head "$udev_file"
 
-    log "Obtaining hwinfo..."
-    hwinfo_macs=$($NETRONOME_BIN/nfp-hwinfo | grep "eth[0-7].mac")
-    macs=$(echo "$hwinfo_macs" | tr " " "\n")
-    id_prefix="eth"
+    # If the kernel has the phys_port_name feature
+    if [ -e "/sys/devices/virtual/net/lo/phys_port_name" ]; then
+        log "Writing Rules..."
+        echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"?*\", ATTR{address}==\"00:15:4d:*:*:*\", KERNEL==\"eth*\", NAME=\"nfp_\$attr{phys_port_name}\"" >> $udev_file
+        echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"?*\", ATTR{address}==\"00:15:4d:*:*:*\", NAME=\"nfp_\$attr{phys_port_name}\"" >> $udev_file
+        echo "" >> $udev_file
+    else
+        log "Obtaining hwinfo..."
+        hwinfo_macs=$($NETRONOME_BIN/nfp-hwinfo | grep "eth[0-7].mac")
+        macs=$(echo "$hwinfo_macs" | tr " " "\n")
+        id_prefix="eth"
 
-    log "Writing Rules..."
-    for mac in $macs
-    do
-        mac_addr=$(echo "$mac" | cut -d '=' -f 2)
-        netdev_id=$(echo "$mac" | cut -d '=' -f 1 | cut -d '.' -f 1)
-        netdev_id=${netdev_id#$id_prefix}  # remove id_prefix
+        log "Writing Rules..."
+        for mac in $macs
+        do
+            mac_addr=$(echo "$mac" | cut -d '=' -f 2)
+            netdev_id=$(echo "$mac" | cut -d '=' -f 1 | cut -d '.' -f 1)
+            netdev_id=${netdev_id#$id_prefix}  # remove id_prefix
 
-        write_rule "$udev_file" "$mac_addr" "$netdev_id"
-    done
+            write_rule "$udev_file" "$mac_addr" "$netdev_id"
+        done
+    fi
 
     return 0
 }
