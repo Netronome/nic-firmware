@@ -19,6 +19,10 @@ log_disable_file=$log_file_dir/ns-core-nic-log.disable
 
 mkdir -p $log_file_dir
 
+print_heading() {
+    echo "======== $1 ========"
+}
+
 function log() {
     logger -si "ns-core-nic: $@"
     d=$(date)
@@ -251,8 +255,71 @@ function setup_nic() {
     reload_nfp_net || return
 }
 
+check_minimum_version() {
+    current_version=$1
+    required_version=$2
+    if [ "$(echo "$current_version" | grep -Eo "^[0-9a-fA-F]{2}")" = "$(echo "$required_version" | grep -Eo "^[0-9a-fA-F]{2}")" ] && \
+                [ "$(printf "%d\n" 0x$current_version)" -ge "$(printf "%d\n" 0x$required_version)" ]; then
+        return 0
+    fi
+    return 1
+}
+
+function check_flash() {
+    # Minimum required versions
+    local req_primary="020014"
+    local req_secondary="020014"
+    local req_nsp="020039"
+
+    local versions
+    # Is BSP available?
+    if [ -e "${NETRONOME_BIN}/nfp-hwinfo" ]; then
+        versions=$(${NETRONOME_BIN}/nfp-hwinfo | grep bsp.version= | sed -r 's/.*=(.*)$/\1/')
+    else
+        versions=$(dmesg | grep 'nfp.*BSP'| sed -r 's/.*BSP:\s?(.*)$/\1/' | tail -1)
+    fi
+
+    local primary=$(echo "${versions}" | sed -r 's/([0-9A-Za-z]+)\.([0-9A-Za-z]+)\.([0-9A-Za-z]+).*/\1/')
+    local secondary=$(echo "${versions}" | sed -r 's/([0-9A-Za-z]+)\.([0-9A-Za-z]+)\.([0-9A-Za-z]+).*/\2/')
+    local nsp=$(echo "${versions}" | sed -r 's/([0-9A-Za-z]+)\.([0-9A-Za-z]+)\.([0-9A-Za-z]+).*/\3/')
+
+    # To detemine whether the NSP version is up to date, the reported NSP version
+    # must have a corresponding host file (if the BSP is installed). This will only
+    # be true if the NSP is up to date.
+    # If the BSP is not available, assume the NSP is up to date.
+    nsp_already_updated=0
+    if [ -e "/opt/netronome/flash/nfp-nspd.bin" ]; then
+        [ -e "/opt/netronome/flash/nfp-nspd-$nsp.bin" ] || nsp_already_updated=1
+    fi
+
+    set -e
+    if check_minimum_version $primary $req_primary && check_minimum_version $secondary $req_secondary && \
+            check_minimum_version $nsp $req_nsp && [ "$nsp_already_updated" -eq "0" ]; then
+        echo "NFP already has desired ARM flash image"
+        exit 0
+    fi
+
+    # If we haven't forced a reflash and the minimum requirements of the primary/secondary
+    # versions have been met, we only have to download the NSP binary.
+    local ret=1
+    if check_minimum_version $primary $req_primary && check_minimum_version $secondary $req_secondary; then
+        print_heading "NFP requires an updated NSP only"
+        echo -e "\t # This command needs to be executed again after reboot."
+        echo -e "\t$NETRONOME_BIN/nfp-nsp -L /opt/netronome/flash/nfp-nspd.bin"
+        echo -e "\n\t # To make the change persistent, reflash the card with:"
+        ret=0
+    else
+        print_heading "NFP requires a new ARM flash image"
+    fi
+    echo -e "\t$NETRONOME_BIN/nfp-flash --preserve-media-overrides -w /opt/netronome/flash/flash-nic.bin"
+    echo -e "\t$NETRONOME_BIN/nfp-one"
+    echo -e "\treboot"
+    print_heading
+    exit $ret
+}
+
 function usage() {
-    echo "CLI: $1 (<no param> | boot | clean | force | help | log-enable | log-disable)"
+    echo "CLI: $1 (<no param> | boot | clean | force | check-flash | help | log-enable | log-disable)"
     echo "This utility is used to setup the CoreNIC configuration"
     echo "  for ns-agilio-corenic usage"
     echo ""
@@ -286,6 +353,9 @@ case "$1" in
         ;;
     "force")
         setup_nic || exit
+        ;;
+    "check-flash")
+        check_flash
         ;;
     "-h")
         usage $0

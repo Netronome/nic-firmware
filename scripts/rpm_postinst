@@ -40,9 +40,6 @@ dkms add -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION"
         done
 
    fi
-print_heading() {
-    echo "======== $1 ========"
-}
 dolog() {
      # Use one of the following levels as $1
      # alert, crit, debug, emerg, err, info, notice, warning
@@ -77,47 +74,6 @@ verify_kmods() {
          fi
      fi
 }
-check_flash_nic() {
-      local ret=0
-      verify_kmods
-      local flash_image="$1"
-      # Note, the sed below ifgnores nfp-media changes applied when configuring breakout cables
-      # VRT-825
-      local nfp_versions=$($NETRONOME_BIN/nfp-fis list -v | sed -e '/^hwinfo\.bin\.*$/d' -e '/^usinfo\.bin.*$/d')
-      local flash_versions=$($NETRONOME_BIN/nfp-fis --image=/opt/netronome/flash/flash-nic.bin list -v)
-      if [ "$flash_versions" = "$nfp_versions" ]; then
-          dolog "info" "NFP already has desired ARM flash image"
-          ret=0
-      else
-          dolog "info" "NFP requires a new ARM flash image"
-          ret=1
-      fi
-      return $ret
- }
-check_flash() {
-    print_heading "Check flash version in the NFP NIC"
-
-    local NETRONOME_BIN="/opt/netronome/bin"
-    local flash_image=/opt/netronome/flash/flash-nic.bin
-    # Note, the sed below ifgnores nfp-media changes IE using a breakout cable
-    local nfp_versions=$($NETRONOME_BIN/nfp-fis list -v | sed '/^hwinfo.bin.*$/d')
-    local flash_versions=$($NETRONOME_BIN/nfp-fis --image=$flash_image list -v)
-
-    if [ "$flash_versions" = "$nfp_versions" ]; then
-        echo "NFP has desired flash image"
-    else
-        print_heading "NFP needs to be flashed. Please run the following commands:"
-        # TODO use newer BSP and nfp-flash flag '--preserve-media-overrides'
-        echo -n -e "\t"
-        echo "$NETRONOME_BIN/nfp-flash --i-accept-the-risk-of-overwriting-miniloader --preserve-media-overrides -w $flash_image"
-        # TODO change this when supporting SFs
-        echo -n -e "\t"
-        echo "$NETRONOME_BIN/nfp-one"
-        echo -n -e "\t"
-        echo "reboot"
-        print_heading
-    fi
-}
 
 # Backup netronome blacklist
 blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
@@ -149,4 +105,4 @@ while [ $count -lt $kernel_count ]; do
 done
 echo ""
 
-check_flash_nic
+/opt/netronome/bin/ns-core-nic-setup check-flash
