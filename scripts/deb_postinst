@@ -64,30 +64,6 @@ process_dkms() {
 
    fi
 }
-check_flash() {
-    print_heading "Check flash version in the NFP NIC"
-    local NETRONOME_BIN="/opt/netronome/bin"
-    local flash_image=/opt/netronome/flash/flash-nic.bin
-    # Note, the sed below ifgnores nfp-media changes IE using a breakout cable
-    # VRT-825
-    local nfp_versions=$($NETRONOME_BIN/nfp-fis list -v | sed -e '/^hwinfo\.bin\.*$/d' -e '/^usinfo\.bin.*$/d')
-    local flash_versions=$($NETRONOME_BIN/nfp-fis --image=/opt/netronome/flash/flash-nic.bin list -v)
-
-    if [ "$flash_versions" = "$nfp_versions" ]; then
-        echo "NFP already has desired ARM flash image"
-    else
-        print_heading "NFP requires a new ARM flash image"
-        # TODO use newer BSP and nfp-flash flag '--preserve-media-overrides'
-        echo -n -e "\t"
-        echo "$NETRONOME_BIN/nfp-flash --i-accept-the-risk-of-overwriting-miniloader --preserve-media-overrides -w $flash_image"
-        # TODO change this when supporting SFs
-        echo -n -e "\t"
-        echo "$NETRONOME_BIN/nfp-one"
-        echo -n -e "\t"
-        echo "reboot"
-        print_heading
-    fi
-}
 
 echo "Executing the Post install script"
 process_dkms
@@ -131,4 +107,4 @@ while [ $count -lt $kernel_count ]; do
 done
 echo ""
 
-check_flash
+/opt/netronome/bin/ns-core-nic-setup check-flash
