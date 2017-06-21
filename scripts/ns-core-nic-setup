@@ -204,6 +204,38 @@ function check_file_status() {
     fi
 }
 
+function boot_nic() {
+    local nfp_net_drv_check
+    local nfp_dev_cpp_check
+    local reload
+
+    lsmod | grep -wq "nfp" > /dev/null 2>&1
+    nfp_net_drv_check=$?
+    cat /sys/module/nfp/parameters/nfp_dev_cpp | grep "1" > /dev/null 2>&1
+    nfp_dev_cpp_check=$?
+
+    if [ ! "$nfp_net_drv_check" -eq 0 ]; then
+	log "nfp not loaded, skipping boot procedure"
+	return
+    fi
+
+    reload=0
+    if [ ! "$nfp_dev_cpp_check" -eq 0 ]; then
+	# Reload driver with dev_cpp support
+	check_and_load_driver || return
+	reload=1
+    fi
+
+    # remove udev file
+    clean_udev
+    # write udev rules based on current platform
+    write_udev || return
+
+    if [ "$reload" -eq 1 ]; then
+        reload_nfp_net || return
+    fi
+}
+
 function setup_nic() {
     # check err47
     err47_check || return
@@ -220,7 +252,7 @@ function setup_nic() {
 }
 
 function usage() {
-    echo "CLI: $1 (<no param> | clean | force | help | log-enable | log-disable)"
+    echo "CLI: $1 (<no param> | boot | clean | force | help | log-enable | log-disable)"
     echo "This utility is used to setup the CoreNIC configuration"
     echo "  for ns-agilio-corenic usage"
     echo ""
@@ -245,6 +277,9 @@ function usage() {
 }
 
 case "$1" in
+    "boot")
+        boot_nic || exit
+        ;;
     "clean")
         # remove udev file
         clean_udev
