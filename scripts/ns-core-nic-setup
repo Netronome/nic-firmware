@@ -12,6 +12,7 @@ NETRONOME_BIN="$NETRONOME_DIR"/bin
 udev_file=/etc/udev/rules.d/99-netronome-corenic.udev.rules
 blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
 mod_file=/etc/modprobe.d/nfp.conf
+dep_file=/etc/depmod.d/nfp.conf
 fw_file=/lib/firmware/netronome/
 log_file_dir=/opt/netronome/log
 log_file=$log_file_dir/ns-core-nic.log
@@ -35,7 +36,7 @@ function write_head() {
     local out_file
     out_file=$1
 
-    echo "# Copyright (C) 2012-2016 Netronome Systems, Inc. All rights reserved." > $out_file
+    echo "# Copyright (C) 2012-2017 Netronome Systems, Inc. All rights reserved." > $out_file
     echo "# Netronome Core NIC udev rules to configure the names of the" >> $out_file
     echo "# netdev(s) created when using the Core NIC."   >> $out_file
     echo "# Netronome Core NIC uses the nfp (formerly nfp_net) driver." >> $out_file
@@ -175,6 +176,22 @@ function blacklist_nfp() {
 
 }
 
+function clean_depmod() {
+    log "Removing depmod file $dep_file..."
+    if [ -e "$dep_file" -a -n "$dep_file" ]; then
+        rm -f $dep_file
+    fi
+}
+
+function override_intree_nfp() {
+    log "Overriding intree nfp..."
+    write_head "$dep_file"
+    echo -e "override nfp * extra/netronome" >> $dep_file
+    echo -e "override nfp * updates/dkms" >> $dep_file
+    echo -e "override nfp * extra" >> $dep_file
+    depmod -a
+}
+
 function check_file_status() {
     local udev_status modprobe_status fw_file_status
 
@@ -216,6 +233,10 @@ function setup_nic() {
     write_udev || return
     # select nfp over nfp_uio
     blacklist_nfp
+    # clean depmod file
+    clean_depmod
+    # override the intree nfp
+    override_intree_nfp
     # reload nfp
     reload_nfp_net || return
 }
@@ -313,8 +334,9 @@ case "$1" in
         boot_nic || exit
         ;;
     "clean")
-        # remove udev file
+        # remove udev/depmod file
         clean_udev
+        clean_depmod
         ;;
     "force")
         setup_nic || exit
