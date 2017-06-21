@@ -33,7 +33,7 @@
 #define EBPF_PORT_STATS_BLK	(8)		/* 8 u64 counters */
 
 /**
- *  return value bit field description 
+ *  return value bit field description
  *
  * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
@@ -68,13 +68,16 @@
     .reg nic_stats_extra_hi
     .reg pkt_length
     .reg ebpf_rc
-    .reg_addr ebpf_rc 0 B
+    .reg_addr ebpf_rc 0 A
     .set ebpf_rc
+	.reg rc
+
+	alu[rc, --, b, ebpf_rc]
 
     // can this be written as an index by the eBPF code?
-    alu[stats_flags, EBPF_RET_STATS_MASK, AND, ebpf_rc, >>EBPF_RET_STATS_PASS]
+    alu[stats_flags, EBPF_RET_STATS_MASK, AND, rc, >>EBPF_RET_STATS_PASS]
 
-    beq[skip_ebpf_stats#] 
+    beq[skip_ebpf_stats#]
 	/* only port 0i for now */
         ffs[stats_idx, stats_flags]
         alu[stats_offset, EBPF_STATS_START_OFFSET, OR, stats_idx, <<4]
@@ -89,13 +92,13 @@
         mem[add64_imm, --, nic_stats_extra_hi, <<8, stats_offset, 1], indirect_ref
     skip_ebpf_stats#:
 
-    br_bset[ebpf_rc, EBPF_RET_DROP, drop#]
+    br_bset[rc, EBPF_RET_DROP, drop#]
 
     local_csr_wr[T_INDEX, __actions_t_idx]
 
     pv_set_tx_host_rx_bpf(pkt_vec)
 
-    br_bset[ebpf_rc, EBPF_RET_PASS, actions#]
+    br_bset[rc, EBPF_RET_PASS, actions#]
 
     alu[stats_base, 0xff, AND, BF_A(pkt_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
     alu[stats_base, stats_base, +, EBPF_PORT_STATS_BLK]
