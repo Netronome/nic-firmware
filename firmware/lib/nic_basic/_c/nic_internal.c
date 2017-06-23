@@ -388,13 +388,7 @@ nic_local_reconfig_done()
     synch_cnt_dram_ack(&nic_cfg_synch);
 }
 
-//===========
 #include "ebpf.h"
-
-M_CREATE_WQ(m_ebpf_wq0);
-M_CREATE_WQ(m_ebpf_wq1);
-
-__shared __lmem uint32_t bpf_mes_ids[] = {APP_BPF_MES_LIST};
 
 __intrinsic int
 nic_local_cfg_bpf_is_enabled()
@@ -405,124 +399,166 @@ nic_local_cfg_bpf_is_enabled()
 }
 
 /* XXX Move to some sort of CT reflect library */
-static __intrinsic void
-ct_reflect_csr(unsigned int dst_me, unsigned int dst_csr,
-               volatile __xwrite void *src_xfer)
+static __intrinsic unsigned int
+ct_read_csr(unsigned int isl, unsigned int me, unsigned int csr_addr)
 {
     SIGNAL sig;
     unsigned int addr;
+    unsigned int ret;
+    unsigned int __xread xfer;
 
-    /* Where address[29:24] specifies the Island Id of remote ME to write to
-     * address[16] is the XferCsrRegSel select bit (0:
-     * Transfer Registers, 1: CSR Registers), address[13:10] is
-     * the master number (= FPC + 4) within the island to write
-     * data to, address[9:2] is the first register address (Register
-     * depends upon XferCsrRegSel) to write to. */
-	/* dst_me format:  dst(isl,me) =  ((((isl + 32) << 4) + (me + 4)) << 8) */
-    addr = (1 << 16) | ((dst_me & 0x3F000)<<12 | ((dst_me & 0xF00)<<2 | (dst_csr & 0xFF)<<2));
+    addr = (isl << 24) | (1 << 16) | (me << 10) | csr_addr;
 
     __asm {
-        alu[--, --, b, 0];
-        ct[reflect_write_sig_init, *src_xfer, addr, 0, 1], ctx_swap[sig];
+        ct[reflect_read_sig_init, xfer, addr, 0, 1], ctx_swap[sig];
+    };
+
+    ret = xfer;
+
+    return ret;
+}
+
+
+static __intrinsic void
+ct_write_csr(unsigned int isl, unsigned int me, unsigned int csr_addr, unsigned int val)
+{
+    SIGNAL sig;
+    unsigned int addr;
+    unsigned int __xwrite xfer;
+
+    addr = (isl << 24) | (1 << 16) | (me << 10) | csr_addr;
+    xfer = val;
+
+    __asm {
+        ct[reflect_write_sig_init, xfer, addr, 0, 1], ctx_swap[sig];
     };
 }
 
 
 static __intrinsic void
-bpf_reflect_to_workers(unsigned int csr_no, __xwrite uint32_t *data_out)
+ct_signal(unsigned int isl, unsigned int me, unsigned int ctx, unsigned int signal)
 {
-    __gpr unsigned int i;
-    __gpr unsigned int j;
-	__gpr uint32_t data_value;
+    unsigned int addr;
 
-    ctassert(__is_ct_const(csr_no));
+    addr = (isl << 24) | (me << 9) | (ctx << 6) | (signal << 2);
 
-    for(i = 0; i < sizeof(bpf_mes_ids)/sizeof(uint32_t); i++) {
-        ct_reflect_csr(bpf_mes_ids[i], csr_no / 4, data_out);
-	}
+    __asm {
+        ct[interthread_signal, --, 0, addr, --];
+    };
 }
+
+#define PKT_IO_SIG_NBI          9
+#define PKT_IO_SIG_NFD          10
+#define PKT_IO_SIG_NFD_RETRY    11
+#define PKT_IO_SIG_RESUME       12
+#define PKT_IO_SIG_QUIESCE_NBI  13
+#define PKT_IO_SIG_QUIESCE_NFD  14
+
+#define ME_CSR_USTORE_ADDR      0x00
+#define ME_CSR_USTORE_DATA_LO   0x04
+#define ME_CSR_USTORE_DATA_HI   0x08
+#define ME_CSR_CTX_ENABLES      0x18
+#define ME_CSR_CTX_PTR          0x20
+#define ME_CSR_IND_CTX_STS      0x40
+#define ME_CSR_IND_CTX_WKP_EVT  0x50
+
+__shared __lmem uint32_t bpf_mes_ids[] = { APP_MES_LIST };
 
 static __intrinsic void
 update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
 {
     __xread uint32_t host_mem_bpf_cfg[3];
     __xread uint32_t data[2];
-    __xwrite uint32_t data_out;
+    __gpr uint32_t data_out;
     __gpr unsigned int addr_hi;
     __gpr unsigned int addr_lo;
     __gpr unsigned int i;
-    __gpr unsigned int tmp;
+    __gpr unsigned int words;
+    __gpr unsigned int isl;
+    __gpr unsigned int me;
+    __gpr unsigned int ctx;
+    __gpr unsigned int wkp_mask;
+    __gpr unsigned int ctx_enables;
 
+    for (i = 0; i < sizeof(bpf_mes_ids) / sizeof(uint32_t); i++) {
+        isl = bpf_mes_ids[i] >> 4;
+        me = bpf_mes_ids[i] & 0xf;
 
-    mem_read32(host_mem_bpf_cfg, bar_base + NFP_NET_CFG_BPF_SIZE - 2,
-               sizeof host_mem_bpf_cfg);
+        // signal threads to go quiescent
+        for (ctx = 0; ctx < 8; ctx = ctx + 2) {
+            ct_signal(isl, me, ctx, PKT_IO_SIG_QUIESCE_NBI);
+            ct_signal(isl, me, ctx, PKT_IO_SIG_QUIESCE_NFD);
+        }
+        sleep(10000);
 
-    /* Note: data from the BAR comes in 4B-swapped; low is high, high is low */
-    i = host_mem_bpf_cfg[0] >> 16;
-    addr_lo = host_mem_bpf_cfg[1];
-    addr_hi = host_mem_bpf_cfg[2];
+        // force any remaining threads to quiesce
+        do {
+            ctx_enables = ct_read_csr(isl, me, ME_CSR_CTX_ENABLES);
+            ctx_enables &= 0xffff00ff;
+            ct_write_csr(isl, me, ME_CSR_CTX_ENABLES, ctx_enables);
+            sleep(250);
+            for (ctx = 0; ctx < 8; ctx += 2) {
+                ct_write_csr(isl, me, ME_CSR_CTX_PTR, ctx);
+                wkp_mask = ct_read_csr(isl, me, ME_CSR_IND_CTX_WKP_EVT);
+                if (! (wkp_mask & ((1 << PKT_IO_SIG_NFD_RETRY) | (1 << PKT_IO_SIG_RESUME))))
+                    ctx_enables |= (1 << (8 + ctx));
+            }
+            if (ctx_enables & 0xff00) {
+                ct_write_csr(isl, me, ME_CSR_CTX_ENABLES, ctx_enables);
+                sleep(1000); // shorter wait, will wait again if necessary
+            }
+        }
+        while (ctx_enables & 0xff00);
 
-    pcie_c2p_barcfg_set(0 /*pci_isl0*/, PCIE_CPP2PCIE_BPF_LOAD,
-                        addr_hi, addr_lo, 0);
+        // safe to write BPF code store
+        mem_read32(host_mem_bpf_cfg, bar_base + NFP_NET_CFG_BPF_SIZE - 2, sizeof host_mem_bpf_cfg);
 
-    addr_lo >>= 3;
-	NIC_LIB_DBG(libnic_dbg, i);
+        // note: data from the BAR comes in 4B-swapped; low is high, high is low 
+        words = host_mem_bpf_cfg[0] >> 16;
+        addr_lo = host_mem_bpf_cfg[1];
+        addr_hi = host_mem_bpf_cfg[2];
 
-    /* Set instr pointer to 'start' and enable writing. */
-    tmp = 0x80000000 + NFD_BPF_START_OFF;
-	data_out = tmp;
-    bpf_reflect_to_workers(0x00, &data_out);
-	NIC_LIB_DBG(libnic_dbg, tmp);
+        pcie_c2p_barcfg_set(0 /*pci_isl0*/, PCIE_CPP2PCIE_BPF_LOAD, addr_hi, addr_lo, 0);
 
+        addr_lo >>= 3;
 
-    while (i--) {
-        pcie_read(&data, 4, PCIE_CPP2PCIE_BPF_LOAD,
-                  addr_hi, addr_lo << 3, sizeof(data));
+        // set instr pointer to 'start' and enable writing. */
+        data_out = 0x80000000 + NFD_BPF_START_OFF;
+        ct_write_csr(isl, me, ME_CSR_USTORE_ADDR, data_out);
 
-        addr_lo++;
-        addr_hi += addr_lo >> 29;
+        while (words--) {
+            pcie_read(&data, 4, PCIE_CPP2PCIE_BPF_LOAD, addr_hi, addr_lo << 3, sizeof(data));
 
-        data_out = data[0];
-        bpf_reflect_to_workers(0x04, &data_out);	/* Ustore data lower */
+            addr_lo++;
+            addr_hi += addr_lo >> 29;
+            NIC_LIB_DBG(libnic_dbg, isl);
+            NIC_LIB_DBG(libnic_dbg, me);
+            data_out = data[0];
+            NIC_LIB_DBG(libnic_dbg, data_out);
+            ct_write_csr(isl, me, ME_CSR_USTORE_DATA_LO, data_out);
+            data_out = data[1];
+            NIC_LIB_DBG(libnic_dbg, data_out);
+            ct_write_csr(isl, me, ME_CSR_USTORE_DATA_HI, data_out);
+        }
 
-        data_out = data[1];
-        bpf_reflect_to_workers(0x08, &data_out);	/* Ustore data upper, write to control store, incr ustore addr*/
+        // normal mode
+        data_out = 0;
+        ct_write_csr(isl, me, ME_CSR_USTORE_ADDR, data_out);
 
-		NIC_LIB_DBG(libnic_dbg, data[0]);
-		NIC_LIB_DBG(libnic_dbg, data[1]);
-    }
+        sleep(500);
 
-    data_out = 0;
-    bpf_reflect_to_workers(0x00, &data_out);		/* normal mode */
+        ctx_enables = ct_read_csr(isl, me, ME_CSR_CTX_ENABLES);
+        ct_write_csr(isl, me, ME_CSR_CTX_ENABLES, ctx_enables | 0x5500);
+
+        sleep(500);
+
+        // kick off threads again
+        for (ctx = 0; ctx < 8; ctx += 2) {
+            ct_signal(isl, me, ctx, PKT_IO_SIG_RESUME);
+        }
+   }
 
     return;
-}
-
-static __intrinsic void
-nic_bpf_kill_threads(__gpr uint32_t *ctx_mode,
-                     unsigned int rnum, mem_ring_addr_t raddr)
-{
-    __xwrite uint32_t work[EBPF_WQ_E_N];
-    __xread uint32_t response[EBPF_WQ_E_N];
-    __gpr unsigned int wsize = sizeof(work);
-    __gpr unsigned int i;
-
-    work[0] = 0;
-    /* Hand out the "killer" work items */
-    for (i = 0; i < BPF_NUM_MES << (2 + *ctx_mode); i++) {
-        work[1] = i;
-        mem_workq_add_work(rnum, raddr, work, wsize);
-    }
-    i--;
-
-    /* 'i' is now max work id */
-    do {
-        i++;
-        work[1] = i;
-        mem_workq_add_work(rnum, raddr, work, wsize);
-
-        mem_workq_add_thread(rnum, raddr, response, wsize);
-    } while (response[1] != i);
 }
 
 __intrinsic void
@@ -541,9 +577,6 @@ nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t port)
 
     return;
 }
-
-
-//==========
 
 #endif /* _LIBNIC_NIC_INTERNAL_C_ */
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*- */
