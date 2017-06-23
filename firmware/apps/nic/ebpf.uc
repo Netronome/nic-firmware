@@ -58,6 +58,7 @@
 
 #define pkt_vec *l$index1
 
+
 #macro ebpf_reentry()
 .begin
     .reg egress_q_base
@@ -70,9 +71,9 @@
     .reg ebpf_rc
     .reg_addr ebpf_rc 0 A
     .set ebpf_rc
-	.reg rc
+    .reg rc
 
-	alu[rc, --, b, ebpf_rc]
+    alu[rc, --, b, ebpf_rc]
 
     // can this be written as an index by the eBPF code?
     alu[stats_flags, EBPF_RET_STATS_MASK, AND, rc, >>EBPF_RET_STATS_PASS]
@@ -125,7 +126,7 @@
     alu[stack_addr, stack_addr, +, ctx_offset]
     local_csr_wr[ACTIVE_LM_ADDR_0, stack_addr]
 
-    br_addr[NFD_BPF_START_OFF, ebpf_reentry#], live_regs[@dma_semaphore, t_idx_ctx, __actions_t_idx, __pkt_io_ctm_pkt_no]
+    br_addr[NFD_BPF_START_OFF, ebpf_reentry#], live_regs[@dma_semaphore, t_idx_ctx, __actions_t_idx, __pkt_io_nfd_pkt_no, __pkt_io_quiescent]
 .end
 #endm
 

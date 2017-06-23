@@ -417,9 +417,9 @@ cfg_changes_loop(void)
                 }
             }
 
-			if (update & NFP_NET_CFG_UPDATE_BPF) {
-				nic_local_bpf_reconfig(&ctx_mode, port);
-			}
+            if (update & NFP_NET_CFG_UPDATE_BPF) {
+                nic_local_bpf_reconfig(&ctx_mode, port);
+            }
 
             /* Save the control word */
             nic_control_word[port] = control;
@@ -429,8 +429,7 @@ cfg_changes_loop(void)
             }
 
             /* Wait for queues to drain / config to stabilize */
-            for (i = 0; i < 100; ++i) 
-                sleep(1000000);
+            sleep(100000);
 
             /* Complete the message */
             cfg_msg.msg_valid = 0;
