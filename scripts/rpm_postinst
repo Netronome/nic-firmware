@@ -22,7 +22,7 @@ for POSTINST in %{_prefix}/lib/dkms/common.postinst %{_datarootdir}/%{module_nam
         # Disable logging
         /opt/netronome/bin/ns-core-nic-setup log-disable
 
-        /opt/netronome/bin/ns-core-nic-setup check-flash
+        /opt/netronome/bin/ns-core-nic-setup check-flash || :
 
                 exit $?
         fi
