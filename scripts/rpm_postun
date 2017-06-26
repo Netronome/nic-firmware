@@ -1,2 +1,0 @@
-cd /usr/src/nfp-__CORENIC_REV__-__NIC_BUILD__
-sudo dkms remove nfp/__CORENIC_REV__-__NIC_BUILD__ --all

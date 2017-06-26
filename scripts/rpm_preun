@@ -1,0 +1,4 @@
+echo -e
+echo -e "Uninstall of %{module_name} module (version %{version}) beginning:"
+dkms remove -m %{module_name} -v %{version} --all --rpm_safe_upgrade
+exit 0
