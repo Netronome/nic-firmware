@@ -107,4 +107,4 @@ while [ $count -lt $kernel_count ]; do
 done
 echo ""
 
-/opt/netronome/bin/ns-core-nic-setup check-flash
+/opt/netronome/bin/ns-core-nic-setup check-flash || :
