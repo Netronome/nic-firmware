@@ -1,108 +1,35 @@
-#! /bin/bash
+#!/bin/bash
+for POSTINST in %{_prefix}/lib/dkms/common.postinst %{_datarootdir}/%{module_name}/postinst; do
+        if [ -f $POSTINST ]; then
+                $POSTINST %{module_name} %{version} %{_datarootdir}/%{module_name}
 
-NETRONOME_DIR=/opt/netronome
-NETRONOME_BIN=$NETRONOME_DIR/bin
-export PATH=$NETRONOME_BIN:$PATH
-DKMS_MODULE_NAME="nfp"
-DKMS_MODULE_VERSION="__CORENIC_REV__-__NIC_BUILD__"
-dkms add -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION"
-    ret=$?
-    if [ $ret -ne 0 ]; then
-        ret=$ERR_DKMS_ADD
-    else
-        kernel_count=0
-        for sm in `find /boot -nowarn -name "System.map*"`; do
-            kernel=${sm#"/boot/System.map-"}
-            grep -wq quirk_nfp6000 $sm
-            if [ $? -ne 0 ]; then
-                echo -n "ERR47 kernel patches not detected for version: "
-                echo $kernel
-                # TODO: instruct the user on how to apply them
-            else
-                echo -n $sm
-                echo " has ERR47 patch"
-                dkms build -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION" \
-                    -k $kernel
-                ret=$?
-                if [ $ret -ne 0 ]; then
-                    ret=$ERR_DKMS_BUILD
-                else
-                    dkms install -m "$DKMS_MODULE_NAME" -v \
-                        "$DKMS_MODULE_VERSION" -k $kernel
-                    ret=$?
-                    if [ $ret -ne 0 ]; then
-                        ret=$ERR_DKMS_INSTALL
-                    fi
-                    kernel_array[kernel_count]=$kernel
-                    let "kernel_count= $kernel_count + 1"
-                fi
-            fi
-        done
+        # Backup netronome blacklist
+        blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
 
-   fi
-dolog() {
-     # Use one of the following levels as $1
-     # alert, crit, debug, emerg, err, info, notice, warning
-     level="$1"
-     which logger >/dev/null 2>&1
-     ret=$?
-     if [ "$ret" -eq 0 ]; then
-         case $level in
-         alert) ;;
-         crit) ;;
-         debug) ;;
-         emerg) ;;
-         err) ;;
-         info) ;;
-         notice) ;;
-         warning) ;;
-         *)
-             echo "Unknown log level ($level) specified!"
-             exit 1
-         esac
-         while read -r line; do
-             logger -t "$LOG_APP" -p local0.$level -- "$line"
-         done <<< "$msg"
-     fi
-     echo "$2"
- }
-verify_kmods() {
-     if ! lsmod|awk '{print $1}'|grep -qxE 'nfp|nfp_net'; then
-         if ! modprobe nfp; then
-             dolog "err" "nfp module cannot be loaded"
-             exit 50
-         fi
-     fi
-}
+        if [ -e "$blacklist_file" ]; then
+            cp "$blacklist_file" "$blacklist_file".corenic.bak
+        fi
 
-# Backup netronome blacklist
-blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
+        # Enable start script
+        systemctl enable ns-core-nic.service
 
-if [ -e "$blacklist_file" ]; then
-    cp "$blacklist_file" "$blacklist_file".corenic.bak
-fi
+        # Clear any old config
+        /opt/netronome/bin/ns-core-nic-setup clean
 
-# Enable start script
-systemctl enable ns-core-nic.service
+        # Generate new config
+        /opt/netronome/bin/ns-core-nic-setup force
 
-# Clear any old config
-/opt/netronome/bin/ns-core-nic-setup clean
+        # Disable logging
+        /opt/netronome/bin/ns-core-nic-setup log-disable
 
-# Generate new config
-/opt/netronome/bin/ns-core-nic-setup force
+        /opt/netronome/bin/ns-core-nic-setup check-flash
 
-# Disable logging
-/opt/netronome/bin/ns-core-nic-setup log-disable
-
-echo "Core NIC's nfp_net driver succesfully installed for the following"
-echo "kernel versions:"
-echo -n -e "\t"
-count=0
-while [ $count -lt $kernel_count ]; do
-    echo -n ${kernel_array[${count}]}
-    echo -n " "
-    count=$(( $count + 1 ))
+                exit $?
+        fi
+        echo "WARNING: $POSTINST does not exist."
 done
-echo ""
-
-/opt/netronome/bin/ns-core-nic-setup check-flash
+echo -e "ERROR: DKMS version is too old and %{module_name} was not"
+echo -e "built with legacy DKMS support."
+echo -e "You must either rebuild %{module_name} with legacy postinst"
+echo -e "support or upgrade DKMS to a more current version."
+exit 1
