@@ -48,7 +48,7 @@ function write_rule() {
     mac=$2
     id=$3
     # TBD - ATTR{dev_id}=="0x0", ATTR{type}=="1"
-    echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"nfp\", ATTR{address}==\"$mac\", KERNEL==\"eth*\", NAME=\"nfp_p$id\""  >> $out_file
+    echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"nfp\", ATTR{address}==\"$mac\", NAME=\"nfp_p$id\""  >> $out_file
     echo "" >> $out_file
 }
 
@@ -105,7 +105,7 @@ function clean_udev() {
 }
 
 function write_udev() {
-    local hwinfo_macs macs id_prefix mac_addr netdev_id
+    local ethm_mac mac_addr netdev_id
     if [ -e "$udev_file" ]; then
         clean_udev
     fi
@@ -114,27 +114,19 @@ function write_udev() {
     write_head "$udev_file"
 
     # If the kernel has the phys_port_name feature
-    if [ -e "/sys/devices/virtual/net/lo/phys_port_name" ]; then
-        log "Writing Rules..."
-        echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"?*\", ATTR{address}==\"00:15:4d:*:*:*\", KERNEL==\"eth*\", NAME=\"nfp_\$attr{phys_port_name}\"" >> $udev_file
-        echo "SUBSYSTEM==\"net\", ACTION==\"add\", DRIVERS==\"?*\", ATTR{address}==\"00:15:4d:*:*:*\", NAME=\"nfp_\$attr{phys_port_name}\"" >> $udev_file
-        echo "" >> $udev_file
-    else
-        log "Obtaining hwinfo..."
-        hwinfo_macs=$($NETRONOME_BIN/nfp-hwinfo | grep "eth[0-7].mac")
-        macs=$(echo "$hwinfo_macs" | tr " " "\n")
-        id_prefix="eth"
-
-        log "Writing Rules..."
-        for mac in $macs
-        do
-            mac_addr=$(echo "$mac" | cut -d '=' -f 2)
-            netdev_id=$(echo "$mac" | cut -d '=' -f 1 | cut -d '.' -f 1)
-            netdev_id=${netdev_id#$id_prefix}  # remove id_prefix
-
-            write_rule "$udev_file" "$mac_addr" "$netdev_id"
-        done
+    log "Obtaining hwinfo..."
+    ethm_mac=$(printf "%d\n" 0x$($NETRONOME_BIN/nfp-hwinfo | awk -F'=' '/ethm.mac/ {print $2}' | tr -d ':') 2>/dev/null)
+    if [ "$ethm_mac" -eq "0" ]; then
+        log "Failed to obtain MAC addresses!"
+        return 1
     fi
+
+    log "Writing Rules..."
+    for netdev_id in `seq 0 7`
+    do
+        mac_addr=$(printf "00%x\n" $((ethm_mac+$netdev_id+1)) | sed -e 's/.\{2\}/&:/g' -e 's/://6')
+        write_rule "$udev_file" "$mac_addr" "$netdev_id"
+    done
 
     return 0
 }
