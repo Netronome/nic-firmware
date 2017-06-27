@@ -1,11 +1,15 @@
 #! /bin/bash
 
-nfp_net_name=nfp
-nfp_net_ver=$(dkms status | grep $nfp_net_name |grep installed | grep $(uname -r) | cut -d ',' -f2 | xargs)
-src_name="$nfp_net_name"-"$nfp_net_ver"
-
 # remove nfp driver from dkms
-dkms remove -m  $nfp_net_name -v $nfp_net_ver --all
+dkms status | while read line[i];
+    do
+        if ( [[ ${line} == *"nfp"* ]] || [[ ${line} == *"nfp-net"* ]] );then
+            nfp_net_name=$(echo $line | cut -d "," -f 1)
+            nfp_net_ver=$(echo $line | cut -d "," -f 2)
+            dkms remove -m  $nfp_net_name -v $nfp_net_ver --all
+        fi
+    done
+
 
 blacklist_file=/etc/modprobe.d/blacklist-netronome.conf
 
