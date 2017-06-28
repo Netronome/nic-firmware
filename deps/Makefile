@@ -2,11 +2,12 @@
 # Change these revisions to suit the project
 #
 # FLOWENV_REV - Tip as of January 17 2017
-FLOWENV_REV=59c0f4f94bb4
+FLOWENV_REV=74d431eeb670
 # GRO_REV  - Tip as of July 12 2016
 GRO_REV=25c868a8c724
 # NFD_REV - Tip of default branch as of 27 Oct 2016
-NFD_REV=cbad0447831e
+#NFD_REV=cbad0447831e
+NFD_REV=1b8f7ef80f64
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
@@ -70,6 +71,7 @@ $(DEPS_DIR)/ng-nfd.hg:
 	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
 	cd $(NFD_DIR) && patch -p1 < ../nfd-bpf-config.patch && cd -
 	cd $(NFD_DIR) && patch -p1 < ../fix-chain-meta.patch && cd -
+	#patch -d $(NFD_DIR) -p1 <$(DEPS_DIR)/disa_pending_tmp6.txt
 
 
 HG_DEPS += $(NFD_DIR)

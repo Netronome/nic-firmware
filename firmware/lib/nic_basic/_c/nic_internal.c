@@ -187,11 +187,6 @@ CREATE_JOURNAL(libnic_dbg);
       (((__lmem struct eth_addr *)_a)->a[0] & NET_ETH_GROUP_ADDR) \
     : (((__gpr struct eth_addr *)_a)->a[0] & NET_ETH_GROUP_ADDR))
 
-#if NFD_MAX_PFS != 0
-    #define NVNICS NFD_MAX_PFS
-#else
-    #define NVNICS 2
-#endif
 /*
  * Struct describing the current state of the NIC endpoint.
  *

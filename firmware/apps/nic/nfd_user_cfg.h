@@ -91,7 +91,7 @@
 #define NFD_VNIC_VF
 
 /* Use a service ME which will handle MSIX generation when enabled */
-#define USE_SVC_ME
+//#define USE_SVC_ME
 
 #define NFD_PCIE0_EMEM          emem0
 
@@ -185,5 +185,14 @@
 #define NFD_BPF_ABI             2
 
 #define NFD_NET_APP_TYPE        (2)
+
+#define NFD_BPF_ABI				2
+#define NFD_NET_APP_ID			(2)
+
+/* enable cmsg */
+#define NFD_USE_CTRL
+
+/* # of PFs + ctrl vnic */
+#define NVNICS (NFD_MAX_PFS + NFD_MAX_CTRL)
 
 #endif /* !_NFD_USER_CFG_H_ */
