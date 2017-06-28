@@ -24,9 +24,6 @@
 	__hashmap_journal_init()
 #endif	/* EBPF_DEBUG */
 
-.alloc_mem _pf0_net_app_id dram global 8 8
-.init _pf0_net_app_id+0 (NFD_NET_APP_TYPE)
-
 #define EBPF_STACK_SIZE 64
 .alloc_mem EBPF_STACK_BASE lmem me (4 * (1 << log2(EBPF_STACK_SIZE, 1))) (1 << log2(EBPF_STACK_SIZE))
 
