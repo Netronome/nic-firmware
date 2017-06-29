@@ -68,6 +68,7 @@ NFD_INC = -I$(NFD_DIR)/shared \
 $(DEPS_DIR)/ng-nfd.hg:
 	hg clone -r $(NFD_REV) \
 	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
+	cd $(NFD_DIR) && patch -p1 < ../nfd-bpf-caps.patch && cd -
 
 
 HG_DEPS += $(NFD_DIR)
