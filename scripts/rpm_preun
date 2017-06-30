@@ -1,3 +1,6 @@
+systemctl stop ns-core-nic.service
+systemctl disable ns-core-nic.service
+
 echo -e
 echo -e "Uninstall of %{module_name} module (version %{version}) beginning:"
 dkms remove -m %{module_name} -v %{version} --all --rpm_safe_upgrade
