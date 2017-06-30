@@ -776,11 +776,12 @@ endef
 # Template for adding a run-time symbol table
 #
 # @param $1 firmware name
+# @param $2 MIP name
 #
 #
 define nffw.add_rtsyms
 
-$1__LINK_FLAGS += -mip -rtsyms
+$1__LINK_FLAGS += -mip -rtsyms -name $2
 
 endef
 

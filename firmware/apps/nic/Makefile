@@ -193,8 +193,10 @@ $(eval $(call nffw.add_obj,$(PROJECT),nic_tx,\
 $(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,lib/infra_basic,init_pms.uc,-DPMS_INIT_TM=1 -DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
 
-# Link
-$(eval $(call nffw.add_rtsyms,$(PROJECT)))
+# Link stage
+# Write the FW name to the MIP
+# TODO: get the release name e.g. 06 from the branch name
+$(eval $(call nffw.add_rtsyms,$(PROJECT),1cNIC06.$(NFP_NIC_REV)))
 # TODO get link_w_analysis to work without adding a warning
 $(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx))
 $(eval $(call nffw.cat,$(PROJECT),nic_rx,nic_tx))
