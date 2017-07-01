@@ -55,7 +55,7 @@
 #endm
 
 
-#ifndef EBPF_REENTRY_DEFINED
+#ifndef _ACTIONS_UC
 .if (0)
     ebpf_reentry#:
 .endif
