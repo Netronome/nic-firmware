@@ -1233,4 +1233,9 @@ end#:
     pv_seek(--, io_vec, in_offset, in_length, in_flags)
 #endm
 
+
+#macro pv_invalidate_cache(in_pkt_vec)
+    alu[BF_A(in_pkt_vec, PV_SEEK_BASE_bf), BF_A(in_pkt_vec, PV_SEEK_BASE_bf), OR, 0xff, <<BF_L(PV_SEEK_BASE_bf)]
+#endm
+
 #endif

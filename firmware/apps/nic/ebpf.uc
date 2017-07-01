@@ -56,8 +56,7 @@
 //-- change lib/nic_basic/nic_stats.h to match
 #define EBPF_STATS_START_OFFSET         0x80 // after rx and tx stats
 
-#define pkt_vec *l$index1
-
+#define _ebpf_pkt_vec *l$index1
 
 #macro ebpf_reentry()
 .begin
@@ -85,7 +84,7 @@
         move(nic_stats_extra_hi, _nic_stats_extra >>8)
         mem[incr64, --, nic_stats_extra_hi, <<8, stats_offset] // pkts count
         alu[stats_offset, stats_offset, +, 8] // bytes count
-        pv_get_length(pkt_length, pkt_vec)
+        pv_get_length(pkt_length, _ebpf_pkt_vec)
         ov_start((OV_IMMED16 | OV_LENGTH))
         ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
         ov_set_use(OV_IMMED16, pkt_length)
@@ -97,17 +96,17 @@
 
     local_csr_wr[T_INDEX, __actions_t_idx]
 
-    pv_set_tx_host_rx_bpf(pkt_vec)
+    pv_set_tx_host_rx_bpf(_ebpf_pkt_vec)
 
     br_bset[rc, EBPF_RET_PASS, actions#]
 
-    alu[stats_base, 0xff, AND, BF_A(pkt_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
+    alu[stats_base, 0xff, AND, BF_A(_ebpf_pkt_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
     alu[stats_base, stats_base, +, EBPF_PORT_STATS_BLK]
-    pv_stats_select(pkt_vec, stats_base)
-    pv_reset_egress_queue(pkt_vec)
-    pv_get_ingress_queue_nbi_chan(egress_q_base, pkt_vec)
+    pv_stats_select(_ebpf_pkt_vec, stats_base)
+    pv_reset_egress_queue(_ebpf_pkt_vec)
+    pv_get_ingress_queue_nbi_chan(egress_q_base, _ebpf_pkt_vec)
 
-    pkt_io_tx_wire(pkt_vec, egress_q_base, egress#, drop#)
+    pkt_io_tx_wire(_ebpf_pkt_vec, egress_q_base, egress#, drop#)
 .end
 #endm
 
