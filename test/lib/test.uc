@@ -35,8 +35,22 @@
     .if_unsigned(lhs != rhs)
         local_csr_wr[MAILBOX_2, lhs]
         local_csr_wr[MAILBOX_3, rhs]
-        test_fail(0xfc)
+        test_fail(0xfc) ; fail compare
     .endif
+.end
+#endm
+
+
+#macro test_assert_unequal(tested, expected)
+.begin
+    .reg lhs
+    .reg rhs
+    move(lhs, tested)
+    move(rhs, expected)
+   .if_unsigned(lhs == rhs)
+       local_csr_wr[MAILBOX_2, lhs]
+       test_fail(0xfe) ; fail equal
+   .endif
 .end
 #endm
 
