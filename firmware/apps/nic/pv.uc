@@ -1027,12 +1027,18 @@ skip_ctm_buffer#:
 .begin
     .reg tibi // T_INDEX_BYTE_INDEX
 
-    #if (((in_flags & PV_SEEK_REVERSE) == 0))
-        #define _PV_SEEK_BASE_MASK 0x3fc0
-        #define _PV_SEEK_OFFSET_MASK 0x3f
+    #if ((in_flags & PV_SEEK_REVERSE) || (in_flags & PV_SEEK_T_INDEX_ONLY))
+        #define _PV_SEEK_TEST_OFFSET_MASK 0x7f
+        #define _PV_SEEK_READ_BASE_MASK 0x3f80
+        #define _PV_SEEK_READ_OFFSET_MASK 0x7f
+    #elif (! streq('in_length', '--'))
+        #define _PV_SEEK_TEST_OFFSET_MASK 0x7f
+        #define _PV_SEEK_READ_BASE_MASK 0x3fc0
+        #define _PV_SEEK_READ_OFFSET_MASK 0x3f
     #else
-        #define _PV_SEEK_BASE_MASK 0x3f80
-        #define _PV_SEEK_OFFSET_MASK 0x7f
+        #define _PV_SEEK_TEST_OFFSET_MASK 0x3f
+        #define _PV_SEEK_READ_BASE_MASK 0x3fc0
+        #define _PV_SEEK_READ_OFFSET_MASK 0x3f
     #endif
 
     #if (isnum(in_offset))
@@ -1040,7 +1046,7 @@ skip_ctm_buffer#:
         #if (((in_flags & PV_SEEK_PAD_INCLUDED) == 0))
             #define_eval _PV_SEEK_OFFSET (_PV_SEEK_OFFSET + 2)
         #endif
-        alu[tibi, t_idx_ctx, OR, (_PV_SEEK_OFFSET & 0x7f)]
+        alu[tibi, t_idx_ctx, OR, (_PV_SEEK_OFFSET & _PV_SEEK_TEST_OFFSET_MASK)]
         #if (_PV_SEEK_OFFSET >= 256)
            .reg seek_offset
            immed[seek_offset, _PV_SEEK_OFFSET]
@@ -1053,7 +1059,7 @@ skip_ctm_buffer#:
             alu[seek_offset, in_offset, +, 2]
             #define_eval _PV_SEEK_OFFSET seek_offset
         #endif
-        alu[tibi, _PV_SEEK_OFFSET_MASK, AND, _PV_SEEK_OFFSET]
+        alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_TEST_OFFSET_MASK]
         alu[tibi, tibi, OR, t_idx_ctx]
     #endif
 
@@ -1140,9 +1146,9 @@ skip_ctm_buffer#:
 
         br[finalize#], defer[2]
             #if (isnum(_PV_SEEK_OFFSET))
-                immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_OFFSET_MASK)]
+                immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_READ_OFFSET_MASK)]
             #else
-                alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_OFFSET_MASK]
+                alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_READ_OFFSET_MASK]
             #endif
             alu[tibi, tibi, OR, t_idx_ctx]
 
@@ -1153,9 +1159,9 @@ skip_ctm_buffer#:
         mem[read32, $__pv_pkt_data[0], mu_addr, <<8, read_offset, max_32], indirect_ref, sig_done[sig_mu]
         ctx_arb[sig_mu], br[finalize#], defer[2]
             #if (isnum(_PV_SEEK_OFFSET))
-                immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_OFFSET_MASK)]
+                immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_READ_OFFSET_MASK)]
             #else
-                alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_OFFSET_MASK]
+                alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_READ_OFFSET_MASK]
             #endif
             alu[tibi, tibi, OR, t_idx_ctx]
 
@@ -1166,9 +1172,9 @@ read#:
         br_bset[BF_AL(io_vec, PV_SPLIT_bf), split#], defer[2]
     #endif
             #if (isnum(_PV_SEEK_OFFSET))
-                immed[aligned_offset, (_PV_SEEK_OFFSET & _PV_SEEK_BASE_MASK)]
+                immed[aligned_offset, (_PV_SEEK_OFFSET & _PV_SEEK_READ_BASE_MASK)]
             #else
-                alu[aligned_offset, _PV_SEEK_OFFSET, AND~, _PV_SEEK_OFFSET_MASK]
+                alu[aligned_offset, _PV_SEEK_OFFSET, AND~, _PV_SEEK_READ_OFFSET_MASK]
             #endif
             alu[read_offset, aligned_offset, -, 2]
 
@@ -1176,9 +1182,9 @@ read_ctm#:
     ov_single(OV_LENGTH, 32, OVF_SUBTRACT_ONE)
     mem[read32, $__pv_pkt_data[0], BF_A(io_vec, PV_CTM_ADDR_bf), read_offset, max_32], indirect_ref, defer[2], ctx_swap[sig_ctm]
         #if (isnum(_PV_SEEK_OFFSET))
-            immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_OFFSET_MASK)]
+            immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_READ_OFFSET_MASK)]
         #else
-            alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_OFFSET_MASK]
+            alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_READ_OFFSET_MASK]
         #endif
         alu[tibi, tibi, OR, t_idx_ctx]
 
@@ -1213,8 +1219,9 @@ check#:
 end#:
 #endif // ((in_flags) & PV_SEEK_T_INDEX_ONLY) == 0
 #undef _PV_SEEK_OFFSET
-#undef _PV_SEEK_OFFSET_MASK
-#undef _PV_SEEK_BASE_MASK
+#undef _PV_SEEK_TEST_OFFSET_MASK
+#undef _PV_SEEK_READ_OFFSET_MASK
+#undef _PV_SEEK_READ_BASE_MASK
 .end
 #endm
 
