@@ -105,5 +105,6 @@ union instruction_format {
 #define INSTR_PIPELINE_BIT 16
 #define INSTR_OPCODE_LSB   17
 
+#define INSTR_RSS_V1_META_BIT 7
 
 #endif /* _APP_CONFIG_INSTR_H_ */
