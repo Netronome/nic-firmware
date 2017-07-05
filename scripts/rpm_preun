@@ -1,5 +1,6 @@
 systemctl stop ns-core-nic.service
 systemctl disable ns-core-nic.service
+/opt/netronome/bin/ns-core-nic-setup clean
 
 echo -e
 echo -e "Uninstall of %{module_name} module (version %{version}) beginning:"

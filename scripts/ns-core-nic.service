@@ -3,7 +3,6 @@ Description=Script to manage Netronome Core NIC firmware and udev rules
 
 [Service]
 ExecStart=/opt/netronome/bin/ns-core-nic-setup boot
-ExecStop=/opt/netronome/bin/ns-core-nic-setup clean
 RemainAfterExit=yes
 Type=oneshot
 

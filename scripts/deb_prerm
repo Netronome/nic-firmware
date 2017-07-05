@@ -23,6 +23,7 @@ fi
 if `readlink /proc/1/exe | grep -qi systemd`; then
     systemctl stop ns-core-nic.service
     systemctl disable ns-core-nic.service
+    /opt/netronome/bin/ns-core-nic-setup clean
 else
     # Delete udev rules, modprobe blacklist, and firmware files
     service ns-core-nic.autorun clean
