@@ -6,7 +6,8 @@ dkms status | while read line[i];
         if ( [[ ${line} == *"nfp"* ]] || [[ ${line} == *"nfp-net"* ]] );then
             nfp_net_name=$(echo $line | cut -d "," -f 1)
             nfp_net_ver=$(echo $line | cut -d "," -f 2)
-            dkms remove -m  $nfp_net_name -v $nfp_net_ver --all
+            kernel_ver=$(echo $line | cut -d "," -f 3)
+            dkms remove -m  $nfp_net_name -v $nfp_net_ver -k $kernel_ver
         fi
     done
 
