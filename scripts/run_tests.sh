@@ -34,7 +34,9 @@ for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
     else
         TESTED=`nfp-reg mecsr:i32.me0.Mailbox2 | cut -d= -f2`
         EXPECTED=`nfp-reg mecsr:i32.me0.Mailbox3 | cut -d= -f2`
-        if [[ ${RESULT} -eq "0xfc" ]] ; then
+        if [[ ${RESULT} -eq "0xfa" ]] ; then
+            DETAIL="- assertion failed"
+        elif [[ ${RESULT} -eq "0xfc" ]] ; then
             DETAIL=`printf -- "- expected 0x%08x, got 0x%08x" ${EXPECTED} ${TESTED}`
         elif [[ ${RESULT} -eq "0xfe" ]] ; then
             DETAIL=`printf -- "- unexpectedly got 0x%08x" ${TESTED}`

@@ -26,6 +26,14 @@
 #endm
 
 
+#macro test_assert(ASSERT)
+    .if_unsigned(ASSERT)
+    .else
+        test_fail(0xfa) ; fail assert
+    .endif
+#endm
+
+
 #macro test_assert_equal(tested, expected)
 .begin
     .reg lhs
