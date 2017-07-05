@@ -35,6 +35,8 @@
 
 #include <single_ctx_test.uc>
 
+#include "actions_harness.uc"
+
 #include <config.h>
 #include <gro_cfg.uc>
 #include <global.uc>
@@ -86,10 +88,6 @@ move(nn_idx, 0)
 #endm
 
 .reg prev_hash
-
-#define JOURNAL_ENABLE
-#include "journal.uc"
-journal_declare(queue)
 
 #macro rss_validate(in_pkt_vec, TARGET_HASH_TYPE, CHECK, expected)
 .begin
@@ -151,11 +149,3 @@ journal_declare(queue)
 .end
 #endm
 
-.if (0)
-    drop#:
-    egress#:
-    actions#:
-    test_fail()
-    .reentry
-    br[ebpf_reentry#]
-.endif

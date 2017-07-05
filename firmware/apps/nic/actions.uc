@@ -242,58 +242,41 @@ skip_rss#:
 
 #macro __actions_checksum_complete(in_pkt_vec)
 .begin
+    .reg available_words
     .reg carries
     .reg checksum
     .reg data_len
+    .reg idx
+    .reg include_mask
     .reg iteration_bytes
     .reg iteration_words
-    .reg jump_idx
     .reg last_bits
-    .reg mask
     .reg offset
-    .reg padded
     .reg pkt_len
     .reg remaining_words
     .reg shift
+    .reg zero_padded
     .reg write $metadata
-    .reg t_idx
 
     .sig sig_read
 
     __actions_read(--, --, --)
 
-    pv_invalidate_cache(in_pkt_vec)
-
     immed[checksum, 0]
     immed[carries, 0]
-    immed[offset, 14]
 
     pv_get_length(pkt_len, in_pkt_vec)
-    alu[data_len, pkt_len, -, offset]
-    alu[remaining_words, --, B, data_len, >>2]
 
-loop#:
-    ov_start(OV_LENGTH)
-    ov_set_use(OV_LENGTH, 32, OVF_SUBTRACT_ONE)
-    ov_clean()
-    mem[read8, $__pv_pkt_data[0], BF_A(in_pkt_vec, PV_CTM_ADDR_bf), offset, max_32], indirect_ref, ctx_swap[sig_read]
+    alu[data_len, pkt_len, -, 14]
+    bgt[start#], defer[3]
+        alu[remaining_words, --, B, data_len, >>2]
+        immed[iteration_words, 0]
+        immed[offset, (14 + 2)]
 
-    local_csr_wr[T_INDEX, t_idx_ctx]
-
-    alu[jump_idx, 8, -, remaining_words]
-    ble[max#]
-
-    jump[jump_idx, w0#], targets[w0#,  w1#,  w2#,  w3#,  w4#,  w5#,  w6#, w7#], defer[3]
-       alu[iteration_words, --, B, remaining_words]
-       alu[iteration_bytes, --, B, remaining_words, <<2]
-       alu[offset, offset, +, iteration_bytes]
-
-max#:
-    alu[offset, offset, +, 32]
-    immed[iteration_words, 8]
+    br[skip_checksum#]
 
 #define_eval LOOP_UNROLL (0)
-#while (LOOP_UNROLL < 8)
+#while (LOOP_UNROLL < 32)
 w/**/LOOP_UNROLL#:
     alu[checksum, checksum, +carry, *$index++]
     #define_eval LOOP_UNROLL (LOOP_UNROLL + 1)
@@ -302,34 +285,49 @@ w/**/LOOP_UNROLL#:
 
     alu[carries, carries, +carry, 0] // accumulate carries that would be lost to looping construct alu[]s
 
-    alu[remaining_words, remaining_words, -, iteration_words]
-    bgt[loop#]
+start#:
+    pv_seek(idx, in_pkt_vec, offset, --, PV_SEEK_PAD_INCLUDED)
 
+    alu[remaining_words, remaining_words, -, iteration_words]
+    beq[last_bits#]
+
+    alu[available_words, 32, -, idx]
+    alu[--, available_words, -, remaining_words]
+    bmi[consume_available#]
+
+    alu[idx, 32, -, remaining_words]
+
+consume_available#:
+    jump[idx, w0#], targets[w0#,  w1#,  w2#,  w3#,  w4#,  w5#,  w6#,  w7#,
+                            w8#,  w9#,  w10#, w11#, w12#, w13#, w14#, w15#,
+                            w16#, w17#, w18#, w19#, w20#, w21#, w22#, w23#,
+                            w24#, w25#, w26#, w27#, w28#, w29#, w30#, w31#], defer[3]
+        alu[iteration_words, 32, -, idx]
+        alu[iteration_bytes, --, B, iteration_words, <<2]
+        alu[offset, offset, +, iteration_bytes]
+
+last_bits#:
+    pv_meta_push_type(in_pkt_vec, NFP_NET_META_CSUM)
     alu[last_bits, (3 << 3), AND, data_len, <<3]
     beq[finalize#]
 
-    mem[read8, $__pv_pkt_data[0], BF_A(in_pkt_vec, PV_CTM_ADDR_bf), offset, 4], ctx_swap[sig_read]
-
-    local_csr_wr[T_INDEX, t_idx_ctx]
     alu[shift, 32, -, last_bits]
-    alu[mask, shift, ~B, 0]
-    alu[mask, --, B, mask, <<indirect]
-    alu[padded, mask, AND, *$index++]
-    alu[checksum, checksum, +, padded]
-    alu[carries, carries, +carry, 0]
+    alu[include_mask, shift, ~B, 0]
+    alu[include_mask, --, B, include_mask, <<indirect]
+    alu[zero_padded, include_mask, AND, *$index]
+    alu[checksum, checksum, +, zero_padded]
 
 finalize#:
-    alu[checksum, checksum, +, carries]
-    alu[checksum, checksum, +carry, 0]
+    alu[checksum, checksum, +carry, carries]
     alu[$metadata, checksum, +carry, 0] // adding carries might cause another carry
 
-    pv_meta_push_type(in_pkt_vec, 6)
     pv_meta_prepend(in_pkt_vec, $metadata, 4)
 
     __actions_restore_t_idx()
+
+skip_checksum#:
 .end
 #endm
-
 
 
 #macro actions_load(in_pkt_vec)
