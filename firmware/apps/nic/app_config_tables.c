@@ -24,6 +24,7 @@
 #include <vnic/shared/nfd_cfg.h>
 #include <vnic/pci_in.h>
 #include <vnic/pci_out.h>
+#include <vnic/nfd_common.h>
 #include <shared/nfp_net_ctrl.h>
 #include <nic_basic/nic_basic.h>
 #include <nic_basic/nic_stats.h>
@@ -515,7 +516,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     }
 
     /* RSS */
-    if (control & NFP_NET_CFG_CTRL_RSS2) {
+    if (control & NFP_NET_CFG_CTRL_RSS_ANY) {
 
         /* RSS remapping table with NN register index as start offset */
         rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
@@ -542,6 +543,9 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         instr[count].instr = INSTR_RSS;
 #endif
         instr[count].param = (rss_tbl_nnidx << 8) | (rss_flags & 0x0f);
+        if ((NFD_CFG_MAJOR < 4) && !(control & NFP_NET_CFG_CTRL_CHAIN_META)) {
+            instr[count].param |= (1 << INSTR_RSS_V1_META_BIT);
+        }
         instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RSS);
         prev_instr = INSTR_RSS;
 

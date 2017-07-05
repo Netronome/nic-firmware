@@ -216,12 +216,14 @@ process_l4#:
 
 skip_l4#:
     pv_meta_push_type(in_pkt_vec, hash_type)
-    pv_meta_push_type(in_pkt_vec, 1)
+    br_bset[opcode, INSTR_RSS_V1_META_BIT, skip_meta_type#], defer[3]
+        local_csr_rd[CRC_REMAINDER]
+        immed[hash, 0]
+        alu[$metadata, --, B, hash]
 
-    local_csr_rd[CRC_REMAINDER]
-    immed[hash, 0]
+    pv_meta_push_type(in_pkt_vec, NFP_NET_META_HASH)
 
-    alu[$metadata, --, B, hash]
+skip_meta_type#:
     pv_meta_prepend(in_pkt_vec, $metadata, 4]
 
     alu[queue_off, 0x1f, AND, hash, >>2]

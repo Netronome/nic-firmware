@@ -69,6 +69,7 @@ $(DEPS_DIR)/ng-nfd.hg:
 	hg clone -r $(NFD_REV) \
 	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
 	cd $(NFD_DIR) && patch -p1 < ../nfd-bpf-config.patch && cd -
+	cd $(NFD_DIR) && patch -p1 < ../fix-chain-meta.patch && cd -
 
 
 HG_DEPS += $(NFD_DIR)
