@@ -405,6 +405,8 @@ cfg_changes_loop(void)
                 } else {
                     link_state = 0;
                 }
+				app_config_port(vid, control, update);	/* write cmsg instr */
+
                 mem_write32(&link_state,
                             (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg.vid) +
                              NFP_NET_CFG_STS),

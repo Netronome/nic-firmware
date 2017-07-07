@@ -292,7 +292,7 @@ upd_rx_wire_instr(__xwrite uint32_t *xwr_instr,
 /* Update RX host instr -> multiple table entries (mult queues) per port */
 __intrinsic void
 upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
-                   uint32_t start_offset, uint32_t count)
+                   uint32_t start_offset, uint32_t count, uint32_t num_pcie_q)
 {
     __cls __addr32 void *nic_cfg_instr_tbl = (__cls __addr32 void*)
                                         __link_sym("NIC_CFG_INSTR_TBL");
@@ -305,7 +305,7 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
 
     /* Write multiple entries (one for each host queue) to local CLS.
      * All writes without a signal except last. */
-    for (i = 0; i < NUM_PCIE_Q_PER_PORT - 1; i++)
+    for (i = 0; i < (num_pcie_q - 1); i++)
     {
         __asm cls[write, *xwr_instr, nic_cfg_instr_tbl, byte_off, \
                     __ct_const_val(count)]
@@ -324,7 +324,7 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
         addr_hi = app_isl_ids[isl] >> 4; /* only use island, mask out ME */
         addr_hi = (addr_hi << (34 - 8)); /* address shifted by 8 in instr */
 
-        for (i = 0; i < NUM_PCIE_Q_PER_PORT - 1; i++)
+        for (i = 0; i < (num_pcie_q - 1); i++)
         {
             __asm cls[write, *xwr_instr, addr_hi, <<8, addr_lo, \
                         __ct_const_val(count)]
@@ -442,23 +442,34 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     uint32_t count;
     uint32_t phy_port, type, vnic;
     uint32_t prev_instr = 0;
+	__xwrite uint32_t dbg;
     __imem struct nic_port_stats_extra *nic_stats_extra =
         (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
+
+    reg_zero(instr, sizeof(instr));
+    count = 0;
 
     NFD_VID2VNIC(type, vnic, vnic_port);
     if (type == NFD_VNIC_TYPE_PF) {
         phy_port = vnic;
     } else {
-        /* TODO handle CTRL vNIC actions here
-         * or ensure they can't reach here */
+		/* CTRL vnic instruction */
+#ifdef GEN_INSTRUCTION
+        instr[0].instr = instr_tbl[INSTR_CMSG];
+#else
+        instr[0].instr = INSTR_CMSG;
+#endif
+		reg_cp(xwr_instr, (void *)instr, 4);
+		byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
+    	upd_rx_host_instr (xwr_instr, byte_off<<2, 1, 1);
 		return;
     }
 
     /*
      * RX HOST --> TX WIRE
      */
-    reg_zero(instr, sizeof(instr));
-    count = 0;
+   // reg_zero(instr, sizeof(instr));
+   // count = 0;
 
 #ifdef GEN_INSTRUCTION
     instr[count].instr = instr_tbl[INSTR_STATISTICS];
@@ -498,7 +509,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
     /* write TX instr to local table and to other islands too */
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-    upd_rx_host_instr (xwr_instr, byte_off<<2, count);
+    upd_rx_host_instr (xwr_instr, byte_off<<2, count, NUM_PCIE_Q_PER_PORT);
 
 
     /*
@@ -655,29 +666,26 @@ app_config_port_down(uint32_t vnic_port)
 #endif
 
     /* write drop instr to local host table */
+	/* do nothing for CTRL vNIC */
     NFD_VID2VNIC(type, vnic, vnic_port);
     if (type == NFD_VNIC_TYPE_PF) {
-        /* TODO handle the PF */
-    } else {
-        /* TODO handle CTRL vNIC actions here
-         * or ensure they can't reach here */
-    }
-    byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-    upd_rx_host_instr (&xwr_instr.value, byte_off << 2, 1);
+    	byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
+    	upd_rx_host_instr (&xwr_instr.value, byte_off << 2, 1, NUM_PCIE_Q_PER_PORT);
 
-    /* write drop instr to local wire table */
-    byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic_port) * NIC_MAX_INSTR;
-    upd_rx_wire_instr(&xwr_instr.value, byte_off << 2, 1);
+    	/* write drop instr to local wire table */
+    	byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic_port) * NIC_MAX_INSTR;
+    	upd_rx_wire_instr(&xwr_instr.value, byte_off << 2, 1);
 
 #ifdef APP_CONFIG_DEBUG
-    {
-        union debug_instr_journal data;
-        data.value = 0x00;
-        data.event = PORT_DOWN;
-        data.param = vnic_port;
-        JDBG(app_debug_jrn, data.value);
-    }
+    	{	
+        	union debug_instr_journal data;
+        	data.value = 0x00;
+        	data.event = PORT_DOWN;
+        	data.param = vnic_port;
+        	JDBG(app_debug_jrn, data.value);
+    	}
 #endif
+	}
 
     return;
 }

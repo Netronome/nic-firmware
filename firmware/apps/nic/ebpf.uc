@@ -13,7 +13,7 @@
 #include "slicc_hash.h"
 
 //#undef EBPF_DEBUG
-//#define EBPF_DEBUG
+#define EBPF_DEBUG
 #define EBPF_MAPS
 
 #ifdef EBPF_DEBUG
@@ -29,6 +29,7 @@
     pkt_counter_init()
     #include "hashmap.uc"
     #include "hashmap_priv.uc"
+	#include "cmsg_map.uc"
 #endif
 #ifdef EBPF_DEBUG
     #include "map_debug_config.h"
@@ -143,6 +144,7 @@
 
 #macro ebpf_init()
 	hashmap_init()
+	cmsg_init()
 #endm
 
 #macro ebpf_htab_entries()

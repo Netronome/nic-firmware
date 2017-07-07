@@ -493,7 +493,7 @@ ret#:
 .begin
 	.reg $desc_xfer
 	.set $desc_xfer
-	
+
 	.sig lock_upgrade_sig
 	.sig lock_wait_sig
 	.reg cnt
@@ -964,7 +964,7 @@ ret#:
 .reentry
 .begin
 	htab_subr_regs_alloc()
-	
+
 	.reg htab_return_addr
 	.reg_addr htab_return_addr 0 B
 	.set htab_return_addr

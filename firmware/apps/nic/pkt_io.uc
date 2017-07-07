@@ -18,7 +18,7 @@ nfd_out_send_init()
 .endif
 
 #include "pv.uc"
-#include "nfd_cc.uc"
+//#include "nfd_cc.uc"
 
 
 .reg volatile write $__pkt_io_gro_meta[GRO_META_SIZE_LW]

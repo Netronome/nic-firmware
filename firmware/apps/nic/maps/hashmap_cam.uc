@@ -94,7 +94,7 @@
 				alu[index, index, -, 1]
 				#define_eval __IDX (__IDX + 1)
 			#endloop
-			ru_emem_ring_op($data[0], HASHMAP_FREE_QID, sig_init_write, journal, HASHMAP_FREE_RBASE, 16, --)
+			ru_emem_ring_op($data, HASHMAP_FREE_QID, sig_init_write, journal, HASHMAP_FREE_RBASE, 16, --)
 		.endw
 		#undef __IDX
 	.end

@@ -380,7 +380,7 @@ next#:
     ins_5#: br[checksum_complete#]
     ins_6#: br[tx_host#]
     ins_7#: br[tx_wire#]
-    ins_8#: br[DROP_LABEL]
+    ins_8#: br[cmsg#]
     ins_9#: br[ebpf#]
     ins_10#: br[rxcsum#]
 
@@ -419,6 +419,9 @@ ebpf#:
 rxcsum#:
     __actions_rxcsum(in_pkt_vec)
     br[next#] // last instruction in code will not pipeline
+
+cmsg#:
+	cmsg_desc_workq($__pkt_io_gro_meta, in_pkt_vec, EGRESS_LABEL)
 
 .end
 #endm
