@@ -84,7 +84,7 @@ $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
 	mei3.me0 mei3.me1 mei3.me2 mei3.me3 mei3.me4 mei3.me5 mei3.me6 mei3.me7 \
 	mei4.me0 mei4.me1 mei4.me2 mei4.me3 mei4.me4 mei4.me5 mei4.me6 mei4.me7 \
 	))
-	
+
 # Custom config to give ME list to the app master
 define NIC_ISL_ME_DEST
 ((($(1) + 32) << 4) + ($(2) + 4))
@@ -143,6 +143,18 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 4, 6), \
         $(call NIC_ISL_ME_DEST, 4, 7)"
 
+# Add cmsg map handler
+$(eval $(call microcode.assemble,$(PROJECT),mapcmsg,apps/nic/maps,cmsg_app.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/lib))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/apps/nic/lib))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/apps/nic/maps))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,deps/ng-nfd.hg))
+$(eval $(call microcode.add_includes,$(PROJECT),mapcmsg,$(DEPS_DIR)/flowenv.hg/me/blocks/blm))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(BLM_DIR)))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(GRO_DIR)))
+$(eval $(call microcode.add_define,$(PROJECT),mapcmsg,WORKERS_PER_ISLAND=4))
+$(eval $(call microcode.add_define,$(PROJECT),mapcmsg,GLOBAL_INIT=1))
+$(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,mei1.me8))
 
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))

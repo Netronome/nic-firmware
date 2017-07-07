@@ -8,8 +8,9 @@
 #ifndef _JOURNAL_UC_
 #define _JOURNAL_UC_
 
-//#include <ring_utils.uc>
-#include <ring_utils_ext.uc>
+#include <ring_utils.uc>
+#include <ring_ext.uc>
+//#include <ring_utils_ext.uc>
 
 #ifndef JOURNAL_SIZE_LW
     #ifdef NO_DRAM

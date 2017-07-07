@@ -9,16 +9,23 @@
 #ifndef PKT_COUNTER_ENABLE
     #define PKT_COUNTER_ENABLE
     #include "pkt_counter.uc"
+	pkt_counter_init()
 #endif
 
 #define DEBUG_TRACE
 #define CMSG_UNITTEST_CODE
 #define JOURNAL_ENABLE 1
+
+#define CMSG_MAP_PROC 1
 #include "hashmap.uc"
 #include "cmsg_map.uc"
-#include "map_debug_config.h"
+hashmap_init()
 cmsg_init()
 
+#ifdef DEBUG_TRACE
+	#include "map_debug_config.h"
+    __hashmap_journal_init()
+#endif  /* DEBUG_TRACE */
 
 .begin
     .reg ctx_num
@@ -38,7 +45,7 @@ cmsg_init()
     immed[ctx_num, 0]
     alu[ctx_num, ctx_num, and, 7]
 
-    local_csr_wr[MAILBOX3, 1]
+    local_csr_wr[MAILBOX3, 0]
 	alu[@cmsg_rx_init, @cmsg_rx_init, +, 1]
     local_csr_wr[MAILBOX2, @cmsg_rx_init]
 
@@ -53,6 +60,7 @@ main_loop#:
     br[main_loop#]
 
 done#:
+#pragma warning(disable: 4702)
 ctx_arb[kill]
 
 .end

@@ -36,9 +36,8 @@
 #include <nfd_in.uc>
 #include <nfd_out.uc>
 #include <gro.uc>
-#include "nfd_meta_prepend.uc"
-#include "pv.uc"
-#include "nfd_cc.uc"
+//#include "nfd_meta_prepend.uc"
+#include "pkt_buf.uc"
 
 #ifndef NUM_CONTEXT
 	#define NUM_CONTEXT 4
@@ -47,13 +46,19 @@
 
 #ifndef INCL_CMSG_MAP_PROC
 	#include "cmsg_map_types.h"
+	#include "slicc_hash.h"
 	#include "hashmap.uc"
+	#include "hashmap_priv.uc"
 #endif
 
 #define CMSG_TXFR_COUNT 16
 #define HASHMAP_TXFR_COUNT 16
 #define	HASHMAP_RXFR_COUNT 16
 #define CMSG_DESC_LW	3
+
+#ifndef NFD_META_MAX_LW
+    #define NFD_META_MAX_LW NFP_NET_META_FIELD_SIZE
+#endif
 
 #macro cmsg_lm_handles_define()
     lm_handle_alloc(CMSG_KEY_LM_HANDLE)
@@ -95,9 +100,8 @@
 
 	.alloc_resource MAP_CMSG_Q_IDX emem0_queues global 1
 
-#ifdef INCL_CMSG_MAP_PROC
+#ifdef CMSG_MAP_PROC
 	pkt_counter_decl(cmsg_enq)
-#else
 	pkt_counter_decl(cmsg_rx)
 	pkt_counter_decl(cmsg_tx)
 	pkt_counter_decl(cmsg_err)
@@ -115,20 +119,19 @@
 
 	.alloc_mem LM_CMSG_BASE	lm me (NUM_CONTEXT * (CMSG_LM_FIELD_SZ * 2)) 4
 
-	// identity for ctrl vnic - should be define in ng-nfd.hg/me/blocks/vnic/shared/nfd_cfg_internal.c
-	// app_id is defined in ebpf_rx.uc
-	//.alloc_mem _pf0_net_app_id ctm global 8 8
-	//.init _pf0_net_app_id+0 (NFD_NET_APP_TYPE)
-
 	.reg volatile read $map_rxfr[HASHMAP_RXFR_COUNT]
 	.xfer_order $map_rxfr
+
 	.reg write $map_txfr[HASHMAP_TXFR_COUNT]
-	.xfer_order $map_rxfr
+	.xfer_order $map_txfr
+	__hashmap_set($map_txfr)
+
+	.reg read $map_cam[8]
+	.xfer_order $map_cam
 
 	#define MAP_RDXR $map_rxfr
 	#define MAP_TXFR $map_txfr
-
-	__hashmap_set($map_txfr)
+	#define MAP_RXCAM $map_cam[0]
 
 	nfd_out_send_init()
 
@@ -139,7 +142,7 @@
 	.reg bls
 	.reg mu_addr
 	.reg pkt_num
-	//pv_free_buffers(in_nfd)			; MARY FIX ME
+
 	cmsg_get_nfd_bls(bls, in_nfd)
 	cmsg_get_mem_addr(mu_addr, in_nfd)
 	bitfield_extract(pkt_num, BF_AML(in_nfd, NFD_OUT_PKTNUM_fld))
@@ -181,30 +184,39 @@
 	.reg nfdo_desc[NFD_OUT_DESC_SIZE_LW]
 	.reg nfd_credit
 	.reg pkt_offset
-	.reg pcinum, nfd_q, meta_len
+	.reg meta_len
 	.reg nfd_bls
 	.reg mu_ptr, mu_addr
 	.reg plen
+	.reg $credit
+	.sig credit_sig
 
-	immed[pcinum, 0]
-	move(nfd_q, NFD_CMSG_QUEUE)
-	//bitfield_extract(nfd_q, BF_AML(in_nfd_out_desc, NFD_OUT_QID_fld))
+	nfd_out_get_credits($credit, NIC_PCI, NFD_CTRL_QUEUE, 1, credit_sig, SIG_WAIT)
+	alu[--, --, b, $credit]
+	beq[NO_CREDIT_LABEL]
 
-    immed[nfd_credit, 1]
-	nfd_cc_acquire(0, nfd_q, NO_CREDIT_LABEL)
+#ifdef __WAIT_FOR_CREDITS
+	.while ($credit == 0)
+		#define_eval _SLEEP_TICKS (NO_CREDIT_SLEEP / 16)
+            timestamp_sleep(_SLEEP_TICKS)
+        #undef _SLEEP_TICKS
+
+        nfd_out_get_credits($credit, NIC_PCI, NFD_CTRL_QUEUE, 1, credit_sig,
+                                SIG_WAIT)
+    .endw
+#endif
 
 	alu[plen, --, b, in_pkt_len]
-#ifdef CMSG_UNITTEST_CODE
-	.if (plen < 64)
-		immed[plen, 64]
-	.endif
-#endif
+//#ifdef CMSG_UNITTEST_CODE
+//	.if (plen < 64)
+//		immed[plen, 64]
+//	.endif
+//#endif
 
 	move(pkt_offset, NFD_IN_DATA_OFFSET)
 	cmsg_get_mem_addr(mu_addr, in_nfd_out_desc)
 	immed[meta_len, 0]
-			// returns plen, pkt_offset, meta_len
-	nfd_out_meta_prepend(plen, pkt_offset, meta_len, CMSG_PORT, mu_addr, NFP_NET_META_REPR, YES)
+		// meta prepend is not needed
 	bitfield_extract(nfd_bls, BF_AML(in_nfd_out_desc, NFD_OUT_BLS_fld))
 	bitfield_extract(mu_ptr, BF_AML(in_nfd_out_desc, NFD_OUT_MUADDR_fld))
 
@@ -213,7 +225,7 @@
                       meta_len)
 
     nfd_lm_handle_define()
-   	nfd_out_send(nfdo_desc, pcinum, nfd_q, NFD_LM_HANDLE)
+   	nfd_out_send(nfdo_desc, NIC_PCI, NFD_CTRL_QUEUE, NFD_LM_HANDLE)
     nfd_lm_handle_undef()
 
 	pkt_counter_incr(cmsg_tx)
@@ -279,7 +291,7 @@
     alu[out_desc[2], desc, OR, buf_list, <<NFD_OUT_BLS_shf]
 
     // Word 3 -- NFD_OUT_QID_wrd+1
-    alu[desc, pkt_len, OR, BF_A(in_vec, PV_HOST_META_LENGTH_bf), <<NFD_OUT_METALEN_shf]
+    alu[desc, pkt_len, OR, BF_A(in_vec, PV_META_LENGTH_bf), <<NFD_OUT_METALEN_shf]
     #ifndef GRO_EVEN_NFD_OFFSETS_ONLY
        alu[desc, desc, OR, BF_A(in_vec, PV_OFFSET_bf), <<31]
     #endif
@@ -292,7 +304,7 @@
 #endm
 #macro cmsg_desc_workq(o_gro_meta, in_vec, SUCCESS_LABEL)
 .begin
-	.reg gro_desc[GRO_META_SIZE_LW]
+	//.reg gro_desc[GRO_META_SIZE_LW]
 	.reg q_idx
 	.reg word, dest
 	.reg desc
@@ -301,11 +313,11 @@
 	move(q_idx, MAP_CMSG_Q_IDX)
 	cmsg_get_gro_workq_desc(o_gro_meta, in_vec, q_idx)
 
-	pkt_counter_incr(cmsg_enq)
 	br[SUCCESS_LABEL]
 .end
 #endm
 
+#if 0		//MARY DBG
 #macro cmsg_enqueue_dbg(in_nfd_cmsg)
 .begin
     .reg q_base_hi
@@ -324,6 +336,7 @@
 
 .end
 #endm
+#endif
 
 #macro cmsg_recv_workq(out_cmsg, SIGNAL, SIGTYPE)
 .begin
@@ -365,48 +378,25 @@
 	.reg cmsg_hdr_w0
 
     // Fetch work from queue.
-//#ifndef CMSG_UNITTEST_CODE
 	#define_eval __CMSG_Q_BASE__	MAP_CMSG_Q_BASE
 	#define_eval __CMSG_Q_IDX__		MAP_CMSG_Q_IDX
-//#else
-//	#define_eval __CMSG_Q_BASE__	MAP_CMSG_Q_DBG_BASE
-//	#define_eval __CMSG_Q_IDX__		MAP_CMSG_Q_DBG_IDX
-//#endif
+
     move(q_base_hi, (((__CMSG_Q_BASE__ >>32) & 0xff) <<24))
     immed[q_idx, __CMSG_Q_IDX__]
-#undef __CMSG_Q_BASE__
-#undef __CMSG_Q_IDX__
+
+	#undef __CMSG_Q_BASE__
+	#undef __CMSG_Q_IDX__
 
     mem[qadd_thread, $nfd_data[0], q_base_hi, <<8, q_idx, CMSG_DESC_LW], ctx_swap[q_sig]
 	pkt_counter_incr(cmsg_rx)
 
-#if 0
-	//debug code & old cmsg with metadata length
-    __hashmap_dbg_print(0xc000,0, $nfd_data[0], $nfd_data[1], $nfd_data[2])
-   .reg nfd_q
-   bitfield_extract(nfd_q, BF_AML($nfd_data, NFD_OUT_QID_fld))
-   bitfield_extract(nfd_meta_len, BF_AML($nfd_data, NFD_OUT_METALEN_fld))
-
-   __hashmap_dbg_print(0xc001,0, nfd_q, NFD_CMSG_QUEUE, nfd_meta_len)
-
-	//  alu[c_offset, NFD_IN_DATA_OFFSET, -, nfd_meta_len]
-	//	alu[--, nfd_meta_len, -, 0]
-	//	beq[cmsg_error#], defer[3]
-#endif
-
-		alu[nfd_pkt_meta[0], --, b, $nfd_data[0]]
-		alu[nfd_pkt_meta[1], --, b, $nfd_data[1]]
-		alu[nfd_pkt_meta[2], --, b, $nfd_data[2]]
+	alu[nfd_pkt_meta[0], --, b, $nfd_data[0]]
+	alu[nfd_pkt_meta[1], --, b, $nfd_data[1]]
+	alu[nfd_pkt_meta[2], --, b, $nfd_data[2]]
 
 	// extract buffer address.
 	cmsg_get_mem_addr(mem_location, $nfd_data)
 
-//	__hashmap_dbg_print(0xc001, 0, mem_location)
-
-
-//	nfd_in_meta_parse($nfd_data, $cmsg_data, nfd_meta_len, mem_location, 4, cmsg_exit_free#)
-//	alu[msg_type, --, b, *$index++]
-//	alu[req_fd, --, b, *$index++]
     .sig read_sig
 	move(c_offset, NFD_IN_DATA_OFFSET)
 	mem[read32, $cmsg_data[0], c_offset, mem_location, <<8, 2], ctx_swap[read_sig]
@@ -414,8 +404,6 @@
 	alu[req_fd, --, b, $cmsg_data[1]]
 
 	cmsg_validate(cmsg_type, cmsg_tag, cmsg_hdr_w0, cmsg_error#)
-
-//	__hashmap_dbg_print(0xc002, 0, mem_location, c_offset, msg_type, req_fd)
 
     cmsg_proc(mem_location, reply_pktlen, cmsg_type, req_fd, cmsg_tag, cmsg_exit_free#)
 	cmsg_reply(nfd_pkt_meta, reply_pktlen, cmsg_no_credit#)
@@ -584,7 +572,7 @@ cmsg_proc_ret#:
 		immed[fd, 0]
 		alu[$reply[1], --, b, fd]
 
-		hashmap_alloc_fd(fd, key_sz, value_sz, max_entries, cont#]
+		hashmap_alloc_fd(fd, key_sz, value_sz, max_entries, cont#)
 
 		alu[$reply[1], --, b, fd]
 
@@ -640,14 +628,12 @@ s2#:
 
 s/**/HASHMAP_OP_LOOKUP#:
 	hashmap_ops(in_fd, in_lm_key, --, HASHMAP_OP_LOOKUP, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
-	//hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_LOOKUP, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
 	alu[--, reply_lw, -, 0]				;error if 0
 	bne[cont_proc#]
 	br[error_map_function#]
 
 s/**/HASHMAP_OP_ADD#:
 	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --)
-	//hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
 
 	alu[--, reply_lw, -, 0]				;add & delete returns 0
 	beq[success_reply#]
