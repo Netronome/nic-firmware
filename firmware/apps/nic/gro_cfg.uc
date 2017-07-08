@@ -62,6 +62,7 @@
     /* Netdev wire does not send to NBI, so no NBI dest         */
     /* gro_declare_dest_nbi(BLOCKNUM, CALLER, 0, GRO_1_SEQR)    */
     /* gro_declare_dest_nbi(BLOCKNUM, CALLER, 1, GRO_1_SEQR)    */
+    gro_declare_dest_nbi(BLOCKNUM, CALLER, 0, (BLOCKNUM + 1))
 
     /* Declare the ring IDs with the same exact names as in nfd_out.h */
     /* This will allocate nfd_out_ring_num<isl>0                      */
