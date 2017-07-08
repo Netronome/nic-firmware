@@ -1,6 +1,9 @@
 #ifndef _EBPF_UC
 #define _EBPF_UC
 
+.alloc_mem bpf_capabilities emem global 28 256
+.init bpf_capabilities 2 20 1 44 248 84 112
+
 #include <nic_basic/nic_stats.h>
 #include <aggregate.uc>
 #include <stdmac.uc>
