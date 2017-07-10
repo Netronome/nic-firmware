@@ -412,6 +412,9 @@ tx_wire#:
     __actions_read(egress_q_base, egress_q_mask, --)
     pkt_io_tx_wire(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
 
+cmsg#:
+    cmsg_desc_workq($__pkt_io_gro_meta, in_pkt_vec, EGRESS_LABEL)
+
 ebpf#:
     __actions_read(--, --, --)
     ebpf_call(in_pkt_vec, DROP_LABEL, tx_wire_ebpf#)
@@ -419,9 +422,6 @@ ebpf#:
 rxcsum#:
     __actions_rxcsum(in_pkt_vec)
     br[next#] // last instruction in code will not pipeline
-
-cmsg#:
-	cmsg_desc_workq($__pkt_io_gro_meta, in_pkt_vec, EGRESS_LABEL)
 
 .end
 #endm
