@@ -77,7 +77,6 @@
 #include "lm_handle.uc"
 #include "slicc_hash.uc"
 
-//#include <journal.uc>
 #include "hashmap_priv.uc"
 #include "hashmap_cam.uc"
 

@@ -13,7 +13,6 @@
 #include "slicc_hash.h"
 
 //#undef EBPF_DEBUG
-#define EBPF_DEBUG
 #define EBPF_MAPS
 
 #ifdef EBPF_DEBUG
@@ -134,8 +133,6 @@
     immed[stack_addr, EBPF_STACK_BASE]
     alu[stack_addr, stack_addr, +, ctx_offset]
     local_csr_wr[ACTIVE_LM_ADDR_0, stack_addr]
-
-		//__hashmap_dbg_print(0xe003, 0, stack_addr)
 
     br_addr[NFD_BPF_START_OFF, ebpf_reentry#], live_regs[@dma_semaphore, t_idx_ctx, __actions_t_idx, __pkt_io_nfd_pkt_no, __pkt_io_quiescent]
 .end
