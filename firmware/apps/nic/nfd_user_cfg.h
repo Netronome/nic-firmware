@@ -186,13 +186,16 @@
 
 #define NFD_NET_APP_TYPE        (2)
 
-#define NFD_BPF_ABI				2
-#define NFD_NET_APP_ID			(2)
+#define NFD_BPF_ABI		2
+#define NFD_NET_APP_ID		(2)
 
 /* enable cmsg */
 #define NFD_USE_CTRL
 
 /* # of PFs + ctrl vnic */
 #define NVNICS (NFD_MAX_PFS + NFD_MAX_CTRL)
+
+#define NFD_OUT_FL_BUFS_PER_QUEUE      1024
+#define NFD_PCIE0_FL_CACHE_MEM         emem0_cache_upper
 
 #endif /* !_NFD_USER_CFG_H_ */
