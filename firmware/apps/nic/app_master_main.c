@@ -545,7 +545,7 @@ out:
 /* Check the Link state and try to generate an interrupt if it changed.
  * Return 0 if everything is fine, or 1 if there is pending interrupt. */
 __inline static int
-lsc_check(__gpr unsigned int *ls_current, int port)
+lsc_check(unsigned int *ls_current, int port)
 {
     __mem char *nic_ctrl_bar; // = NFD_CFG_BAR_ISL(NIC_PCI, NFD_PF2VID(port));
     __gpr enum link_state ls;
@@ -612,8 +612,8 @@ out:
 static void
 lsc_loop(void)
 {
-    __gpr int port;
-    __gpr unsigned int temp_ls;
+    int port;
+    unsigned int temp_ls;
     /* This is the per-port state information. */
     __lmem unsigned int ls_current[NS_PLATFORM_NUM_PORTS];
     __lmem unsigned int pending[NS_PLATFORM_NUM_PORTS];

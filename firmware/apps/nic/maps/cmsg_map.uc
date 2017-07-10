@@ -36,7 +36,6 @@
 #include <nfd_in.uc>
 #include <nfd_out.uc>
 #include <gro.uc>
-//#include "nfd_meta_prepend.uc"
 #include "pkt_buf.uc"
 
 #ifndef NUM_CONTEXT
@@ -207,11 +206,6 @@
 #endif
 
 	alu[plen, --, b, in_pkt_len]
-//#ifdef CMSG_UNITTEST_CODE
-//	.if (plen < 64)
-//		immed[plen, 64]
-//	.endif
-//#endif
 
 	move(pkt_offset, NFD_IN_DATA_OFFSET)
 	cmsg_get_mem_addr(mu_addr, in_nfd_out_desc)
@@ -304,7 +298,6 @@
 #endm
 #macro cmsg_desc_workq(o_gro_meta, in_vec, SUCCESS_LABEL)
 .begin
-	//.reg gro_desc[GRO_META_SIZE_LW]
 	.reg q_idx
 	.reg word, dest
 	.reg desc
@@ -316,27 +309,6 @@
 	br[SUCCESS_LABEL]
 .end
 #endm
-
-#if 0		//MARY DBG
-#macro cmsg_enqueue_dbg(in_nfd_cmsg)
-.begin
-    .reg q_base_hi
-    .reg q_idx
-    .reg $q_entry[CMSG_DESC_LW]
-    .xfer_order $q_entry
-	.sig q_sig
-
-    aggregate_copy($q_entry, in_nfd_cmsg, CMSG_DESC_LW)
-
-    move(q_base_hi, (((MAP_CMSG_Q_DBG_BASE >>32) & 0xff) <<24))
-    immed[q_idx, MAP_CMSG_Q_DBG_IDX]
-
-    pkt_counter_incr(cmsg_dbg_enq)
-	mem[qadd_work, $q_entry[0], q_base_hi, <<8, q_idx, CMSG_DESC_LW], ctx_swap[q_sig]
-
-.end
-#endm
-#endif
 
 #macro cmsg_recv_workq(out_cmsg, SIGNAL, SIGTYPE)
 .begin
