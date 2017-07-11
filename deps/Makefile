@@ -5,9 +5,8 @@
 FLOWENV_REV=74d431eeb670
 # GRO_REV  - Tip as of July 12 2016
 GRO_REV=25c868a8c724
-# NFD_REV - Tip of default branch as of 27 Oct 2016
-#NFD_REV=cbad0447831e
-NFD_REV=1b8f7ef80f64
+# NFD_REV - Tip of default branch as of 10 July 2017
+NFD_REV=64ea5722b61e
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
@@ -69,9 +68,7 @@ NFD_INC = -I$(NFD_DIR)/shared \
 $(DEPS_DIR)/ng-nfd.hg:
 	hg clone -r $(NFD_REV) \
 	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
-	patch -d $(NFD_DIR) -p1 <$(DEPS_DIR)/disa_pending_tmp6.txt
-	patch -d $(NFD_DIR)/me/blocks/vnic/shared <$(DEPS_DIR)/nfd-bpf-config-v2.patch
-	patch -d $(NFD_DIR)/kernel <$(DEPS_DIR)/fix-chain-meta-v2.patch
+	cd $(NFD_DIR) && patch -p1 < ../nfd-bpf-config.patch && cd -
 
 
 HG_DEPS += $(NFD_DIR)
