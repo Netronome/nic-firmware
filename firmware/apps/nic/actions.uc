@@ -431,7 +431,7 @@ rxcsum#:
     ebpf_reentry#:
     ebpf_reentry()
 
-	//ebpf_htab_entries()
+	ebpf_htab_entries()
 .endif
 
 
