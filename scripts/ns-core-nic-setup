@@ -115,7 +115,7 @@ function write_udev() {
 
     # If the kernel has the phys_port_name feature
     log "Obtaining hwinfo..."
-    ethm_mac=$(printf "%d\n" 0x$($NETRONOME_BIN/nfp-hwinfo | awk -F'=' '/ethm.mac/ {print $2}' | tr -d ':') 2>/dev/null)
+    ethm_mac=$(printf "%d\n" 0x$($NETRONOME_BIN/nfp-hwinfo | awk -F'=' '/eth0.mac/ {print $2}' | tr -d ':') 2>/dev/null)
     if [ "$ethm_mac" -eq "0" ]; then
         log "Failed to obtain MAC addresses!"
         return 1
@@ -124,7 +124,7 @@ function write_udev() {
     log "Writing Rules..."
     for netdev_id in `seq 0 7`
     do
-        mac_addr=$(printf "00%x\n" $((ethm_mac+$netdev_id+1)) | sed -e 's/.\{2\}/&:/g' -e 's/://6')
+        mac_addr=$(printf "00%x\n" $((ethm_mac+$netdev_id)) | sed -e 's/.\{2\}/&:/g' -e 's/://6')
         write_rule "$udev_file" "$mac_addr" "$netdev_id"
     done
 
