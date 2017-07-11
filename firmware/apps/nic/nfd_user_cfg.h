@@ -24,13 +24,13 @@
 #elif NS_PLATFORM_NUM_PORTS > 4  /* 4 < NS_PLATFORM_NUM_PORTS <= 8 */
 
 #ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       8
+#define NFD_MAX_PF_QUEUES       4
 #endif
 
 #elif NS_PLATFORM_NUM_PORTS > 2  /* 2 < NS_PLATFORM_NUM_PORTS <= 4 */
 
 #ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       16
+#define NFD_MAX_PF_QUEUES       8
 #endif
 
 #else /* NS_PLATFORM_NUM_PORTS = 2 */
