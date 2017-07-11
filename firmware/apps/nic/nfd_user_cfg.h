@@ -184,9 +184,6 @@
 #define NFD_BPF_CAPS            NFP_NET_BPF_CAP_RELO
 #define NFD_BPF_ABI             2
 
-#define NFD_NET_APP_TYPE        (2)
-
-#define NFD_BPF_ABI		2
 #define NFD_NET_APP_ID		(2)
 
 /* enable cmsg */
