@@ -331,8 +331,8 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
     wait_for_all(&last_sig);
 
     /* Propagate to all worker (remote) CLS islands */
-    for (isl= 0; isl< sizeof(app_isl_ids)/sizeof(uint32_t); isl++) {
-        addr_lo = (uint32_t)nic_cfg_instr_tbl + start_offset;
+    for (isl = 0; isl < sizeof(app_isl_ids) / sizeof(uint32_t); isl++) {
+        addr_lo = (uint32_t) nic_cfg_instr_tbl + start_offset;
         addr_hi = app_isl_ids[isl] >> 4; /* only use island, mask out ME */
         addr_hi = (addr_hi << (34 - 8)); /* address shifted by 8 in instr */
 
@@ -438,9 +438,9 @@ extract_rss_flags(uint32_t rss_ctrl)
 
 /*vnic_port == vid */
 __intrinsic void
-app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
+app_config_port(uint32_t vid, uint32_t control, uint32_t update)
 {
-    __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vnic_port);
+    __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
     __xread uint32_t rss_ctrl[2];
     __xread uint32_t mtu;
     __xread uint32_t nic_mac[2];
@@ -452,29 +452,27 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     uint32_t rss_tbl_nnidx;
     uint32_t byte_off;
     uint32_t count;
-    uint32_t phy_port, type, vnic;
+    uint32_t type, vnic;
     uint32_t prev_instr = 0;
-	__xwrite uint32_t dbg;
+    __xwrite uint32_t dbg;
     __imem struct nic_port_stats_extra *nic_stats_extra =
         (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
 
     reg_zero(instr, sizeof(instr));
     count = 0;
 
-    NFD_VID2VNIC(type, vnic, vnic_port);
-    if (type == NFD_VNIC_TYPE_PF) {
-        phy_port = vnic;
-    } else {
+    NFD_VID2VNIC(type, vnic, vid);
+    if (type == NFD_VNIC_TYPE_CTRL) {
 		/* CTRL vnic instruction */
 #ifdef GEN_INSTRUCTION
         instr[0].instr = instr_tbl[INSTR_CMSG];
 #else
         instr[0].instr = INSTR_CMSG;
 #endif
-		reg_cp(xwr_instr, (void *)instr, 4);
-		byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-    	upd_rx_host_instr (xwr_instr, byte_off<<2, 1, 1);
-		return;
+        reg_cp(xwr_instr, (void *)instr, 4);
+        byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
+        upd_rx_host_instr(xwr_instr, byte_off<<2, 1, 1);
+        return;
     }
 
     /*
@@ -488,10 +486,9 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
     instr[count].instr = INSTR_STATISTICS;
 #endif
-    instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].tx_uc_octets
-                            - (uint64_t)&nic_stats_extra[vnic_port]) >> 3;
+    instr[count++].param = ((uint64_t)&nic_stats_extra[vid].tx_uc_octets
+                            - (uint64_t)&nic_stats_extra[vid]) >> 3;
     prev_instr = INSTR_STATISTICS;
-    count++;
 
 
     /* mtu */
@@ -513,7 +510,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
     instr[count].instr = INSTR_TX_WIRE;
 #endif
-    instr[count].param = NS_PLATFORM_NBI_TM_QID_LO(phy_port);
+    instr[count].param = NS_PLATFORM_NBI_TM_QID_LO(vnic);
     instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_WIRE);
     prev_instr = INSTR_TX_WIRE;
 
@@ -521,8 +518,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
     /* write TX instr to local table and to other islands too */
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-    upd_rx_host_instr (xwr_instr, byte_off<<2, count, NUM_PCIE_Q_PER_PORT);
-
+    upd_rx_host_instr(xwr_instr, byte_off<<2, count, NUM_PCIE_Q_PER_PORT);
 
     /*
      * RX WIRE --> TX HOST
@@ -537,8 +533,8 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     instr[count].instr = INSTR_STATISTICS;
 #endif
 
-    instr[count].param = ((uint64_t)&nic_stats_extra[vnic_port].rx_uc_octets
-                            - (uint64_t)&nic_stats_extra[vnic_port]) >> 3;
+    instr[count].param = ((uint64_t)&nic_stats_extra[vid].rx_uc_octets
+                            - (uint64_t)&nic_stats_extra[vid]) >> 3;
     prev_instr = INSTR_STATISTICS;
     count++;
 
@@ -580,12 +576,12 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
     if (control & NFP_NET_CFG_CTRL_RSS_ANY) {
 
         /* RSS remapping table with NN register index as start offset */
-        rss_tbl_nnidx = vnic_port*NFP_NET_CFG_RSS_ITBL_SZ_wrd;
+        rss_tbl_nnidx = vnic * NFP_NET_CFG_RSS_ITBL_SZ_wrd;
 
         /* Udate the RSS NN table but only if RSS has changed
         * If vnic_port x write at x*32 NN register */
         if (update & NFP_NET_CFG_UPDATE_RSS) {
-            upd_rss_table(rss_tbl_nnidx, bar_base, vnic_port);
+            upd_rss_table(rss_tbl_nnidx, bar_base, vnic);
         }
 
         /* RSS flags: read rss_ctrl but only first word is used */
@@ -631,16 +627,14 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 #else
     instr[count].instr = INSTR_TX_HOST;
 #endif
-     /* XXX vnic_port is currently a vid.  Populate param with QID of the
-      * first queue on that vNIC. */
-    instr[count].param = NFD_VID2QID(vnic_port, 0);
+    instr[count].param = NFD_VID2QID(vid, 0);
     instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
     prev_instr = INSTR_TX_HOST;
 
     reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
 
     /* map vnic_port to NBI index in the instruction table */
-    byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, phy_port) * NIC_MAX_INSTR;
+    byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic) * NIC_MAX_INSTR;
 
     /* write TX instr to local table and to other islands too */
     upd_rx_wire_instr(xwr_instr, byte_off<<2, count);
@@ -650,7 +644,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
         union debug_instr_journal data;
         data.value = 0x00;
         data.event = PORT_CFG;
-        data.param = vnic_port;
+        data.param = vid;
         JDBG(app_debug_jrn, data.value);
     }
 #endif
@@ -660,7 +654,7 @@ app_config_port(uint32_t vnic_port, uint32_t control, uint32_t update)
 
 
 __intrinsic void
-app_config_port_down(uint32_t vnic_port)
+app_config_port_down(uint32_t vid)
 {
     __xwrite union instruction_format xwr_instr;
     uint32_t i;
@@ -679,13 +673,13 @@ app_config_port_down(uint32_t vnic_port)
 
     /* write drop instr to local host table */
 	/* do nothing for CTRL vNIC */
-    NFD_VID2VNIC(type, vnic, vnic_port);
+    NFD_VID2VNIC(type, vnic, vid);
     if (type == NFD_VNIC_TYPE_PF) {
     	byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-    	upd_rx_host_instr (&xwr_instr.value, byte_off << 2, 1, NUM_PCIE_Q_PER_PORT);
+    	upd_rx_host_instr(&xwr_instr.value, byte_off << 2, 1, NUM_PCIE_Q_PER_PORT);
 
     	/* write drop instr to local wire table */
-    	byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic_port) * NIC_MAX_INSTR;
+    	byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic) * NIC_MAX_INSTR;
     	upd_rx_wire_instr(&xwr_instr.value, byte_off << 2, 1);
 
 #ifdef APP_CONFIG_DEBUG
@@ -697,7 +691,7 @@ app_config_port_down(uint32_t vnic_port)
         	JDBG(app_debug_jrn, data.value);
     	}
 #endif
-	}
+    }
 
     return;
 }

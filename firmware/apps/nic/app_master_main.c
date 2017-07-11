@@ -417,7 +417,7 @@ cfg_changes_loop(void)
                 } else {
                     link_state = 0;
                 }
-				app_config_port(vid, control, update);	/* write cmsg instr */
+	        app_config_port(vid, control, update);	/* write cmsg instr */
 
                 mem_write32(&link_state,
                             (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg.vid) +
@@ -436,9 +436,9 @@ cfg_changes_loop(void)
                     }
                 }
 
-			    if (update & NFP_NET_CFG_UPDATE_BPF) {
-				   nic_local_bpf_reconfig(&ctx_mode, vid);
-			    }
+                if (update & NFP_NET_CFG_UPDATE_BPF) {
+	            nic_local_bpf_reconfig(&ctx_mode, vid);
+                }
 
                 /* Save the control word */
                 nic_control_word[vid] = control;
