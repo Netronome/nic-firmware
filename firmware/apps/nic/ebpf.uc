@@ -109,6 +109,8 @@
 
     br_bset[rc, EBPF_RET_PASS, actions#]
 
+    pv_stats_add_tx_octets(_ebpf_pkt_vec)
+
     alu[stats_base, 0xff, AND, BF_A(_ebpf_pkt_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
     alu[stats_base, stats_base, +, EBPF_PORT_STATS_BLK]
     pv_stats_select(_ebpf_pkt_vec, stats_base)
