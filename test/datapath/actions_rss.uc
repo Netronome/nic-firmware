@@ -1,5 +1,5 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_62=0xc0ffee
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_63=0xdeadbeef
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xc0ffee
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xdeadbeef
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_96=0x04030201
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_97=0x08070605
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_98=0x0c0b0a09
@@ -43,17 +43,10 @@
 #include <pv.uc>
 #include <stdmac.uc>
 
-.reg read $opcodes[3]
-.xfer_order $opcodes
-.addr $opcodes[0] 61
-.set $opcodes[0]
-.set $opcodes[1]
-.set $opcodes[2]
-
 local_csr_wr[NN_GET, 96]
 
-test_assert_equal($opcodes[1], 0xc0ffee)
-test_assert_equal($opcodes[2], 0xdeadbeef)
+test_assert_equal($__actions[1], 0xc0ffee)
+test_assert_equal($__actions[2], 0xdeadbeef)
 
 .reg nn_idx
 .reg nn_entry
@@ -79,8 +72,8 @@ move(nn_idx, 0)
 .endw
 
 #macro rss_reset_test(in_pkt_vec)
-    local_csr_wr[T_INDEX, (61 * 4)]
-    immed[__actions_t_idx, (61 * 4)]
+    local_csr_wr[T_INDEX, (32 * 4)]
+    immed[__actions_t_idx, (32 * 4)]
     pv_invalidate_cache(in_pkt_vec)
     immed[BF_A(in_pkt_vec, PV_META_LENGTH_bf), 0]
     immed[BF_A(in_pkt_vec, PV_QUEUE_OUT_bf), 0]

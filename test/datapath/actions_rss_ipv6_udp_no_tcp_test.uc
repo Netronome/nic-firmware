@@ -1,4 +1,4 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_61=0x600e
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x600e
 
 #include "pkt_ipv6_udp_x88.uc"
 

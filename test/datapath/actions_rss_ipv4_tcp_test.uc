@@ -1,4 +1,4 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_61=0x600f
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x600f
 
 #include "pkt_ipv4_tcp_x88.uc"
 
