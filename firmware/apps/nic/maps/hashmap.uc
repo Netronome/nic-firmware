@@ -653,16 +653,6 @@ ret#:
 #macro __hashmap_index_from_hash(value, idx)
 	move(idx, HASHMAP_NUM_ENTRIES_MASK)
     alu[idx, value, and, idx]
-	#ifdef OV_DEBUG
-		.reg dbg_tmp
-		//#define __DBG_HASH_MASK__ 0xff
-		#define __DBG_HASH_MASK__ 3
-		alu[idx, __DBG_HASH_MASK__, and, idx]
-		alu[dbg_tmp, __DBG_HASH_MASK__, and, hash[1]]
-		#undef __DBG_HASH_MASK__
-		move(hash[1], 0xbeef)
-		alu[hash[1], hash[1], or, dbg_tmp, <<16]
-	#endif
 #endm
 
 

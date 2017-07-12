@@ -133,7 +133,7 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 3, 5), \
         $(call NIC_ISL_ME_DEST, 3, 6), \
         $(call NIC_ISL_ME_DEST, 3, 7), \
-	\
+		\
         $(call NIC_ISL_ME_DEST, 4, 0), \
         $(call NIC_ISL_ME_DEST, 4, 1), \
         $(call NIC_ISL_ME_DEST, 4, 2), \
@@ -143,7 +143,7 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 4, 6), \
         $(call NIC_ISL_ME_DEST, 4, 7)"
 
-# Add cmsg map handler
+# Add cmsg map handler 
 $(eval $(call microcode.assemble,$(PROJECT),mapcmsg,apps/nic/maps,cmsg_app.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/lib))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/apps/nic/lib))

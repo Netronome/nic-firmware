@@ -100,6 +100,9 @@
 	.alloc_resource MAP_CMSG_Q_IDX emem0_queues global 1
 
 #ifdef CMSG_MAP_PROC
+	.init_csr mecsr:CtxEnables.NNreceiveConfig 0x2 const ; 0x2=NN path from CTM MiscEngine
+	slicc_hash_init_nn()
+
 	pkt_counter_decl(cmsg_enq)
 	pkt_counter_decl(cmsg_rx)
 	pkt_counter_decl(cmsg_tx)
