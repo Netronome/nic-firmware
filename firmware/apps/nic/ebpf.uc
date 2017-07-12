@@ -1,8 +1,6 @@
 #ifndef _EBPF_UC
 #define _EBPF_UC
 
-.alloc_mem bpf_capabilities emem global 28 256
-.init bpf_capabilities 2 20 1 44 248 84 112
 
 #include <nic_basic/nic_stats.h>
 #include <aggregate.uc>
@@ -11,6 +9,17 @@
 #include "nfd_user_cfg.h"
 
 #include "slicc_hash.h"
+
+#define EBPF_CAP_FUNC_ID_LOOKUP 1
+
+#define EBPF_CAP_ADJUST_HEAD_FLAG_NO_META (1 << 0)
+
+#define NFP_BPF_CAP_TYPE_FUNC 1
+#define NFP_BPF_CAP_TYPE_ADJUST_HEAD 2
+#define NFP_BPF_CAP_TYPE_MAPS 3
+
+.alloc_mem bpf_capabilities emem global 1024 256
+#define __EBPF_CAP_LENGTH 0
 
 //#undef EBPF_DEBUG
 #define EBPF_MAPS
@@ -34,6 +43,44 @@
     #include "map_debug_config.h"
     __hashmap_journal_init()
 #endif  /* EBPF_DEBUG */
+
+
+#macro ebpf_init_cap_adjust_head(flags, min_offset, max_offset, guaranteed_sub, guaranteed_add)
+    .init bpf_capabilities+__EBPF_CAP_LENGTH NFP_BPF_CAP_TYPE_ADJUST_HEAD 20 \
+        (flags) (min_offset) (max_offset) (guaranteed_sub) (guaranteed_add)
+    #define_eval __EBPF_CAP_LENGTH (__EBPF_CAP_LENGTH + 28)
+#endm
+
+
+#macro ebpf_init_cap_func(id, LABEL)
+.begin
+    .reg base
+    .reg offset
+    .reg func_addr
+    .reg write $cap_data[4]
+    .xfer_order $cap_data
+    .sig sig_caps
+
+    immed[$cap_data[0], NFP_BPF_CAP_TYPE_FUNC]
+    immed[$cap_data[1], 8]
+    immed[$cap_data[2], id]
+    load_addr[func_addr, LABEL]
+    alu[$cap_data[3], --, B, func_addr]
+    move(base, (bpf_capabilities >> 8))
+    move(offset, __EBPF_CAP_LENGTH)
+    mem[write32, $cap_data[0], base, <<8, offset, 4], ctx_swap[sig_caps]
+    move(offset, __EBPF_CAP_LENGTH)
+    #define_eval __EBPF_CAP_LENGTH (__EBPF_CAP_LENGTH + 16)
+.end
+#endm
+
+
+#macro ebpf_init_cap_maps(types, max_maps, max_elements, max_key_sz, max_val_sz, max_entry_sz)
+    .init bpf_capabilities+__EBPF_CAP_LENGTH NFP_BPF_CAP_TYPE_MAPS 24 \
+        (types) (max_maps) (max_elements) (max_key_sz) (max_val_sz) (max_entry_sz)
+    #define_eval __EBPF_CAP_LENGTH (__EBPF_CAP_LENGTH + 32)
+#endm
+
 
 #define EBPF_STACK_SIZE 64
 .alloc_mem EBPF_STACK_BASE lmem me (4 * (1 << log2(EBPF_STACK_SIZE, 1))) (1 << log2(EBPF_STACK_SIZE))
@@ -141,12 +188,15 @@
 #endm
 
 
-#macro ebpf_init()
-	hashmap_init()
-	cmsg_init()
-#endm
+hashmap_init()
+cmsg_init()
 
-#macro ebpf_htab_entries()
+ebpf_init_cap_adjust_head(EBPF_CAP_ADJUST_HEAD_FLAG_NO_META, 44, 248, 84, 112)
+ebpf_init_cap_func(EBPF_CAP_FUNC_ID_LOOKUP, HTAB_MAP_LOOKUP_SUBROUTINE#)
+ebpf_init_cap_maps(BPF_MAP_TYPE_HASH, HASHMAP_MAX_TID, HASHMAP_TOTAL_ENTRIES, HASHMAP_MAX_KEYS_SZ, HASHMAP_MAX_VALU_SZ, \
+                   (HASHMAP_MAX_KEYS_SZ + HASHMAP_MAX_VALU_SZ))
+
+.if (0)
 	#pragma warning(push)
 	#pragma warning(disable: 4702) // disable warning "unreachable code"
 
@@ -160,6 +210,6 @@ HTAB_MAP_DELETE_SUBROUTINE#:
 //	htab_map_delete_subr_func()
 
 	#pragma warning(pop)
-#endm
+.endif
 
 #endif 	/*_EBPF_UC */
