@@ -15,9 +15,6 @@
 .xfer_order $__actions
 .reg volatile __actions_t_idx
 
-ebpf_init()
-
-
 #macro __actions_read(out_data, in_mask, in_shf)
     #if (streq('in_mask', '--'))
         #if (streq('in_shf', '--'))
@@ -431,8 +428,6 @@ rxcsum#:
 .if (0)
     ebpf_reentry#:
     ebpf_reentry()
-
-	ebpf_htab_entries()
 .endif
 
 
