@@ -1,4 +1,32 @@
 #!/bin/bash
+
+FIRMWARE_DIR=/lib/firmware/netronome
+# CNIC is from deb/rpm and UPNIC is upstream FW or backup of
+FIRMWARE_DIR_CNIC=/lib/firmware/netronome/cnic
+FIRMWARE_DIR_UPNIC=/lib/firmware/netronome/nic
+
+mkdir -p $FIRMWARE_DIR_UPNIC
+
+#Delete symbolic links if any
+find $FIRMWARE_DIR -maxdepth 1 -name *.nffw -type l -delete
+
+#Delete hard links if any
+for FILE in `find $FIRMWARE_DIR -maxdepth 1 -type f -name *.nffw`; do
+    if [ $(stat --printf='%h' $FILE) != '1' ]; then
+        rm $FILE
+    fi
+done
+
+# backup remaining FW files, assumed to be upstream FW
+# TODO: figure out what to do with future upstream FW already placed in UPNIC
+find $FIRMWARE_DIR -maxdepth 1 -type f -name *.nffw -exec mv -t \
+    $FIRMWARE_DIR_UPNIC {} +;
+
+#Create links
+ln -s $FIRMWARE_DIR_CNIC/* $FIRMWARE_DIR/
+
+echo "Switched to CoreNIC firmware files"
+
 for POSTINST in %{_prefix}/lib/dkms/common.postinst %{_datarootdir}/%{module_name}/postinst; do
         if [ -f $POSTINST ]; then
                 $POSTINST %{module_name} %{version} %{_datarootdir}/%{module_name}
@@ -24,7 +52,7 @@ for POSTINST in %{_prefix}/lib/dkms/common.postinst %{_datarootdir}/%{module_nam
 
         /opt/netronome/bin/ns-core-nic-setup check-flash || :
 
-                exit $?
+        exit $?
         fi
         echo "WARNING: $POSTINST does not exist."
 done
