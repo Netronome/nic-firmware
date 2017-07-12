@@ -116,7 +116,8 @@
 #define HASHMAP_OP_ADD			4
 #define HASHMAP_OP_REMOVE		5
 #define HASHMAP_OP_GETNEXT		6
-#define HASHMAP_OP_MAX			HASHMAP_OP_GETNEXT
+#define HASHMAP_OP_GETFIRST		7
+#define HASHMAP_OP_MAX			HASHMAP_OP_GETFIRST
 
 #define HASHMAP_RTN_LMEM		1
 #define HASHMAP_RTN_TINDEX		2
@@ -694,7 +695,7 @@ ret#:
 	__hashmap_lm_handles_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, lm_key_addr]
 
-		__hashmap_dbg_print(0x1001, 0, fd)
+	//	__hashmap_dbg_print(0x1001, 0, fd)
 	hashmap_get_fd(fd, key_lwsz, value_lwsz, key_mask, value_mask, INVALID_MAP_LABEL)
 
 	alu[HASHMAP_LM_INDEX, --, b, fd]
@@ -711,16 +712,24 @@ ret#:
 	alu[HASHMAP_LM_INDEX, key_mask, and, HASHMAP_LM_INDEX]
 	__hashmap_lm_handles_undef()
 
-	slicc_hash(hash, lm_key_addr, keys_n_tid, HASHMAP_MAX_KEYS_LW)
+    #if (OP == HASHMAP_OP_GETFIRST)
+		immed[ent_index, 0]
+    	__hashmap_lock_init(ent_state, ent_addr_hi, offset, mu_partition, ent_index)
+		alu[tbl_addr_hi, --, b, ent_addr_hi]
+    	__hashmap_lock_shared(ent_index, fd, found#, found#)
+		br[found#]
+	#else
+		slicc_hash(hash, lm_key_addr, keys_n_tid, HASHMAP_MAX_KEYS_LW)
 
-    __hashmap_index_from_hash(hash[0], ent_index)
-    __hashmap_lock_init(ent_state, ent_addr_hi, offset, mu_partition, ent_index)
-	alu[tbl_addr_hi, --, b, ent_addr_hi]
+    	__hashmap_index_from_hash(hash[0], ent_index)
+    	__hashmap_lock_init(ent_state, ent_addr_hi, offset, mu_partition, ent_index)
+		alu[tbl_addr_hi, --, b, ent_addr_hi]
+	#endif
 
 retry#:
     __hashmap_lock_shared(ent_index, fd, check_ov#, check_ov_valid#)
 
-		__hashmap_dbg_print(0xa001, 0, ent_index)
+	//	__hashmap_dbg_print(0xa001, 0, ent_index)
     __hashmap_compare(map_tindex, lm_key_addr, ent_addr_hi, offset, key_lwsz, check_ov_valid#)
 found#:		/* found entry which matches the key */
 	#if (OP == HASHMAP_OP_LOOKUP)
@@ -738,7 +747,7 @@ found#:		/* found entry which matches the key */
 		br_bset[ent_state, __HASHMAP_DESC_OV_BIT, delete_ov_ent#]
         __hashmap_lock_release_and_invalidate(ent_index, ent_state)
     	br[ret#]
-    #elif (OP == HASHMAP_OP_GETNEXT)
+    #elif ( (OP == HASHMAP_OP_GETNEXT) || (OP == HASHMAP_OP_GETFIRST) )
 getnext_loop#:
 		/* check overflow first */
 		__hashmap_ov_getnext(tbl_addr_hi, ent_index, fd, ent_addr_hi, offset, ent_state, read_next_key#)
@@ -874,9 +883,12 @@ ret#:
 	__hashmap_dbg_print(0xf1111, 0, out_addr[0], out_addr[1])
 	.reg_addr ebpf_rc 0 A
 	alu[ebpf_rc, --, b, out_addr[0]]
+	//alu[ebpf_rc, --, b, out_addr[0]], gpr_wrboth
 
+	/* MARY check grp_wrboth, results needs to be in both A & B  */
 	.reg_addr htab_value_addr_lo 1 A
 	alu[htab_value_addr_lo, --, b, out_addr[1]]
+	//alu[htab_value_addr_lo, --, b, out_addr[1]], gpr_wrboth
 	br[ret#]
 
 htab_lookup_error_map#:

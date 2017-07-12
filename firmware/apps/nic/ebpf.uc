@@ -18,7 +18,6 @@
 #define NFP_BPF_CAP_TYPE_ADJUST_HEAD 2
 #define NFP_BPF_CAP_TYPE_MAPS 3
 
-#undef EBPF_DEBUG
 //#define EBPF_DEBUG
 #define EBPF_MAPS
 

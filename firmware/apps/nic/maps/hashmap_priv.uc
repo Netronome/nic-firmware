@@ -291,13 +291,9 @@ ret#:
 do_read#:
 	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, lm_off]
 
-		__hashmap_dbg_print(0x0061, 0, off)
-
 	__hashmap_read_data(io_tindex, in_addr_hi, off, lw_read)
 	local_csr_wr[T_INDEX, io_tindex]   ; global csr 3 cycles
 	alu[bytes_read, --, b, lw_read, <<2]
-
-		__hashmap_dbg_print(0x0062, 0, MAP_RDXR[0])
 
 	unroll_compare(*$index, ++, HASHMAP_LM_INDEX, ++, MISS_LABEL, lw_read, HASHMAP_RXFR_COUNT, --)
 
