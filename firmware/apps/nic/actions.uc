@@ -11,6 +11,7 @@
 #include "ebpf.uc"
 
 .reg volatile read $__actions[NIC_MAX_INSTR]
+.addr $__actions[0] 32
 .xfer_order $__actions
 .reg volatile __actions_t_idx
 

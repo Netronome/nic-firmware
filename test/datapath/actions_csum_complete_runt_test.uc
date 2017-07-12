@@ -1,5 +1,5 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_60=0x0
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_61=0xdeadbeef
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x0
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xdeadbeef
 
 #include "actions_harness.uc"
 
@@ -7,10 +7,6 @@
 
 #include <single_ctx_test.uc>
 #include <global.uc>
-
-.reg volatile read $instr[2]
-.xfer_order $instr
-.addr $instr[0] 60
 
 .reg read $csum
 .reg write $zero
@@ -24,8 +20,8 @@ mem[write32, $zero, BF_A(pkt_vec, PV_CTM_ADDR_bf), csum_offset, 1], ctx_swap[sig
 .reg length
 immed[length, 0]
 .while (length < 15)
-    local_csr_wr[T_INDEX, (60 * 4)]
-    immed[__actions_t_idx, (60 * 4)]
+    local_csr_wr[T_INDEX, (32 * 4)]
+    immed[__actions_t_idx, (32 * 4)]
 
     immed[BF_A(pkt_vec, PV_META_TYPES_bf), 0]
     immed[BF_A(pkt_vec, PV_META_LENGTH_bf), 0]
