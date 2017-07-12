@@ -23,6 +23,49 @@
     #undef _SLICC_HASH_LM_INDEX
 #endm
 
+#macro slicc_hash_init_nn()
+.begin
+        .reg act_ctx_sts
+        .reg offset
+        .reg pad_base
+        .reg reflect_base
+        .reg $pad[8]
+        .xfer_order $pad
+        .sig sig_reflect
+        .sig volatile sig_reflected
+        .sig sig_pad
+
+        .if (ctx() == 0)
+            local_csr_rd[active_ctx_sts]
+            immed[act_ctx_sts, 0]
+            alu[reflect_base, 0xf, AND, act_ctx_sts, >>3]
+            alu[reflect_base, --, B, reflect_base, <<17]
+            alu[reflect_base, reflect_base, OR, __ISLAND, <<24]
+            alu[reflect_base, reflect_base, OR, &sig_reflected, <<10]
+            alu[reflect_base, reflect_base, OR, 0x01, <<9]
+            alu[reflect_base, reflect_base, OR, SLICC_HASH_PAD_NN_IDX, <<2]
+
+            move(pad_base, (SLICC_HASH_PAD_DATA >> 8))
+
+            passert(SLICC_HASH_PAD_SIZE_LW, "MULTIPLE_OF", 8)
+            move(offset, 0)
+            .while (offset < (SLICC_HASH_PAD_SIZE_LW * 4))
+                mem[read32, $pad[0], pad_base, <<8, offset, 8], ctx_swap[sig_pad]
+                aggregate_copy($pad, $pad, 8)
+                .set_sig sig_reflected
+                ct[ctnn_write, $pad[0], reflect_base, offset, 8], ctx_swap[sig_reflect]
+                alu[offset, offset, +, (8 * 4)]
+                ctx_arb[sig_reflected]
+                // work around for SDN-1658 / THS-163
+                .repeat
+                    timestamp_sleep(3)
+                .until (!SIGNAL(sig_reflected))
+            .endw
+        .endif
+.end
+#endm
+
+
 #define _slicc_hash_init_INSTRUCTIONS 3
 #macro _slicc_hash_init()
     alu[_SLICC_HASH_STATE[0], _SLICC_HASH_LENGTH, XOR, *n$index++]

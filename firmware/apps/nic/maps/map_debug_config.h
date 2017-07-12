@@ -20,7 +20,6 @@
 
 #ifdef __HASHMAP_UC__
 	// use small mask to debug
-	#define OV_DEBUG
 	#define __DBG_ID1__ 1
 #endif /*__HASHMAP_UC__*/
 
