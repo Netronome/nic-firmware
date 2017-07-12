@@ -220,17 +220,11 @@
 	bitfield_extract(nfd_bls, BF_AML(in_nfd_out_desc, NFD_OUT_BLS_fld))
 	bitfield_extract(mu_ptr, BF_AML(in_nfd_out_desc, NFD_OUT_MUADDR_fld))
 
-	.reg ctm_isl
 	.reg ctm_pnum
-	.reg ctm_split
 
-	bitfield_extract(ctm_isl, BF_AML(in_nfd_out_desc, NFD_OUT_CTM_ISL_fld))
 	bitfield_extract(ctm_pnum, BF_AML(in_nfd_out_desc, NFD_OUT_PKTNUM_fld))
-	bitfield_extract(ctm_split, BF_AML(in_nfd_out_desc, NFD_OUT_SPLIT_fld))
-
 	pkt_buf_free_ctm_buffer(ctm_pnum)
-	
-    //nfd_out_fill_desc(nfdo_desc, ctm_isl, ctm_pnum, ctm_split, nfd_bls,
+
     nfd_out_fill_desc(nfdo_desc, 0, 0, 0, nfd_bls,
                       mu_ptr, pkt_offset, plen,
                       meta_len)
@@ -507,6 +501,7 @@ cmsg_exit#:
     s/**/CMSG_TYPE_MAP_ADD#:
     s/**/CMSG_TYPE_MAP_DELETE#:
     s/**/CMSG_TYPE_MAP_GETNEXT#:
+    s/**/CMSG_TYPE_MAP_GETFIRST#:
 		.begin
 			.reg lm_key_offset
 			.reg lm_value_offset
@@ -534,6 +529,7 @@ cmsg_exit#:
 
 			cmsg_lm_handles_undef()
 
+			//		__hashmap_dbg_print(0xc0a3, 0, in_cmsg_type, in_fd)
 			_cmsg_hashmap_op(in_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, in_cmsg_tag, out_pktlen)
 
 		.end
@@ -563,16 +559,17 @@ cmsg_proc_ret#:
 		#undef _MAX_ENT_IDX_
 
 		immed[fd, 0]
-		immed[$reply[1], 1]		;rc
-		immed[$reply[2], 0]		;tid
 
 	//		__hashmap_dbg_print(0xc012, 0, key_sz, value_sz, max_entries)
 
+		immed[$reply[1], CMSG_RC_ERR_MAP_FD]		; error
+		alu[$reply[2], --, b, fd]					; fd=0 error
+
 		hashmap_alloc_fd(fd, key_sz, value_sz, max_entries, cont#)
 
-		alu[$reply[2], --, b, fd]
-		immed[$reply[1], 0]		;rc
 	//		__hashmap_dbg_print(0xc013, 0, fd)
+		immed[$reply[1], CMSG_RC_SUCCESS]			; error
+		alu[$reply[2], --, b, fd]
 
 cont#:
 		cmsg_set_reply($reply[0], CMSG_TYPE_MAP_ALLOC, in_cmsg_tag)
@@ -648,6 +645,15 @@ s/**/HASHMAP_OP_GETNEXT#:
 	alu[--, reply_lw, -, 0]				;error if 0
 	bne[cont_proc#]
 	br[error_map_function#]
+
+s/**/HASHMAP_OP_GETFIRST#:
+	#pragma warning(push)
+    #pragma warning(disable: 4702) // disable warning "unreachable code"
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_GETFIRST, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
+	alu[--, reply_lw, -, 0]				;error if 0
+	bne[cont_proc#]
+	br[error_map_function#]
+	#pragma warning(pop)
 
 cont_proc#:
 	alu[--, reply_lw, -, CMSG_MAP_KEY_LW]

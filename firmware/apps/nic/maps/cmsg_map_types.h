@@ -38,7 +38,9 @@
  *       +---------------------------------------------------------------+
  *   map_alloc reply
  *       +---------------------------------------------------------------+
- *    1  |    map fd (0 is error)                                        |
+ *    1  |    map fd (0 success)                                         |
+ *       +---------------------------------------------------------------+
+ *    1  |    fd (0 is error)                                            |
  *       +---------------------------------------------------------------+
  *
  *   map_free request
@@ -126,6 +128,31 @@
  *   11  |   key word 9                                                  |
  *       +---------------------------------------------------------------+
  *
+ *  map_get_first request
+ *       +---------------------------------------------------------------+
+ *    1  |   map fd                                                      |
+ *       +---------------------------------------------------------------+
+ *    2  |   key word 0                                                  |
+ *       +---------------------------------------------------------------+
+ *    3  |   key word 1                                                  |
+ *       +---------------------------------------------------------------+
+ *       |     ...                                                       |
+ *       +---------------------------------------------------------------+
+ *   11  |   key word 9                                                  |
+ *       +---------------------------------------------------------------+
+ *  map_get_first reply
+ *       +---------------------------------------------------------------+
+ *    1  |   RC, 0=success                                               |
+ *       +---------------------------------------------------------------+
+ *    2  |   key word 0                                                  |
+ *       +---------------------------------------------------------------+
+ *    3  |   key word 1                                                  |
+ *       +---------------------------------------------------------------+
+ *       |     ...                                                       |
+ *       +---------------------------------------------------------------+
+ *   11  |   key word 9                                                  |
+ *       +---------------------------------------------------------------+
+ *
  *  map_delete_elem request
  *       +---------------------------------------------------------------+
  *    1  |   map fd                                                      |
@@ -154,11 +181,12 @@
 #define CMSG_TYPE_MAP_ADD       4
 #define CMSG_TYPE_MAP_DELETE    5
 #define CMSG_TYPE_MAP_GETNEXT   6
+#define CMSG_TYPE_MAP_GETFIRST  7
 
 #define CMSG_TYPE_MAP_START		1
-#define CMSG_TYPE_MAP_MAX		6
+#define CMSG_TYPE_MAP_MAX		7
 
-#define CMSG_TYPE_MAX (CMSG_TYPE_LAST_UNUSED)
+//#define CMSG_TYPE_MAX (CMSG_TYPE_LAST_UNUSED)
 
 #define CMSG_TYPE_MAP_ALLOC_REPLY		0x81
 #define CMSG_TYPE_MAP_FREE_REPLY		0x82
@@ -166,6 +194,7 @@
 #define CMSG_TYPE_MAP_ADD_REPLY			0x84
 #define CMSG_TYPE_MAP_DELETE_REPLY		0x85
 #define CMSG_TYPE_MAP_GETNEXT_REPLY		0x86
+#define CMSG_TYPE_MAP_GETFIRST_REPLY	0x87
 
 #define CMSG_TYPE_MAP_REPLY_BIT			7
 
@@ -204,9 +233,10 @@ struct cmsg_reply_map_alloc_tbl {
 			uint32_t type:8;
 			uint32_t ver:8; 
 			uint32_t tag:16;
+			uint32_t rc;		/* 0 success */
 			uint32_t tid;		/* 0 if error */
 		};
-		uint32_t __raw[2];
+		uint32_t __raw[3];
 	};
 };
 struct cmsg_req_map_free_tbl {
