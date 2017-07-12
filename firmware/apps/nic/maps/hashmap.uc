@@ -94,6 +94,19 @@
 #define HASHMAP_MAX_KEYS_SZ     (40)			// camp_hash limit 120 bytes
 #define HASHMAP_MAX_VALU_SZ		(24)
 
+/* bpf_map_type  from linux include/uapi/linux/bpf.h */
+#define BPF_MAP_TYPE_UNSPEC 				0
+#define BPF_MAP_TYPE_HASH 					1
+#define BPF_MAP_TYPE_ARRAY					2
+#define BPF_MAP_TYPE_PROG_ARRAY				3
+#define BPF_MAP_TYPE_PERF_EVENT_ARRAY		4
+#define BPF_MAP_TYPE_PERCPU_HASH			5
+#define BPF_MAP_TYPE_PERCPU_ARRAY			6
+#define BPF_MAP_TYPE_STACK_TRACE			7
+#define BPF_MAP_TYPE_CGROUP_ARRAY			8
+#define BPF_MAP_TYPE_LRU_HASH				9
+#define BPF_MAP_TYPE_LRU_PERCPU_HASH	   10
+
 
 /* ********************************* */
 /* call interface
