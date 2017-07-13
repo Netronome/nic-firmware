@@ -27,8 +27,8 @@
     /* debug level: 1 hashmap, 2 hashmap_cam, 5 hashmap_priv */
 	/* min level 0 (main), max is 15 */
     #ifndef DEBUG_LEVEL
-		#define DEBUG_LEVEL 0
-        //#define DEBUG_LEVEL 15
+		//#define DEBUG_LEVEL 0
+        #define DEBUG_LEVEL 15
     #endif
     #ifndef JOURNAL_ENABLE
         #define JOURNAL_ENABLE 1

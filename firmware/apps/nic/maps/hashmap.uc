@@ -706,6 +706,7 @@ ret#:
 	__hashmap_lm_handles_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, lm_key_addr]
 
+		__hashmap_dbg_print(0x1001, 0, fd)
 	hashmap_get_fd(fd, key_lwsz, value_lwsz, key_mask, value_mask, INVALID_MAP_LABEL)
 
 	alu[HASHMAP_LM_INDEX, --, b, fd]
@@ -730,6 +731,8 @@ ret#:
 
 retry#:
     __hashmap_lock_shared(ent_index, fd, check_ov#, check_ov_valid#)
+
+		__hashmap_dbg_print(0xa001, 0, ent_index)
     __hashmap_compare(map_tindex, lm_key_addr, ent_addr_hi, offset, key_lwsz, check_ov_valid#)
 found#:		/* found entry which matches the key */
 	#if (OP == HASHMAP_OP_LOOKUP)
@@ -877,16 +880,20 @@ ret#:
 	immed[lm_key_offset, 0]
 	alu[tid, --, b,HTAB_EBPF_LM_KEY_INDEX]
 
+	__hashmap_dbg_print(0xf001, 0, tid, HTAB_EBPF_LM_KEY_INDEX[1])
 	hashmap_ops(tid, lm_key_offset, --, HASHMAP_OP_LOOKUP, htab_lookup_error_map#, htab_lookup_not_found#, HASHMAP_RTN_ADDR, --, --, out_addr)
 
+	__hashmap_dbg_print(0xf1111, 0, out_addr[0], out_addr[1])
 	.reg_addr ebpf_rc 0 A
 	alu[ebpf_rc, --, b, out_addr[0]]
+
 	.reg_addr htab_value_addr_lo 1 A
 	alu[htab_value_addr_lo, --, b, out_addr[1]]
 	br[ret#]
 
 htab_lookup_error_map#:
 htab_lookup_not_found#:
+		__hashmap_dbg_print(0xf01f, 0, 0)
 	.reg_addr ebpf_rc 0 A
 	immed[ebpf_rc, 0]
 	.reg_addr htab_value_addr_lo 1 A
