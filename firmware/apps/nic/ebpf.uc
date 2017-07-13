@@ -18,9 +18,6 @@
 #define NFP_BPF_CAP_TYPE_ADJUST_HEAD 2
 #define NFP_BPF_CAP_TYPE_MAPS 3
 
-.alloc_mem bpf_capabilities emem global 1024 256
-#define __EBPF_CAP_LENGTH 0
-
 //#undef EBPF_DEBUG
 #define EBPF_MAPS
 
@@ -45,14 +42,22 @@
 #endif  /* EBPF_DEBUG */
 
 
+#define __EBPF_CAP_RESERVED 0
+#define __EBPF_CAP_LENGTH 0
+#define __EBPF_CAP_DATA 0
+
 #macro ebpf_init_cap_adjust_head(flags, min_offset, max_offset, guaranteed_sub, guaranteed_add)
-    .init bpf_capabilities+__EBPF_CAP_LENGTH NFP_BPF_CAP_TYPE_ADJUST_HEAD 20 \
-        (flags) (min_offset) (max_offset) (guaranteed_sub) (guaranteed_add)
+    #define_eval __EBPF_CAP_DATA '__EBPF_CAP_DATA,NFP_BPF_CAP_TYPE_ADJUST_HEAD,20,(flags),(min_offset),(max_offset),(guaranteed_sub),(guaranteed_add)'
     #define_eval __EBPF_CAP_LENGTH (__EBPF_CAP_LENGTH + 28)
 #endm
 
 
-#macro ebpf_init_cap_func(id, LABEL)
+#macro ebpf_init_cap_func_reserve(count)
+    #define_eval __EBPF_CAP_RESERVED (__EBPF_CAP_RESERVED + (count << 4))
+#endm
+
+
+#macro ebpf_init_cap_func_declare(id, LABEL)
 .begin
     .reg base
     .reg offset
@@ -69,16 +74,27 @@
     move(base, (bpf_capabilities >> 8))
     move(offset, __EBPF_CAP_LENGTH)
     mem[write32, $cap_data[0], base, <<8, offset, 4], ctx_swap[sig_caps]
-    move(offset, __EBPF_CAP_LENGTH)
-    #define_eval __EBPF_CAP_LENGTH (__EBPF_CAP_LENGTH + 16)
 .end
 #endm
 
 
 #macro ebpf_init_cap_maps(types, max_maps, max_elements, max_key_sz, max_val_sz, max_entry_sz)
-    .init bpf_capabilities+__EBPF_CAP_LENGTH NFP_BPF_CAP_TYPE_MAPS 24 \
-        (types) (max_maps) (max_elements) (max_key_sz) (max_val_sz) (max_entry_sz)
+    #define_eval __EBPF_CAP_DATA '__EBPF_CAP_DATA,NFP_BPF_CAP_TYPE_MAPS,24,(types),(max_maps),(max_elements),(max_key_sz),(max_val_sz),(max_entry_sz)'
     #define_eval __EBPF_CAP_LENGTH (__EBPF_CAP_LENGTH + 32)
+#endm
+
+#macro ebpf_init_cap_alloc()
+    .alloc_mem bpf_capabilities emem global (__EBPF_CAP_LENGTH+__EBPF_CAP_RESERVED) 256
+    // remove "0," from front of list
+    #define_eval __EBPF_CAP_DATA strright('__EBPF_CAP_DATA', -2)
+    #define __EBPF_CAP_OFFSET 0
+    #while (__EBPF_CAP_OFFSET < (__EBPF_CAP_LENGTH - 4))
+        #define_eval VALUE strleft('__EBPF_CAP_DATA', strstr('__EBPF_CAP_DATA', ',') - 1)
+        #define_eval __EBPF_CAP_DATA strright('__EBPF_CAP_DATA', strlen('__EBPF_CAP_DATA') - strstr('__EBPF_CAP_DATA', ','))
+        .init bpf_capabilities+__EBPF_CAP_OFFSET VALUE
+        #define_eval __EBPF_CAP_OFFSET (__EBPF_CAP_OFFSET + 4)
+    #endloop
+    .init bpf_capabilities+__EBPF_CAP_OFFSET __EBPF_CAP_DATA
 #endm
 
 
@@ -192,9 +208,11 @@ hashmap_init()
 cmsg_init()
 
 ebpf_init_cap_adjust_head(EBPF_CAP_ADJUST_HEAD_FLAG_NO_META, 44, 248, 84, 112)
-ebpf_init_cap_func(EBPF_CAP_FUNC_ID_LOOKUP, HTAB_MAP_LOOKUP_SUBROUTINE#)
 ebpf_init_cap_maps(BPF_MAP_TYPE_HASH, HASHMAP_MAX_TID, HASHMAP_TOTAL_ENTRIES, HASHMAP_MAX_KEYS_SZ, HASHMAP_MAX_VALU_SZ, \
                    (HASHMAP_MAX_KEYS_SZ + HASHMAP_MAX_VALU_SZ))
+ebpf_init_cap_func_reserve(1)
+ebpf_init_cap_alloc()
+ebpf_init_cap_func_declare(EBPF_CAP_FUNC_ID_LOOKUP, HTAB_MAP_LOOKUP_SUBROUTINE#)
 
 .if (0)
 	#pragma warning(push)
