@@ -34,3 +34,15 @@ else
     # remove start script
     update-rc.d -f ns-core-nic.autorun remove
 fi
+
+# restore backup FW
+FIRMWARE_DIR=/lib/firmware/netronome
+# CNIC is from deb/rpm and UPNIC is upstream FW or backup of
+FIRMWARE_DIR_CNIC=/lib/firmware/netronome/cnic
+FIRMWARE_DIR_UPNIC=/lib/firmware/netronome/nic
+
+# 1) Delete symbolic links if any
+find $FIRMWARE_DIR -maxdepth 1 -name *.nffw -type l -delete
+
+# 2) create symlinks to 'restore' backup FW
+ln -s $FIRMWARE_DIR_UPNIC/* $FIRMWARE_DIR/

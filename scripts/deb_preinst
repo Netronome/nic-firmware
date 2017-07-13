@@ -19,7 +19,3 @@ if ( [[ ${cmdline} != *"intel_iommu=on"* ]] || [[ ${cmdline} != *"iommu=pt"* ]] 
     echo "       intel_iommu=on iommu=pt intremap=on"
     echo "command-line option (typically set in /etc/default/grub)."
 fi
-
-echo -n "Removing fw files from /lib/firmware/netronome..."
-rm -f /lib/firmware/netronome/*.nffw
-echo "..done"
