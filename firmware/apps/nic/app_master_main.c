@@ -374,7 +374,7 @@ cfg_changes_loop(void)
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
 	nic_local_init(0, 0);		/* dummy regs right now */
 
-   upd_slicc_hash_table();
+   //upd_slicc_hash_table();
 
     for (;;) {
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
@@ -406,6 +406,7 @@ cfg_changes_loop(void)
                     link_state = 0;
                 }
 	        app_config_port(vid, control, update);	/* write cmsg instr */
+   			upd_slicc_hash_table();
 
                 mem_write32(&link_state,
                             (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg.vid) +

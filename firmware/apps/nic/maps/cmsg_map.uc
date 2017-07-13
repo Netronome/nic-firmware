@@ -193,6 +193,9 @@
 	.reg $credit
 	.sig credit_sig
 
+#define __WAIT_FOR_CREDITS
+#define NO_CREDIT_SLEEP 500
+
 	nfd_out_get_credits($credit, NIC_PCI, NFD_CTRL_QUEUE, 1, credit_sig, SIG_WAIT)
 	alu[--, --, b, $credit]
 	beq[NO_CREDIT_LABEL]
@@ -217,6 +220,17 @@
 	bitfield_extract(nfd_bls, BF_AML(in_nfd_out_desc, NFD_OUT_BLS_fld))
 	bitfield_extract(mu_ptr, BF_AML(in_nfd_out_desc, NFD_OUT_MUADDR_fld))
 
+	.reg ctm_isl
+	.reg ctm_pnum
+	.reg ctm_split
+
+	bitfield_extract(ctm_isl, BF_AML(in_nfd_out_desc, NFD_OUT_CTM_ISL_fld))
+	bitfield_extract(ctm_pnum, BF_AML(in_nfd_out_desc, NFD_OUT_PKTNUM_fld))
+	bitfield_extract(ctm_split, BF_AML(in_nfd_out_desc, NFD_OUT_SPLIT_fld))
+
+	pkt_buf_free_ctm_buffer(ctm_pnum)
+	
+    //nfd_out_fill_desc(nfdo_desc, ctm_isl, ctm_pnum, ctm_split, nfd_bls,
     nfd_out_fill_desc(nfdo_desc, 0, 0, 0, nfd_bls,
                       mu_ptr, pkt_offset, plen,
                       meta_len)
@@ -295,7 +309,6 @@
     alu[out_desc[3], desc, OR, BF_A(in_vec, PV_QUEUE_IN_bf), <<NFD_OUT_QID_shf]
 
 .end
-
 	#undef __NUM_WORKQ_DESC__
 	#undef __WORKQ_ISL__
 #endm
@@ -379,6 +392,8 @@
 	alu[req_fd, --, b, $cmsg_data[1]]
 
 	cmsg_validate(cmsg_type, cmsg_tag, cmsg_hdr_w0, cmsg_error#)
+
+//		__hashmap_dbg_print(0xc002, 0, mem_location, c_offset, cmsg_type, req_fd)
 
     cmsg_proc(mem_location, reply_pktlen, cmsg_type, req_fd, cmsg_tag, cmsg_exit_free#)
 	cmsg_reply(nfd_pkt_meta, reply_pktlen, cmsg_no_credit#)
@@ -509,8 +524,11 @@ cmsg_exit#:
 			#define_eval	__LW_CNT__	CMSG_MAP_KEY_LW
 			aggregate_copy(CMSG_KEY_LM_INDEX, ++, $pkt_data, 0, __LW_CNT__)
 
+			//	__hashmap_dbg_print(0xc0a1, 0, $pkt_data[0], $pkt_data[1], $pkt_data[2], $pkt_data[3])
+
 			#define_eval	__VALUE_IDX__	(__LW_CNT__)
 			aggregate_copy(CMSG_VALUE_LM_INDEX, ++, $pkt_data, __VALUE_IDX__, CMSG_MAP_VALUE_LW)
+			//	__hashmap_dbg_print(0xc0a2, 0, $pkt_data[10], $pkt_data[11], $pkt_data[12], $pkt_data[13])
 			#undef __LW_CNT__
 			#undef __VALUE_IDX__
 
@@ -530,7 +548,7 @@ cmsg_proc_ret#:
 		.reg value_sz
 		.reg max_entries
 		.reg fd
-		.reg $reply[2]
+		.reg $reply[3]
 		.xfer_order $reply
 		.sig sig_reply_map_alloc
 		.reg addr_lo
@@ -545,17 +563,22 @@ cmsg_proc_ret#:
 		#undef _MAX_ENT_IDX_
 
 		immed[fd, 0]
-		alu[$reply[1], --, b, fd]
+		immed[$reply[1], 1]		;rc
+		immed[$reply[2], 0]		;tid
+
+	//		__hashmap_dbg_print(0xc012, 0, key_sz, value_sz, max_entries)
 
 		hashmap_alloc_fd(fd, key_sz, value_sz, max_entries, cont#)
 
-		alu[$reply[1], --, b, fd]
+		alu[$reply[2], --, b, fd]
+		immed[$reply[1], 0]		;rc
+	//		__hashmap_dbg_print(0xc013, 0, fd)
 
 cont#:
 		cmsg_set_reply($reply[0], CMSG_TYPE_MAP_ALLOC, in_cmsg_tag)
 		immed[addr_lo, NFD_IN_DATA_OFFSET]
-		mem[write32, $reply[0], in_addr_hi, <<8, addr_lo, 2], sig_done[sig_reply_map_alloc]
-		immed[out_len, (2<<2)]
+		mem[write32, $reply[0], in_addr_hi, <<8, addr_lo, 3], sig_done[sig_reply_map_alloc]
+		immed[out_len, (3<<2)]
 		ctx_arb[sig_reply_map_alloc]
 
 .end

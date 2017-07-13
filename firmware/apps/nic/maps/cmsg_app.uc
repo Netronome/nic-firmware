@@ -51,6 +51,7 @@ cmsg_init()
 
 	local_csr_wr[MAILBOX0, 0]
 	local_csr_wr[MAILBOX1, 0]
+	local_csr_wr[MAILBOX2, 0]
 
 main_loop#:
     cmsg_rx()
