@@ -27,37 +27,43 @@ cmsg_init()
     __hashmap_journal_init()
 #endif  /* DEBUG_TRACE */
 
+#macro ctx_sig_next()
+	local_csr_wr[SAME_ME_SIGNAL, ((&g_ordersig<<3)|(1<<7))]
+#endm
+
 .begin
     .reg ctx_num
 	.reg @cmsg_rx_cntr
 	.reg @cmsg_rx_init
+	.sig volatile g_ordersig
 
 	.if (ctx() == 0)
-		local_csr_wr[MAILBOX0, 0xf]
-		local_csr_wr[MAILBOX1, 0xe]
-		local_csr_wr[MAILBOX2, 0xe]
-		local_csr_wr[MAILBOX3, 0xd]
 		move(@cmsg_rx_init, 0)
 		move(@cmsg_rx_cntr, 0)
+		local_csr_wr[MAILBOX0, 0]
+		local_csr_wr[MAILBOX1, 0]
+		local_csr_wr[MAILBOX2, 0]
+		ctx_sig_next()	
+	.else
+		ctx_arb[g_ordersig]
+		ctx_sig_next()
     .endif
 
     local_csr_rd[ACTIVE_CTX_STS]
     immed[ctx_num, 0]
     alu[ctx_num, ctx_num, and, 7]
 
-    local_csr_wr[MAILBOX3, 0]
-	alu[@cmsg_rx_init, @cmsg_rx_init, +, 1]
-    local_csr_wr[MAILBOX2, @cmsg_rx_init]
-
-	local_csr_wr[MAILBOX0, 0]
-	local_csr_wr[MAILBOX1, 0]
-	local_csr_wr[MAILBOX2, 0]
+		//__hashmap_dbg_print(0x1001, 0, ctx_num)
 
 main_loop#:
+	//ctx_sig_next()
     cmsg_rx()
 	alu[@cmsg_rx_cntr, 1, +, @cmsg_rx_cntr]
     local_csr_wr[MAILBOX0, @cmsg_rx_cntr]
+		//__hashmap_dbg_print(0x1002, 0, ctx_num)
 
+	ctx_arb[g_ordersig]
+	ctx_sig_next()
     br[main_loop#]
 
 done#:
