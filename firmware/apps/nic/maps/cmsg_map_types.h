@@ -40,7 +40,7 @@
  *       +---------------------------------------------------------------+
  *    1  |    map fd (0 success)                                         |
  *       +---------------------------------------------------------------+
- *    1  |    fd (0 is error)                                            |
+ *    2  |    fd (0 is error)                                            |
  *       +---------------------------------------------------------------+
  *
  *   map_free request
@@ -50,6 +50,8 @@
  *   map_free reply
  *       +---------------------------------------------------------------+
  *    1  |    0		                                                     |
+ *       +---------------------------------------------------------------+
+ *    2  |    number of entries deleted	                                 |
  *       +---------------------------------------------------------------+
  *
  *
@@ -205,12 +207,30 @@
 
 #define CMSG_MAP_KEY_LW					 10
 #define CMSG_MAP_VALUE_LW				  6
+#define CMSG_MAP_KEY_VALUE_LW			 16
 
 #define CMSG_RC_SUCCESS				0
-#define CMSG_RC_ERR_MAP_FD			1
-#define CMSG_RC_ERR_MAP_NOENT		2
-#define CMSG_RC_ERR_MAP_ERR			3
-#define CMSG_RC_ERR_MAP_PARSE		4
+#define CMSG_RC_ERR_MAP_FD			(1<<0)
+#define CMSG_RC_ERR_MAP_NOENT		(1<<1)
+#define CMSG_RC_ERR_MAP_ERR			(1<<2)
+#define CMSG_RC_ERR_MAP_PARSE		(1<<3)
+
+#define CMSG_OP_HDR_LW			4
+
+#define CMSG_MAP_RC_IDX				1
+#define CMSG_MAP_TID_IDX			1
+#define CMSG_MAP_OP_COUNT_IDX		2
+#define CMSG_MAP_OP_FLAGS_IDX		3
+
+#define CMSG_MAP_ALLOC_KEYSZ_IDX	1
+#define CMSG_MAP_ALLOC_VALUESZ_IDX	2
+#define CMSG_MAP_ALLOC_MAXENT_IDX	3
+#define CMSG_MAP_ALLOC_FLAGS_IDX	4
+
+/* flags used for add/update */
+#define CMSG_BPF_ANY     0 /* create new element or update existing */
+#define CMSG_BPF_NOEXIST 1 /* create new element if it didn't exist */
+#define CMSG_BPF_EXIST   2 /* update existing element */
 
 #ifndef __NFP_LANG_ASM
 struct cmsg_req_map_alloc_tbl {
@@ -261,17 +281,30 @@ struct cmsg_reply_map_free_tbl {
 		uint32_t __raw[2];
 	};
 };
+
+struct cmsg_key_value {
+	union {
+		struct {
+			uint32_t key[CMSG_MAP_KEY_VALUE_LW];
+			uint32_t value[CMSG_MAP_KEY_VALUE_LW];
+		};
+		uint32_t __raw[CMSG_MAP_KEY_VALUE_LW*2];
+	};
+};
+
+
 struct cmsg_req_map_op {
 	union {
 		struct {
-			uint32_t type:8;		/* CMSG_TYPE_MAP_xxx add, delete, lookup, getnext */
+			uint32_t type:8;				/* CMSG_TYPE_MAP_xxx add, delete, lookup, getnext, getfirst */
 			uint32_t ver:8;
 			uint32_t tag:16;
 			uint32_t tid;
-			uint32_t key[CMSG_MAP_KEY_LW];
-			uint32_t value[CMSG_MAP_VALUE_LW];
+			uint32_t count;
+			uint32_t flags;					/* 0 if any (add if not existed), 1 is update only */
+			struct cmsg_key_value[11];		/* max number of key+value pair per pkt */
 		};
-		uint32_t __raw[18];
+		uint32_t __raw[353];				/* 4 - 353 LW */
 	};
 };
 struct cmsg_reply_map_op {
@@ -280,10 +313,13 @@ struct cmsg_reply_map_op {
 			uint32_t type:8;
 			uint32_t ver:8; 
 			uint32_t tag:16;
-			uint32_t rc;		/* 0 if success */
-			uint32_t data[CMSG_MAP_KEY_LW];
+			uint32_t rc;					/* rc cummulative */
+			uint32_t count;					/* # of successful ops */
+			uint32_t reserve;
+			struct cmsg_key_value[11];		/* max number of key+value pair per pkt */
 		};
-		uint32_t __raw[12];
+		uint32_t __raw[353];				/* 4 - 353 LW */
+
 	};
 };
 #endif /* __NFP_LANG_ASM */
