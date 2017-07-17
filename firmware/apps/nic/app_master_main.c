@@ -168,6 +168,8 @@ __shared __gpr volatile int mac_reg_lock = 0;
 #define   NFP_NET_CFG_STS_LINK_RATE_100G          7
 
 
+__intrinsic void nic_local_epoch();
+
 /* Translate port speed to link rate encoding */
 __intrinsic static unsigned int
 port_speed_to_link_rate(unsigned int port_speed)
@@ -366,15 +368,15 @@ cfg_changes_loop(void)
     uint32_t vid, type, vnic, port;
     uint32_t update;
     uint32_t control;
-	__gpr uint32_t ctx_mode = 1;
-	__emem __addr40 uint8_t *bar_base;
+    __gpr uint32_t ctx_mode = 1;
+    __emem __addr40 uint8_t *bar_base;
 
     /* Initialisation */
-	MSIX_INIT_ISL(NIC_PCI);
+    MSIX_INIT_ISL(NIC_PCI);
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
-	nic_local_init(0, 0);		/* dummy regs right now */
+    nic_local_init(0, 0);		/* dummy regs right now */
 
-   upd_slicc_hash_table();
+    upd_slicc_hash_table();
 
     for (;;) {
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
@@ -413,27 +415,29 @@ cfg_changes_loop(void)
                             sizeof link_state);
             } else if (type == NFD_VNIC_TYPE_PF) {
                 port = vnic;
-                /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
-                if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
-                    if (control & NFP_NET_CFG_CTRL_ENABLE) {
-                       mac_port_enable_rx(port);
-                    } else {
-                        mac_port_disable_rx(port);
-                        sleep(100000);
-                        app_config_port_down(vid);
-                    }
-                }
 
                 if (update & NFP_NET_CFG_UPDATE_BPF) {
 	            nic_local_bpf_reconfig(&ctx_mode, vid);
                 }
 
-                /* Save the control word */
-                nic_control_word[vid] = control;
-
                 if (control & NFP_NET_CFG_CTRL_ENABLE) {
                     app_config_port(vid, control, update);
+                    nic_local_epoch();
                 }
+
+                /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
+                if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
+                    if (control & NFP_NET_CFG_CTRL_ENABLE) {
+                        mac_port_enable_rx(port);
+                    } else {
+                        mac_port_disable_rx(port);
+                        app_config_port_down(vid);
+                        nic_local_epoch();
+                    }
+                }
+
+                /* Save the control word */
+                nic_control_word[vid] = control;
 
                 /* Wait for queues to drain / config to stabilize */
                 sleep(100000);
@@ -487,6 +491,8 @@ perq_stats_loop(void)
             __nfd_in_push_pkt_cnt(NIC_PCI, rxq, ctx_swap, &rxq_sig);
             sleep(PERQ_STATS_SLEEP);
         }
+
+        nic_local_epoch();
     }
     /* NOTREACHED */
 }

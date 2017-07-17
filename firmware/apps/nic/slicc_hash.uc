@@ -144,6 +144,8 @@
 
 #macro slicc_hash(out_hash, in_key_address, in_key_length, MAX_KEY_LENGTH)
 .begin
+    passert(MAX_KEY_LENGTH, "LT", SLICC_HASH_PAD_SIZE_LW) // note additional *n$index op for init
+
     #define_eval _SLICC_HASH_STATE out_hash
     #define_eval _SLICC_HASH_LENGTH in_key_length
     #define_eval _SLICC_HASH_MAX_KEY_LENGTH MAX_KEY_LENGTH
