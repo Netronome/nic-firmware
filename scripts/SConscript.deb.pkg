@@ -9,6 +9,7 @@ deb_files = [
     ("opt/netronome/bin/ns-core-nic-setup", "#nfp-nic/scripts/ns-core-nic-setup"),
     ("etc/init.d/ns-core-nic.autorun", "#nfp-nic/scripts/ns-core-nic.autorun"),
     ("etc/systemd/system/ns-core-nic.service", "#nfp-nic/scripts/ns-core-nic.service"),
+    ("usr/share/initramfs-tools/hooks/nfp", "#nfp-nic/scripts/initramfs-tools-module-setup.sh"),
 ]
 
 deb_FileList.add_files(deb_files)
