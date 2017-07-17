@@ -114,6 +114,9 @@ else
     update-rc.d ns-core-nic.autorun enable
 fi
 
+# update initramfs
+update-initramfs -uk $(uname -r)
+
 # Clear any old config
 /opt/netronome/bin/ns-core-nic-setup clean
 
