@@ -208,7 +208,7 @@ hashmap_init()
 cmsg_init()
 
 ebpf_init_cap_adjust_head(EBPF_CAP_ADJUST_HEAD_FLAG_NO_META, 44, 248, 84, 112)
-ebpf_init_cap_maps(BPF_MAP_TYPE_HASH, HASHMAP_MAX_TID, HASHMAP_TOTAL_ENTRIES, HASHMAP_MAX_KEYS_SZ, HASHMAP_MAX_VALU_SZ, \
+ebpf_init_cap_maps((1 << BPF_MAP_TYPE_HASH), HASHMAP_MAX_TID, HASHMAP_TOTAL_ENTRIES, HASHMAP_MAX_KEYS_SZ, HASHMAP_MAX_VALU_SZ, \
                    (HASHMAP_MAX_KEYS_SZ + HASHMAP_MAX_VALU_SZ))
 ebpf_init_cap_func_reserve(1)
 ebpf_init_cap_alloc()
