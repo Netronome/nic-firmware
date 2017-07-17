@@ -32,7 +32,7 @@ cmsg_init()
 #endm
 
 .begin
-    .reg ctx_num
+    .reg my_act_ctx
 	.reg @cmsg_rx_cntr
 	.reg @cmsg_rx_init
 	.sig volatile g_ordersig
@@ -50,8 +50,8 @@ cmsg_init()
     .endif
 
     local_csr_rd[ACTIVE_CTX_STS]
-    immed[ctx_num, 0]
-    alu[ctx_num, ctx_num, and, 7]
+    immed[my_act_ctx, 0]
+    alu[my_act_ctx, my_act_ctx, and, 7]
 
 		//__hashmap_dbg_print(0x1001, 0, ctx_num)
 
