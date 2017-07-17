@@ -221,7 +221,7 @@ void ct_nn_write(
 
 /* Write the RSS table to NN registers for all MEs */
 /* RSS table uses 0-63 NN registers (max of 2 VNIC ports, 1 RSS tbl per port) */
-/* HASH table uses 64-127  */
+/* HASH table uses 64-103, EPOCH uses NN 127  */
 __intrinsic void
 upd_nn_table_instr(__xwrite uint32_t *xwr_instr, uint32_t start_offset,
                     uint32_t count)

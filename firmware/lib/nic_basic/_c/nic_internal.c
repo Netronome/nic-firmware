@@ -27,6 +27,7 @@
 #include <assert.h>
 #include <nfp.h>
 #include <stdint.h>
+#include <nfp_cluster_target.h>
 
 #include <nfp/me.h>
 #include <nfp/mem_atomic.h>
@@ -404,6 +405,21 @@ nic_local_cfg_bpf_is_enabled()
     return !!(nic->control[0] & NFP_NET_CFG_CTRL_BPF);
 }
 
+static __intrinsic void
+ct_write_nn(unsigned int isl, unsigned int me, unsigned int nn_idx, unsigned int val)
+{
+    SIGNAL sig;
+    unsigned int addr;
+    unsigned int __xwrite xfer;
+
+    addr = (isl << 24) | (me << 17) | (1 << 9) | (nn_idx << 2);
+    xfer = val;
+
+    __asm {
+        ct[ctnn_write, xfer, addr, 0, 1], ctx_swap[sig];
+    };
+}
+
 /* XXX Move to some sort of CT reflect library */
 static __intrinsic unsigned int
 ct_read_csr(unsigned int isl, unsigned int me, unsigned int csr_addr)
@@ -453,6 +469,7 @@ ct_signal(unsigned int isl, unsigned int me, unsigned int ctx, unsigned int sign
     };
 }
 
+#define PKT_IO_SIG_EPOCH        8
 #define PKT_IO_SIG_NBI          9
 #define PKT_IO_SIG_NFD          10
 #define PKT_IO_SIG_NFD_RETRY    11
@@ -466,9 +483,10 @@ ct_signal(unsigned int isl, unsigned int me, unsigned int ctx, unsigned int sign
 #define ME_CSR_CTX_ENABLES      0x18
 #define ME_CSR_CTX_PTR          0x20
 #define ME_CSR_IND_CTX_STS      0x40
+#define ME_CSR_IND_CTX_SGL_EVT  0x48
 #define ME_CSR_IND_CTX_WKP_EVT  0x50
 
-__shared __lmem uint32_t bpf_mes_ids[] = { APP_MES_LIST };
+__shared __lmem uint32_t dp_mes_ids[] = { APP_MES_LIST };
 
 static __intrinsic void
 update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
@@ -486,9 +504,9 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
     __gpr unsigned int wkp_mask;
     __gpr unsigned int ctx_enables;
 
-    for (i = 0; i < sizeof(bpf_mes_ids) / sizeof(uint32_t); i++) {
-        isl = bpf_mes_ids[i] >> 4;
-        me = bpf_mes_ids[i] & 0xf;
+    for (i = 0; i < sizeof(dp_mes_ids) / sizeof(uint32_t); i++) {
+        isl = dp_mes_ids[i] >> 4;
+        me = dp_mes_ids[i] & 0xf;
 
         // signal threads to go quiescent
         for (ctx = 0; ctx < 8; ctx = ctx + 2) {
@@ -506,7 +524,7 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
             for (ctx = 0; ctx < 8; ctx += 2) {
                 ct_write_csr(isl, me, ME_CSR_CTX_PTR, ctx);
                 wkp_mask = ct_read_csr(isl, me, ME_CSR_IND_CTX_WKP_EVT);
-                if (! (wkp_mask & ((1 << PKT_IO_SIG_NFD_RETRY) | (1 << PKT_IO_SIG_RESUME))))
+                if (! (wkp_mask & ((1 << PKT_IO_SIG_EPOCH) | (1 << PKT_IO_SIG_RESUME))))
                     ctx_enables |= (1 << (8 + ctx));
             }
             if (ctx_enables & 0xff00) {
@@ -582,6 +600,41 @@ nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t vid_port)
     update_bpf_prog(ctx_mode, bar_base);
 
     return;
+}
+
+#define EPOCH_NN_IDX 127
+__shared __lmem uint32_t epoch = 0;
+
+__intrinsic void
+nic_local_epoch() {
+    __gpr unsigned int i;
+    __gpr unsigned int isl;
+    __gpr unsigned int me;
+    __gpr unsigned int ctx;
+    __gpr unsigned int sig_mask;
+
+    epoch++;
+
+    for (i = 0; i < sizeof(dp_mes_ids) / sizeof(uint32_t); i++) {
+        isl = dp_mes_ids[i] >> 4;
+        me = dp_mes_ids[i] & 0xf;
+
+        for (ctx = 0; ctx < 8; ctx = ctx + 2) {
+            ct_signal(isl, me, ctx, PKT_IO_SIG_EPOCH);
+        }
+
+        do {
+            sleep(250);
+            sig_mask = 0;
+            for (ctx = 0; ctx < 8; ctx += 2) {
+                ct_write_csr(isl, me, ME_CSR_CTX_PTR, ctx);
+                sig_mask |= ct_read_csr(isl, me, ME_CSR_IND_CTX_SGL_EVT);
+            }
+        }
+        while (sig_mask & (1 << PKT_IO_SIG_EPOCH));
+
+        ct_write_nn(isl, me, EPOCH_NN_IDX, epoch);
+    }
 }
 
 #endif /* _LIBNIC_NIC_INTERNAL_C_ */
