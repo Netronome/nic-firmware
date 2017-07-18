@@ -11,11 +11,11 @@
 
 /* Global mandetory parameters */
 #ifndef GRO_NUM_BLOCKS
-    #define GRO_NUM_BLOCKS          3
+    #define GRO_NUM_BLOCKS          6
 #endif
 
 #ifndef GRO_CTX_PER_BLOCK
-    #define GRO_CTX_PER_BLOCK       2
+    #define GRO_CTX_PER_BLOCK       1
 #endif
 
 #if 0
