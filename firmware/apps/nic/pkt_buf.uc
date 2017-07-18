@@ -6,7 +6,7 @@
 #include <timestamp.uc>
 
 #ifndef PKT_BUF_ME_CTM_PACKETS
-    #define PKT_BUF_ME_CTM_PACKETS 36
+    #define PKT_BUF_ME_CTM_PACKETS 48
 #endif
 
 #ifndef PKT_BUF_ME_CTM_BUFFERS
@@ -193,6 +193,7 @@ recycle#:
 
 #if (WORKERS_PER_ISLAND > 4)
     .reg volatile @dma_semaphore // per ME lock, permit one outstanding DMA per ME for now (12 per island)
+    .reg_addr @dma_semaphore 28 A
     immed[@dma_semaphore, (16 / WORKERS_PER_ISLAND)] // implicit init on #include
 #endif
 
@@ -252,9 +253,8 @@ check_status#:
 
 #if (WORKERS_PER_ISLAND > 4)
 retry_dma#:
-    .reg_addr @dma_semaphore 28 A
     alu[@dma_semaphore, @dma_semaphore, -, 1]
-    beq[yield_retry_dma#]
+    bmi[yield_retry_dma#]
 #endif
 
     ov_start((OV_BYTE_MASK | OV_IMMED16 | OV_LENGTH))
