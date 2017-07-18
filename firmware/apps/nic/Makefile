@@ -75,14 +75,14 @@ $(eval $(call microcode.add_include,$(PROJECT),datapath,$(GRO_DIR)))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,SS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
-$(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=8))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=10))
 #$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
 $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
-        mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5 mei0.me6 mei0.me7 \
-        mei1.me0 mei1.me1 mei1.me2 mei1.me3 mei1.me4 mei1.me5 mei1.me6 mei1.me7 \
-        mei2.me0 mei2.me1 mei2.me2 mei2.me3 mei2.me4 mei2.me5 mei2.me6 mei2.me7 \
-	mei3.me0 mei3.me1 mei3.me2 mei3.me3 mei3.me4 mei3.me5 mei3.me6 mei3.me7 \
-	mei4.me0 mei4.me1 mei4.me2 mei4.me3 mei4.me4 mei4.me5 mei4.me6 mei4.me7 \
+        mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5 mei0.me6 mei0.me7 mei0.me8 mei0.me9 \
+        mei1.me0 mei1.me1 mei1.me2 mei1.me3 mei1.me4 mei1.me5 mei1.me6 mei1.me7 mei1.me8 mei1.me9 \
+        mei2.me0 mei2.me1 mei2.me2 mei2.me3 mei2.me4 mei2.me5 mei2.me6 mei2.me7 mei2.me8 mei2.me9 \
+	mei3.me0 mei3.me1 mei3.me2 mei3.me3 mei3.me4 mei3.me5 mei3.me6 mei3.me7 mei3.me8 mei3.me9 \
+	mei4.me0 mei4.me1 mei4.me2 mei4.me3 mei4.me4 mei4.me5 mei4.me6 mei4.me7 mei4.me8 mei4.me9 \
 	))
 
 # Custom config to give ME list to the app master
@@ -106,6 +106,8 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 0, 5), \
         $(call NIC_ISL_ME_DEST, 0, 6), \
         $(call NIC_ISL_ME_DEST, 0, 7), \
+        $(call NIC_ISL_ME_DEST, 0, 8), \
+        $(call NIC_ISL_ME_DEST, 0, 9), \
         \
         $(call NIC_ISL_ME_DEST, 1, 0), \
         $(call NIC_ISL_ME_DEST, 1, 1), \
@@ -115,6 +117,8 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 1, 5), \
         $(call NIC_ISL_ME_DEST, 1, 6), \
         $(call NIC_ISL_ME_DEST, 1, 7), \
+        $(call NIC_ISL_ME_DEST, 1, 8), \
+        $(call NIC_ISL_ME_DEST, 1, 9), \
         \
         $(call NIC_ISL_ME_DEST, 2, 0), \
         $(call NIC_ISL_ME_DEST, 2, 1), \
@@ -124,6 +128,8 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 2, 5), \
         $(call NIC_ISL_ME_DEST, 2, 6), \
         $(call NIC_ISL_ME_DEST, 2, 7), \
+        $(call NIC_ISL_ME_DEST, 2, 8), \
+        $(call NIC_ISL_ME_DEST, 2, 9), \
         \
         $(call NIC_ISL_ME_DEST, 3, 0), \
         $(call NIC_ISL_ME_DEST, 3, 1), \
@@ -133,6 +139,8 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 3, 5), \
         $(call NIC_ISL_ME_DEST, 3, 6), \
         $(call NIC_ISL_ME_DEST, 3, 7), \
+        $(call NIC_ISL_ME_DEST, 3, 8), \
+        $(call NIC_ISL_ME_DEST, 3, 9), \
 		\
         $(call NIC_ISL_ME_DEST, 4, 0), \
         $(call NIC_ISL_ME_DEST, 4, 1), \
@@ -141,7 +149,9 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 4, 4), \
         $(call NIC_ISL_ME_DEST, 4, 5), \
         $(call NIC_ISL_ME_DEST, 4, 6), \
-        $(call NIC_ISL_ME_DEST, 4, 7)"
+        $(call NIC_ISL_ME_DEST, 4, 7), \
+        $(call NIC_ISL_ME_DEST, 4, 8), \
+        $(call NIC_ISL_ME_DEST, 4, 9)"
 
 # Add cmsg map handler 
 $(eval $(call microcode.assemble,$(PROJECT),mapcmsg,apps/nic/maps,cmsg_app.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
@@ -154,7 +164,7 @@ $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(BLM_DIR)))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(GRO_DIR)))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,WORKERS_PER_ISLAND=4))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,GLOBAL_INIT=1))
-$(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,mei1.me8))
+$(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,mei3.me10))
 
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
