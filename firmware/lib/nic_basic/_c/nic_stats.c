@@ -214,7 +214,7 @@ void nic_tx_discard_cntr(int port)
 __forceinline static void
 mac_stats_accumulate(void)
 {
-    __gpr uint32_t i;
+    uint32_t i;
 
     /* Accumulate the port statistics for each port. */
     for (i = 0; i < NS_PLATFORM_NUM_PORTS; ++i) {
@@ -227,7 +227,7 @@ mac_stats_accumulate(void)
 __forceinline static void
 nic_stats_rx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
 {
-    __gpr  struct cfg_bar_cntrs bar_cntrs = {0};
+    struct cfg_bar_cntrs bar_cntrs = {0};
     __imem struct macstats_port_accum* port_stats;
     __xread uint64_t read_array[8];
     __xread uint64_t read_val;
@@ -276,7 +276,7 @@ nic_stats_rx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
 __forceinline static void
 nic_stats_tx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
 {
-    __gpr  struct cfg_bar_cntrs bar_cntrs = {0};
+    struct cfg_bar_cntrs bar_cntrs = {0};
     __imem struct macstats_port_accum* port_stats;
     __xread uint64_t read_array[8];
     __xread uint64_t read_val;
@@ -362,10 +362,10 @@ nic_stats_update_control_bar(void)
  __forceinline static void
 nic_tmq_drops_accumulate(void)
 {
-    __gpr uint32_t    port;
-    __gpr uint32_t    qid;
+    uint32_t    port;
+    uint32_t    qid;
     __gpr uint32_t    tmq_cnt;
-    __gpr uint64_t    tmq_port_drop_cnt;
+    uint64_t    tmq_port_drop_cnt;
     __xwrite uint64_t cnt_xw;
 
     /* Accumulate the NBI TM queue drop counts for each port. */
@@ -390,7 +390,7 @@ void
 nic_stats_loop(void)
 {
     SIGNAL sig;
-    __gpr uint32_t alarms = 0;
+    uint32_t alarms = 0;
 
     set_alarm(MAC_STATS_CNTRS_INTERVAL, &sig);
 

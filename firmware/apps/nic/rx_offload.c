@@ -112,7 +112,7 @@ rx_check_inner_csum(int port, __lmem struct pkt_hdrs *hdrs,
     __addr40 void *l3_hdr;
     uint32_t csum_copy, opt_size;
     int ret = 0;
-    __gpr int ret2 = NIC_RX_OK;
+    int ret2 = NIC_RX_OK;
     __xread uint32_t ip_opts[10];
     SIGNAL read_sig;
 
