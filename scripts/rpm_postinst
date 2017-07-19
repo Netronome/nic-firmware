@@ -25,9 +25,9 @@ find $FIRMWARE_DIR -maxdepth 1 -type f -name *.nffw -exec mv -t \
 #Create links
 ln -s $FIRMWARE_DIR_CNIC/* $FIRMWARE_DIR/
 
-echo "Switched to CoreNIC firmware files"
+echo "Switched to CoreNIC firmware files in /lib/firmware/netronome/cnic"
 
-for POSTINST in %{_prefix}/lib/dkms/common.postinst %{_datarootdir}/%{module_name}/postinst; do
+for POSTINST in %{_datarootdir}/%{module_name}/postinst; do
         if [ -f $POSTINST ]; then
                 $POSTINST %{module_name} %{version} %{_datarootdir}/%{module_name}
 
@@ -56,6 +56,7 @@ for POSTINST in %{_prefix}/lib/dkms/common.postinst %{_datarootdir}/%{module_nam
         fi
         echo "WARNING: $POSTINST does not exist."
 done
+
 echo -e "ERROR: DKMS version is too old and %{module_name} was not"
 echo -e "built with legacy DKMS support."
 echo -e "You must either rebuild %{module_name} with legacy postinst"
