@@ -563,6 +563,7 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     }
 
     if (control & NFP_NET_CFG_CTRL_BPF) {
+        instr[count].param = NFD_BPF_START_OFF + vnic * NFD_BPF_MAX_LEN;
 #ifdef GEN_INSTRUCTION
         instr[count++].instr = instr_tbl[INSTR_EBPF];
 #else

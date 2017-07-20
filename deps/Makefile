@@ -6,7 +6,7 @@ FLOWENV_REV=74d431eeb670
 # GRO_REV  - Tip as of July 12 2016
 GRO_REV=25c868a8c724
 # NFD_REV - Tip of default branch as of 11 July 2017
-NFD_REV=9718abf1f504
+NFD_REV=4617188a5091
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 

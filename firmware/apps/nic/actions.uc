@@ -361,14 +361,17 @@ skip_checksum#:
 
 #macro actions_execute(in_pkt_vec, EGRESS_LABEL, DROP_LABEL, ERROR_LABEL)
 .begin
+    .reg ebpf_addr
+    .reg ebpf_mask
     .reg jump_idx
     .reg egress_q_base
     .reg egress_q_mask
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#], defer[1] ;actions_jump
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#], defer[2] ;actions_jump
         immed[egress_q_mask, BF_MASK(PV_QUEUE_OUT_bf)]
+        immed[ebpf_mask, 0xffff]
 
     ins_0#: br[DROP_LABEL]
     ins_1#: br[statistics#]
@@ -414,8 +417,8 @@ cmsg#:
     cmsg_desc_workq($__pkt_io_gro_meta, in_pkt_vec, EGRESS_LABEL)
 
 ebpf#:
-    __actions_read(--, --, --)
-    ebpf_call(in_pkt_vec, DROP_LABEL, tx_wire_ebpf#)
+    __actions_read(ebpf_addr, ebpf_mask, --)
+    ebpf_call(in_pkt_vec, ebpf_addr, DROP_LABEL, tx_wire_ebpf#)
 
 rxcsum#:
     __actions_rxcsum(in_pkt_vec)
