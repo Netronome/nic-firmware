@@ -157,18 +157,17 @@
 
 #macro pv_init(io_vec, PACKET_ID)
 #if (strstr('io_vec', '*l$index') == 1)
-    .alloc_mem _PKT_IO_PKT_VEC_/**/PACKET_ID lmem me (4 * (1 << log2((PV_SIZE_LW * 4), 1))) (1 << log2((PV_SIZE_LW * 4), 1))
+    .alloc_mem _PKT_IO_PKT_VEC_/**/PACKET_ID lmem me (4 * (1 << log2((PV_SIZE_LW * 4), 1))) (4 * (1 << log2((PV_SIZE_LW * 4), 1)))
 .begin
     .reg addr
     .reg offset
 
-#if (log2((PV_SIZE_LW * 4), 1) <= 7)
-    alu[offset, --, B, t_idx_ctx, >>(7 - log2((PV_SIZE_LW * 4), 1))]
-#else
-    alu[offset, --, B, t_idx_ctx, <<(log2((PV_SIZE_LW * 4), 1) - 7)]
-#endif
     immed[addr, _PKT_IO_PKT_VEC_/**/PACKET_ID]
-    alu[addr, addr, +, offset]
+#if (log2((PV_SIZE_LW * 4), 1) <= 8)
+    alu[addr, addr, OR, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4), 1))]
+#else
+    alu[addr, addr, OR, t_idx_ctx, <<(log2((PV_SIZE_LW * 4), 1) - 8)]
+#endif
     #define_eval _PV_INIT_LM_HANDLE strright('io_vec', 1)
     local_csr_wr[ACTIVE_LM_ADDR_/**/_PV_INIT_LM_HANDLE, addr]
     #undef _PV_INIT_LM_HANDLE
