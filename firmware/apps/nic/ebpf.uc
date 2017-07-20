@@ -185,6 +185,7 @@ ebpf_init_cap_finalize()
     alu[jump_offset, in_ustore_addr, -, jump_offset]
     jump[jump_offset, ebpf_start#], targets[dummy0#, dummy1#], defer[3]
         immed[stack_addr, EBPF_STACK_BASE]
+        .reg_addr stack_addr 22 B
         alu[stack_addr, stack_addr, +, ctx_offset]
         local_csr_wr[ACTIVE_LM_ADDR_0, stack_addr]
 
