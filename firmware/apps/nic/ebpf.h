@@ -41,5 +41,5 @@
     } while(0)
 
 /* in lib/nic_basic/_c/nic_internal.c */
-__intrinsic void nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t port);
+__intrinsic void nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t vid, uint32_t vnic);
 __intrinsic void upd_slicc_hash_table(void);

@@ -489,7 +489,7 @@ ct_signal(unsigned int isl, unsigned int me, unsigned int ctx, unsigned int sign
 __shared __lmem uint32_t dp_mes_ids[] = { APP_MES_LIST };
 
 static __intrinsic void
-update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
+update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base, uint32_t vnic)
 {
     __xread uint32_t host_mem_bpf_cfg[3];
     __xread uint32_t data[2];
@@ -547,7 +547,7 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
         addr_lo >>= 3;
 
         // set instr pointer to 'start' and enable writing. */
-        data_out = 0x80000000 + NFD_BPF_START_OFF;
+        data_out = 0x80000000 + NFD_BPF_START_OFF + vnic * NFD_BPF_MAX_LEN;
         ct_write_csr(isl, me, ME_CSR_USTORE_ADDR, data_out);
 
         while (words--) {
@@ -586,7 +586,7 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base)
 }
 
 __intrinsic void
-nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t vid_port)
+nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t vid, uint32_t vnic)
 {
     __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
     __xread uint32_t tmp2[2];
@@ -595,9 +595,9 @@ nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t vid_port)
     /* Need to read the update word from the BAR */
 
     /* Calculate the relevant configuration BAR base address */
-    bar_base = NFD_CFG_BAR_ISL(NIC_PCI,vid_port);
+    bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
 
-    update_bpf_prog(ctx_mode, bar_base);
+    update_bpf_prog(ctx_mode, bar_base, vnic);
 
     return;
 }

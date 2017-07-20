@@ -429,7 +429,7 @@ cfg_changes_loop(void)
                 port = vnic;
 
                 if (update & NFP_NET_CFG_UPDATE_BPF) {
-	            nic_local_bpf_reconfig(&ctx_mode, vid);
+	            nic_local_bpf_reconfig(&ctx_mode, vid, vnic);
                 }
 
                 if (control & NFP_NET_CFG_CTRL_ENABLE) {
