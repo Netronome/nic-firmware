@@ -96,7 +96,6 @@ ln -s $FIRMWARE_DIR_CNIC/* $FIRMWARE_DIR/
 process_dkms
 if [ $ret -ne 0 ]; then
     echo "There was an error processing dkms install. ERROR $ret"
-    exit $ret
 fi
 
 # Backup netronome blacklist
