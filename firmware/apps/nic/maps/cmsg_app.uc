@@ -43,7 +43,7 @@ cmsg_init()
 		local_csr_wr[MAILBOX0, 0]
 		local_csr_wr[MAILBOX1, 0]
 		local_csr_wr[MAILBOX2, 0]
-		ctx_sig_next()	
+		ctx_sig_next()
 	.else
 		ctx_arb[g_ordersig]
 		ctx_sig_next()

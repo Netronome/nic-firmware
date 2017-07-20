@@ -83,8 +83,8 @@ ebpf_init_cap_maps((1 << BPF_MAP_TYPE_HASH), HASHMAP_MAX_TID, HASHMAP_TOTAL_ENTR
 ebpf_init_cap_func(EBPF_CAP_FUNC_ID_LOOKUP, HTAB_MAP_LOOKUP_SUBROUTINE#)
 ebpf_init_cap_finalize()
 
-#define EBPF_STACK_SIZE 64
-.alloc_mem EBPF_STACK_BASE lmem me (4 * (1 << log2(EBPF_STACK_SIZE, 1))) (1 << log2(EBPF_STACK_SIZE))
+#define EBPF_STACK_SIZE 128
+.alloc_mem EBPF_STACK_BASE lmem me (4 * (1 << log2(EBPF_STACK_SIZE, 1))) (4 * (1 << log2(EBPF_STACK_SIZE)))
 
 #define EBPF_PORT_STATS_BLK	(8)		/* 8 u64 counters */
 
@@ -170,8 +170,9 @@ ebpf_init_cap_finalize()
 #endm
 
 
-#macro ebpf_call(in_vec, DROP_LABEL, TX_WIRE_LABEL)
+#macro ebpf_call(in_vec, in_ustore_addr, DROP_LABEL, TX_WIRE_LABEL)
 .begin
+    .reg jump_offset
     .reg ctx_offset
     .reg stack_addr
 
@@ -180,9 +181,18 @@ ebpf_init_cap_finalize()
 #else
     alu[ctx_offset, --, B, t_idx_ctx, <<(log2(EBPF_STACK_SIZE, 1) - 7)]
 #endif
-    immed[stack_addr, EBPF_STACK_BASE]
-    alu[stack_addr, stack_addr, +, ctx_offset]
-    local_csr_wr[ACTIVE_LM_ADDR_0, stack_addr]
+    load_addr[jump_offset, ebpf_start#]
+    alu[jump_offset, in_ustore_addr, -, jump_offset]
+    jump[jump_offset, ebpf_start#], targets[dummy0#, dummy1#], defer[3]
+        immed[stack_addr, EBPF_STACK_BASE]
+        alu[stack_addr, stack_addr, +, ctx_offset]
+        local_csr_wr[ACTIVE_LM_ADDR_0, stack_addr]
+
+ebpf_start#:
+dummy0#:
+    nop
+dummy1#:
+    nop
 
     br_addr[NFD_BPF_START_OFF, ebpf_reentry#], live_regs[@dma_semaphore, t_idx_ctx, __actions_t_idx, __pkt_io_nfd_pkt_no, __pkt_io_quiescent]
 .end
