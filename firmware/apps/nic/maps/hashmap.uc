@@ -875,6 +875,10 @@ ret#:
 	.reg htab_return_addr
 	.reg_addr htab_return_addr 0 B
 	.set htab_return_addr
+	.reg rtnB1
+	.reg_addr rtnB1 1 B
+	.set rtnB1
+	.reg rtn_addr
 
 	.reg htab_value_addr_lo
 	.reg ebpf_rc
@@ -888,6 +892,7 @@ ret#:
 	local_csr_rd[ACTIVE_LM_ADDR_/**/HTAB_EBPF_LM_KEY_HANDLE]
 	immed[lm_key_offset, 0]
 	alu[tid, --, b,HTAB_EBPF_LM_KEY_INDEX]
+	alu[rtn_addr, --, b, htab_return_addr]
 
 	__hashmap_dbg_print(0xf001, 0, tid, HTAB_EBPF_LM_KEY_INDEX[1])
 	hashmap_ops(tid, lm_key_offset, --, HASHMAP_OP_LOOKUP, htab_lookup_error_map#, htab_lookup_not_found#, HASHMAP_RTN_ADDR, --, --, out_addr)
@@ -895,11 +900,13 @@ ret#:
 	__hashmap_dbg_print(0xf1111, 0, out_addr[0], out_addr[1])
 	.reg_addr ebpf_rc 0 A
 	alu[ebpf_rc, --, b, out_addr[0]]
+	alu[htab_return_addr, --, b, out_addr[0]]
 	//alu[ebpf_rc, --, b, out_addr[0]], gpr_wrboth
 
 	/* MARY check grp_wrboth, results needs to be in both A & B  */
 	.reg_addr htab_value_addr_lo 1 A
 	alu[htab_value_addr_lo, --, b, out_addr[1]]
+	alu[rtnB1, --, b, out_addr[1]]
 	//alu[htab_value_addr_lo, --, b, out_addr[1]], gpr_wrboth
 	br[ret#]
 
@@ -907,9 +914,11 @@ htab_lookup_error_map#:
 htab_lookup_not_found#:
 		__hashmap_dbg_print(0xf01f, 0, 0)
 	.reg_addr ebpf_rc 0 A
-	immed[ebpf_rc, 0]
+	immed[ebpf_rc, 0]				;A0
+	immed[htab_return_addr, 0]		;B0
 	.reg_addr htab_value_addr_lo 1 A
-	immed[htab_value_addr_lo,0 ]
+	immed[htab_value_addr_lo,0 ]	;A1
+	immed[rtnB1,0 ]					;B1
 
 	htab_subr_regs_free()
 ret#:
@@ -918,7 +927,8 @@ ret#:
 		.use htab_return_addr
 		.use ebpf_rc
 		.use htab_value_addr_lo
-		rtn[htab_return_addr]
+		.use rtnB1
+		rtn[rtn_addr]
 	#pragma warning(pop)
 
 	#undef HASHMAP_RXFR_COUNT
