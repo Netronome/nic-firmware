@@ -280,7 +280,7 @@ for KERNEL in $KERNELS; do
     dkms --force install -m $NAME -v $VERSION -k $KERNEL $ARCH || failed=$((failed+1))
 done
 if [ "$attempted" = "$failed" ]; then
-    exit 1
+    echo "WARNING: Some kernel builds failed!"
 fi
 
 dracut -f || :
