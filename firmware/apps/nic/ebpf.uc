@@ -150,8 +150,7 @@ ebpf_init_cap_finalize()
 
     br_bset[rc, EBPF_RET_DROP, drop#]
 
-    //local_csr_wr[T_INDEX, __actions_t_idx]
-	__actions_restore_t_idx()
+    __actions_restore_t_idx()
 
     pv_set_tx_host_rx_bpf(_ebpf_pkt_vec)
 
@@ -163,7 +162,7 @@ ebpf_init_cap_finalize()
     alu[stats_base, stats_base, +, EBPF_PORT_STATS_BLK]
     pv_stats_select(_ebpf_pkt_vec, stats_base)
     pv_reset_egress_queue(_ebpf_pkt_vec)
-    pv_get_ingress_queue_nbi_chan(egress_q_base, _ebpf_pkt_vec)
+    pv_get_nbi_egress_channel_mapped_to_ingress(egress_q_base, _ebpf_pkt_vec)
 
     pkt_io_tx_wire(_ebpf_pkt_vec, egress_q_base, egress#, drop#)
 .end

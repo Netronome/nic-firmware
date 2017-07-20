@@ -224,8 +224,17 @@
     bitfield_extract__sz1(out_queue, BF_AML(in_vec, PV_QUEUE_IN_bf))
 #endm
 
-#macro pv_get_ingress_queue_nbi_chan(out_chan, in_vec)
+#macro pv_get_nbi_egress_channel_mapped_to_ingress(out_chan, in_vec)
+    // TODO: configure Catamaran / TM such that egress and ingress channel numbers coincide
     bitfield_extract__sz1(out_chan, BF_AML(in_vec, PV_QUEUE_IN_NBI_CHAN_bf))
+    #define_eval __PV_EGRESS_CHANNEL_SPACING NS_PLATFORM_NBI_TM_QID_LO(1)
+    #define __PV_EGRESS_CHANNEL_SHIFT 0
+    #if (__PV_EGRESS_CHANNEL_SPACING != 0)
+        #define_eval __PV_EGRESS_CHANNEL_SHIFT log2(__PV_EGRESS_CHANNEL_SPACING)
+    #endif
+    alu[out_chan, --, B, out_chan, <<__PV_EGRESS_CHANNEL_SHIFT] // will only work for base queue
+    #undef __PV_EGRESS_CHANNEL_SPACING
+    #undef __PV_EGRESS_CHANNEL_SHIFT
 #endm
 
 #macro pv_get_instr_addr(out_addr, in_vec, IN_LIST_SIZE)
