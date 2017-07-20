@@ -180,10 +180,10 @@ ebpf_init_cap_finalize()
     jump[jump_offset, ebpf_start#], targets[dummy0#, dummy1#], defer[3]
         immed[stack_addr, EBPF_STACK_BASE]
         .reg_addr stack_addr 22 B
-        #if (log2(EBPF_STACK_SIZE, 1) <= 7)
-            alu[stack_addr, stack_addr, OR, t_idx_ctx, >>(7 - log2(EBPF_STACK_SIZE, 1))]
+        #if (log2(EBPF_STACK_SIZE, 1) <= 8)
+            alu[stack_addr, stack_addr, OR, t_idx_ctx, >>(8 - log2(EBPF_STACK_SIZE, 1))]
         #else
-            alu[stack_addr, stack_addr, OR, t_idx_ctx, <<(log2(EBPF_STACK_SIZE, 1) - 7)]
+            alu[stack_addr, stack_addr, OR, t_idx_ctx, <<(log2(EBPF_STACK_SIZE, 1) - 8)]
         #endif
         local_csr_wr[ACTIVE_LM_ADDR_0, stack_addr]
 
