@@ -1,5 +1,7 @@
 #include "global.uc"
 
+#include <nic_basic/nic_stats.h>
+
 #include "actions.uc"
 #include "pkt_io.uc"
 
@@ -10,32 +12,45 @@ pv_init(pkt_vec, 0)
 pkt_io_init(pkt_vec)
 br[ingress#]
 
-error_rx_nbi#:
-    // TODO: no access to port info here, will always increment VNIC errors for VNIC zero
-    pv_stats_incr_error(pkt_vec)
-    pkt_io_drop(pkt_vec)
+rx_discards_proto#:
+    pv_stats_increment(pkt_vec, EXT_STATS_GLOBAL_RX_DISCARDS_PROTO)
     br[ingress#]
 
-error_rx_nfd#:
-    // TODO: no access to port info here, will always increment VNIC errors for VNIC zero
-    pv_stats_select(pkt_vec, PV_STATS_TX)
+rx_errors_parse#:
+    pv_stats_increment(pkt_vec, EXT_STATS_GLOBAL_RX_ERRORS_PARSE)
+    br[drop#]
 
-error#:
-    pv_stats_incr_error(pkt_vec)
+tx_errors_pci#:
+    pv_stats_increment(pkt_vec, EXT_STATS_GLOBAL_TX_ERRORS_PCI)
+    br[drop#]
+
+tx_errors_offset#:
+    pv_stats_increment(pkt_vec, EXT_STATS_TX_ERRORS_OFFSET)
+    br[drop#]
+
+rx_discards_mtu#:
+    pv_stats_increment_rxtx(pkt_vec, EXT_STATS_RX_DISCARDS_MTU, EXT_STATS_TX_ERRORS_MTU)
+    br[drop#]
+
+rx_discards_filter_mac#:
+    pv_stats_increment(pkt_vec, EXT_STATS_RX_DISCARDS_FILTER_MAC)
+    br[drop#]
+
+rx_discards_no_buf_pci#:
+    pv_stats_increment(pkt_vec, EXT_STATS_RX_DISCARDS_NO_BUF_PCI)
 
 drop#:
-    pv_stats_incr_discard(pkt_vec)
     pkt_io_drop(pkt_vec)
 
 egress#:
     pkt_io_reorder(pkt_vec)
 
 ingress#:
-    pkt_io_rx(pkt_vec, drop#, error_rx_nbi#, error_rx_nfd#)
+    pkt_io_rx(pkt_vec)
     actions_load(pkt_vec)
 
 actions#:
-    actions_execute(pkt_vec, egress#, drop#, error#)
+    actions_execute(pkt_vec, egress#)
 
 #pragma warning(disable: 4702)
 fatal_error("MAIN LOOP EXIT")

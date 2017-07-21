@@ -392,7 +392,7 @@ upd_slicc_hash_table(void)
 		upd_nn_table_instr(xwr_nn_info,  start_offset, (sizeof(xrd_data)/4));
 
 		start_offset += sizeof(xrd_data)/4;
-		slicc_hash_data += sizeof(xrd_data)/4; 
+		slicc_hash_data += sizeof(xrd_data)/4;
 	}
     return;
 }
@@ -479,8 +479,7 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
 #else
     instr[count].instr = INSTR_STATISTICS;
 #endif
-    instr[count++].param = ((uint64_t)&nic_stats_extra[vid].tx_uc_octets
-                            - (uint64_t)&nic_stats_extra[vid]) >> 3;
+    instr[count++].param = (vnic + 1) << 3 | (1 << 2);
     prev_instr = INSTR_STATISTICS;
 
 
@@ -526,8 +525,7 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     instr[count].instr = INSTR_STATISTICS;
 #endif
 
-    instr[count].param = ((uint64_t)&nic_stats_extra[vid].rx_uc_octets
-                            - (uint64_t)&nic_stats_extra[vid]) >> 3;
+    instr[count].param = (vnic + 1) << 3;
     prev_instr = INSTR_STATISTICS;
     count++;
 
@@ -677,7 +675,7 @@ app_config_port_down(uint32_t vid)
     	upd_rx_wire_instr(&xwr_instr.value, byte_off << 2, 1);
 
 #ifdef APP_CONFIG_DEBUG
-    	{	
+    	{
         	union debug_instr_journal data;
         	data.value = 0x00;
         	data.event = PORT_DOWN;

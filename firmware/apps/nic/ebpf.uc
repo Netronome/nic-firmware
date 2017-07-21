@@ -117,11 +117,7 @@ ebpf_init_cap_finalize()
 #macro ebpf_reentry()
 .begin
     .reg egress_q_base
-    .reg stats_base
-    .reg stats_idx
-    .reg stats_flags
-    .reg stats_offset
-    .reg nic_stats_extra_hi
+    .reg stat
     .reg pkt_length
     .reg ebpf_rc
     .reg_addr ebpf_rc 0 A
@@ -131,45 +127,36 @@ ebpf_init_cap_finalize()
     alu[rc, --, b, ebpf_rc]
 
     // can this be written as an index by the eBPF code?
-    alu[stats_flags, EBPF_RET_STATS_MASK, AND, rc, >>EBPF_RET_STATS_PASS]
+    alu[stat, EBPF_RET_STATS_MASK, AND, rc, >>EBPF_RET_STATS_PASS]
 
     beq[skip_ebpf_stats#]
-	/* only port 0i for now */
-        ffs[stats_idx, stats_flags]
-        alu[stats_offset, EBPF_STATS_START_OFFSET, OR, stats_idx, <<4]
-        move(nic_stats_extra_hi, _nic_stats_extra >>8)
-        mem[incr64, --, nic_stats_extra_hi, <<8, stats_offset] // pkts count
-        alu[stats_offset, stats_offset, +, 8] // bytes count
-        pv_get_length(pkt_length, _ebpf_pkt_vec)
-        ov_start((OV_IMMED16 | OV_LENGTH))
-        ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
-        ov_set_use(OV_IMMED16, pkt_length)
-        ov_clean()
-        mem[add64_imm, --, nic_stats_extra_hi, <<8, stats_offset, 1], indirect_ref
+        ffs[stat, stat]
+        alu[stat, --, B, stat, <<4]
+        alu[stat, stat, +, EXT_STATS_BPF_PASS_FRAMES]
+        pv_stats_increment(_ebpf_pkt_vec, stat)
+        alu[stat, stat, +, 8]
+        pv_stats_add_octets(_ebpf_pkt_vec, stat)
     skip_ebpf_stats#:
 
     br_bset[rc, EBPF_RET_DROP, drop#]
 
     __actions_restore_t_idx()
 
-    pv_set_tx_host_rx_bpf(_ebpf_pkt_vec)
+    pv_set_tx_flag(_ebpf_pkt_vec, BF_L(PV_TX_HOST_RX_BPF_bf))
 
     br_bset[rc, EBPF_RET_PASS, actions#]
 
-    pv_stats_add_tx_octets(_ebpf_pkt_vec)
-
-    alu[stats_base, 0xff, AND, BF_A(_ebpf_pkt_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
-    alu[stats_base, stats_base, +, EBPF_PORT_STATS_BLK]
-    pv_stats_select(_ebpf_pkt_vec, stats_base)
-    pv_reset_egress_queue(_ebpf_pkt_vec)
+    pv_stats_add_octets(_ebpf_pkt_vec)
+    pv_clear_egress_queue(_ebpf_pkt_vec)
     pv_get_nbi_egress_channel_mapped_to_ingress(egress_q_base, _ebpf_pkt_vec)
-
-    pkt_io_tx_wire(_ebpf_pkt_vec, egress_q_base, egress#, drop#)
+    pv_stats_set_tx(_ebpf_pkt_vec)
+    pkt_io_tx_wire(_ebpf_pkt_vec, egress_q_base)
+    br[egress#]
 .end
 #endm
 
 
-#macro ebpf_call(in_vec, in_ustore_addr, DROP_LABEL, TX_WIRE_LABEL)
+#macro ebpf_call(in_vec, in_ustore_addr)
 .begin
     .reg jump_offset
     .reg stack_addr

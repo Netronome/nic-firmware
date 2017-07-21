@@ -2,9 +2,12 @@
 #define _ACTIONS_UC
 
 #include <kernel/nfp_net_ctrl.h>
+#include <nic_basic/nic_stats.h>
 
 #include "app_config_instr.h"
 #include "protocols.h"
+
+#include <passert.uc>
 
 #include "pv.uc"
 #include "pkt_io.uc"
@@ -48,33 +51,35 @@
 
 #macro __actions_statistics(in_pkt_vec)
 .begin
-    .reg stats_base
+    .reg stats_ctx
     .reg tmp
     .reg hi
 
-    __actions_read(stats_base, 0xff, --)
-    pv_stats_select(in_pkt_vec, stats_base)
+    __actions_read(stats_ctx, --, <<BF_L(PV_STATS_CTX_bf))
     br[check_mac#]
 
 broadcast#:
-    pv_stats_select(in_pkt_vec, PV_STATS_BC)
+    pv_stats_set_bc(in_pkt_vec)
     br[done#]
 
 multicast#:
     alu[hi, --, B, *$index++, <<16]
     alu[tmp, --, B, 1, <<16]
-    alu[--, hi, +, tmp]  // byte_align_be[] not necessary for MAC (word aligned)
+    alu[--, hi, +, tmp]
     alu[--, *$index, +carry, 0]
     __actions_restore_t_idx()
     bcs[broadcast#]
 
-    pv_stats_select(in_pkt_vec, PV_STATS_MC)
+    pv_stats_set_mc(in_pkt_vec)
     br[done#]
 
 check_mac#:
     pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
 
-    br_bset[*$index, BF_L(MAC_MULTICAST_bf), multicast#]
+    br_bset[*$index, BF_L(MAC_MULTICAST_bf), multicast#], defer[2]
+        passert(BF_L(PV_STATS_CTX_bf), "EQ", 16)
+        alu[BF_A(in_pkt_vec, PV_STATS_CTX_bf), BF_A(in_pkt_vec, PV_STATS_CTX_bf), AND~, BF_MASK(PV_STATS_CTX_bf), <<BF_L(PV_STATS_CTX_bf)]
+        alu[BF_A(in_pkt_vec, PV_STATS_CTX_bf), BF_A(in_pkt_vec, PV_STATS_CTX_bf), OR, stats_ctx]
 
     __actions_restore_t_idx()
 
@@ -359,7 +364,7 @@ skip_checksum#:
 #endm
 
 
-#macro actions_execute(in_pkt_vec, EGRESS_LABEL, DROP_LABEL, ERROR_LABEL)
+#macro actions_execute(in_pkt_vec, EGRESS_LABEL)
 .begin
     .reg ebpf_addr
     .reg ebpf_mask
@@ -373,7 +378,7 @@ next#:
         immed[egress_q_mask, BF_MASK(PV_QUEUE_OUT_bf)]
         immed[ebpf_mask, 0xffff]
 
-    ins_0#: br[DROP_LABEL]
+    ins_0#: br[policy_drop#]
     ins_1#: br[statistics#]
     ins_2#: br[mtu#]
     ins_3#: br[mac#]
@@ -385,16 +390,20 @@ next#:
     ins_9#: br[ebpf#]
     ins_10#: br[rxcsum#]
 
+policy_drop#:
+    pv_stats_increment_rxtx(in_pkt_vec, EXT_STATS_RX_DISCARDS_POLICY, EXT_STATS_TX_DISCARDS_POLICY)
+    br[drop#]
+
 statistics#:
     __actions_statistics(in_pkt_vec)
     __actions_next()
 
 mtu#:
-    __actions_check_mtu(in_pkt_vec, DROP_LABEL)
+    __actions_check_mtu(in_pkt_vec, rx_discards_mtu#)
     __actions_next()
 
 mac#:
-    __actions_check_mac(in_pkt_vec, DROP_LABEL)
+    __actions_check_mac(in_pkt_vec, rx_discards_filter_mac#)
     __actions_next()
 
 rss#:
@@ -407,22 +416,24 @@ checksum_complete#:
 
 tx_host#:
     __actions_read(egress_q_base, egress_q_mask, --)
-    pkt_io_tx_host(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
+    pkt_io_tx_host(in_pkt_vec, egress_q_base)
+    br[EGRESS_LABEL]
 
 tx_wire#:
     __actions_read(egress_q_base, egress_q_mask, --)
-    pkt_io_tx_wire(in_pkt_vec, egress_q_base, EGRESS_LABEL, DROP_LABEL)
+    pkt_io_tx_wire(in_pkt_vec, egress_q_base)
+    br[EGRESS_LABEL]
 
 cmsg#:
     cmsg_desc_workq($__pkt_io_gro_meta, in_pkt_vec, EGRESS_LABEL)
 
 ebpf#:
     __actions_read(ebpf_addr, ebpf_mask, --)
-    ebpf_call(in_pkt_vec, ebpf_addr, DROP_LABEL, tx_wire_ebpf#)
+    ebpf_call(in_pkt_vec, ebpf_addr)
 
 rxcsum#:
     __actions_rxcsum(in_pkt_vec)
-    br[next#] // last instruction in code will not pipeline
+    br[next#] // last instruction in code will not pipe
 
 .end
 #endm

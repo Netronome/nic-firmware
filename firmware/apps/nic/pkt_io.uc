@@ -61,34 +61,20 @@ nfd_out_send_init()
 #endm
 
 
-#macro pkt_io_tx_host(in_pkt_vec, egress_q_base, SUCCESS_LABEL, FAIL_LABEL)
-.begin
-    .reg addr_hi
-    .reg addr_lo
-    .reg pkt_len
-
-    pv_acquire_nfd_credit(in_pkt_vec, egress_q_base, FAIL_LABEL)
-
-    pv_stats_add_tx_octets(in_pkt_vec)
-
+#macro pkt_io_tx_host(in_pkt_vec, egress_q_base)
+    pv_acquire_nfd_credit(in_pkt_vec, egress_q_base, rx_discards_no_buf_pci#)
     pv_get_gro_host_desc($__pkt_io_gro_meta, in_pkt_vec, egress_q_base)
-
-    br[SUCCESS_LABEL]
-.end
+    pv_stats_add_octets(in_pkt_vec)
 #endm
 
 
-#macro pkt_io_tx_wire(in_pkt_vec, egress_q_base, SUCCESS_LABEL, FAIL_LABEL)
+#macro pkt_io_tx_wire(in_pkt_vec, egress_q_base)
 .begin
     .reg pms_offset
 
-    pv_write_nbi_meta(pms_offset, in_pkt_vec, FAIL_LABEL)
-
-    pv_stats_add_tx_octets(in_pkt_vec)
-
+    pv_write_nbi_meta(pms_offset, in_pkt_vec, tx_errors_offset#)
     pv_get_gro_wire_desc($__pkt_io_gro_meta, in_pkt_vec, egress_q_base, pms_offset)
-
-    br[SUCCESS_LABEL]
+    pv_stats_add_octets(in_pkt_vec)
 .end
 #endm
 
@@ -141,7 +127,7 @@ consume_quiesce_sig#:
 #endm
 
 
-#macro pkt_io_rx(io_vec, DROP_LABEL, RX_NBI_ERROR_LABEL, RX_NFD_ERROR_LABEL)
+#macro pkt_io_rx(io_vec)
     br_bclr[BF_AL(io_vec, PV_QUEUE_IN_NBI_bf), nfd_dispatch#] // previous packet was NFD, dispatch another
 
 nbi_dispatch#:
@@ -157,7 +143,7 @@ clear_sig_rx_nfd#:
     br_!signal[__pkt_io_sig_nfd, clear_sig_rx_nbi#] // __pkt_io_sig_nbi is asserted
 
 rx_nfd#:
-    pv_init_nfd(io_vec, __pkt_io_nfd_pkt_no, $__pkt_io_nfd_desc, RX_NFD_ERROR_LABEL)
+    pv_init_nfd(io_vec, __pkt_io_nfd_pkt_no, $__pkt_io_nfd_desc)
     br[end#]
 
 quiesce_nbi#:
@@ -183,7 +169,7 @@ clear_sig_rx_nbi#:
     br_!signal[__pkt_io_sig_nbi, clear_sig_rx_nfd#] // __pkt_io_sig_nfd is asserted
 
 rx_nbi#:
-    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, DROP_LABEL, RX_NBI_ERROR_LABEL)
+    pv_init_nbi(io_vec, $__pkt_io_nbi_desc)
 
 end#:
 #endm
