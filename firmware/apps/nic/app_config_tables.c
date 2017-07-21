@@ -135,6 +135,8 @@ enum instruction_type {
 unsigned int instr_tbl[] = {0, 0x40, 0x50, 0x20, 0x30, 0x80, 0x60, 0x90};
 #endif
 
+__export __emem uint64_t cfg_error_rss_cntr = 0;
+
 
 /* RSS table length in words */
 #define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
@@ -360,6 +362,10 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base,
     __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
     uint32_t i;
 
+	if ( (start_offset + NFP_NET_CFG_RSS_ITBL_SZ_wrd) > SLICC_HASH_PAD_NN_IDX) {
+		cfg_error_rss_cntr++;
+		return;
+	}
     /* Read all 32 words of RSS table */
     mem_read32_swap(xrd_rss_tbl,
                     bar_base + NFP_NET_CFG_RSS_ITBL,
