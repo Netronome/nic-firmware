@@ -91,7 +91,7 @@ find $FIRMWARE_DIR -maxdepth 1 -type f -name *.nffw -exec mv -t \
     $FIRMWARE_DIR_UPNIC {} +;
 
 # Create symlinks to the just copied FW on FIRMWARE_DIR for the driver to use
-ln -s $FIRMWARE_DIR_CNIC/* $FIRMWARE_DIR/
+find $FIRMWARE_DIR_CNIC -maxdepth 1 -name '*.nffw' -exec ln -s {} $FIRMWARE_DIR \;
 
 process_dkms
 if [ $ret -ne 0 ]; then
