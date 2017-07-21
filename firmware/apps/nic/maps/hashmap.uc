@@ -928,11 +928,14 @@ ret#:
 htab_lookup_error_map#:
 htab_lookup_not_found#:
 	//__hashmap_dbg_print(0xf1111, 0, out_addr[0], out_addr[1])
+	#pragma warning(push)
+	#pragma warning(disable: 5186) //disable warning "gpr_wrboth is experimental"
 	.reg_addr ebpf_rc 0 A
 	alu[ebpf_rc, --, b, out_addr[0]], gpr_wrboth
 
 	.reg_addr htab_value_addr_lo 1 A
 	alu[htab_value_addr_lo, --, b, out_addr[1]], gpr_wrboth
+	#pragma warning (pop)
 
 ret#:
 	htab_subr_regs_free()
