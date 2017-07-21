@@ -5,7 +5,7 @@
 
 #ifndef CMSG_PORT
 	#define CMSG_PORT		0xffffffff
-#endif 
+#endif
 
 /*
  * enhancement:  add field length to support variable size
@@ -237,7 +237,7 @@ struct cmsg_req_map_alloc_tbl {
 	union {
 		struct {
 			uint32_t type:8;
-			uint32_t ver:8; 
+			uint32_t ver:8;
 			uint32_t tag:16;
 			uint32_t key_size;		/* in bytes */
 			uint32_t value_size;	/* in bytes */
@@ -251,7 +251,7 @@ struct cmsg_reply_map_alloc_tbl {
 	union {
 		struct {
 			uint32_t type:8;
-			uint32_t ver:8; 
+			uint32_t ver:8;
 			uint32_t tag:16;
 			uint32_t rc;		/* 0 success */
 			uint32_t tid;		/* 0 if error */
@@ -263,18 +263,18 @@ struct cmsg_req_map_free_tbl {
 	union {
 		struct {
 			uint32_t type:8;
-			uint32_t ver:8; 
+			uint32_t ver:8;
 			uint32_t tag:16;
 			uint32_t tid;
 		};
 		uint32_t __raw[2];
 	};
 };
-struct cmsg_reply_map_free_tbl {	
+struct cmsg_reply_map_free_tbl {
 	union {
 		struct {
 			uint32_t type:8;
-			uint32_t ver:8; 
+			uint32_t ver:8;
 			uint32_t tag:16;
 			uint32_t rc;		/* 0 success */
 		};
@@ -311,7 +311,7 @@ struct cmsg_reply_map_op {
 	union {
 		struct {
 			uint32_t type:8;
-			uint32_t ver:8; 
+			uint32_t ver:8;
 			uint32_t tag:16;
 			uint32_t rc;					/* rc cummulative */
 			uint32_t count;					/* # of successful ops */

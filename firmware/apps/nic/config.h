@@ -28,7 +28,7 @@
  * - Set the number of bytes the MAC prepends data into
  * - Configure RX checksum offload so the wire can validate checksums
  */
-#define PKT_NBI_OFFSET           128 
+#define PKT_NBI_OFFSET           128
 #define MAC_PREPEND_BYTES        8
 #define HOST_PREPEND_BYTES       0
 #define CFG_RX_CSUM_PREPEND
@@ -691,7 +691,7 @@
  * Note: GRO_NUM_BLOCKS is expected to be passed in via a -D
  *       GRO_CTX_PER_BLOCK is computed based on GRO_NUM_BLOCKS
  */
-#define GRO_ISL				48	
+#define GRO_ISL				48
 
 /* Ingress sequencer numbers (1/2/3/4) for packets from the wire will be
    mapped to GRO CTX numbers 1/3/5/7; those for packets from NFD (0/1/2/3)

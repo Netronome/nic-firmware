@@ -5,7 +5,7 @@
 #define IP_VERSION_bf               0, 31, 28  // version field in same location for IPv4 and IPv6
 
 /**
- * IPv4 header (without options) 
+ * IPv4 header (without options)
  * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  * Word  +-------+-------+-----------+---+-------------------------------+
@@ -39,7 +39,7 @@
 #define IPV4_SOURCE_bf              3, 31, 0
 
 #define IPV4_DESTINATION_bf         4, 31, 0
- 
+
 #define IPV4_LEN_OFFS               2
 #define IPV4_PROTOCOL_BYTE          2
 
@@ -69,7 +69,7 @@
  *       +                                                               +
  *    9  |                                                               |
  *       +---------------------------------------------------------------+
- */ 
+ */
 
 #define IPV6_VERSION_bf             IP_VERSION_bf
 #define IPV6_TRAFFIC_CLASS_bf       0, 27, 20
@@ -82,8 +82,8 @@
 #define IPV6_PAYLOAD_OFFS           4
 #define IPV6_NEXT_HEADER_BYTE       1
 
-#define IP_PROTOCOL_TCP             0x06       
-#define IP_PROTOCOL_UDP             0x11    
+#define IP_PROTOCOL_TCP             0x06
+#define IP_PROTOCOL_UDP             0x11
 
 #define L4_SOURCE_PORT_bf           0, 31, 16
 #define L4_DESTINATION_PORT_bf      0, 15, 0
@@ -101,7 +101,7 @@
  *       +-------+-----+-+-+-+-+-+-+-+-+-+-------------------------------+
  *       |       |     |N|C|E|U|A|P|R|S|F|                               |
  *    3  |Data of|0 0 0|S|W|C|R|C|S|S|Y|I|          Window size          |
- *       |       |     | |R|E|G|K|H|T|N|N|                               | 
+ *       |       |     | |R|E|G|K|H|T|N|N|                               |
  *       +-------+-----+-+-+-+-+-+-+-+-+-+-------------------------------+
  *    4  |           Checksum            |        Urgent pointer         |
  *       +---------------------------------------------------------------+

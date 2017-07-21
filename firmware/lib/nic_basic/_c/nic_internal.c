@@ -537,7 +537,7 @@ update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base, uin
         // safe to write BPF code store
         mem_read32(host_mem_bpf_cfg, bar_base + NFP_NET_CFG_BPF_SIZE - 2, sizeof host_mem_bpf_cfg);
 
-        // note: data from the BAR comes in 4B-swapped; low is high, high is low 
+        // note: data from the BAR comes in 4B-swapped; low is high, high is low
         words = host_mem_bpf_cfg[0] >> 16;
         addr_lo = host_mem_bpf_cfg[1];
         addr_hi = host_mem_bpf_cfg[2];

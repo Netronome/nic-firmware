@@ -60,12 +60,14 @@ $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLA
 
 # Add microcode datapath
 $(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
+$(eval $(call dep.gen_awk,$(PROJECT),datapath,firmware/lib/nic_basic/ext_stats.h,firmware/lib/nic_basic/ext_stats.def,scripts/ext_stats_h.awk))
+$(eval $(call dep.gen_awk,$(PROJECT),datapath,firmware/lib/nic_basic/_c/ext_stats.c,firmware/lib/nic_basic/ext_stats.def,scripts/ext_stats_c.awk))
 $(eval $(call microcode.add_tests,$(PROJECT),datapath))
 $(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call microcode.add_flags, $(PROJECT),datapath,-O))
-#$(eval $(call microcode.add_flags, $(PROJECT),datapath,-d40))
-#$(eval $(call microcode.add_flags, $(PROJECT),datapath,-verbose))
-$(eval $(call microcode.add_flags, $(PROJECT),datapath,-keep_unreachable_code))
+$(eval $(call microcode.add_flags,$(PROJECT),datapath,-O))
+#$(eval $(call microcode.add_flags,$(PROJECT),datapath,-d40))
+#$(eval $(call microcode.add_flags,$(PROJECT),datapath,-verbose))
+$(eval $(call microcode.add_flags,$(PROJECT),datapath,-keep_unreachable_code))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/lib))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/apps/nic/lib))
 $(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/apps/nic/maps))

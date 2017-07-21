@@ -183,6 +183,8 @@ FW_TEST_TARGETS += $1_$2_test
 
 endef
 
+
+
 #a Microcode templates
 #f microcode.assemble
 #
@@ -196,6 +198,21 @@ endef
 #
 define microcode.assemble
 $(eval $(call microcode.assemble.abspath,$1,$2,$(FIRMWARE_DIR)/$3,$4,$5))
+endef
+
+# Add an AWK generated dependency
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 output file
+# @param $4 input file
+# @param $5 AWK generator script
+define dep.gen_awk
+
+GENERATED_DEPS += $1__$2__$3
+
+$1__$2__$3: $4 $5
+	@awk -f $5 $4 > $3
 endef
 
 
@@ -227,7 +244,7 @@ FW_LIST_TARGETS += $1_$2.list
 
 $(eval $(call nffw.add_build_dir,$(FW_BUILD)/$1))
 
-$$($1__$2__LIST): $3/$4
+$$($1__$2__LIST): $3/$4 $(GENERATED_DEPS)
 	@echo Building $$($1__$2__LIST) ...
 	$(Q)mkdir -p $(FW_BUILD)/$1
 	$(Q)$(NFAS) $$($1__$2__FLAGS) $$($1__$2__DEFS) $$($1__$2__INC) -o $$@ $$<
@@ -385,7 +402,7 @@ $1_$2.list: $$($1__$2__LIST)
 FW_LIST_TARGETS += $1_$2.list
 FW_MKDEP_TARGETS += $(FW_BUILD)/$1/$2/$2.d
 
-$$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS)
+$$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS) $(GENERATED_DEPS)
 	@echo Building $$($1__$2__LIST) ...
 	$(Q)mkdir -p $(FW_BUILD)/$1/$2
 	$(Q)$(NFCC) -QM $$($1__$2__FLAGS) \
@@ -431,7 +448,7 @@ $1_$2.list: $$($1__$2__LIST)
 FW_LIST_TARGETS += $1_$2.list
 FW_MKDEP_TARGETS += $(FW_BUILD)/$1/$2/$2.d
 
-$$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS)
+$$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS) $(GENERATED_DEPS)
 	@echo Building $$($1__$2__LIST) ...
 	$(Q)mkdir -p $(FW_BUILD)/$1/$2
 	$(Q)$(NFCC) -QM $$($1__$2__FLAGS) \
@@ -475,7 +492,7 @@ $1_$2.list: $$($1__$2__LIST)
 FW_LIST_TARGETS += $1_$2.list
 FW_MKDEP_TARGETS += $(FW_BUILD)/$1/$2/$2.d
 
-$$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS)
+$$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS) $(GENERATED_DEPS)
 	@echo Building $$($1__$2__LIST) ...
 	$(Q)mkdir -p $(FW_BUILD)/$1/$2
 	$(Q)$(NFCC) -QM $$($1__$2__FLAGS) \

@@ -56,7 +56,7 @@
  *       +-----+-------------+---+---+---+---+---------------+-------+-+-+
  *    5  |P_STS|L4Offset (2B)|L3I|MPD|VLD|           Checksum            |
  *       +-----+---------+---+---+---+---+-----------+-------------------+
- *    6  | Ingress Queue |  Stats Addr   |     0     |   Egress Queue    |
+ *    6  | Ingress Queue | Stats Context |     0     |   Egress Queue    |
  *       +---------------+---------------+-----------+-------------------+
  *    7  |                    Metadata Type Fields                       |
  *       +---------------------------------------------------------------+
@@ -121,7 +121,7 @@
 
 #define PV_FLAGS_wrd                    4
 #define PV_TX_FLAGS_bf                  PV_FLAGS_wrd, 31, 16
-#define PV_TX_HOST_RX_BPF               PV_FLAGS_wrd, 24, 24
+#define PV_TX_HOST_RX_BPF_bf            PV_FLAGS_wrd, 24, 24
 #define PV_TX_HOST_L3_bf                PV_FLAGS_wrd, 22, 21
 #define PV_TX_HOST_IP4_bf               PV_FLAGS_wrd, 22, 22
 #define PV_TX_HOST_CSUM_IP4_OK_bf       PV_FLAGS_wrd, 21, 21
@@ -147,7 +147,11 @@
 #define PV_QUEUE_IN_bf                  PV_QUEUE_wrd, 31, 24
 #define PV_QUEUE_IN_NBI_CHAN_bf         PV_QUEUE_wrd, 30, 24
 #define PV_QUEUE_IN_NBI_bf              PV_QUEUE_wrd, 31, 31
-#define PV_STAT_bf                      PV_QUEUE_wrd, 23, 16
+#define PV_STATS_CTX_bf                 PV_QUEUE_wrd, 23, 16
+#define PV_STATS_VNIC_bf                PV_QUEUE_wrd, 23, 19
+#define PV_STATS_TX_bf                  PV_QUEUE_wrd, 18, 18
+#define PV_STATS_BC_bf                  PV_QUEUE_wrd, 17, 17
+#define PV_STATS_MC_bf                  PV_QUEUE_wrd, 16, 16
 #define PV_QUEUE_OUT_bf                 PV_QUEUE_wrd, 9, 0
 
 #define PV_META_TYPES_wrd               7
@@ -199,8 +203,8 @@
 .end
 #endm
 
-#macro pv_set_tx_host_rx_bpf(io_vec)
-    alu[BF_A(io_vec, PV_TX_HOST_RX_BPF), BF_A(io_vec, PV_TX_HOST_RX_BPF), OR, 1, <<BF_L(PV_TX_HOST_RX_BPF)]
+#macro pv_set_tx_flag(io_vec, flag)
+    alu[BF_A(io_vec, PV_TX_FLAGS_bf), BF_A(io_vec, PV_TX_FLAGS_bf), OR, 1, <<flag]
 #endm
 
 #macro pv_set_egress_queue(io_vec, in_queue)
@@ -212,12 +216,12 @@
     #endif
 #endm
 
-#macro pv_reset_egress_queue(io_vec)
-	.begin
-	.reg msk
-	immed[msk, (BF_MASK(PV_QUEUE_OUT_bf))]
-	alu[BF_A(io_vec, PV_QUEUE_OUT_bf), BF_A(io_vec, PV_QUEUE_OUT_bf), AND~, msk]
-	.end
+#macro pv_clear_egress_queue(io_vec)
+.begin
+    .reg msk
+    immed[msk, BF_MASK(PV_QUEUE_OUT_bf)]
+    alu[BF_A(io_vec, PV_QUEUE_OUT_bf), BF_A(io_vec, PV_QUEUE_OUT_bf), AND~, msk]
+.end
 #endm
 
 #macro pv_get_ingress_queue(out_queue, in_vec)
@@ -269,28 +273,67 @@
 #endm
 
 
-#define PV_STATS_DISCARD 0
-#define PV_STATS_ERROR   1
-#define PV_STATS_UC      2
-#define PV_STATS_MC      3
-#define PV_STATS_BC      4
-#define PV_STATS_TX      8
-#macro pv_stats_select(io_vec, in_stats)
-    alu[BF_A(io_vec, PV_STAT_bf), BF_A(io_vec, PV_STAT_bf), AND~, 0x7, <<BF_L(PV_STAT_bf)] ; PV_STAT_bf
-    alu[BF_A(io_vec, PV_STAT_bf), BF_A(io_vec, PV_STAT_bf), OR, in_stats, <<BF_L(PV_STAT_bf)] ; PV_STAT_bf
+#macro pv_stats_set_tx(io_vec)
+    alu[BF_A(io_vec, PV_STATS_TX_bf), BF_A(io_vec, PV_STATS_TX_bf), OR, 1, <<BF_L(PV_STATS_TX_bf)] ; PV_STATS_TX_bf
 #endm
 
 
-#macro pv_stats_add_tx_octets(io_vec)
+#macro pv_stats_set_mc(io_vec)
+    alu[BF_A(io_vec, PV_STATS_MC_bf), BF_A(io_vec, PV_STATS_MC_bf), OR, 1, <<BF_L(PV_STATS_MC_bf)] ; PV_STATS_MC_bf
+#endm
+
+
+#macro pv_stats_set_bc(io_vec)
+    alu[BF_A(io_vec, PV_STATS_BC_bf), BF_A(io_vec, PV_STATS_BC_bf), OR, 1, <<BF_L(PV_STATS_BC_bf)] ; PV_STATS_BC_bf
+#endm
+
+
+#macro pv_stats_add_octets(io_vec)
 .begin
     .reg addr
     .reg isl
     .reg octets
+    .reg stat_offset
+    .reg vnic
 
-    immed[isl, (_nic_stats_extra >> 24), <<16]
-    alu[addr, 0xff, AND, BF_A(io_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
-    alu[addr, --, B, addr, <<3]
-    alu[octets, BF_A(io_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)]
+    alu[stat_offset, (3 << 3), AND, BF_A(io_vec, PV_STATS_CTX_bf), >>(BF_L(PV_STATS_CTX_bf) - 3)] ; PV_STATS_CTX_bf
+    beq[skip#]
+    br_bclr[BF_AL(io_vec, PV_STATS_TX_bf), rx#], defer[3] ; PV_STATS_TX_bf
+        bitfield_extract__sz1(vnic, BF_AML(io_vec, PV_STATS_VNIC_bf)) ; PV_STATS_VNIC_bf
+        alu[octets, BF_A(io_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
+        immed[isl, (__ext_stats >> 24), <<16]
+    alu[stat_offset, stat_offset, +, EXT_STATS_TX_UC_OCTETS]
+
+rx#:
+    alu[addr, stat_offset, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+    ov_start((OV_IMMED16 | OV_LENGTH))
+    ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
+    ov_set_use(OV_IMMED16, octets) // ov_set_use() will shift IMMED16 left 16 bits, no need to mask
+    ov_clean()
+    mem[add64_imm, --, isl, <<8, addr, 1], indirect_ref
+
+skip#:
+.end
+#endm
+
+
+#macro pv_stats_add_octets(io_vec, stat)
+.begin
+    .reg addr
+    .reg isl
+    .reg octets
+    .reg vnic
+
+    bitfield_extract__sz1(vnic, BF_AML(io_vec, PV_STATS_VNIC_bf)) ; PV_STATS_VNIC_bf
+    #if (isnum(stat) && stat >= 256)
+        immed[addr, stat]
+        alu[addr, addr, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+    #else
+        alu[addr, stat, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+    #endif
+
+    alu[octets, BF_A(io_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
+    immed[isl, (__ext_stats >> 24), <<16]
     ov_start((OV_IMMED16 | OV_LENGTH))
     ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
     ov_set_use(OV_IMMED16, octets) // ov_set_use() will shift IMMED16 left 16 bits, no need to mask
@@ -300,29 +343,53 @@
 #endm
 
 
-#macro pv_stats_incr_error(io_vec)
+#macro pv_stats_increment(io_vec, stat)
 .begin
     .reg addr
     .reg isl
+    .reg vnic
 
-    immed[isl, (_nic_stats_extra >> 24), <<16]
-    alu[addr, 0xf8, AND, BF_A(io_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
-    alu[addr, (PV_STATS_ERROR << 3), OR, addr, <<3]
+    bitfield_extract__sz1(vnic, BF_AML(io_vec, PV_STATS_VNIC_bf)) ; PV_STATS_VNIC_bf
+    #if (isnum(stat) && stat >= 256)
+        immed[addr, stat]
+        alu[addr, addr, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+    #else
+        alu[addr, stat, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+    #endif
+    immed[isl, (__ext_stats >> 24), <<16]
     mem[incr64, --, isl, <<8, addr, 1]
 .end
 #endm
 
 
-#macro pv_stats_incr_discard(io_vec)
+#macro pv_stats_increment_rxtx(io_vec, rx_stat, tx_stat)
 .begin
     .reg addr
     .reg isl
+    .reg vnic
 
-    immed[isl, (_nic_stats_extra >> 24), <<16]
-    alu[addr, 0xf8, AND, BF_A(io_vec, PV_STAT_bf), >>BF_L(PV_STAT_bf)]
-    alu[addr, --, B, addr, <<3]
+    immed[isl, (__ext_stats >> 24), <<16]
+    bitfield_extract__sz1(vnic, BF_AML(io_vec, PV_STATS_VNIC_bf)) ; PV_STATS_VNIC_bf
+    #if (isnum(rx_stat) && rx_stat >= 256)
+        immed[addr, rx_stat]
+        alu[addr, addr, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+    #else
+        alu[addr, rx_stat, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+    #endif
+
+    br_bclr[BF_AL(io_vec, PV_STATS_TX_bf), rx#] ; PV_STATS_TX_bf
+
+    #if (isnum(tx_stat) && tx_stat >= 256)
+        immed[addr, tx_stat]
+        alu[addr, addr, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+    #else
+        alu[addr, tx_stat, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+    #endif
+
+rx#:
     mem[incr64, --, isl, <<8, addr, 1]
 .end
+
 #endm
 
 
@@ -392,7 +459,7 @@
         alu[prev_alu, prev_alu, -, 1]
         alu[prev_alu, 0xcb, OR, prev_alu, <<8]
     #endif
-    alu[queue, base_queue, +, BF_A(in_vec, PV_QUEUE_OUT_bf)]
+    alu[queue, base_queue, +16, BF_A(in_vec, PV_QUEUE_OUT_bf)]
     alu[prev_alu, prev_alu, OR, queue, <<16]
     bitfield_extract__sz1(ctm_buf_sz, BF_AML(in_vec, PV_CBS_bf)) ; PV_CBS_bf
     alu[out_desc[GRO_META_NBI_PALU_wrd], prev_alu, OR, ctm_buf_sz, <<28]
@@ -468,7 +535,7 @@ skip_meta#:
     #ifndef GRO_EVEN_NFD_OFFSETS_ONLY
        alu[desc, desc, OR, BF_A(in_vec, PV_OFFSET_bf), <<31] // meta_len is always even, this is safe
     #endif
-    alu[queue, base_queue, +, BF_A(in_vec, PV_QUEUE_OUT_bf)]
+    alu[queue, base_queue, +16, BF_A(in_vec, PV_QUEUE_OUT_bf)]
     alu[out_desc[NFD_OUT_QID_wrd], desc, OR, queue, <<NFD_OUT_QID_shf]
 
     // Word 3
@@ -677,7 +744,7 @@ end#:
 #define MAC_PARSE_VLAN_bf               MAC_PARSE_wrd, 17, 16
 #define MAC_CSUM_bf                     MAC_PARSE_wrd, 15, 0
 
-#macro pv_init_nbi(out_vec, in_nbi_desc, DROP_LABEL, FAIL_LABEL)
+#macro pv_init_nbi(out_vec, in_nbi_desc)
 .begin
     .reg cbs
     .reg l4_type
@@ -768,10 +835,10 @@ skip_l4_offset#:
     immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
 
     alu[--, BF_MASK(CAT_SEQ_CTX_bf), AND, BF_A(in_nbi_desc, CAT_SEQ_CTX_bf), >>BF_L(CAT_SEQ_CTX_bf)] ; CAT_SEQ_CTX_bf
-    beq[FAIL_LABEL] // drop without releasing sequence number for sequencer zero (errored packets are expected here)
+    beq[rx_discards_proto#] // drop without releasing sequence number for sequencer zero (errored packets are expected here)
 
     alu[--, BF_MASK(CAT_ERRORS_bf), AND, BF_A(in_nbi_desc, CAT_ERRORS_bf), >>BF_L(CAT_ERRORS_bf)] ; CAT_ERRORS_bf
-    bne[DROP_LABEL] // catch any other errors we miss (these appear to have valid sequence numbers)
+    bne[rx_errors_parse#] // catch any other errors we miss (these appear to have valid sequence numbers)
 
 .end
 #endm
@@ -901,7 +968,7 @@ end#:
 #define NFD_IN_LSO_L3_OFFS_fld      3, 7, 0
 #define NFD_IN_LSO_L4_OFFS_fld      3, 15, 8
 
-#macro pv_init_nfd(out_vec, in_pkt_num, in_nfd_desc, FAIL_LABEL)
+#macro pv_init_nfd(out_vec, in_pkt_num, in_nfd_desc)
 .begin
     .reg addr_hi
     .reg addr_lo
@@ -951,7 +1018,7 @@ end#:
 
     // error checks near end to ensure consistent metadata (fields written below excluded) and buffer allocation
     // state (contents of CTM also excluded) in drop path
-    br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), FAIL_LABEL]
+    br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), tx_errors_pci#]
 
     pkt_buf_copy_mu_head_to_ctm(in_pkt_num, BF_A(out_vec, PV_MU_ADDR_bf), NFD_IN_DATA_OFFSET, 1)
 
