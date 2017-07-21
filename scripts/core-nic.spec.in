@@ -57,10 +57,6 @@ if [ -f %{module_name}-%{version}.dkms.tar.gz ]; then
         install -m 644 %{module_name}-%{version}.dkms.tar.gz $RPM_BUILD_ROOT/%{_datarootdir}/%{module_name}
 fi
 
-if [ -f %{_sourcedir}/common.postinst ]; then
-        install -m 755 %{_sourcedir}/common.postinst $RPM_BUILD_ROOT/%{_datarootdir}/%{module_name}/postinst
-fi
-
 %clean
 if [ "$RPM_BUILD_ROOT" != "/" ]; then
         rm -rf $RPM_BUILD_ROOT
