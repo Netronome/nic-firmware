@@ -526,7 +526,7 @@ retry_lock#:
 	ctx_arb[lock_shared_sig]
 	br_bclr[$desc_xfer[0], __HASHMAP_DESC_LOCK_EXCL_BIT, ret#]
 	mem[sub, $desc_xfer[0], lk_addr_hi, <<8, lk_addr_lo], ctx_swap[lock_shared_sig]
-	timestamp_sleep(100)
+	timestamp_sleep(4000)
 	br[retry_lock#]
 
 ret#:
