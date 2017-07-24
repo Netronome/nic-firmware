@@ -45,7 +45,7 @@ FIRMWARE_DIR_UPNIC=/lib/firmware/netronome/nic
 find $FIRMWARE_DIR -maxdepth 1 -name *.nffw -type l -delete
 
 # 2) create symlinks to 'restore' backup FW
-find $FIRMWARE_DIR_CNIC -maxdepth 1 -name '*.nffw' -exec ln -s {} $FIRMWARE_DIR \;
+find $FIRMWARE_DIR_UPNIC -maxdepth 1 -name '*.nffw' -exec ln -s {} $FIRMWARE_DIR \;
 
 # update initramfs
 update-initramfs -uk $(uname -r)
