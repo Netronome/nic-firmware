@@ -157,15 +157,19 @@
 #endm
 
 #macro cmsg_free_mem_buffer(in_nfd)
-	.reg bls
-	.reg mu_addr
-	.reg pkt_num
+.begin
+    .reg isl
+    .reg bls
+    .reg mu_addr 
+    .reg pkt_num
 
-	cmsg_get_nfd_bls(bls, in_nfd)
-	cmsg_get_mem_addr(mu_addr, in_nfd)
-	bitfield_extract(pkt_num, BF_AML(in_nfd, NFD_OUT_PKTNUM_fld))
-	pkt_buf_free_mu_buffer(bls, mu_addr)
-	pkt_buf_free_ctm_buffer(pkt_num)
+    cmsg_get_nfd_bls(bls, in_nfd)
+    cmsg_get_mem_addr(mu_addr, in_nfd)
+    bitfield_extract(pkt_num, BF_AML(in_nfd, NFD_OUT_PKTNUM_fld))
+    bitfield_extract(isl, BF_AML(in_nfd, NFD_OUT_CTM_ISL_fld))
+    pkt_buf_free_mu_buffer(bls, mu_addr)
+    pkt_buf_free_ctm_buffer(isl, pkt_num)
+.end
 #endm
 
 #macro cmsg_get_mem_addr(out_mem_addr, in_nfd)
@@ -225,7 +229,7 @@ loop#:
 		bne[loop#]
 
 	br[NO_FREE_TID_LABEL]
-ret#:	
+ret#:
 	cmsg_bm_lm_undef()
 .end
 #endm
@@ -305,17 +309,19 @@ ret#:
 	bitfield_extract(mu_ptr, BF_AML(in_nfd_out_desc, NFD_OUT_MUADDR_fld))
 
 	.reg ctm_pnum
+        .reg ctm_isl
 
 	bitfield_extract(ctm_pnum, BF_AML(in_nfd_out_desc, NFD_OUT_PKTNUM_fld))
-	pkt_buf_free_ctm_buffer(ctm_pnum)
+        bitfield_extract(ctm_isl, BF_AML(in_nfd_out_desc, NFD_OUT_CTM_ISL_fld))
+	pkt_buf_free_ctm_buffer(ctm_isl, ctm_pnum)
 
-    nfd_out_fill_desc(nfdo_desc, 0, 0, 0, nfd_bls,
+        nfd_out_fill_desc(nfdo_desc, 0, 0, 0, nfd_bls,
                       mu_ptr, pkt_offset, plen,
                       meta_len)
 
-    nfd_lm_handle_define()
+        nfd_lm_handle_define()
    	nfd_out_send(nfdo_desc, NIC_PCI, NFD_CTRL_QUEUE, NFD_LM_HANDLE)
-    nfd_lm_handle_undef()
+        nfd_lm_handle_undef()
 
 	pkt_counter_incr(cmsg_tx)
 .end
@@ -585,7 +591,7 @@ cmsg_exit#:
 		 .end
 
 	s0#:
-    s/**/CMSG_TYPE_MAP_FREE#:		
+    s/**/CMSG_TYPE_MAP_FREE#:
 			alu[in_fd, --, b, HDR_DATA[CMSG_MAP_TID_IDX]]
 			_cmsg_free_fd(in_fd, in_addr_hi, in_cmsg_tag, out_pktlen)
 			br[cmsg_proc_ret#]
@@ -610,7 +616,7 @@ cmsg_exit#:
 
 			alu[in_fd, --, b, HDR_DATA[CMSG_MAP_TID_IDX]]
 			alu[count, --, b, HDR_DATA[CMSG_MAP_OP_COUNT_IDX]]
-			alu[flags, --, b, HDR_DATA[CMSG_MAP_OP_FLAGS_IDX]] 
+			alu[flags, --, b, HDR_DATA[CMSG_MAP_OP_FLAGS_IDX]]
 			alu[key_offset, addr_lo, +, (CMSG_OP_HDR_LW*4)]
 			alu[l_cmsg_type, --, b, in_cmsg_type]
 
@@ -646,7 +652,7 @@ proc_loop#:
 
 do_op#:
 			_cmsg_hashmap_op(l_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, key_offset, value_offset, flags, rc)
-		
+
 			alu[key_offset, value_offset, +, 64]
 			alu[out_pktlen, out_pktlen, +, (64*2)]
 			alu[save_rc, save_rc, or, rc]
@@ -730,7 +736,7 @@ cont#:
 		alu[fd, --, b, in_key]
 		immed[del_entries, 0]
 
-		immed[$reply[1], CMSG_RC_ERR_MAP_FD]			; 
+		immed[$reply[1], CMSG_RC_ERR_MAP_FD]			;
 		cmsg_free_fd_from_bm(fd, ret#)
 
 		__hashmap_table_delete(fd)		/* set num entries to 0 */
@@ -766,7 +772,7 @@ delete_ov_ent#:
 
 end_loop#:
 
-		immed[$reply[1], CMSG_RC_SUCCESS]			; 
+		immed[$reply[1], CMSG_RC_SUCCESS]			;
 
 ret#:
 		alu[$reply[2], --, b, del_entries]
@@ -929,7 +935,7 @@ reply_keys#:
 	alu[tmp, --, b, reply_lw, <<2]
 	alu[r_addr[1], r_addr[1], +, tmp]
 	alu[reply_lw, 16, -, reply_lw]
-	ctx_arb[sig_reply_map_ops]				; falls thru 
+	ctx_arb[sig_reply_map_ops]				; falls thru
 
 reply_value#:
 	ov_start(OV_LENGTH)

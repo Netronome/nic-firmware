@@ -982,16 +982,15 @@ skip_lso#:
     // ensure all CTM I/O is complete before free (assume code never writes to MU buffer)
     mem[read32, $tmp, BF_A(in_pkt_vec, PV_CTM_ADDR_bf), 0, 1], ctx_swap[sig_read], defer[2]
         bitfield_extract__sz1(bls, BF_AML(in_pkt_vec, PV_BLS_bf)) ; PV_BLS_bf
-        bitfield_extract__sz1(mu_addr, BF_AML(in_pkt_vec, PV_MU_ADDR_bf)) ; PV_MU_ADDR_bf
+        alu[pkt_num, --, B, BF_A(in_pkt_vec, PV_NUMBER_bf), >>BF_L(PV_NUMBER_bf)] ; PV_NUMBER_bf
 
-    alu[--, --, B, BF_A(in_pkt_vec, PV_MU_ADDR_bf), <<(31 - BF_M(PV_MU_ADDR_bf))]
+    bitfield_extract__sz1(mu_addr, BF_AML(in_pkt_vec, PV_MU_ADDR_bf)) ; PV_MU_ADDR_bf
     beq[skip_mu_buffer#]
     pkt_buf_free_mu_buffer(bls, mu_addr)
 skip_mu_buffer#:
 
     br_bclr[BF_AL(in_pkt_vec, PV_CTM_ALLOCATED_bf), skip_ctm_buffer#]
-    alu[pkt_num, --, B, BF_A(in_pkt_vec, PV_NUMBER_bf), >>BF_L(PV_NUMBER_bf)] ; PV_NUMBER_bf
-    pkt_buf_free_ctm_buffer(pkt_num)
+    pkt_buf_free_ctm_buffer(--, pkt_num)
 skip_ctm_buffer#:
 
 .end
