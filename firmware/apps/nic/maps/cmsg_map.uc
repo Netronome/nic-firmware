@@ -160,11 +160,11 @@
 .begin
     .reg isl
     .reg bls
-    .reg mu_addr 
+    .reg mu_addr
     .reg pkt_num
 
-    cmsg_get_nfd_bls(bls, in_nfd)
-    cmsg_get_mem_addr(mu_addr, in_nfd)
+    bitfield_extract(bls, BF_AML(in_nfd, NFD_OUT_BLS_fld))
+    bitfield_extract(mu_addr, BF_AML(in_nfd, NFD_OUT_MUADDR_fld))
     bitfield_extract(pkt_num, BF_AML(in_nfd, NFD_OUT_PKTNUM_fld))
     bitfield_extract(isl, BF_AML(in_nfd, NFD_OUT_CTM_ISL_fld))
     pkt_buf_free_mu_buffer(bls, mu_addr)
@@ -180,9 +180,6 @@
 	alu[out_mem_addr, --, B, mu_ptr, <<(31 - __MU_PTR_msb__)]
 	#undef __MU_PTR_msb__
 .end
-#endm
-#macro cmsg_get_nfd_bls(out_bls, in_nfd)
-	bitfield_extract__sz1(out_bls, BF_AML(in_nfd, NFD_OUT_BLS_fld)) ;
 #endm
 
 #macro cmsg_lm_ctx_addr(out_lm_fld1,out_lm_fld2, in_ctx)
@@ -302,7 +299,6 @@ ret#:
 	alu[plen, --, b, in_pkt_len]
 
 	move(pkt_offset, NFD_IN_DATA_OFFSET)
-	cmsg_get_mem_addr(mu_addr, in_nfd_out_desc)
 	immed[meta_len, 0]
 		// meta prepend is not needed
 	bitfield_extract(nfd_bls, BF_AML(in_nfd_out_desc, NFD_OUT_BLS_fld))
