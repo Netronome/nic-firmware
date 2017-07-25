@@ -737,7 +737,7 @@ ret#:
 	.reg keys_n_tid
 	.reg my_act_ctx
 	.reg map_tindex
-	
+
 
 	__hashmap_lm_handles_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, lm_key_addr]

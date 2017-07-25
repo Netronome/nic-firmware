@@ -185,9 +185,16 @@ recycle#:
 #endm
 
 
-#macro pkt_buf_free_ctm_buffer(in_pkt_num)
+#macro pkt_buf_free_ctm_buffer(in_isl, in_pkt_num)
 .begin
-    mem[packet_free, --, 0, in_pkt_num]
+    #if (streq('in_isl', '--'))
+        mem[packet_free, --, 0, in_pkt_num]
+    #else
+        .reg addr_hi
+        alu[addr_hi, --, B, in_isl, <<24]
+        alu[addr_hi, addr_hi, OR, 1, <<31]
+        mem[packet_free, --, addr_hi, <<8, in_pkt_num]
+    #endif
 .end
 #endm
 
