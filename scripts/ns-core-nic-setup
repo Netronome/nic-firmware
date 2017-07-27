@@ -332,7 +332,7 @@ function check_flash() {
     # Minimum required versions
     local req_primary="020014"
     local req_secondary="020014"
-    local req_nsp="020039"
+    local req_nsp="02004e"
 
     local versions
     # Is BSP available?
