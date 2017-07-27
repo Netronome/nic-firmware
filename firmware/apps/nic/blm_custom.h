@@ -14,6 +14,8 @@
 #ifndef __NFP_BLM_CUSTOM_H__
 #define __NFP_BLM_CUSTOM_H__
 
+#define BLM_NBI_BLQ1_CACHE_SIZE                 64
+
 #define NBI8_BLQ_EMU_0_PKTBUF_SIZE              10240
 #define NBI8_BLQ_EMU_1_PKTBUF_SIZE              10240
 #define NBI8_BLQ_EMU_2_PKTBUF_SIZE              10240
@@ -53,7 +55,7 @@
 #endif
 
 #define BLM_NBI8_BLQ0_Q_SIZE                    8192
-#define BLM_NBI8_BLQ1_Q_SIZE                    2048
+#define BLM_NBI8_BLQ1_Q_SIZE                    4096
 #define BLM_NBI8_BLQ2_Q_SIZE                    2048
 #define BLM_NBI8_BLQ3_Q_SIZE                    2048
 
@@ -127,8 +129,8 @@
 #define BLM_NBI8_BLQ1_EMU_IMEM1_NUM_BUFS        0
 #define BLM_NBI8_BLQ1_BDSRAM_IMEM1_NUM_BUFS     0
 #define BLM_NBI8_BLQ1_EMU_IMEM1_DENSITY         0
-#define BLM_NBI8_BLQ1_EMU_EMEM0_NUM_BUFS        448
-#define BLM_NBI8_BLQ1_BDSRAM_EMEM0_NUM_BUFS     448
+#define BLM_NBI8_BLQ1_EMU_EMEM0_NUM_BUFS        800
+#define BLM_NBI8_BLQ1_BDSRAM_EMEM0_NUM_BUFS     0
 #define BLM_NBI8_BLQ1_EMU_EMEM0_DENSITY         7
 #define BLM_NBI8_BLQ1_EMU_EMEM1_NUM_BUFS        0
 #define BLM_NBI8_BLQ1_BDSRAM_EMEM1_NUM_BUFS     0

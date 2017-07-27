@@ -796,7 +796,6 @@ skip_l4_offset#:
     .reg l3_off
     .reg l4_off
     .reg lso_seq
-    .reg mask_0xffff
     .reg mss
     .reg pkt_len
     .reg tcp_seq_add
@@ -840,23 +839,22 @@ tcp_flags_fix_done#:
 
     br_bclr[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_IPV4_CSUM_fld), ipv6#], defer[3]
         /* IP length = pkt_len - l3_off */
-        immed[mask_0xffff, 0xffff]
-        alu[pkt_len, BF_A(io_vec, PV_LENGTH_bf), AND, mask_0xffff] ; PV_LENGTH_bf
-        alu[ip_len, pkt_len, -, l3_off]
+        alu[ip_len, BF_A(io_vec, PV_LENGTH_bf), -, l3_off]
+        alu[ip_len, ip_len, AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)]
+        alu[ip_len, 0, B, ip_len, <<16]
 
 ipv4#:
     alu[l3_off, l3_off, +, IPV4_LEN_OFFS]
     mem[read32, $ip, BF_A(io_vec, PV_CTM_ADDR_bf), l3_off, 1], ctx_swap[sig_read_ip]
 
     alu[ip_id, $ip, +, lso_seq]
-    alu[ip_id, ip_id, AND, mask_0xffff]
-    alu[$ip, ip_id, OR, ip_len, <<16]
+    alu[$ip, ip_len, +16, ip_id]
 
     mem[write32, $ip, BF_A(io_vec, PV_CTM_ADDR_bf), l3_off, 1], sig_done[sig_write_ip]
     ctx_arb[sig_write_tcp_seq, sig_write_tcp_flags, sig_write_ip], br[end#]
 
 ipv6#:
-    alu[$ip, --, B, ip_len]
+    alu[$ip, --, B, ip_len, >>16]
     alu[l3_off, l3_off, +, IPV6_PAYLOAD_OFFS]
     mem[write8, $ip, BF_A(io_vec, PV_CTM_ADDR_bf), l3_off, 2], sig_done[sig_write_ip]
     ctx_arb[sig_write_tcp_seq, sig_write_tcp_flags, sig_write_ip]
