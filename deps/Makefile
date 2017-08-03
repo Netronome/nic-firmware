@@ -68,6 +68,7 @@ NFD_INC = -I$(NFD_DIR)/shared \
 $(DEPS_DIR)/ng-nfd.hg:
 	hg clone -r $(NFD_REV) \
 	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
+	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../pf_oversubscription_series.patch && cd -
 
 HG_DEPS += $(NFD_DIR)
 HG_REVS += $(NFD_REV)
