@@ -9,6 +9,17 @@ GRO_REV=25c868a8c724
 NFD_REV=1b8f7ef80f64
 
 NFP_NIC_REV=$(shell git rev-parse HEAD)
+NFP_NIC_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
+
+ifeq ($(NFP_NIC_BRANCH),master)
+NFP_NIC_RELEASE=10
+else
+ifeq ($(NFP_NIC_BRANCH),sriov)
+NFP_NIC_RELEASE=11
+else
+NFP_NIC_RELEASE=XX
+endif
+endif
 
 #
 # Global variables
