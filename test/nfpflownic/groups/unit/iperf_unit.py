@@ -761,8 +761,8 @@ class Csum_Tx(Iperftest):
         LOG_sec("rx/tx packets on both ends")
         msg = 'ethtool.rx_packets@DST = %s; ' \
               'ethtool.tx_packets@SRC = %s' % \
-              (diff_dst_cntrs.ethtool['rx_packets'],
-               diff_src_cntrs.ethtool['tx_packets'])
+              (diff_dst_cntrs.ifconfig['rx_pkts'],
+               diff_src_cntrs.ifconfig['tx_pkts'])
         LOG(msg)
         LOG_endsec()
         LOG_sec("rx packets (filtering out non TCP/UDP packets)")
@@ -1516,8 +1516,8 @@ class LSO_iperf(Csum_Tx):
         msg = 'ethtool.rx_packets@DST = %s; ' \
               'ethtool.tx_packets@SRC = %s; ' \
               'ethtool.tx_lso@SRC = %s;' % \
-              (diff_dst_cntrs.ethtool['rx_packets'],
-               diff_src_cntrs.ethtool['tx_packets'],
+              (diff_dst_cntrs.ifconfig['rx_pkts'],
+               diff_src_cntrs.ifconfig['tx_pkts'],
                diff_src_cntrs.ethtool['tx_lso'])
         LOG(msg)
         LOG_endsec()

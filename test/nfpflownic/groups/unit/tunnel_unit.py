@@ -1105,8 +1105,8 @@ class Csum_Tx_tunnel(Csum_Tx):
         LOG_sec("rx/tx packets on both ends")
         msg = 'ethtool.rx_packets@DST = %s; ' \
               'ethtool.tx_packets@SRC = %s' % \
-              (diff_dst_cntrs.ethtool['rx_packets'],
-               diff_src_cntrs.ethtool['tx_packets'])
+              (diff_dst_cntrs.ifconfig['rx_pkts'],
+               diff_src_cntrs.ifconfig['tx_pkts'])
         LOG(msg)
         LOG_endsec()
         LOG_sec("tx_checksum counters on src (NFP)")
@@ -1572,8 +1572,8 @@ class LSO_tunnel(LSO_iperf):
         msg = 'ethtool.rx_packets@DST = %s; ' \
               'ethtool.tx_packets@SRC = %s; ' \
               'ethtool.tx_lso@SRC = %s;' % \
-              (diff_dst_cntrs.ethtool['rx_packets'],
-               diff_src_cntrs.ethtool['tx_packets'],
+              (diff_dst_cntrs.ifconfig['rx_pkts'],
+               diff_src_cntrs.ifconfig['tx_pkts'],
                diff_src_cntrs.ethtool['tx_lso'])
         LOG(msg)
         LOG_endsec()
