@@ -334,7 +334,7 @@ ret#:
 #endm
 
 
-#macro __hashmap_ov_lookup(in_hashkey, in_tid, in_addr_hi, in_idx, in_key_lmaddr, in_key_lwsz, o_tindex, out_addr_hi, out_addr_lo, out_state, FOUND_LABEL)
+#macro __hashmap_ov_lookup(in_hashkey, in_tid, in_addr_hi, in_idx, in_key_lmaddr, in_key_lwsz, o_tindex, out_addr_hi, out_addr_lo, out_state, FOUND_LABEL, endian)
 .begin
 	.reg ov_offset
 	.reg match_bitmap
@@ -372,7 +372,7 @@ match#:
 compare_key#:
 	ld_field_w_clr[pool_offset, 0111, $ov_addr]
 	alu[pool_offset, --, b, pool_offset, <<HASHMAP_OV_ENTRY_SZ_SHFT]
-	__hashmap_compare(o_tindex, in_key_lmaddr, freelist_hi, pool_offset, in_key_lwsz, comp_next_match#)
+	__hashmap_compare(o_tindex, in_key_lmaddr, freelist_hi, pool_offset, in_key_lwsz, comp_next_match#, endian)
 	#define __OV_IDX_SHFT__ (__HASHMAP_DESC_OV_IDX - 2)
 	alu[out_state, out_state, or, match_idx, <<__OV_IDX_SHFT__]
 	alu[out_state, out_state, or, 1, <<__HASHMAP_DESC_OV_BIT]

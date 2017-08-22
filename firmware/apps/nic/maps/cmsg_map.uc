@@ -582,7 +582,7 @@ cmsg_exit#:
 			alu[keysz, --, b, HDR_DATA[CMSG_MAP_ALLOC_KEYSZ_IDX]]
 			alu[valuesz, --, b,  HDR_DATA[CMSG_MAP_ALLOC_VALUESZ_IDX]]
 			alu[maxent, --, b,  HDR_DATA[CMSG_MAP_ALLOC_MAXENT_IDX]]
-			_cmsg_alloc_fd(keysz, valuesz, maxent, in_addr_hi, in_cmsg_tag, out_pktlen)
+			_cmsg_alloc_fd(keysz, valuesz, maxent, in_addr_hi, in_cmsg_tag, out_pktlen, swap)
 			br[cmsg_proc_ret#]
 		 .end
 
@@ -631,7 +631,7 @@ proc_loop#:
 			nop
 
     		ov_single(OV_LENGTH, CMSG_TXFR_COUNT, OVF_SUBTRACT_ONE) // Length in 32-bit LWs
-    		mem[read32, $pkt_data[0], in_addr_hi, <<8, key_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
+    		mem[read32_swap, $pkt_data[0], in_addr_hi, <<8, key_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
 			alu[CMSG_KEY_LM_INDEX++, --, b, in_fd]
 			ctx_arb[rd_sig]
 
@@ -639,7 +639,7 @@ proc_loop#:
 			alu[value_offset, key_offset, +, 64]
 
     		ov_single(OV_LENGTH, CMSG_TXFR_COUNT, OVF_SUBTRACT_ONE) // Length in 32-bit LWs
-    		mem[read32, $pkt_data[0], in_addr_hi, <<8, value_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
+    		mem[read32_swap, $pkt_data[0], in_addr_hi, <<8, value_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
 			ctx_arb[rd_sig]
 
 			aggregate_copy(CMSG_VALUE_LM_INDEX, ++, $pkt_data, 0, CMSG_TXFR_COUNT)
@@ -647,7 +647,7 @@ proc_loop#:
 			cmsg_lm_handles_undef()
 
 do_op#:
-			_cmsg_hashmap_op(l_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, key_offset, value_offset, flags, rc)
+			_cmsg_hashmap_op(l_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, key_offset, value_offset, flags, rc, swap)
 
 			alu[key_offset, value_offset, +, 64]
 			alu[out_pktlen, out_pktlen, +, (64*2)]
@@ -686,7 +686,7 @@ cmsg_proc_ret#:
 .end
 #endm
 
-#macro _cmsg_alloc_fd(key_sz, value_sz, max_entries, in_addr_hi, in_cmsg_tag, out_len)
+#macro _cmsg_alloc_fd(key_sz, value_sz, max_entries, in_addr_hi, in_cmsg_tag, out_len, endian)
 .begin
 		.reg fd
 		.reg $reply[3]
@@ -701,7 +701,7 @@ cmsg_proc_ret#:
 
 		cmsg_alloc_fd_from_bm(fd, cont#)			; skip alloc if no free slots
 
-		hashmap_alloc_fd(fd, key_sz, value_sz, max_entries, cont#)
+		hashmap_alloc_fd(fd, key_sz, value_sz, max_entries, cont#, endian)
 
 		immed[$reply[1], CMSG_RC_SUCCESS]			; success
 		alu[$reply[2], --, b, fd]
@@ -785,7 +785,7 @@ ret#:
 #define_eval _CMSG_FLD_LW 			(CMSG_MAP_KEY_VALUE_LW)
 #define_eval _CMSG_FLD_LW_MINUS_1   (_CMSG_FLD_LW - 1)
 
-#macro _cmsg_hashmap_op(in_op, in_fd, in_lm_key, in_lm_value, in_addr_hi, in_key_offset, in_value_offset, in_flags, out_rc)
+#macro _cmsg_hashmap_op(in_op, in_fd, in_lm_key, in_lm_value, in_addr_hi, in_key_offset, in_value_offset, in_flags, out_rc, endian)
 .begin
 	.reg op
 	.sig sig_read_ent
@@ -828,14 +828,14 @@ s2#:
 	immed[out_rc, CMSG_RC_ERR_MAP_PARSE]
 
 s/**/HASHMAP_OP_LOOKUP#:
-	hashmap_ops(in_fd, in_lm_key, --, HASHMAP_OP_LOOKUP, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
+	hashmap_ops(in_fd, in_lm_key, --, HASHMAP_OP_LOOKUP, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian)
 	alu[--, reply_lw, -, 0]				;error if 0
 	bne[reply_value#]
 	br[error_map_function#], defer[1]
 	immed[out_rc, CMSG_RC_ERR_MAP_ERR]
 
 s/**/HASHMAP_OP_ADD_ANY#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD_ANY, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --)
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD_ANY, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --, endian)
 
 	alu[--, reply_lw, -, 0]				;add & delete returns 0
 	beq[ret#], defer[1]
@@ -845,7 +845,7 @@ s/**/HASHMAP_OP_ADD_ANY#:
 	immed[out_rc, CMSG_RC_ERR_MAP_ERR]
 
 s/**/HASHMAP_OP_UPDATE#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_UPDATE, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --)
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_UPDATE, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --, endian)
 
 	alu[--, reply_lw, -, 0]				;add & delete returns 0
 	beq[ret#], defer[1]
@@ -855,7 +855,7 @@ s/**/HASHMAP_OP_UPDATE#:
 	immed[out_rc, CMSG_RC_ERR_MAP_ERR]
 
 s/**/HASHMAP_OP_ADD_ONLY#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD_ONLY, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --)
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD_ONLY, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --, endian)
 
 	alu[--, reply_lw, -, 0]				;add & delete returns 0
 	beq[ret#], defer[1]
@@ -865,7 +865,7 @@ s/**/HASHMAP_OP_ADD_ONLY#:
 	immed[out_rc, CMSG_RC_ERR_MAP_ERR]
 
 s/**/HASHMAP_OP_REMOVE#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_REMOVE, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_REMOVE, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian)
 	alu[--, reply_lw, -, 0]				;add & delete returns 0
 	beq[ret#], defer[1]
 	immed[out_rc, CMSG_RC_SUCCESS]
@@ -874,7 +874,7 @@ s/**/HASHMAP_OP_REMOVE#:
 	immed[out_rc, CMSG_RC_ERR_MAP_ERR]
 
 s/**/HASHMAP_OP_GETNEXT#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_GETNEXT, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_GETNEXT, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian)
 	alu[--, reply_lw, -, 0]				;error if 0
 	bne[reply_keys#]
 	br[error_map_function#], defer[1]
@@ -883,7 +883,7 @@ s/**/HASHMAP_OP_GETNEXT#:
 s/**/HASHMAP_OP_GETFIRST#:
 	#pragma warning(push)
     #pragma warning(disable: 4702) // disable warning "unreachable code"
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_GETFIRST, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr)
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_GETFIRST, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian)
 	alu[--, reply_lw, -, 0]				;error if 0
 	bne[reply_keys#]
 	br[error_map_function#], defer[1]
@@ -942,6 +942,7 @@ reply_value#:
 	ctx_arb[sig_read_ent]
 
 	unroll_copy($ent_reply, 0, $ent_reply, 0, reply_lw, _CMSG_FLD_LW, --)
+
 	//ov_single(OV_LENGTH, reply_lw, OVF_SUBTRACT_ONE)
 	ov_single(OV_LENGTH, _CMSG_FLD_LW, OVF_SUBTRACT_ONE)
     mem[write32, $ent_reply[0], in_addr_hi, <<8, in_value_offset, max_/**/_CMSG_FLD_LW], indirect_ref, sig_done[sig_reply_map_ops]

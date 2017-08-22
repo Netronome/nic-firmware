@@ -221,7 +221,7 @@
  * length:	the number of bytes to read, returns the actual number of bytes read
  *
  */
-#macro __hashmap_read_data(o_tindex, in_addr_hi, in_addr_lo, buf_wlen)
+#macro __hashmap_read_data(o_tindex, in_addr_hi, in_addr_lo, buf_wlen, endian)
 .begin
 
 	.reg txfr_size_lw       ; number of words available in $io_txfr
@@ -240,7 +240,7 @@ cont#:
 	ov_start(OV_LENGTH)
 	ov_set_use(OV_LENGTH, txfr_size_lw, OVF_SUBTRACT_ONE)	; length is in 32-bit LWs
 	ov_clean
-	mem[read32, MAP_RDXR[0], in_addr_hi, <<8, in_addr_lo, max_/**/HASHMAP_RXFR_COUNT], indirect_ref, sig_done[read_sig]
+	mem[read32_/**/endian, MAP_RDXR[0], in_addr_hi, <<8, in_addr_lo, max_/**/HASHMAP_RXFR_COUNT], indirect_ref, sig_done[read_sig]
 
 	alu[o_tindex, (&MAP_RDXR[0] << 2), OR, my_act_ctx, <<7]
 
@@ -250,7 +250,7 @@ ret#:
 .end
 #endm
 
-#macro __hashmap_read_more(io_tindex, in_addr_hi, in_addr_lo, buf_wlen)
+#macro __hashmap_read_more(io_tindex, in_addr_hi, in_addr_lo, buf_wlen, endian)
 .begin
 	.reg start_tindex
 	.reg consumed
@@ -267,13 +267,13 @@ ret#:
 	bge[ret#]
 
 do_read#:
-	__hashmap_read_data(io_tindex, in_addr_hi, in_addr_lo, buf_wlen)
+	__hashmap_read_data(io_tindex, in_addr_hi, in_addr_lo, buf_wlen, endian)
 
 .end
 ret#:
 #endm
 
-#macro __hashmap_compare(io_tindex, lm_addr, in_addr_hi, in_addr_lo, in_wlen, MISS_LABEL)
+#macro __hashmap_compare(io_tindex, lm_addr, in_addr_hi, in_addr_lo, in_wlen, MISS_LABEL, endian)
 .begin
 
 	.reg comp_lw
@@ -291,9 +291,13 @@ ret#:
 do_read#:
 	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, lm_off]
 
-	__hashmap_read_data(io_tindex, in_addr_hi, off, lw_read)
+	__hashmap_read_data(io_tindex, in_addr_hi, off, lw_read, endian)
 	local_csr_wr[T_INDEX, io_tindex]   ; global csr 3 cycles
 	alu[bytes_read, --, b, lw_read, <<2]
+
+		nop
+		nop
+		__hashmap_dbg_print(0xd123, 0, *$index, HASHMAP_LM_INDEX[0])
 
 	unroll_compare(*$index, ++, HASHMAP_LM_INDEX, ++, MISS_LABEL, lw_read, HASHMAP_RXFR_COUNT, --)
 
@@ -312,7 +316,7 @@ ret#:
 #endm
 
 
-#macro __hashmap_read_field(io_tindex, lm_field_addr, in_addr_hi, in_addr_lo, in_wlen, RTN_OPT, out_addr, out_tindex)
+#macro __hashmap_read_field(io_tindex, lm_field_addr, in_addr_hi, in_addr_lo, in_wlen, RTN_OPT, out_addr, out_tindex, endian)
 .begin
 	.reg read_lw, bytes
 	.reg copy_lw
@@ -323,7 +327,7 @@ ret#:
 		alu[out_addr[0], --, b, in_addr_hi]
 		alu[out_addr[1], --, b, in_addr_lo]
 	#elif (RTN_OPT == HASHMAP_RTN_TINDEX)
-		__hashmap_read_more(io_tindex, in_addr_hi, in_addr_lo, in_wlen)
+		__hashmap_read_more(io_tindex, in_addr_hi, in_addr_lo, in_wlen, endian)
 		alu[out_tindex, --, b, io_tindex]
 		alu[out_addr[0], --, b, in_addr_hi]
 		alu[out_addr[1], --, b, in_addr_lo]
@@ -338,7 +342,7 @@ ret#:
 
 do_read#:
 		local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, lm_off]
-		__hashmap_read_more(io_tindex, in_addr_hi, off, read_lw)
+		__hashmap_read_more(io_tindex, in_addr_hi, off, read_lw, endian)
 
 		local_csr_wr[T_INDEX, io_tindex]   ; global csr 3 cycles
 		alu[bytes, --, b, read_lw, <<2]
@@ -358,7 +362,7 @@ do_read#:
 .end
 #endm
 
-#macro __hashmap_write_field(lm_field_addr, field_mask, in_addr_hi, in_addr_lo, in_wlen)
+#macro __hashmap_write_field(lm_field_addr, field_mask, in_addr_hi, in_addr_lo, in_wlen, endian)
 .begin
 	.reg wbytes, write_lw
 	.reg copied_lw
@@ -397,7 +401,7 @@ write_cont#:
 	ov_start(OV_LENGTH)
     ov_set_use(OV_LENGTH, write_lw, OVF_SUBTRACT_ONE)   ; length is in 32-bit LWs
     ov_clean
-    mem[write32, MAP_TXFR[0], in_addr_hi, <<8, off, max_/**/HASHMAP_TXFR_COUNT], indirect_ref, ctx_swap[write_sig]
+    mem[write32_/**/endian, MAP_TXFR[0], in_addr_hi, <<8, off, max_/**/HASHMAP_TXFR_COUNT], indirect_ref, ctx_swap[write_sig]
 
 	alu[wbytes, --, b, write_lw, <<2]
 	alu[copied_lw, copied_lw, +, write_lw]
