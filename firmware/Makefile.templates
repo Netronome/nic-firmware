@@ -152,7 +152,7 @@ FW_LIST_TARGETS += $1_$2.list
 
 $(eval $(call nffw.add_build_dir,$(FW_BUILD)/$1))
 
-$$($1__$2__LIST): $3/$4
+$$($1__$2__LIST): $3/$4 $(GENERATED_DEPS)
 	@echo Building $$($1__$2__LIST) ...
 	$(Q)mkdir -p $(FW_BUILD)/$1
 	$(Q)$(NFAS) $$($1__$2__FLAGS) $$($1__$2__DEFS) $$($1__$2__INC) -o $$@ $$<
