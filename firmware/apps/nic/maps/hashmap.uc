@@ -313,11 +313,10 @@
  *
  */
 
-#macro __hashmap_rounded_mask(in_val, out_val, out_mask)
+#macro __hashmap_rounded_mask(in_val, out_val, out_mask, endian)
 .begin
 	.reg tmp
 	.reg mask
-	.reg mval
 	.reg val
 
 	alu[tmp, --, b, in_val]
@@ -326,21 +325,21 @@
 
 	alu[tmp, out_val, -, in_val]
 
-	move(mask, ~0)
-	alu[out_mask, --, b, mask]
 	alu[tmp, --, b, tmp, <<3]
-	beq[ret#], defer[1]
-	alu[mval, --, b, mask]
-	alu[--, tmp, or, 0]
-	alu[mask, mval, and, mask, >>indirect]
-	alu[--, tmp, or, 0]
-	alu[out_mask, --, b, mask, <<indirect]
-ret#:
+    alu[mask, tmp, ~B, 0]
+
+    #if (streq('endian', 'swap')) 
+   		alu[mask, tmp, b, mask, <<indirect]
+		alu[out_mask, --, b, mask, >>indirect]
+    #else
+		alu[mask, tmp, b, mask, >>indirect]
+		alu[out_mask, --, b, mask, <<indirect]
+    #endif
 .end
 #endm
 
 
-#macro hashmap_alloc_fd(out_tid, key_size, value_size, max_entries, ERROR_LABEL)
+#macro hashmap_alloc_fd(out_tid, key_size, value_size, max_entries, ERROR_LABEL, endian)
 .begin
 	.reg base
 	.reg offset
@@ -372,10 +371,10 @@ ret#:
 #endif
 
 alloc_fd_cont#:
-	__hashmap_rounded_mask(key_size, rnd_val, $fd_xfer[__HASHMAP_FD_NDX_KEY_MASK])
+	__hashmap_rounded_mask(key_size, rnd_val, $fd_xfer[__HASHMAP_FD_NDX_KEY_MASK], endian)
 	alu[rnd_val, --, b, rnd_val, >>2]
 	ld_field_w_clr[key_value_sz, 1100, rnd_val, <<16]
-	__hashmap_rounded_mask(value_size, rnd_val, $fd_xfer[__HASHMAP_FD_NDX_VALUE_MASK])
+	__hashmap_rounded_mask(value_size, rnd_val, $fd_xfer[__HASHMAP_FD_NDX_VALUE_MASK], endian)
 	alu[rnd_val, --, b, rnd_val, >>2]
 	ld_field[key_value_sz, 0011, rnd_val]
 
@@ -392,7 +391,7 @@ alloc_fd_cont#:
 .end
 #endm
 
-#macro hashmap_get_fd(in_fd, key_size, value_size, key_mask, value_mask, ERROR_LABEL)
+#macro hashmap_get_fd(in_fd, key_size, value_size, key_mask, value_mask, ERROR_LABEL, endian)
 .begin
 
 	.reg base
@@ -708,7 +707,7 @@ ret#:
  * key MUST start at lm_key_addr[1]
  */
 
-#macro hashmap_ops(fd, lm_key_addr, lm_value_addr, OP, INVALID_MAP_LABEL, NOTFOUND_LABEL, RTN_OPT, out_ent_lw, out_ent_tindex, out_ent_addr)
+#macro hashmap_ops(fd, lm_key_addr, lm_value_addr, OP, INVALID_MAP_LABEL, NOTFOUND_LABEL, RTN_OPT, out_ent_lw, out_ent_tindex, out_ent_addr, endian)
 .begin
 	.reg ent_addr_hi
 	.reg tbl_addr_hi
@@ -730,7 +729,7 @@ ret#:
 	__hashmap_lm_handles_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, lm_key_addr]
 
-    hashmap_get_fd(fd, key_lwsz, value_lwsz, key_mask, value_mask, INVALID_MAP_LABEL)
+    hashmap_get_fd(fd, key_lwsz, value_lwsz, key_mask, value_mask, INVALID_MAP_LABEL, endian)
 
 	alu[HASHMAP_LM_INDEX, --, b, fd]
 	alu[keys_n_tid, 1, +, key_lwsz]
@@ -762,15 +761,14 @@ ret#:
 retry#:
     __hashmap_lock_shared(ent_index, fd, check_ov#, check_ov_valid#)
 
-		//__hashmap_dbg_print(0xa001, 0, ent_index)
-    __hashmap_compare(map_tindex, lm_key_addr, ent_addr_hi, offset, key_lwsz, check_ov_valid#)
+    __hashmap_compare(map_tindex, lm_key_addr, ent_addr_hi, offset, key_lwsz, check_ov_valid#, endian)
 found#:		/* found entry which matches the key */
 	#if (OP == HASHMAP_OP_LOOKUP)
 		alu[bytes, --, b, key_lwsz, <<2]
 		alu[offset, offset, +, bytes]
 		/* TODO LRU:  set ref flag */
 		__hashmap_set_opt_field(out_ent_lw, value_lwsz)
-		__hashmap_read_field(map_tindex, lm_value_addr, ent_addr_hi, offset, value_lwsz, RTN_OPT, out_ent_addr, out_ent_tindex)
+		__hashmap_read_field(map_tindex, lm_value_addr, ent_addr_hi, offset, value_lwsz, RTN_OPT, out_ent_addr, out_ent_tindex, endian)
 		__hashmap_lock_release(ent_index, ent_state)
     	br[ret#]
     #elif (OP == HASHMAP_OP_REMOVE)
@@ -792,7 +790,7 @@ getnext_loop#:
 read_next_key#:
 		__hashmap_set_opt_field(out_ent_lw, key_lwsz)
 		immed[map_tindex, 0]		; force read
-		__hashmap_read_field(map_tindex,lm_value_addr,ent_addr_hi, offset, key_lwsz, RTN_OPT, out_ent_addr, out_ent_tindex)
+		__hashmap_read_field(map_tindex,lm_value_addr,ent_addr_hi, offset, key_lwsz, RTN_OPT, out_ent_addr, out_ent_tindex, endian)
 		__hashmap_lock_release(ent_index, ent_state)
         br[ret#]
 	#elif ( (OP == HASHMAP_OP_ADD_ANY) || (OP == HASHMAP_OP_UPDATE) ) /* entry exists */
@@ -800,7 +798,7 @@ read_next_key#:
 		__hashmap_set_opt_field(out_ent_lw, 0)
 		alu[bytes, --, b, key_lwsz, <<2]
 		alu[offset, offset, +, bytes]
-		__hashmap_write_field(lm_value_addr, value_mask, ent_addr_hi, offset, value_lwsz)
+		__hashmap_write_field(lm_value_addr, value_mask, ent_addr_hi, offset, value_lwsz, endian)
 		__hashmap_lock_release(ent_index, ent_state)
         br[ret#]
 	#else
@@ -810,7 +808,7 @@ read_next_key#:
 check_ov_valid#:
 	alu[ent_state, ent_state, or, 1, <<__HASHMAP_DESC_VALID_BIT]
 check_ov#:
-	__hashmap_ov_lookup(hash[1], fd, tbl_addr_hi, ent_index, lm_key_addr, key_lwsz, map_tindex, ent_addr_hi, offset, ent_state, found#)
+	__hashmap_ov_lookup(hash[1], fd, tbl_addr_hi, ent_index, lm_key_addr, key_lwsz, map_tindex, ent_addr_hi, offset, ent_state, found#, endian)
 #if ( (OP == HASHMAP_OP_ADD_ANY) || (OP == HASHMAP_OP_ADD_ONLY) )	/* entry does not exist */
         __hashmap_lock_upgrade(ent_index, ent_state, retry#)
 		__hashmap_table_take_credits(fd, miss#)
@@ -824,11 +822,11 @@ write_tid_key#:
 write_key#:
 		.reg lm_kaddr
 		alu[lm_kaddr, 4, +, lm_key_addr]
-        __hashmap_write_field(lm_kaddr, key_mask, ent_addr_hi, offset, key_lwsz)
+        __hashmap_write_field(lm_kaddr, key_mask, ent_addr_hi, offset, key_lwsz, endian)
 		__hashmap_set_opt_field(out_ent_lw, 0)
 		alu[bytes, --, b, key_lwsz, <<2]
 		alu[offset, offset, +, bytes]
-		__hashmap_write_field(lm_value_addr, value_mask, ent_addr_hi, offset, value_lwsz)
+		__hashmap_write_field(lm_value_addr, value_mask, ent_addr_hi, offset, value_lwsz, endian)
 		__hashmap_lock_release(ent_index, ent_state)
         br[ret#]
 add_error#:
@@ -905,6 +903,9 @@ ret#:
 	.reg htab_value_addr_lo
 	.reg_addr htab_value_addr_lo 1 A
 	.set htab_value_addr_lo
+	.reg htab_in_tid 
+	.reg_addr htab_in_tid 0 A
+	.set htab_in_tid
 
 	.reg rtn_addr
 	.reg ebpf_rc
@@ -917,13 +918,13 @@ ret#:
 
 	local_csr_rd[ACTIVE_LM_ADDR_/**/HTAB_EBPF_LM_KEY_HANDLE]
 	immed[lm_key_offset, 0]
-	alu[tid, --, b,HTAB_EBPF_LM_KEY_INDEX]
+	//alu[tid, --, b,HTAB_EBPF_LM_KEY_INDEX]
+	alu[tid, htab_in_tid, or, 0]
 	alu[rtn_addr, --, b, htab_return_addr]
 	immed[out_addr[0], 0]
 	immed[out_addr[1], 0]
 
-	//__hashmap_dbg_print(0xf001, 0, tid, HTAB_EBPF_LM_KEY_INDEX[1])
-	hashmap_ops(tid, lm_key_offset, --, HASHMAP_OP_LOOKUP, htab_lookup_error_map#, htab_lookup_not_found#, HASHMAP_RTN_ADDR, --, --, out_addr)
+	hashmap_ops(tid, lm_key_offset, --, HASHMAP_OP_LOOKUP, htab_lookup_error_map#, htab_lookup_not_found#, HASHMAP_RTN_ADDR, --, --, out_addr, swap)
 
 htab_lookup_error_map#:
 htab_lookup_not_found#:
@@ -983,7 +984,7 @@ ret#:
     alu[tid, --, b,HTAB_EBPF_LM_KEY_INDEX]
 	alu[lm_value_offset, 40, +, lm_key_offset]	; assume value is 40 bytes after keys
 
-	hashmap_ops(tid, lm_key_offset, lm_value_offset, HASHMAP_OP_ADD, htab_update_error_map#, htab_update_not_found#, HASHMAP_RTN_ADDR, --, --, --)
+	hashmap_ops(tid, lm_key_offset, lm_value_offset, HASHMAP_OP_ADD, htab_update_error_map#, htab_update_not_found#, HASHMAP_RTN_ADDR, --, --, --, swap)
 
 	.reg_addr ebpf_rc 0 A
 	immed[ebpf_rc, 0]
@@ -1039,7 +1040,7 @@ ret#:
 	local_csr_rd[ACTIVE_LM_ADDR_/**/HTAB_EBPF_LM_KEY_HANDLE]
     immed[lm_key_offset, 0]
     alu[tid, --, b,HTAB_EBPF_LM_KEY_INDEX]
-	hashmap_ops(tid, lm_key_offset, --, HASHMAP_OP_REMOVE, htap_del_error_map#, htap_del_not_found#, HASHMAP_RTN_ADDR, --, --, --)
+	hashmap_ops(tid, lm_key_offset, --, HASHMAP_OP_REMOVE, htap_del_error_map#, htap_del_not_found#, HASHMAP_RTN_ADDR, --, --, --, swap)
 	.reg_addr ebpf_rc 0 A
 	immed[ebpf_rc, 0]
 	br[ret#]
