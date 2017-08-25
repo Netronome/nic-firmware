@@ -297,7 +297,6 @@ do_read#:
 
 		nop
 		nop
-		__hashmap_dbg_print(0xd123, 0, *$index, HASHMAP_LM_INDEX[0])
 
 	unroll_compare(*$index, ++, HASHMAP_LM_INDEX, ++, MISS_LABEL, lw_read, HASHMAP_RXFR_COUNT, --)
 
