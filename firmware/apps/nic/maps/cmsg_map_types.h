@@ -184,6 +184,7 @@
 #define CMSG_TYPE_MAP_DELETE    5
 #define CMSG_TYPE_MAP_GETNEXT   6
 #define CMSG_TYPE_MAP_GETFIRST  7
+#define CMSG_TYPE_MAP_ARRAY_GETNEXT  0xf6
 
 #define CMSG_TYPE_MAP_START		1
 #define CMSG_TYPE_MAP_MAX		7
@@ -214,6 +215,9 @@
 #define CMSG_RC_ERR_MAP_NOENT		(1<<1)
 #define CMSG_RC_ERR_MAP_ERR			(1<<2)
 #define CMSG_RC_ERR_MAP_PARSE		(1<<3)
+#define CMSG_RC_ERR_NOMEM			(1<<4)
+#define CMSG_RC_ERR_E2BIG			(1<<5)
+#define CMSG_RC_ERR_EINVAL			(1<<6)
 
 #define CMSG_OP_HDR_LW			4
 
@@ -225,7 +229,8 @@
 #define CMSG_MAP_ALLOC_KEYSZ_IDX	1
 #define CMSG_MAP_ALLOC_VALUESZ_IDX	2
 #define CMSG_MAP_ALLOC_MAXENT_IDX	3
-#define CMSG_MAP_ALLOC_FLAGS_IDX	4
+#define CMSG_MAP_ALLOC_TYPE_IDX		4
+#define CMSG_MAP_ALLOC_FLAGS_IDX	5
 
 /* flags used for add/update */
 #define CMSG_BPF_ANY     0 /* create new element or update existing */
@@ -242,7 +247,8 @@ struct cmsg_req_map_alloc_tbl {
 			uint32_t key_size;		/* in bytes */
 			uint32_t value_size;	/* in bytes */
 			uint32_t max_entries;
-			uint32_t map_flags;		/* not used */
+			uint32_t map_type;
+			uint32_t map_flags;		/* reserved */
 		};
 		uint32_t __raw[5];
 	};
