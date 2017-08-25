@@ -36,6 +36,7 @@
 #include <nfd_in.uc>
 #include <nfd_out.uc>
 #include <gro.uc>
+#include <endian.uc>
 #include "pkt_buf.uc"
 
 #ifndef NUM_CONTEXT
@@ -133,7 +134,7 @@
 	.alloc_mem LM_CMSG_BASE	lm me (NUM_CONTEXT * (CMSG_LM_FIELD_SZ * 2)) 8
 	.init LM_CMSG_BASE 0
 
-	#define CMSG_NUM_FD_BM_LW	((HASHMAP_MAX_TID+31)/32)
+	#define CMSG_NUM_FD_BM_LW	((HASHMAP_MAX_TID_EBPF+31)/32)
 	.alloc_mem LM_CMSG_FD_BITMAP lm me (CMSG_NUM_FD_BM_LW * 4) 8
 	.init LM_CMSG_FD_BITMAP 0
 
@@ -239,7 +240,7 @@ ret#:
 	.reg bm_idx
 	.reg tid
 
-	alu[--, in_tid, -, HASHMAP_MAX_TID]
+	alu[--, in_tid, -, HASHMAP_MAX_TID_EBPF]
 	bge[ERROR_LABEL]
 
 	immed[lm_addr, LM_CMSG_FD_BITMAP]
@@ -305,19 +306,19 @@ ret#:
 	bitfield_extract(mu_ptr, BF_AML(in_nfd_out_desc, NFD_OUT_MUADDR_fld))
 
 	.reg ctm_pnum
-        .reg ctm_isl
+    .reg ctm_isl
 
 	bitfield_extract(ctm_pnum, BF_AML(in_nfd_out_desc, NFD_OUT_PKTNUM_fld))
-        bitfield_extract(ctm_isl, BF_AML(in_nfd_out_desc, NFD_OUT_CTM_ISL_fld))
+    bitfield_extract(ctm_isl, BF_AML(in_nfd_out_desc, NFD_OUT_CTM_ISL_fld))
 	pkt_buf_free_ctm_buffer(ctm_isl, ctm_pnum)
 
-        nfd_out_fill_desc(nfdo_desc, 0, 0, 0, nfd_bls,
+    nfd_out_fill_desc(nfdo_desc, 0, 0, 0, nfd_bls,
                       mu_ptr, pkt_offset, plen,
                       meta_len)
 
-        nfd_lm_handle_define()
+    nfd_lm_handle_define()
    	nfd_out_send(nfdo_desc, NIC_PCI, NFD_CTRL_QUEUE, NFD_LM_HANDLE)
-        nfd_lm_handle_undef()
+    nfd_lm_handle_undef()
 
 	pkt_counter_incr(cmsg_tx)
 .end
@@ -476,11 +477,10 @@ ret#:
 	br[cmsg_exit#]
 
 cmsg_error#:
-	// count errors
 	pkt_counter_incr(cmsg_err)
 cmsg_exit_free#:
 cmsg_no_credit#:
-		pkt_counter_incr(cmsg_err_no_credits)
+	pkt_counter_incr(cmsg_err_no_credits)
 cmsg_pkt_error#:
 	// free MU buffers
 	cmsg_free_mem_buffer(nfd_pkt_meta)
@@ -545,6 +545,7 @@ cmsg_exit#:
 	.reg map_op
 	.reg l_cmsg_type
 	.reg in_fd
+	.reg map_type
 
 	#define __CMSG_DATA_OFFSET__ (NFD_IN_DATA_OFFSET)
 	immed[addr_lo, __CMSG_DATA_OFFSET__]
@@ -582,7 +583,11 @@ cmsg_exit#:
 			alu[keysz, --, b, HDR_DATA[CMSG_MAP_ALLOC_KEYSZ_IDX]]
 			alu[valuesz, --, b,  HDR_DATA[CMSG_MAP_ALLOC_VALUESZ_IDX]]
 			alu[maxent, --, b,  HDR_DATA[CMSG_MAP_ALLOC_MAXENT_IDX]]
-			_cmsg_alloc_fd(keysz, valuesz, maxent, in_addr_hi, in_cmsg_tag, out_pktlen, swap)
+			alu[map_type, --, b, HDR_DATA[CMSG_MAP_ALLOC_TYPE_IDX]]
+			bne[alloc_cont#]
+			immed[map_type, BPF_MAP_TYPE_HASH]		; default is hash
+alloc_cont#:
+			_cmsg_alloc_fd(keysz, valuesz, maxent, in_addr_hi, in_cmsg_tag, out_pktlen, swap, map_type)
 			br[cmsg_proc_ret#]
 		 .end
 
@@ -603,18 +608,27 @@ cmsg_exit#:
 			.reg save_rc
 			.reg l_cmsg_type
 			.reg rtn_count
+			.reg map_type
+			.reg max_entries
+			.reg cur_key
+			.reg le_key
 
 			cmsg_lm_ctx_addr(lm_key_offset,lm_value_offset, ctx_num)
 			cmsg_lm_handles_define()
-			immed[save_rc, CMSG_RC_SUCCESS]
 			immed[out_pktlen, 0]
 			immed[rtn_count, 0]
+			immed[cur_key, 0]
+			immed[le_key, 0]
 
 			alu[in_fd, --, b, HDR_DATA[CMSG_MAP_TID_IDX]]
 			alu[count, --, b, HDR_DATA[CMSG_MAP_OP_COUNT_IDX]]
 			alu[flags, --, b, HDR_DATA[CMSG_MAP_OP_FLAGS_IDX]]
 			alu[key_offset, addr_lo, +, (CMSG_OP_HDR_LW*4)]
 			alu[l_cmsg_type, --, b, in_cmsg_type]
+
+			immed[save_rc, CMSG_RC_ERR_MAP_FD]
+			hashmap_get_fd_attr(in_fd, map_type, max_entries, done#)
+			immed[save_rc, CMSG_RC_SUCCESS]
 
 			.if (in_cmsg_type == CMSG_TYPE_MAP_ADD)
 				.if (flags == CMSG_BPF_NOEXIST)
@@ -630,13 +644,33 @@ proc_loop#:
 			nop
 			nop
 
+			alu[--, map_type, -, BPF_MAP_TYPE_ARRAY]
+			beq[proc_array_map#]
     		ov_single(OV_LENGTH, CMSG_TXFR_COUNT, OVF_SUBTRACT_ONE) // Length in 32-bit LWs
     		mem[read32_swap, $pkt_data[0], in_addr_hi, <<8, key_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
 			alu[CMSG_KEY_LM_INDEX++, --, b, in_fd]
 			ctx_arb[rd_sig]
-
 			aggregate_copy(CMSG_KEY_LM_INDEX, ++, $pkt_data, 0, (CMSG_TXFR_COUNT-1))
-			alu[value_offset, key_offset, +, 64]
+			br[proc_loop_cont#]
+proc_array_map#:
+    		mem[read32_swap, $pkt_data[0], in_addr_hi, <<8, key_offset, 1], sig_done[rd_sig]
+			alu[CMSG_KEY_LM_INDEX++, --, b, in_fd]
+			ctx_arb[rd_sig]
+			alu[cur_key, --, b, $pkt_data[0]]
+				//__hashmap_dbg_print(0xf00c, 0, cur_key)
+			.if (l_cmsg_type == CMSG_TYPE_MAP_GETFIRST)
+				immed[cur_key, 0]
+				immed[l_cmsg_type, CMSG_TYPE_MAP_ARRAY_GETNEXT]
+			.else
+				.if (l_cmsg_type == CMSG_TYPE_MAP_GETNEXT)
+					alu[cur_key, cur_key, +, 1]
+					immed[l_cmsg_type, CMSG_TYPE_MAP_ARRAY_GETNEXT]
+				.endif
+			.endif
+			alu[CMSG_KEY_LM_INDEX++, --, b, cur_key]
+
+proc_loop_cont#:
+			alu[value_offset, key_offset, +, 64]		; value & key offset in cmsg
 
     		ov_single(OV_LENGTH, CMSG_TXFR_COUNT, OVF_SUBTRACT_ONE) // Length in 32-bit LWs
     		mem[read32_swap, $pkt_data[0], in_addr_hi, <<8, value_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
@@ -647,7 +681,9 @@ proc_loop#:
 			cmsg_lm_handles_undef()
 
 do_op#:
-			_cmsg_hashmap_op(l_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, key_offset, value_offset, flags, rc, swap)
+
+			swap(le_key, cur_key, NO_LOAD_CC) 
+			_cmsg_hashmap_op(l_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, key_offset, value_offset, flags, rc, swap, le_key, cur_key)
 
 			alu[key_offset, value_offset, +, 64]
 			alu[out_pktlen, out_pktlen, +, (64*2)]
@@ -664,6 +700,12 @@ do_op#:
 				.if (rc != CMSG_RC_SUCCESS)
 					br[done#]
 				.endif
+				br[do_op#], defer[1]
+				alu[value_offset, key_offset, +, 64]
+			.elif (l_cmsg_type == CMSG_TYPE_MAP_ARRAY_GETNEXT)
+				alu[cur_key, cur_key, +, 1]
+				alu[--, max_entries, -, cur_key]
+				beq[done#]
 				br[do_op#], defer[1]
 				alu[value_offset, key_offset, +, 64]
 			.endif
@@ -686,7 +728,7 @@ cmsg_proc_ret#:
 .end
 #endm
 
-#macro _cmsg_alloc_fd(key_sz, value_sz, max_entries, in_addr_hi, in_cmsg_tag, out_len, endian)
+#macro _cmsg_alloc_fd(key_sz, value_sz, max_entries, in_addr_hi, in_cmsg_tag, out_len, endian, map_type)
 .begin
 		.reg fd
 		.reg $reply[3]
@@ -701,7 +743,8 @@ cmsg_proc_ret#:
 
 		cmsg_alloc_fd_from_bm(fd, cont#)			; skip alloc if no free slots
 
-		hashmap_alloc_fd(fd, key_sz, value_sz, max_entries, cont#, endian)
+		// driver will initialize arraymap
+		hashmap_alloc_fd(fd, key_sz, value_sz, max_entries, cont#, endian, map_type)
 
 		immed[$reply[1], CMSG_RC_SUCCESS]			; success
 		alu[$reply[2], --, b, fd]
@@ -713,6 +756,8 @@ cont#:
 		immed[out_len, (3<<2)]
 		ctx_arb[sig_reply_map_alloc]
 
+
+ret#:
 .end
 #endm
 
@@ -785,7 +830,7 @@ ret#:
 #define_eval _CMSG_FLD_LW 			(CMSG_MAP_KEY_VALUE_LW)
 #define_eval _CMSG_FLD_LW_MINUS_1   (_CMSG_FLD_LW - 1)
 
-#macro _cmsg_hashmap_op(in_op, in_fd, in_lm_key, in_lm_value, in_addr_hi, in_key_offset, in_value_offset, in_flags, out_rc, endian)
+#macro _cmsg_hashmap_op(in_op, in_fd, in_lm_key, in_lm_value, in_addr_hi, in_key_offset, in_value_offset, in_flags, out_rc, endian, array_lekey, array_bekey)
 .begin
 	.reg op
 	.sig sig_read_ent
@@ -802,7 +847,19 @@ ret#:
 	aggregate_directive(.set, $ent_reply, _CMSG_FLD_LW)
 
 	#define_eval	__HASHMAP_OP__ (CMSG_TYPE_MAP_LOOKUP - HASHMAP_OP_LOOKUP)
-	alu[op, in_op, -, __HASHMAP_OP__]
+	.if (in_op == CMSG_TYPE_MAP_ARRAY_GETNEXT)
+		cmsg_lm_handles_define()
+    	local_csr_wr[ACTIVE_LM_ADDR_/**/CMSG_KEY_LM_HANDLE, lm_key_offset]
+		immed[op, CMSG_TYPE_MAP_LOOKUP]
+		alu[$ent_reply[0], --, b, array_lekey]
+		mem[write32, $ent_reply[0], in_addr_hi, <<8, in_key_offset, 1], sig_done[sig_reply_map_ops]
+    	alu[--, --, b, CMSG_KEY_LM_INDEX++]
+		alu[CMSG_KEY_LM_INDEX, --, b, array_bekey]
+    	cmsg_lm_handles_undef()
+    	ctx_arb[sig_reply_map_ops]              
+	.else
+		alu[op, in_op, -, __HASHMAP_OP__]
+	.endif
 	#undef __HASHMAP_OP__
 
 	#define_eval MAX_JUMP (HASHMAP_OP_MAX + 1)
@@ -914,7 +971,6 @@ reply_keys#:
 	ctx_arb[sig_read_ent]
 
 	unroll_copy($ent_reply, 0, $ent_reply, 0, reply_lw, _CMSG_FLD_LW, --)
-	//ov_single(OV_LENGTH, reply_lw, OVF_SUBTRACT_ONE)
 	ov_single(OV_LENGTH, _CMSG_FLD_LW, OVF_SUBTRACT_ONE)
     mem[write32, $ent_reply[0], in_addr_hi, <<8, in_key_offset, max_/**/_CMSG_FLD_LW], indirect_ref, sig_done[sig_reply_map_ops]
 
@@ -943,7 +999,6 @@ reply_value#:
 
 	unroll_copy($ent_reply, 0, $ent_reply, 0, reply_lw, _CMSG_FLD_LW, --)
 
-	//ov_single(OV_LENGTH, reply_lw, OVF_SUBTRACT_ONE)
 	ov_single(OV_LENGTH, _CMSG_FLD_LW, OVF_SUBTRACT_ONE)
     mem[write32, $ent_reply[0], in_addr_hi, <<8, in_value_offset, max_/**/_CMSG_FLD_LW], indirect_ref, sig_done[sig_reply_map_ops]
 
@@ -955,6 +1010,62 @@ ret#:
 .end
 #endm
 
+/*
+ * This macro is currently not used.  Driver initializes arraymap
+ * init array map entries
+ * array maps:  key_size = 4, key = 0..max_entries-1
+ *              value_size must be zeroed
+ * TABLE_OP = INIT or CLEANUP
+ */
+#macro _cmsg_arraymap_table_op(in_fd, in_num_entries, SUCCESS_LABEL, TABLE_OP)
+.begin
+	.reg lm_key_offset
+	.reg lm_value_offset
+	.reg ctx_num
+	.reg array_ndx
+	.reg reply_lw
+	//.reg le_key
+
+	local_csr_rd[ACTIVE_CTX_STS]
+    immed[ctx_num, 0]
+    alu[ctx_num, ctx_num, and, 7]
+
+	cmsg_lm_ctx_addr(lm_key_offset, lm_value_offset, ctx_num)
+	cmsg_lm_handles_define()
+
+    local_csr_wr[ACTIVE_LM_ADDR_/**/CMSG_VALUE_LM_HANDLE, lm_value_offset]
+	immed[array_ndx, 0]
+    nop
+    nop
+	aggregate_zero(CMSG_VALUE_LM_INDEX, CMSG_TXFR_COUNT)
+
+init_loop#:
+	local_csr_wr[ACTIVE_LM_ADDR_/**/CMSG_KEY_LM_HANDLE, lm_key_offset]
+		nop
+		swap(le_key, array_ndx, NO_LOAD_CC)	
+    alu[CMSG_KEY_LM_INDEX++, --, b, in_fd]
+	alu[CMSG_KEY_LM_INDEX++, --, b, le_key]
+
+    cmsg_lm_handles_undef()
+
+	#if (streq('TABLE_OP', 'INIT'))
+		hashmap_ops(in_fd, lm_key_offset, lm_value_offset, HASHMAP_OP_ADD_ANY, error_rtn#, error_rtn#, HASHMAP_RTN_ADDR, reply_lw, --, --, be)
+	#else
+		hashmap_ops(in_fd, lm_key_offset, lm_value_offset, HASHMAP_OP_REMOVE, error_rtn#, error_rtn#, HASHMAP_RTN_ADDR, reply_lw, --, --, be)
+	#endif
+
+	alu[--, reply_lw, -, 0]
+	bne[error_rtn#]
+
+	alu[array_ndx, 1, +, array_ndx]
+	alu[--, in_num_entries, -, array_ndx]
+	bne[init_loop#]
+
+	br[SUCCESS_LABEL]
+
+error_rtn#:
+.end
+#endm
 
 
 #endif

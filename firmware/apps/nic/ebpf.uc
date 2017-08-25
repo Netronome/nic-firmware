@@ -78,7 +78,7 @@
 
 
 ebpf_init_cap_adjust_head(EBPF_CAP_ADJUST_HEAD_FLAG_NO_META, 44, 248, 84, 112)
-ebpf_init_cap_maps((1 << BPF_MAP_TYPE_HASH), HASHMAP_MAX_TID, HASHMAP_TOTAL_ENTRIES, HASHMAP_MAX_KEYS_SZ, HASHMAP_MAX_VALU_SZ, \
+ebpf_init_cap_maps(((1 << BPF_MAP_TYPE_HASH)+(1<<BPF_MAP_TYPE_ARRAY)), HASHMAP_MAX_TID_EBPF, HASHMAP_TOTAL_ENTRIES, HASHMAP_MAX_KEYS_SZ, HASHMAP_MAX_VALU_SZ, \
                    (HASHMAP_MAX_KEYS_SZ + HASHMAP_MAX_VALU_SZ))
 ebpf_init_cap_func(EBPF_CAP_FUNC_ID_LOOKUP, HTAB_MAP_LOOKUP_SUBROUTINE#)
 ebpf_init_cap_finalize()
@@ -165,7 +165,7 @@ ebpf_init_cap_finalize()
     alu[jump_offset, in_ustore_addr, -, jump_offset]
     jump[jump_offset, ebpf_start#], targets[dummy0#, dummy1#], defer[3]
         immed[stack_addr, EBPF_STACK_BASE]
-        .reg_addr stack_addr 22 B
+        .reg_addr stack_addr 22 A
         #if (log2(EBPF_STACK_SIZE, 1) <= 8)
             alu[stack_addr, stack_addr, OR, t_idx_ctx, >>(8 - log2(EBPF_STACK_SIZE, 1))]
         #else

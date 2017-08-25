@@ -273,7 +273,7 @@ do_read#:
 ret#:
 #endm
 
-#macro __hashmap_compare(io_tindex, lm_addr, in_addr_hi, in_addr_lo, in_wlen, MISS_LABEL, endian)
+#macro __hashmap_compare(io_tindex, lm_addr, in_addr_hi, in_addr_lo, in_wlen, MISS_LABEL, endian, map_type)
 .begin
 
 	.reg comp_lw
@@ -292,9 +292,10 @@ do_read#:
 	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, lm_off]
 
 	__hashmap_read_data(io_tindex, in_addr_hi, off, lw_read, endian)
-	local_csr_wr[T_INDEX, io_tindex]   ; global csr 3 cycles
-	alu[bytes_read, --, b, lw_read, <<2]
 
+read_done#:
+	local_csr_wr[T_INDEX, io_tindex]   ; global csr 3 cycles
+		alu[bytes_read, --, b, lw_read, <<2]
 		nop
 		nop
 
