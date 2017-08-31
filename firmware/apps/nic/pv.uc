@@ -1098,6 +1098,7 @@ skip_ctm_buffer#:
 #macro pv_seek(out_cache_idx, io_vec, in_offset, in_length, in_flags)
 .begin
     .reg tibi // T_INDEX_BYTE_INDEX
+    .reg write $reflect
 
     #if ((in_flags & PV_SEEK_REVERSE) || (in_flags & PV_SEEK_T_INDEX_ONLY))
         #define _PV_SEEK_TEST_OFFSET_MASK 0x7f
@@ -1209,12 +1210,12 @@ skip_ctm_buffer#:
         #if (SCS != 0)
             #error calculation of reflect_addr depends on __MEID
         #endif
-        alu[reflect_addr, data_ref, OR, (__MEID & 0xf), <<10]
+        immed[reflect_addr, ((&$reflect << 2) | ((__MEID & 0xf) << 10))]
         alu[reflect_addr, reflect_addr, OR, __ISLAND, <<24]
         ov_single(OV_DATA_REF, data_ref)
-        ct[reflect_read_sig_init, $__pv_pkt_data[0], reflect_addr, 0, 1], indirect_ref, ctx_swap[sig_reflect], defer[2]
+        ct[reflect_read_sig_init, $__pv_pkt_data[0], t_idx_ctx, reflect_addr, 1], indirect_ref, ctx_swap[sig_reflect], defer[2]
             alu[tmp, *$index, AND, mask]
-            alu[*$index, tmp, OR, straddle_data]
+            alu[$reflect, tmp, OR, straddle_data]
 
         br[finalize#], defer[2]
             #if (isnum(_PV_SEEK_OFFSET))
