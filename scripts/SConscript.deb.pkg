@@ -10,6 +10,7 @@ deb_files = [
     ("etc/init.d/ns-core-nic.autorun", "#nfp-nic/scripts/ns-core-nic.autorun"),
     ("etc/systemd/system/ns-core-nic.service", "#nfp-nic/scripts/ns-core-nic.service"),
     ("usr/share/initramfs-tools/hooks/nfp", "#nfp-nic/scripts/initramfs-tools-module-setup.sh"),
+    ("opt/netronome/bin/set_irq_affinity.sh", "#nfp-nic/kernel/nfp_net/nfp-drv-kmods/tools/set_irq_affinity.sh"),
 ]
 
 deb_FileList.add_files(deb_files)
