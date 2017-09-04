@@ -60,9 +60,11 @@ function check_and_load_driver() {
     # loaded. If nfp is loaded it is a previous version that we
     # have to unload. And then load the version we just installed
     local nfp_net_drv_check ref_cnt dev_cpp
-    lsmod | grep -wq "nfp" > /dev/null 2>&1
-    nfp_net_drv_check=$?
-    ref_cnt=$(lsmod | awk '/^nfp / {print $3}')
+
+    ref_cnt=0
+    if [ -f /sys/module/nfp ]; then
+        ref_cnt=$(cat /sys/module/nfp/refcnt)
+    fi
 
     if [ "$ref_cnt" != "0" ]; then
         log "Cannot unload nfp, ref count non-zero"
@@ -73,7 +75,7 @@ function check_and_load_driver() {
             return 1
         fi
     else
-        if [ "$nfp_net_drv_check" -eq 0 ]; then
+        if [ -f /sys/module/nfp ]; then
             log "nfp already loaded"
             log "Attempting to unload nfp driver"
             rmmod nfp
@@ -81,22 +83,6 @@ function check_and_load_driver() {
                 log "Unload of nfp driver failed"
                 log "ERROR"
                 return 1
-            fi
-        else
-            # Unload nfp driver if loaded
-            local nfp_drv_check
-            lsmod | grep -wq "nfp" > /dev/null 2>&1
-            nfp_drv_check=$?
-
-            if [ "$nfp_drv_check" -eq 0 ]; then
-                log "nfp already loaded"
-                log "Attempting to unload nfp driver"
-                rmmod nfp
-                if [ "$?" -ne 0 ]; then
-                    log "Unload of nfp driver failed"
-                    log "ERROR"
-                    return 1
-                fi
             fi
         fi
 
@@ -229,15 +215,16 @@ function err47_check() {
 function reload_nfp_net() {
     local nfp_net_drv_check ref_cnt
 
-    ref_cnt=$(lsmod | awk '/^nfp / {print $3}')
+    ref_cnt=0
+    if [ -f /sys/module/nfp ]; then
+	ref_cnt=$(cat /sys/module/nfp/refcnt)
+    fi
+
     if [ "$ref_cnt" != "0" ]; then
         return 0
     fi
 
-    lsmod | grep -wq "nfp" > /dev/null 2>&1
-    nfp_net_drv_check=$?
-
-    if [ "$nfp_net_drv_check" -eq 0 ]; then
+    if [ -f /sys/module/nfp ]; then
         rmmod nfp
     fi
 
