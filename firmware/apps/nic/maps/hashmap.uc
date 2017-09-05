@@ -340,7 +340,7 @@
 	alu[tmp, --, b, tmp, <<3]
     alu[mask, tmp, ~B, 0]
 
-    #if (streq('endian', 'swap')) 
+    #if (streq('endian', 'swap'))
    		alu[mask, tmp, b, mask, <<indirect]
 		alu[out_mask, --, b, mask, >>indirect]
     #else
@@ -764,7 +764,7 @@ ret#:
     	__hashmap_lock_shared(ent_index, fd, found#, found#)
 		br[found#]
 	#else
-		slicc_hash(hash, lm_key_addr, keys_n_tid, HASHMAP_MAX_KEYS_LW)
+		slicc_hash_words(hash, 0, lm_key_addr, keys_n_tid)
     	__hashmap_index_from_hash(hash[0], ent_index)
     	__hashmap_lock_init(ent_state, ent_addr_hi, offset, mu_partition, ent_index)
 		alu[tbl_addr_hi, --, b, ent_addr_hi]
@@ -915,7 +915,7 @@ ret#:
 	.reg htab_value_addr_lo
 	.reg_addr htab_value_addr_lo 1 A
 	.set htab_value_addr_lo
-	.reg htab_in_tid 
+	.reg htab_in_tid
 	.reg_addr htab_in_tid 0 A
 	.set htab_in_tid
 
