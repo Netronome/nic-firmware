@@ -2,26 +2,13 @@
 #ifndef _SLICC_HASH
 #define _SLICC_HASH
 
-#include <aggregate.uc>
-#include <lm_handle.uc>
 #include <passert.uc>
+#include <preproc.uc>
 #include <stdmac.uc>
-#include <unroll.uc>
-#include <timestamp.uc>
 
 #include "slicc_hash.h"
 
 #define_eval SLICC_HASH_PAD_NN_ADDR     (SLICC_HASH_PAD_NN_IDX << 2)
-
-#macro _slicc_hash_lm_handle_define()
-    #define_eval _SLICC_HASH_LM_HANDLE 2
-    #define_eval _SLICC_HASH_LM_INDEX  *l$index2
-#endm
-
-#macro _slicc_hash_lm_handle_undef()
-    #undef _SLICC_HASH_LM_HANDLE
-    #undef _SLICC_HASH_LM_INDEX
-#endm
 
 #macro slicc_hash_init_nn()
 .begin
@@ -65,18 +52,7 @@
 .end
 #endm
 
-
-#define _slicc_hash_init_INSTRUCTIONS 3
-#macro _slicc_hash_init()
-    alu[_SLICC_HASH_STATE[0], _SLICC_HASH_LENGTH, XOR, *n$index++]
-    crc_be[crc_32, copy, _SLICC_HASH_STATE[0]]
-    alu[_SLICC_HASH_STATE[1], --, B,  _SLICC_HASH_STATE[0], <<rot21]
-#endm
-
-
-/* _slicc_hash_step()
- *
- * The primary purpose of each round is to efficiently incorporate an additional word of
+/* The primary purpose of each round is to efficiently incorporate an additional word of
  * the input key into the internal hash state. In doing so, the goal is to have each bit
  * of the input word affect as many bits of the internal state as possible. Additionally,
  * it should not be possible to manipulate the input key in such a way as to cause hash
@@ -131,48 +107,159 @@
  * bear on the degree of locomotion incurred in the alternative perspective.
  *
  */
-#define _slicc_hash_step_INSTRUCTIONS 4
-#macro _slicc_hash_step(IDX)
-    alu[_SLICC_HASH_STATE[(IDX % 2)], _SLICC_HASH_STATE[(IDX % 2)], +carry, _SLICC_HASH_LM_INDEX++]
-    crc_be[crc_32, copy, _SLICC_HASH_STATE[(IDX % 2)]], no_cc
-#if (IDX < (_SLICC_HASH_MAX_KEY_LENGTH - 1))
-    alu[_SLICC_HASH_STATE[((IDX + 1) % 2)], _SLICC_HASH_STATE[((IDX + 1) % 2)], XOR, *n$index++], no_cc
-    dbl_shf[_SLICC_HASH_STATE[(IDX % 2)], copy, _SLICC_HASH_STATE[(IDX % 2)], >>indirect], no_cc
-#endif
-#endm
 
-
-#macro slicc_hash(out_hash, in_key_address, in_key_length, MAX_KEY_LENGTH)
+.reg __slicc_hash_ret_addr
+.reg __slicc_hash_copy
+.reg __slicc_hash_state[2]
+.reg __slicc_hash_tail_mask
+.if (0)
+.subroutine
 .begin
-    passert(MAX_KEY_LENGTH, "LT", SLICC_HASH_PAD_SIZE_LW) // note additional *n$index op for init
+    .reg tmp
 
-    #define_eval _SLICC_HASH_STATE out_hash
-    #define_eval _SLICC_HASH_LENGTH in_key_length
-    #define_eval _SLICC_HASH_MAX_KEY_LENGTH MAX_KEY_LENGTH
+    #define LOOP 0
 
-    .reg copy
+    #while (LOOP < (SLICC_HASH_PAD_SIZE_LW - 3))
+        __slicc_hash_round/**/LOOP#:
+        alu[__slicc_hash_state[(LOOP % 2)], __slicc_hash_state[(LOOP % 2)], +carry, *l$index0++]
+        crc_be[crc_32, __slicc_hash_copy, __slicc_hash_state[(LOOP % 2)]], no_cc
+        alu[__slicc_hash_state[((LOOP + 1) % 2)], __slicc_hash_state[((LOOP + 1) % 2)], XOR, *n$index++], no_cc
+        dbl_shf[__slicc_hash_state[(LOOP % 2)], __slicc_hash_copy, __slicc_hash_state[(LOOP % 2)], >>indirect], no_cc
+        #define_eval LOOP (LOOP + 1)
+    #endloop
 
-    _slicc_hash_lm_handle_define()
+    __slicc_hash_round/**/LOOP#:
+        alu[tmp, __slicc_hash_tail_mask, AND, *l$index0++], no_cc
+        alu[__slicc_hash_state[(LOOP % 2)], __slicc_hash_state[(LOOP % 2)], +carry, tmp]
+        alu[__slicc_hash_state[(LOOP % 2)], __slicc_hash_state[(LOOP % 2)], XOR, *n$index++]
+        crc_be[crc_32, __slicc_hash_copy, __slicc_hash_state[(LOOP % 2)]]
 
-    local_csr_wr[ACTIVE_LM_ADDR_/**/_SLICC_HASH_LM_HANDLE, in_key_address] ; (_SLICC_HASH_LM_HANDLE)
+    mul_step[__slicc_hash_state[(LOOP % 2)], __slicc_hash_state[((LOOP + 1) % 2)]], 32x32_start
+    mul_step[__slicc_hash_state[(LOOP % 2)], __slicc_hash_state[((LOOP + 1) % 2)]], 32x32_step1
+    mul_step[__slicc_hash_state[(LOOP % 2)], __slicc_hash_state[((LOOP + 1) % 2)]], 32x32_step2
+    mul_step[__slicc_hash_state[(LOOP % 2)], __slicc_hash_state[((LOOP + 1) % 2)]], 32x32_step3
+    mul_step[__slicc_hash_state[(LOOP % 2)], __slicc_hash_state[((LOOP + 1) % 2)]], 32x32_step4
+    mul_step[__slicc_hash_state[0], --], 32x32_last
+    mul_step[__slicc_hash_state[1], --], 32x32_last2
+
+    #undef LOOP
+
+    rtn[__slicc_hash_ret_addr], defer[3]
+        local_csr_rd[CRC_REMAINDER]
+        .reg_addr __slicc_hash_state[0] 3 B
+        immed[__slicc_hash_state[0], 0]
+         .reg_addr __slicc_hash_state[1] 4 B
+        alu[__slicc_hash_state[1], __slicc_hash_state[0], XOR, __slicc_hash_state[1]]
+.end
+.endsub
+.endif
+
+#macro slicc_hash_words(out_hash, in_salt, in_addr, in_len_words, in_tail_mask)
+.begin
+    .reg offset
+
+    #if (is_ct_const(in_len_words))
+        passert(in_len_words, "GE", 0)
+        passert(in_len_words, "LE", (SLICC_HASH_PAD_SIZE_LW - 2))
+        move(offset, ((SLICC_HASH_PAD_SIZE_LW - 2 - in_len_words) * 4))
+    #else
+        alu[offset, (SLICC_HASH_PAD_SIZE_LW - 2), -, in_len_words]
+        blo[overflow#]
+        alu[offset, --, B, offset, <<2]
+    #endif
+
     local_csr_wr[NN_GET, SLICC_HASH_PAD_NN_IDX]
-    local_csr_wr[CRC_REMAINDER, _SLICC_HASH_LENGTH]
+    local_csr_wr[CRC_REMAINDER, in_len_words]
 
-    unroll_for_each(in_key_length, 0, (MAX_KEY_LENGTH - 1), _slicc_hash_step, _slicc_hash_step, _slicc_hash_init)
+    #if (is_rt_const(in_addr) || is_ct_const(in_addr) && in_addr > 255)
+        .reg addr
+        move(addr, in_addr)
+        local_csr_wr[ACTIVE_LM_ADDR_0, addr]
+    #else
+        local_csr_wr[ACTIVE_LM_ADDR_0, in_addr]
+    #endif
 
-    _slicc_hash_lm_handle_undef()
+    move(__slicc_hash_tail_mask, in_tail_mask)
 
-    // finalization mix to combine _SLICC_HASH_STATE[0] and _SLICC_HASH_STATE[1]
-    alu[_SLICC_HASH_STATE[(MAX_KEY_LENGTH % 2)], _SLICC_HASH_STATE[((MAX_KEY_LENGTH + 1) % 2)], XOR, _SLICC_HASH_STATE[(MAX_KEY_LENGTH % 2)]], no_cc
-    dbl_shf[_SLICC_HASH_STATE[((MAX_KEY_LENGTH + 1) % 2)], copy, _SLICC_HASH_STATE[((MAX_KEY_LENGTH + 1) % 2)], >>indirect], no_cc
-    alu[_SLICC_HASH_STATE[(MAX_KEY_LENGTH % 2)], _SLICC_HASH_STATE[(MAX_KEY_LENGTH % 2)], +carry, _SLICC_HASH_STATE[((MAX_KEY_LENGTH + 1) % 2)]]
-    alu[_SLICC_HASH_STATE[(MAX_KEY_LENGTH % 2)], --, B, _SLICC_HASH_STATE[(MAX_KEY_LENGTH % 2)], <<rot16], no_cc
-    alu[_SLICC_HASH_STATE[1], _SLICC_HASH_STATE[(MAX_KEY_LENGTH % 2)], +carry, copy]
+    #if (is_ct_const(in_salt) && in_salt > 255)
+        .reg salt
+        move(salt, in_salt)
+        alu[__slicc_hash_state[0], salt, XOR, *n$index++]
+    #else
+        alu[__slicc_hash_state[0], in_salt, XOR, *n$index++]
+    #endif
 
-    local_csr_rd[CRC_REMAINDER]
-    immed[_SLICC_HASH_STATE[0], 0]
+    preproc_jump_targets(__slicc_hash_round, (SLICC_HASH_PAD_SIZE_LW - 2))
+    jump[offset, __slicc_hash_round0#], targets[PREPROC_LIST], defer[3]
+        crc_be[crc_32, __slicc_hash_copy, __slicc_hash_state[0]]
+        alu[__slicc_hash_state[1], __slicc_hash_tail_mask, XOR, *n$index++]
+        load_addr[__slicc_hash_ret_addr, end#]
+
+#if (!is_ct_const(in_len_words))
+overflow#:
+    .reg_addr __slicc_hash_state[0] 3 B
+    immed[__slicc_hash_state[0], 0]
+    .reg_addr __slicc_hash_state[1] 4 B
+    immed[__slicc_hash_state[1], 0]
+#endif
+
+end#:
+    .use __slicc_hash_state[0]
+    .reg_addr out_hash[0] 3 B
+    .set out_hash[0]
+    .use __slicc_hash_state[1]
+    .reg_addr out_hash[1] 4 B
+    .set out_hash[1]
 .end
 #endm
 
+
+#macro slicc_hash_words(out_hash, in_salt, in_addr, in_len_words)
+    slicc_hash_words(out_hash, in_salt, in_addr, in_len_words, 0xffffffff)
+#endm
+
+
+#macro slicc_hash_bytes(out_hash, in_salt, in_addr, in_len_bytes, ENDIAN)
+.begin
+    .reg msk
+    .reg shift
+    .reg words
+
+    #if (streq('ENDIAN', 'LE'))
+        alu[shift, (3 << 3), AND, in_len_bytes, <<3]
+        #if (is_ct_const(in_len_bytes))
+            beq[skip#], defer[2]
+                immed[words, ((in_len_bytes + 3) / 4)]
+        #else
+            beq[skip#], defer[3]
+                alu[words, in_len_bytes, +, 3]
+                alu[words, --, B, words, >>2]
+        #endif
+            alu[msk, shift, ~B, 0]
+        alu[msk, --, ~B, msk, <<indirect]
+        skip#:
+    #elif (streq('ENDIAN', 'BE'))
+        #if (is_ct_const(in_len_bytes))
+            immed[words, ((in_len_bytes + 3) / 4)]
+            immed[shift, (((in_len_bytes + 3) % 4) * 8)]
+        #else
+            alu[words, in_len_bytes, +, 3]
+            alu[shift, (3 << 3), AND, words, <<3]
+            alu[words, --, B, words, >>2]
+        #endif
+        alu[msk, shift, B, 0xff, <<24]
+        asr[msk, msk, >>indirect]
+    #else
+        #error "slicc_hash_bytes(): unknown byte order: " ENDIAN
+    #endif
+
+    slicc_hash_words(out_hash, in_salt, in_addr, words, msk)
+.end
+#endm
+
+
+#macro slicc_hash_bytes(out_hash, in_salt, in_addr, in_len_bytes)
+    slicc_hash_bytes(out_hash, in_salt, in_addr, in_len_bytes, BE)
+#endm
 
 #endif
