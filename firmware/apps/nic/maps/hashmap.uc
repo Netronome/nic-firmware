@@ -730,25 +730,11 @@ ret#:
 	.reg map_type
 
 
-	__hashmap_lm_handles_define()
-	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, lm_key_addr]
-
     hashmap_get_fd(fd, key_lwsz, value_lwsz, key_mask, value_mask, map_type, INVALID_MAP_LABEL)
-
-	alu[HASHMAP_LM_INDEX++, --, b, fd]
-
-	alu[keys_n_tid, 1, +, key_lwsz]
-	alu[bytes, --, b, keys_n_tid, <<2]
-	alu[offset, bytes, +, lm_key_addr]
-	alu[offset, offset, -, 4]
-	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, offset]		; 3 cycles
 
 	local_csr_rd[ACTIVE_CTX_STS]
     immed[my_act_ctx, 0]
     alu_shf[my_act_ctx, my_act_ctx, and, 0x7]
-
-	alu[HASHMAP_LM_INDEX, key_mask, and, HASHMAP_LM_INDEX]
-	__hashmap_lm_handles_undef()
 
     #if (OP == HASHMAP_OP_GETFIRST)
 		immed[ent_index, 0]
@@ -757,7 +743,7 @@ ret#:
     	__hashmap_lock_shared(ent_index, fd, found#, found#)
 		br[found#]
 	#else
-		slicc_hash_words(hash, 0, lm_key_addr, keys_n_tid)
+		slicc_hash_words(hash, fd, lm_key_addr, key_lwsz, key_mask)
     	__hashmap_index_from_hash(hash[0], ent_index)
     	__hashmap_lock_init(ent_state, ent_addr_hi, offset, mu_partition, ent_index)
 		alu[tbl_addr_hi, --, b, ent_addr_hi]
@@ -825,9 +811,7 @@ check_ov#:
 write_tid_key#:
 		__hashmap_write_tid(fd, ent_index)
 write_key#:
-		.reg lm_kaddr
-		alu[lm_kaddr, 4, +, lm_key_addr]
-        __hashmap_write_field(lm_kaddr, key_mask, ent_addr_hi, offset, key_lwsz, endian)
+        __hashmap_write_field(lm_key_addr, key_mask, ent_addr_hi, offset, key_lwsz, endian)
 		__hashmap_set_opt_field(out_ent_lw, 0)
 		alu[bytes, --, b, key_lwsz, <<2]
 		alu[offset, offset, +, bytes]
