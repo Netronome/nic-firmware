@@ -15,8 +15,6 @@ if necessary.
 """
 
 UnitIP_dont_care_cntrs = [
-    "tx_packets",
-    "tx_bytes",
     "dev_tx_bytes",
     "dev_tx_bc_bytes",
     "dev_tx_mc_bytes",
@@ -26,8 +24,6 @@ UnitIP_dont_care_cntrs = [
     "dev_rx_uc_bytes",
     "dev_tx_uc_bytes",
     "hw_tx_csum",
-    "rx_dropped",
-    "rx_bytes",
     "dev_rx_bytes",
     "dev_rx_mc_bytes",
     "dev_rx_bc_bytes",
@@ -36,7 +32,6 @@ UnitIP_dont_care_cntrs = [
     "dev_rx_bc_pkts",
     "dev_rx_pkts",
     "dev_rx_discards",
-    "rx_packets",
     #"rvec_0_rx_pkts",
     #"rvec_0_tx_pkts",
     #"rvec_0_tx_busy",
