@@ -282,7 +282,7 @@ ret#:
 	.reg lm_off
 
 	__hashmap_lm_handles_define()
-	alu[lm_off, 4, +, lm_addr]
+	alu[lm_off, --, b, lm_addr]
 
 	alu[lw_read, --, b, in_wlen]
 	alu[off, --, b, in_addr_lo]
@@ -445,38 +445,6 @@ write_cont#:
 	__hashmap_dbg_print(0x1006, DEBUG_ERR_ID, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++)
 .end
 	__hashmap_lm_handles_undef()
-#endm
-
-#macro __hashmap_dbg_log_key(lm_addr, tag, log_val0, log_val1, log_val2)
-.begin
-	.reg tmp
-	.reg value
-
-	alu[tmp, 8,+, lm_addr]
-	__hashmap_lm_handles_define()
-	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, tmp]
-	nop
-	nop
-	nop
-
-	move(value, 0x271000)
-	alu[tmp, HASHMAP_LM_INDEX, and, value]
-	alu[--, value, -, tmp]
-	bne[next_value#]
-
-do_log#:
-	__hashmap_dbg_print(tag, DEBUG_ERR_ID, HASHMAP_LM_INDEX, log_val0, log_val1, log_val2)
-	br[ret#]
-
-next_value#:
-	move(value, 0x270ff00)
-	alu[tmp, HASHMAP_LM_INDEX, and, value]
-	alu[--, value, -, tmp]
-	beq[do_log#]
-
-ret#:
-	__hashmap_lm_handles_undef()
-.end
 #endm
 
 

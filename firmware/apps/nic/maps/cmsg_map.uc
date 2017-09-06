@@ -256,8 +256,6 @@ ret#:
 	alu[--, bm_idx, or, 0]
 	alu[CMSG_BM_LM_INDEX, CMSG_BM_LM_INDEX, and~, 1, <<indirect]
 
-//		__hashmap_dbg_print(0xf00d, 0, in_tid, bm_idx, CMSG_BM_LM_INDEX)
-
 	cmsg_bm_lm_undef()
 .end
 #endm
@@ -648,16 +646,13 @@ proc_loop#:
 			beq[proc_array_map#]
     		ov_single(OV_LENGTH, CMSG_TXFR_COUNT, OVF_SUBTRACT_ONE) // Length in 32-bit LWs
     		mem[read32_swap, $pkt_data[0], in_addr_hi, <<8, key_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
-			alu[CMSG_KEY_LM_INDEX++, --, b, in_fd]
 			ctx_arb[rd_sig]
 			aggregate_copy(CMSG_KEY_LM_INDEX, ++, $pkt_data, 0, (CMSG_TXFR_COUNT-1))
 			br[proc_loop_cont#]
 proc_array_map#:
     		mem[read32_swap, $pkt_data[0], in_addr_hi, <<8, key_offset, 1], sig_done[rd_sig]
-			alu[CMSG_KEY_LM_INDEX++, --, b, in_fd]
 			ctx_arb[rd_sig]
 			alu[cur_key, --, b, $pkt_data[0]]
-				//__hashmap_dbg_print(0xf00c, 0, cur_key)
 			.if (l_cmsg_type == CMSG_TYPE_MAP_GETFIRST)
 				immed[cur_key, 0]
 				immed[l_cmsg_type, CMSG_TYPE_MAP_ARRAY_GETNEXT]
@@ -681,8 +676,8 @@ proc_loop_cont#:
 			cmsg_lm_handles_undef()
 
 do_op#:
+			swap(le_key, cur_key, NO_LOAD_CC)
 
-			swap(le_key, cur_key, NO_LOAD_CC) 
 			_cmsg_hashmap_op(l_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, key_offset, value_offset, flags, rc, swap, le_key, cur_key)
 
 			alu[key_offset, value_offset, +, 64]
@@ -813,7 +808,7 @@ delete_ov_ent#:
 
 end_loop#:
 
-		immed[$reply[1], CMSG_RC_SUCCESS]			;
+		immed[$reply[1], CMSG_RC_SUCCESS]
 
 ret#:
 		alu[$reply[2], --, b, del_entries]
@@ -853,10 +848,9 @@ ret#:
 		immed[op, CMSG_TYPE_MAP_LOOKUP]
 		alu[$ent_reply[0], --, b, array_lekey]
 		mem[write32, $ent_reply[0], in_addr_hi, <<8, in_key_offset, 1], sig_done[sig_reply_map_ops]
-    	alu[--, --, b, CMSG_KEY_LM_INDEX++]
 		alu[CMSG_KEY_LM_INDEX, --, b, array_bekey]
     	cmsg_lm_handles_undef()
-    	ctx_arb[sig_reply_map_ops]              
+    	ctx_arb[sig_reply_map_ops]
 	.else
 		alu[op, in_op, -, __HASHMAP_OP__]
 	.endif
@@ -980,7 +974,6 @@ reply_keys#:
 	nop
 	nop
 	nop
-	alu[--, --, b, CMSG_KEY_LM_INDEX++]
 	aggregate_copy(CMSG_KEY_LM_INDEX, ++, $ent_reply, 0, _CMSG_FLD_LW_MINUS_1)
 	cmsg_lm_handles_undef()
 
@@ -1042,8 +1035,7 @@ ret#:
 init_loop#:
 	local_csr_wr[ACTIVE_LM_ADDR_/**/CMSG_KEY_LM_HANDLE, lm_key_offset]
 		nop
-		swap(le_key, array_ndx, NO_LOAD_CC)	
-    alu[CMSG_KEY_LM_INDEX++, --, b, in_fd]
+		swap(le_key, array_ndx, NO_LOAD_CC)
 	alu[CMSG_KEY_LM_INDEX++, --, b, le_key]
 
     cmsg_lm_handles_undef()
