@@ -625,6 +625,15 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
         prev_instr = INSTR_CHECKSUM_COMPLETE;
     }
 
+    if (control & NFP_NET_CFG_CTRL_RXCSUM) {
+#ifdef GEN_INSTRUCTION
+        instr[count].instr = instr_tbl[INSTR_RXCSUM];
+#else
+        instr[count].instr = INSTR_RXCSUM;
+#endif
+        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RXCSUM);
+        prev_instr = INSTR_RXCSUM;
+    }
 
 #ifdef GEN_INSTRUCTION
     instr[count].instr = instr_tbl[INSTR_TX_HOST];
