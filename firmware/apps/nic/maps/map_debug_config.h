@@ -36,5 +36,5 @@
 #endif
 
 #ifndef DEBUG_ERR_ID
-	#define DEBUG_ERR_ID    0xf
+	#define DEBUG_ERR_ID    0x0
 #endif

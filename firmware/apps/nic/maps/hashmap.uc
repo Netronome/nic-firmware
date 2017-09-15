@@ -741,12 +741,22 @@ ret#:
 	.reg map_tindex
 	.reg map_type
 
+	__hashmap_lm_handles_define()
 
     hashmap_get_fd(fd, key_lwsz, value_lwsz, key_mask, value_mask, map_type, INVALID_MAP_LABEL)
+	alu[bytes, --, b, key_lwsz, <<2]
+    alu[offset, bytes, +, lm_key_addr]
+    alu[offset, offset, -, 4]
+    local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, offset]      ; 3 cycles
 
 	local_csr_rd[ACTIVE_CTX_STS]
     immed[my_act_ctx, 0]
     alu_shf[my_act_ctx, my_act_ctx, and, 0x7]
+
+	alu[HASHMAP_LM_INDEX, key_mask, and, HASHMAP_LM_INDEX]
+
+	__hashmap_lm_handles_undef()
+
 
     #if (OP == HASHMAP_OP_GETFIRST)
 		immed[ent_index, 0]
