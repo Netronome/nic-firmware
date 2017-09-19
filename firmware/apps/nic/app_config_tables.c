@@ -506,7 +506,7 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_WIRE);
     prev_instr = INSTR_TX_WIRE;
 
-    reg_cp(xwr_instr, (void *)instr, count<<2);
+    reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
 
     /* write TX instr to local table and to other islands too */
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
