@@ -106,8 +106,8 @@
 	/* 128=max keys + max value + cam overflow = 40+24+32+32 */
 	/* 8=lock + tid = 4+4 */
 #define_eval HASHMAP_MAX_ENTRY_SZ    (128)
-#define HASHMAP_MAX_KEYS_SZ          (40)	// camp_hash limit 120 bytes
-#define HASHMAP_MAX_VALU_SZ          (24)
+#define HASHMAP_MAX_KEYS_SZ          (56)	// camp_hash limit 120 bytes
+#define HASHMAP_MAX_VALU_SZ          (56)
 #define HASHMAP_KEYS_VALU_SZ		 (64)	// keys + values
 
 /* bpf_map_type  from linux include/uapi/linux/bpf.h */
@@ -352,6 +352,16 @@
     #endif
 .end
 #endm
+
+#macro __hashmap_calc_value_addr(in_val, in_bytes, out_val)
+.begin
+	.reg tmp
+	alu[out_val, in_val, +, in_bytes]
+	alu[out_val, out_val, +, 7]
+	alu[out_val, out_val, and~, 0x7]
+.end
+#endm
+
 
 #macro hashmap_alloc_fd(in_tid, key_size, value_size, max_entries, ERROR_LABEL, endian, type)
 .begin
@@ -719,7 +729,8 @@ ret#:
 
 
 /*
- * key MUST start at lm_key_addr[1]
+ * key MUST start at lm_key_addr[0]
+ * value addr is 8-byte aligned
  */
 
 #macro hashmap_ops(fd, lm_key_addr, lm_value_addr, OP, INVALID_MAP_LABEL, NOTFOUND_LABEL, RTN_OPT, out_ent_lw, out_ent_tindex, out_ent_addr, endian)
@@ -778,7 +789,7 @@ retry#:
 found#:		/* found entry which matches the key */
 	#if (OP == HASHMAP_OP_LOOKUP)
 		alu[bytes, --, b, key_lwsz, <<2]
-		alu[offset, offset, +, bytes]
+		__hashmap_calc_value_addr(offset, bytes, offset)
 		/* TODO LRU:  set ref flag */
 		__hashmap_set_opt_field(out_ent_lw, value_lwsz)
 		__hashmap_read_field(map_tindex, lm_value_addr, ent_addr_hi, offset, value_lwsz, RTN_OPT, out_ent_addr, out_ent_tindex, endian)
@@ -810,7 +821,7 @@ read_next_key#:
         __hashmap_lock_upgrade(ent_index, ent_state, retry#)
 		__hashmap_set_opt_field(out_ent_lw, 0)
 		alu[bytes, --, b, key_lwsz, <<2]
-		alu[offset, offset, +, bytes]
+		__hashmap_calc_value_addr(offset, bytes, offset)
 		__hashmap_write_field(lm_value_addr, value_mask, ent_addr_hi, offset, value_lwsz, endian)
 		__hashmap_lock_release(ent_index, ent_state)
         br[ret#]
@@ -836,7 +847,7 @@ write_key#:
         __hashmap_write_field(lm_key_addr, key_mask, ent_addr_hi, offset, key_lwsz, endian)
 		__hashmap_set_opt_field(out_ent_lw, 0)
 		alu[bytes, --, b, key_lwsz, <<2]
-		alu[offset, offset, +, bytes]
+		__hashmap_calc_value_addr(offset, bytes, offset)
 		__hashmap_write_field(lm_value_addr, value_mask, ent_addr_hi, offset, value_lwsz, endian)
 		__hashmap_lock_release(ent_index, ent_state)
         br[ret#]

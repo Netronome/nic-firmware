@@ -433,16 +433,29 @@ write_cont#:
 
 #macro __hashmap_dump_lm(lm_off)
 .begin
+	.reg dbg_isl
+	.reg dbg_meid
+	.reg dbg_stack_addr
+	.reg dbg_ctx
+	.reg dbg_act
+
+    local_csr_rd[ACTIVE_CTX_STS]
+    immed[dbg_act, 0]
+    alu_shf[dbg_ctx, dbg_act, and, 0x7]
+
 	__hashmap_lm_handles_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/HASHMAP_LM_HANDLE, lm_off]
-	nop
-	nop
-	nop
+	alu_shf[dbg_meid, 0xB, and, dbg_act, >>3]
+	alu_shf[dbg_isl, 0x3f, and, dbg_act, >>25]
+
+	__hashmap_dbg_print(0x1001, 0, dbg_isl, dbg_act, lm_off)
+
 	__hashmap_dbg_print(0x1002, DEBUG_ERR_ID, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++)
 	__hashmap_dbg_print(0x1003, DEBUG_ERR_ID, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++)
 	__hashmap_dbg_print(0x1004, DEBUG_ERR_ID, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++)
 	__hashmap_dbg_print(0x1005, DEBUG_ERR_ID, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++)
 	__hashmap_dbg_print(0x1006, DEBUG_ERR_ID, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++)
+
 .end
 	__hashmap_lm_handles_undef()
 #endm
