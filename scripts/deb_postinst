@@ -49,12 +49,16 @@ process_dkms() {
                 ret=$?
                 if [ $ret -ne 0 ]; then
                     ret=$ERR_DKMS_BUILD
+                    # NIC-305 Rollback changes when anything fails here
+                    dkms remove -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION"
                 else
                     dkms install -m "$DKMS_MODULE_NAME" -v \
                         "$DKMS_MODULE_VERSION" -k $kernel
                     ret=$?
                     if [ $ret -ne 0 ]; then
                         ret=$ERR_DKMS_INSTALL
+                        # NIC-305 Rollback changes when anything fails here
+                        dkms remove -m "$DKMS_MODULE_NAME" -v "$DKMS_MODULE_VERSION"
                     fi
                     kernel_array[kernel_count]=$kernel
                     let "kernel_count= $kernel_count + 1"
