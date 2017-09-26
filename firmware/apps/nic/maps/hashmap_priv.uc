@@ -448,7 +448,7 @@ write_cont#:
 	alu_shf[dbg_meid, 0xB, and, dbg_act, >>3]
 	alu_shf[dbg_isl, 0x3f, and, dbg_act, >>25]
 
-	__hashmap_dbg_print(0x1001, 0, dbg_isl, dbg_act, lm_off)
+	__hashmap_dbg_print(0x1001, 0, dbg_isl, dbg_meid, lm_off)
 
 	__hashmap_dbg_print(0x1002, DEBUG_ERR_ID, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++)
 	__hashmap_dbg_print(0x1003, DEBUG_ERR_ID, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++, HASHMAP_LM_INDEX++)

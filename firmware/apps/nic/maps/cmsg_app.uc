@@ -53,17 +53,14 @@ cmsg_init()
     immed[my_act_ctx, 0]
     alu[my_act_ctx, my_act_ctx, and, 7]
 
-		//__hashmap_dbg_print(0x1001, 0, ctx_num)
-
 main_loop#:
-	//ctx_sig_next()
+	ctx_sig_next()
     cmsg_rx()
 	alu[@cmsg_rx_cntr, 1, +, @cmsg_rx_cntr]
     local_csr_wr[MAILBOX0, @cmsg_rx_cntr]
 		//__hashmap_dbg_print(0x1002, 0, ctx_num)
 
 	ctx_arb[g_ordersig]
-	ctx_sig_next()
     br[main_loop#]
 
 done#:

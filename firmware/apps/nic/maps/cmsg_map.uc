@@ -103,7 +103,7 @@
     #undef CMSG_BM_LM_INDEX
 #endm
 
-#define CMSG_LM_FIELD_SZ	64
+#define CMSG_LM_FIELD_SZ	(CMSG_MAP_KEY_VALUE_LW * 4)
 #define_eval CMSG_LM_FIELD_SZ_SHFT	(LOG2(CMSG_LM_FIELD_SZ))
 #define MAP_CMSG_IN_WQ_SZ	4096
 
@@ -131,12 +131,12 @@
 	.alloc_mem MAP_CMSG_Q_DBG_BASE emem global MAP_CMSG_IN_WQ_SZ MAP_CMSG_IN_WQ_SZ
 	.init_mu_ring MAP_CMSG_Q_DBG_IDX MAP_CMSG_Q_DBG_BASE 0
 
-	.alloc_mem LM_CMSG_BASE	lm me (NUM_CONTEXT * (CMSG_LM_FIELD_SZ * 2)) 8
-	.init LM_CMSG_BASE 0
-
 	#define CMSG_NUM_FD_BM_LW	((HASHMAP_MAX_TID_EBPF+31)/32)
 	.alloc_mem LM_CMSG_FD_BITMAP lm me (CMSG_NUM_FD_BM_LW * 4) 8
 	.init LM_CMSG_FD_BITMAP 0
+
+	.alloc_mem LM_CMSG_BASE	lm me (NUM_CONTEXT * (CMSG_LM_FIELD_SZ * 4)) 8
+	.init LM_CMSG_BASE 0
 
 	.reg volatile read $map_rxfr[HASHMAP_RXFR_COUNT]
 	.xfer_order $map_rxfr
@@ -186,7 +186,8 @@
 #macro cmsg_lm_ctx_addr(out_lm_fld1,out_lm_fld2, in_ctx)
 .begin
 	.reg lm_off
-	#define_eval __LM_CTX_SZ_SHFT__    (LOG2(CMSG_LM_FIELD_SZ * 2))
+		/* 4 context mode */
+	#define_eval __LM_CTX_SZ_SHFT__    (LOG2(CMSG_LM_FIELD_SZ))
 	immed[out_lm_fld1, LM_CMSG_BASE]
 	alu[lm_off, --, b, in_ctx, <<__LM_CTX_SZ_SHFT__]
 	alu[out_lm_fld1, out_lm_fld1, +, lm_off]
@@ -209,14 +210,14 @@
 	immed[count, CMSG_NUM_FD_BM_LW]
 	immed[out_tid, 0]
 	immed[bm_offset, 0]
-	nop
 
 loop#:
 		alu[bitmap, --, ~b, CMSG_BM_LM_INDEX]
 		beq[next#]				; no free slots
 		ffs[bm_idx, bitmap]
 		alu[--, bm_idx, or, 0]
-		alu[CMSG_BM_LM_INDEX, CMSG_BM_LM_INDEX, or, 1, <<indirect]
+		alu[bitmap, CMSG_BM_LM_INDEX, or, 1, <<indirect]
+		alu[CMSG_BM_LM_INDEX, --, b, bitmap]
 		alu[bm_idx, bm_idx, +, 1]
 		alu[out_tid, bm_idx, +, bm_offset]
 		br[ret#]
