@@ -910,9 +910,9 @@ ret#:
 	.reg rtnB1
 	.reg_addr rtnB1 1 B
 	.set rtnB1
-	.reg htab_value_addr_lo
-	.reg_addr htab_value_addr_lo 1 A
-	.set htab_value_addr_lo
+	.reg htab_value_addr_hi
+	.reg_addr htab_value_addr_hi 1 A
+	.set htab_value_addr_hi
 	.reg htab_in_tid
 	.reg_addr htab_in_tid 0 A
 	.set htab_in_tid
@@ -941,10 +941,10 @@ htab_lookup_not_found#:
 	#pragma warning(push)
 	#pragma warning(disable: 5186) //disable warning "gpr_wrboth is experimental"
 	.reg_addr ebpf_rc 0 A
-	alu[ebpf_rc, --, b, out_addr[0]], gpr_wrboth
+	alu[ebpf_rc, --, b, out_addr[1]], gpr_wrboth
 
-	.reg_addr htab_value_addr_lo 1 A
-	alu[htab_value_addr_lo, --, b, out_addr[1]], gpr_wrboth
+	.reg_addr htab_value_addr_hi 1 A
+	alu[htab_value_addr_hi, --, b, out_addr[0]], gpr_wrboth
 	#pragma warning (pop)
 
 ret#:
@@ -953,7 +953,7 @@ ret#:
 	#pragma warning(disable: 5116) 	// disable warning "Return register may not contain valid addr"
 		.use htab_return_addr
 		.use ebpf_rc
-		.use htab_value_addr_lo
+		.use htab_value_addr_hi
 		.use rtnB1
 		rtn[rtn_addr]
 	#pragma warning(pop)
