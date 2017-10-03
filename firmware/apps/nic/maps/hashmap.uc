@@ -756,7 +756,6 @@ ret#:
 
 	__hashmap_lm_handles_undef()
 
-
     #if (OP == HASHMAP_OP_GETFIRST)
 		immed[ent_index, 0]
     	__hashmap_lock_init(ent_state, ent_addr_hi, offset, mu_partition, ent_index)
