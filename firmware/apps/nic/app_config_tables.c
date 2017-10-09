@@ -249,6 +249,29 @@ upd_nn_table_instr(__xwrite uint32_t *xwr_instr, uint32_t start_offset,
     }
 }
 
+__intrinsic void
+init_nn_tables()
+{
+    SIGNAL sig;
+    uint32_t i, j;
+    union ct_nn_write_format command;
+    __xwrite uint32_t xwr_nn_info[16] = { 0 };
+
+    command.value = 0;
+    command.sig_num = 0x0;
+    command.addr_mode = CT_ADDR_MODE_ABSOLUTE;
+
+    for (i = 0; i < 128; i += 16) {
+        command.NN_reg_num = i;
+        for (j = 0; j < sizeof(cfg_mes_ids)/sizeof(uint32_t); j++) {
+            command.remote_isl = cfg_mes_ids[j] >> 4;
+            command.master = cfg_mes_ids[j] & 0x0f;
+            ct_nn_write(xwr_nn_info, &command, 16, ctx_swap, &sig);
+        }
+    }
+    return;
+}
+
 
 /* Update RX wire instr -> one table entry per NBI queue/port */
 __intrinsic void
@@ -360,6 +383,10 @@ upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base,
                     sizeof(xrd_rss_tbl));
 
     for (i = 0; i < NFP_NET_CFG_RSS_ITBL_SZ_wrd; i++) {
+        if ((xrd_rss_tbl[i] & 0xff) >= NFD_MAX_PF_QUEUES) continue;
+        if (((xrd_rss_tbl[i] >> 8) & 0xff) >= NFD_MAX_PF_QUEUES) continue;
+        if (((xrd_rss_tbl[i] >> 16) & 0xff) >= NFD_MAX_PF_QUEUES) continue;
+        if (((xrd_rss_tbl[i] >> 24) & 0xff) >= NFD_MAX_PF_QUEUES) continue;
         xwr_nn_info[i] = xrd_rss_tbl[i];
     }
 

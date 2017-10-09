@@ -376,6 +376,8 @@ cfg_changes_loop(void)
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
     nic_local_init(0, 0);		/* dummy regs right now */
 
+    sleep(1000000); // wait for NN registers to come up in reflect mode
+    init_nn_tables();
     upd_slicc_hash_table();
 
     for (;;) {
