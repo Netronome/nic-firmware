@@ -42,4 +42,9 @@ void app_config_port(unsigned int vnic_port, unsigned int control,
  */
 void app_config_port_down(unsigned int vnic_port);
 
+/**
+ * Initialize app ME NN registers
+ */
+void init_nn_tables();
+
 #endif /* _APP_CONFIG_TABLES_H_ */
