@@ -26,7 +26,8 @@ from netro.testinfra.nrt_result import NrtResult
 from netro.testinfra.system import cmd_log
 from netro.tests.ping import Ping
 from libs.pcap_cmp import Pcap_Cmp_BaseTest
-from netro.testinfra.nti_exceptions import NtiTimeoutError, NtiGeneralError
+from netro.testinfra.nti_exceptions import NtiTimeoutError, NtiGeneralError, \
+    NtiError
 from netro.testinfra.log import LOG_exception
 from expect_cntr_list import UnitIP_dont_care_cntrs, RingSize_ethtool_rx_cntr
 from ...common_test import CommonTest
@@ -1330,7 +1331,7 @@ class LinkState(Test):
         if port_id_list:
             port_id = int(port_id_list[0])
         else:
-            NtiGeneralError("Cannot find the port_id using MAC")
+            raise NtiError("Cannot find the port_id using MAC")
         _, out = self.src.cmd('nfp-media')
         #Assuming that when we use breakout cable, we use it in all ports
         re_no_boc_str = 'phy0=\d+G'
@@ -1341,8 +1342,7 @@ class LinkState(Test):
         elif re.findall(re_boc_str, out):
             with_boc = True
         else:
-            NtiGeneralError("Cannot find the breakout cable setup using "
-                            "nfp-media")
+            raise NtiError("Cannot find the breakout cable setup using nfp-media")
         # Look up chip model in nfp-hwinfo and determine "SerDes family,
         # SerDes family land" (NIC-52)
         hydrogen_str = 'AMDA0081'
@@ -1364,7 +1364,7 @@ class LinkState(Test):
                 sd_family = port_id
                 sd_family_lane = 0
         else:
-            NtiGeneralError("Cannot find supported chip model in nfp-hwinfo")
+            raise NtiError("Cannot find supported chip model in nfp-hwinfo")
 
         ip_cmd = 'ip addr show dev %s' % self.src_ifn
         self.src.cmd(ip_cmd)
@@ -1659,7 +1659,7 @@ class RSStest_same_l4_tuple(Test):
             self.port_id = int(port_id_list[0])
             self.rss_key = self.rss_keys[self.port_id]
         else:
-            NtiGeneralError("Cannot find the port_id using MAC")
+            raise NtiError("Cannot find the port_id using MAC" + dst_mac)
 
         return
 
