@@ -1,0 +1,19 @@
+diff -r 4617188a5091 me/blocks/vnic/nfd_common.h
+--- a/me/blocks/vnic/nfd_common.h	Wed Jul 19 19:45:30 2017 -0400
++++ b/me/blocks/vnic/nfd_common.h	Mon Oct 09 16:04:17 2017 -0700
+@@ -45,12 +45,10 @@
+  * (e.g. a new feature flag).  Reset minor version number to zero for each
+  * major version number change. */
+ #if (defined(NFD_NET_APP_ID_FORCE_CHK) || defined(NFD_USE_CTRL))
+-/* Firmwares using CTRL vNICs need an app_id and must use ABI 5
+- * Firmwares that advertise an app_id but don't use CTRL vNICs
+- * may choose whether to advertise ABI 5 */
+-    #define NFD_CFG_MAJOR_PF            5
++/* Kernel appears happy to consume CTRL vNICs with ABI3 */
++    #define NFD_CFG_MAJOR_PF            3
+     #define NFD_CFG_MAJOR_CTRL          5
+-    #define NFD_CFG_MAJOR_VF_MAX        5
++    #define NFD_CFG_MAJOR_VF_MAX        3
+ #else
+     #define NFD_CFG_MAJOR_PF            4
+     #define NFD_CFG_MAJOR_CTRL          4
