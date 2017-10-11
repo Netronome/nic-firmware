@@ -17,10 +17,10 @@ Q ?= @
 
 HG_USERNAME ?= $(shell whoami)
 
-#Firmware name
-BPF ?= $(shell echo "bpf")
+#Firmware version 
+FW_VER ?= $(shell git rev-parse --abbrev-ref HEAD | cut -c1-6)
 #git SHA tag (first 7 characters)
-GIT_TAG = $(shell git rev-parse HEAD | cut -c1-7)
+GIT_TAG = $(shell git rev-parse HEAD | cut -c1-6)
 #Add a "+" if building with un-committed/un-added changes
 GIT_DIFF_UNC=
 ifneq ($(shell git diff --name-only),)
