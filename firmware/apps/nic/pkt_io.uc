@@ -2,6 +2,7 @@
 #define _PKT_IO_UC
 
 #include <bitfields.uc>
+#include <timestamp.uc>
 
 #include <nfd_user_cfg.h>
 
@@ -15,6 +16,7 @@ nfd_out_send_init()
 .if (ctx() == 0)
     gro_cli_declare()
     gro_cli_init()
+    timestamp_enable()
 .endif
 
 #include "pv.uc"
@@ -136,8 +138,8 @@ nbi_dispatch#:
 
 wait_nfd_priority#:
     ctx_arb[__pkt_io_sig_epoch, __pkt_io_sig_nbi, __pkt_io_sig_nfd, __pkt_io_sig_nfd_retry], any
-    br_signal[__pkt_io_sig_epoch, wait_nfd_priority#]
     br_signal[__pkt_io_sig_nfd_retry, nfd_dispatch#]
+    br_signal[__pkt_io_sig_epoch, wait_nfd_priority#]
 
 clear_sig_rx_nfd#:
     br_!signal[__pkt_io_sig_nfd, clear_sig_rx_nbi#] // __pkt_io_sig_nbi is asserted
@@ -162,8 +164,8 @@ nfd_dispatch#:
 
 wait_nbi_priority#:
     ctx_arb[__pkt_io_sig_epoch, __pkt_io_sig_nbi, __pkt_io_sig_nfd, __pkt_io_sig_nfd_retry], any
-    br_signal[__pkt_io_sig_epoch, wait_nbi_priority#]
     br_signal[__pkt_io_sig_nfd_retry, nfd_dispatch#]
+    br_signal[__pkt_io_sig_epoch, wait_nbi_priority#]
 
 clear_sig_rx_nbi#:
     br_!signal[__pkt_io_sig_nbi, clear_sig_rx_nfd#] // __pkt_io_sig_nfd is asserted
