@@ -1,0 +1,79 @@
+#!/bin/sh -e
+
+# Copyright (C) 2017 Netronome Systems, Inc. All rights reserved.
+
+# This script is expected to be used with a udev rule such as the following:
+# ACTION=="add", SUBSYSTEM=="net", DRIVERS=="nfp*", IMPORT{program}="/lib/udev/nfp-port-name-gen %k"
+
+# NOTE: The udev rule needs to be prioritized higher in the priority chain
+# than 80-net-name-slot.rules.
+
+# This script is partly based on phys-port-name-gen shipped with RHEL 7.4+
+# This script depends on:
+#     sh, cat, tr
+
+SYSPATH="/sys/class/net/$1"
+PEER_PATH="${SYSPATH}/device/net/"
+DEV_ID=`cat ${SYSPATH}/dev_id`
+PHYS_PORT_NAME=`cat ${SYSPATH}/phys_port_name`
+ADDR=`cat ${SYSPATH}/address`
+
+# If ID_NET_NAME_MAC doesn't exist, then this is the PF netdev.
+if [ -z "${ID_NET_NAME_MAC}" ]; then
+    exit 0
+fi
+
+if [ -z "${PHYS_PORT_NAME}" ]; then
+    # If the PHYS_PORT_NAME field doesn't exist, we determine the suffix by
+    # looking for the smallest MAC address allocated to the PF. Subtracting
+    # that from the current netdev MAC address will yield a monotonically
+    # increasing index.
+    # e.g. p0, p1, p2 etc.
+
+    # NOTE: If the PHYS_PORT_NAME attribute is available, that will indicate
+    # sub-ports with an additional sX suffix. However, the MAC method below
+    # cannot differentiate between sub-ports. Thus, there will be a discrepancy
+    # in netdev naming when using breakout mode.
+    # This is not expected to be an issue since our RHEL/CentOS 7.4
+    # has no way to set breakout mode without installing the out of tree
+    # kernel module.
+    MIN_NUM_PADDR=$(printf "%u" 0xffffffffffff)
+    for PEER in ${PEER_PATH}/*; do
+        NUM_PADDR=$(printf "%u" 0x$(cat "${PEER}/address" 2>/dev/null | tr -d ":"))
+        if [ ${NUM_PADDR} -gt 0 -a ${NUM_PADDR} -lt ${MIN_NUM_PADDR} ]; then
+            MIN_NUM_PADDR=${NUM_PADDR}
+        fi
+    done
+    NUM_ADDR=$(printf "%u" 0x$(echo "${ADDR}" | tr -d ":"))
+    STRIDE=$((NUM_ADDR-MIN_NUM_PADDR))
+    PHYS_PORT_NAME="p$STRIDE"
+fi
+
+# From here on, we fall back to phys-port-name-gen
+
+# On-board index based names
+if [ -n "${ID_NET_NAME_ONBOARD}" ]; then
+    ID_NET_NAME_ONBOARD="${ID_NET_NAME_ONBOARD%d${DEV_PORT}}n${PHYS_PORT_NAME}"
+fi
+
+if [ -n "${DEV_ID}" ]; then
+    DEV_ID=$(printf "%u" "${DEV_ID}")
+    if [ "${DEV_ID}" -eq "0" ] && [ -n "${DEV_PORT}" ]; then
+        # dev_port is decimal string, but we have a bug in net_id and we convert it to integer using base 16
+        DEV_ID=$(printf "%u" "0x${DEV_PORT}")
+    fi
+fi
+
+# PCI hot plug slot number based names
+if [ -n "${ID_NET_NAME_SLOT}" ]; then
+    ID_NET_NAME_SLOT="${ID_NET_NAME_SLOT%d${DEV_ID}}n${PHYS_PORT_NAME}"
+fi
+
+# PCI path based names
+if [ -n "${ID_NET_NAME_PATH}" ]; then
+    ID_NET_NAME_PATH="${ID_NET_NAME_PATH%d${DEV_ID}}n${PHYS_PORT_NAME}"
+fi
+
+[ -n "${ID_NET_NAME_ONBOARD}" ] && echo "ID_NET_NAME_ONBOARD=${ID_NET_NAME_ONBOARD}"
+[ -n "${ID_NET_NAME_SLOT}" ] && echo "ID_NET_NAME_SLOT=${ID_NET_NAME_SLOT}"
+[ -n "${ID_NET_NAME_PATH}" ] && echo "ID_NET_NAME_PATH=${ID_NET_NAME_PATH}"
