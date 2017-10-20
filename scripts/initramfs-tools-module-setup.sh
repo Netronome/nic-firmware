@@ -23,6 +23,9 @@ for FILE in `find /lib/firmware/netronome -maxdepth 1 -name *.nffw`; do
     copy_exec $TARGET /lib/firmware/netronome/
 done
 
+copy_exec /lib/udev/rules.d/*netronome.udev.rules /lib/udev/rules.d/
+copy_exec /lib/udev/nfp-port-name-gen /lib/udev/
+
 # Add NFP kernel module
 manual_add_modules nfp
 

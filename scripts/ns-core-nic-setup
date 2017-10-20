@@ -305,10 +305,6 @@ function setup_nic() {
     err47_check || return
     # verify nfp is loaded
     check_and_load_driver || return
-    # remove udev file
-    clean_udev
-    # write udev rules based on current platform
-    write_udev || return
     # create symlink for PMD
     process_platform
     # select nfp over nfp_uio
@@ -414,8 +410,7 @@ case "$1" in
         boot_nic || exit
         ;;
     "clean")
-        # remove udev/depmod file
-        clean_udev
+        # remove depmod file
         clean_depmod
         ;;
     "force")
