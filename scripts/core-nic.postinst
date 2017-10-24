@@ -276,7 +276,7 @@ attempted=0
 failed=0
 for KERNEL in $KERNELS; do
     attempted=$((attempted+1))
-    dkms remove -m $NAME -v $VERSION -k $KERNEL $ARCH || :
+    dkms remove -m $NAME -v $VERSION -k $KERNEL $ARCH 2>/dev/null || :
     dkms --force install -m $NAME -v $VERSION -k $KERNEL $ARCH || failed=$((failed+1))
 done
 if [ "$attempted" = "$failed" ]; then
