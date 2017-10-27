@@ -7,7 +7,7 @@ dkms status | while read line[i];
             nfp_net_name=$(echo $line | cut -d "," -f 1)
             nfp_net_ver=$(echo $line | cut -d "," -f 2)
             kernel_ver=$(echo $line | cut -d "," -f 3)
-            dkms remove -m  $nfp_net_name -v $nfp_net_ver -k $kernel_ver
+            dkms remove -m  $nfp_net_name -v $nfp_net_ver -k $kernel_ver 2>/dev/null || :
         fi
     done
 
