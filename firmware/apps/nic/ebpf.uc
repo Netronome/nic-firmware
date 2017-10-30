@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   ebpf.uc
+ * @brief  Action handler for eBPF execution.
+ */
+
 #ifndef _EBPF_UC
 #define _EBPF_UC
 

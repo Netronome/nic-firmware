@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   gro_cfg.uc
+ * @brief  Configuration for global reorder blocks.
+ */
+
 #ifndef __GRO_CFG_UC
 #define __GRO_CFG_UC
 

@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   action.uc
+ * @brief  Action interpreter and core NIC data plane actions.
+ */
+
 #ifndef _ACTIONS_UC
 #define _ACTIONS_UC
 

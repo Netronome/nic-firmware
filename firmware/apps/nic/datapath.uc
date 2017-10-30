@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   datapath.uc
+ * @brief  Main processing loop for general purpose datapath workers.
+ */
+
 #include "global.uc"
 
 #include <nic_basic/nic_stats.h>

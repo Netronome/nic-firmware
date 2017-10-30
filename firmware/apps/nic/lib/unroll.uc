@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   unroll.uc
+ * @brief  Microcode library for explicit loop unrolling.
+ */
+
 #ifndef _UNROLL_
 #define _UNROLL_
 

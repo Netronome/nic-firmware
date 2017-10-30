@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   pkt_buf.uc
+ * @brief  Packet buffer management library.
+ */
+
 #ifndef _PKT_BUF_UC
 #define _PKT_BUF_UC
 

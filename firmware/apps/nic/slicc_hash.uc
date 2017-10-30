@@ -1,4 +1,10 @@
-// Stereoscopic Locomotive Interleaved Cryptographic CRC Hash
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file  slicc_hash.uc
+ * @brief Stereoscopic Locomotive Interleaved Cryptographic CRC Hash
+ */
+
 #ifndef _SLICC_HASH
 #define _SLICC_HASH
 
