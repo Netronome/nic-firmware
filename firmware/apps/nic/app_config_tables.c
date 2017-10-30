@@ -1,9 +1,8 @@
 /*
- * Copyright 2014-2017 Netronome, Inc.
+ * Copyright 2017 Netronome Systems, Inc. All rights reserved.
  *
- * @file          app_master_main.c
- * @brief         Providing configuration information from PCIe to worker
- *                MEs in a instruction table format.
+ * @file  app_config_tables.c
+ * @brief Control plane management component for datapath action interpreter.         
  *
  * This implementation only handles one PCIe isl.
  */

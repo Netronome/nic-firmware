@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ */
+
 #include <nfp_chipres.h>
 #include <nfp/mem_ring.h>
 #include "slicc_hash.h"

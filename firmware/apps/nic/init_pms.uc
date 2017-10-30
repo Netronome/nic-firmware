@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
  *
+ * @file  init_pms.uc
+ * @brief Initialization of packet modifier indirect scripts.
  */
 
 #ifndef _INIT_PMS_UC_

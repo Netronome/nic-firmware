@@ -1,3 +1,9 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   global.uc
+ * @brief  Global data plane initialization.
+ */
 
 /* Optimization and simplifying assumptions */
 // - 4 CTX mode

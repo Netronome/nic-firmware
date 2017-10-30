@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   pv.uc
+ * @brief  Packet state and metadata management. Also provides packet read access abstraction.
+ */
+
 #ifndef _PACKET_VECTOR_UC
 #define _PACKET_VECTOR_UC
 

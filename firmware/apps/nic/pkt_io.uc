@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   pkt_io.uc
+ * @brief  Libraries for packet reception and transmission.
+ */
+
 #ifndef _PKT_IO_UC
 #define _PKT_IO_UC
 
