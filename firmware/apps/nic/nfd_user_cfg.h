@@ -14,6 +14,8 @@
 
 #include <platform.h>
 
+#define NFD_USE_OVERSUBSCRIPTION
+
 #if NS_PLATFORM_NUM_PORTS > 1
 #if NS_PLATFORM_NUM_PORTS > 8  /* NS_PLATFORM_NUM_PORTS > 8 */
 
@@ -60,7 +62,7 @@
 #endif
 
 #ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       32
+#define NFD_MAX_PF_QUEUES       64
 #endif
 
 #ifndef NFD_MAX_PFS
@@ -79,11 +81,11 @@
 #define NFD_VNIC_VF
 
 /* Use a service ME which will handle MSIX generation when enabled */
-#define USE_SVC_ME
+//#define USE_SVC_ME
 
 #define NFD_PCIE0_EMEM          emem0
 
-#define NFD_IN_DATA_OFFSET      64
+#define NFD_IN_DATA_OFFSET      128
 
 /* Number of credits allocated per VNIC queue */
 #ifndef NFD_QUEUE_CREDITS
@@ -93,26 +95,23 @@
 /* Configuration mechanism defines */
 #define NFD_CFG_MAX_MTU         9216
 
-#define NFD_CFG_VF_CAP                                          \
-    (NFP_NET_CFG_CTRL_ENABLE | NFP_NET_CFG_CTRL_PROMISC |       \
-     NFP_NET_CFG_CTRL_L2BC | NFP_NET_CFG_CTRL_L2MC |            \
-     NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
-     NFP_NET_CFG_CTRL_RXVLAN | NFP_NET_CFG_CTRL_TXVLAN |        \
-     NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
-     NFP_NET_CFG_CTRL_GATHER |      \
-     NFP_NET_CFG_CTRL_IRQMOD | NFP_NET_CFG_CTRL_LSO |           \
-     NFP_NET_CFG_CTRL_VXLAN  | NFP_NET_CFG_CTRL_NVGRE)
+#define NFD_CFG_VF_CAP                                            \
+    (NFP_NET_CFG_CTRL_ENABLE   | NFP_NET_CFG_CTRL_PROMISC |       \
+     NFP_NET_CFG_CTRL_RXCSUM   | NFP_NET_CFG_CTRL_TXCSUM |        \
+     NFP_NET_CFG_CTRL_RSS      | NFP_NET_CFG_CTRL_RSS2 |          \
+     NFP_NET_CFG_CTRL_MSIXAUTO | NFP_NET_CFG_CTRL_CSUM_COMPLETE | \
+     NFP_NET_CFG_CTRL_GATHER   | NFP_NET_CFG_CTRL_LSO2 |          \
+     NFP_NET_CFG_CTRL_IRQMOD)
 
-#define NFD_CFG_PF_CAP                                          \
-    (NFP_NET_CFG_CTRL_ENABLE | NFP_NET_CFG_CTRL_PROMISC |       \
-     NFP_NET_CFG_CTRL_L2BC | NFP_NET_CFG_CTRL_L2MC |            \
-     NFP_NET_CFG_CTRL_RXCSUM | NFP_NET_CFG_CTRL_TXCSUM |        \
-     NFP_NET_CFG_CTRL_RXVLAN | NFP_NET_CFG_CTRL_TXVLAN |        \
-     NFP_NET_CFG_CTRL_RSS    | NFP_NET_CFG_CTRL_MSIXAUTO |      \
-     NFP_NET_CFG_CTRL_GATHER |      \
-     NFP_NET_CFG_CTRL_IRQMOD | NFP_NET_CFG_CTRL_LSO |           \
-     NFP_NET_CFG_CTRL_VXLAN  | NFP_NET_CFG_CTRL_NVGRE |         \
-     NFP_NET_CFG_CTRL_LIVE_ADDR)
+#define NFD_CFG_PF_CAP                                            \
+    (NFP_NET_CFG_CTRL_ENABLE   | NFP_NET_CFG_CTRL_PROMISC |       \
+     NFP_NET_CFG_CTRL_RXCSUM   | NFP_NET_CFG_CTRL_TXCSUM |        \
+     NFP_NET_CFG_CTRL_RSS      | NFP_NET_CFG_CTRL_RSS2 |          \
+     NFP_NET_CFG_CTRL_MSIXAUTO | NFP_NET_CFG_CTRL_CSUM_COMPLETE | \
+     NFP_NET_CFG_CTRL_GATHER   | NFP_NET_CFG_CTRL_LSO2 |          \
+     NFP_NET_CFG_CTRL_IRQMOD   | NFP_NET_CFG_CTRL_BPF)
+
+#define NFD_RSS_HASH_FUNC NFP_NET_CFG_RSS_CRC32
 
 #define NFD_CFG_RING_EMEM       emem0
 
@@ -128,11 +127,11 @@
 
 
 /* PCI.IN block defines */
-#define NFD_IN_BLM_REG_BLS      0
-#define NFD_IN_BLM_REG_POOL     BLM_NBI8_BLQ0_EMU_QID
+#define NFD_IN_BLM_REG_BLS      1
+#define NFD_IN_BLM_REG_POOL     BLM_NBI8_BLQ1_EMU_QID
 #define NFD_IN_BLM_REG_SIZE     (10 * 1024)
-#define NFD_IN_BLM_JUMBO_BLS    0
-#define NFD_IN_BLM_JUMBO_POOL   BLM_NBI8_BLQ0_EMU_QID
+#define NFD_IN_BLM_JUMBO_BLS    1
+#define NFD_IN_BLM_JUMBO_POOL   BLM_NBI8_BLQ1_EMU_QID
 #define NFD_IN_BLM_JUMBO_SIZE   (10 * 1024)
 #define NFD_IN_BLM_RADDR        __LoadTimeConstant("__addr_emem0")
 #define NFD_IN_HAS_ISSUE0       1
@@ -150,6 +149,9 @@
 #define NFD_IN_ADD_SEQN
 #define NFD_IN_NUM_WQS          1
 
+#define NFD_IN_NUM_SEQRS        2
+#define NFD_IN_SEQR_QSHIFT      0
+
 /* PCI.OUT block defines */
 #define NFD_OUT_BLM_POOL_START  BLM_NBI8_BLQ0_EMU_QID
 #define NFD_OUT_BLM_RADDR       __LoadTimeConstant("__addr_emem0")
@@ -164,8 +166,25 @@
  * that might be issued at any time. */
 #define NFD_OUT_RING_SZ         (2 * 16 * 64 * NFD_QUEUE_CREDITS)
 
-#define NFD_OUT_RX_OFFSET       NFP_NET_RX_OFFSET
+#define NFD_OUT_RX_OFFSET       NFP_NET_CFG_RX_OFFSET_DYNAMIC
 
-#define NFD_RSS_HASH_FUNC NFP_NET_CFG_RSS_TOEPLITZ
+#define NFD_BPF_CAPABLE         1
+#define NFD_BPF_START_OFF       2048
+#define NFD_BPF_MAX_LEN         3072
+#define NFD_BPF_DONE_OFF        1
+#define NFD_BPF_CAPS            NFP_NET_BPF_CAP_RELO
+#define NFD_BPF_ABI             2
+#define NFD_BPF_STACK_SZ        512
+
+#define NFD_NET_APP_ID		(1)
+
+/* enable cmsg */
+#define NFD_USE_CTRL
+
+/* # of PFs + ctrl vnic */
+#define NVNICS (NFD_MAX_PFS + NFD_MAX_CTRL)
+
+#define NFD_OUT_FL_BUFS_PER_QUEUE      1024
+#define NFD_PCIE0_FL_CACHE_MEM         emem0_cache_upper
 
 #endif /* !_NFD_USER_CFG_H_ */

@@ -27,6 +27,7 @@
 
 #include "nfd_user_cfg.h"
 #include "nic.h"
+#include "app_config_tables.h"
 
 /* default options */
 #ifndef CFG_RX_CSUM_PREPEND
@@ -100,6 +101,7 @@ proc_from_wire(int port)
     pkt_hdrs_read(pkt_start, offset,
                   pkt_cache, offset + PKT_START_OFF, &hdrs, &encap, 0,
                   vxlan_ports);
+
     /* Perform checks & filtering */
     err = nic_rx_l2_checks(port, &hdrs.o_eth.src, &hdrs.o_eth.dst);
     if (err)
@@ -138,7 +140,7 @@ proc_from_wire(int port)
         sa = &hdrs.o_eth.src;
         da = &hdrs.o_eth.dst;
     }
-    
+
     /* RSS */
     rss_flags = 0;
     if (hdrs.present & HDR_O_IP4)
@@ -163,7 +165,7 @@ proc_from_wire(int port)
         if (hdrs.present & HDR_I_UDP)
             rss_flags |= NIC_RSS_I_UDP;
     }
-    
+
     /* o_ip4/o_ip6 are at the same location so is o_udp, o_tcp */
     hash = nic_rx_rss(port, &hdrs.o_ip4, &hdrs.o_tcp,
                       &hdrs.i_ip4, &hdrs.i_tcp, rss_flags,
@@ -213,6 +215,11 @@ main()
         /* disable all other contexts */
         ctxs = local_csr_read(local_csr_ctx_enables);
         ctxs &= ~NFP_MECSR_CTX_ENABLES_CONTEXTS(0xfe);
+
+        /* enable NN receive config from CTM  */
+        ctxs &= ~0x000007;
+        ctxs |= 0x02;
+
         local_csr_write(local_csr_ctx_enables, ctxs);
 
         init_rx();
@@ -249,6 +256,7 @@ main()
 
     /* Work is performed by non CTX 0 threads */
     for (;;) {
+
         /* Receive a packet from the wire */
         ret = pkt_rx_wire();
         if (ret < 0) {
@@ -264,6 +272,7 @@ main()
             Pkt.p_dst = PKT_DROP_HOST;
             nic_rx_discard_cntr(PKT_PORT_QUEUE_of(Pkt.p_src));
         }
+
 
     send_packet:
         /* Attempt to send. Count the discard if we encountered an error */

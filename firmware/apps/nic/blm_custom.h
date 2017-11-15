@@ -1,7 +1,7 @@
 /**
  * Copyright (C) 2015,  Netronome Systems, Inc.  All rights reserved.
  *
- * @file        blm_custom.h
+ * @file        nfp_blm_custom.h
  * @brief       A reasonable default buffer configuration file.
  *
  * This is a default header file to allow BLM for some sane default buffer
@@ -14,10 +14,7 @@
 #ifndef __NFP_BLM_CUSTOM_H__
 #define __NFP_BLM_CUSTOM_H__
 
-/* Explicitly enable BLM */
-#ifndef BLM_BLQ_ENABLE_MASK
-#define BLM_BLQ_ENABLE_MASK                     0
-#endif
+#define BLM_NBI_BLQ1_CACHE_SIZE                 64
 
 #define NBI8_BLQ_EMU_0_PKTBUF_SIZE              10240
 #define NBI8_BLQ_EMU_1_PKTBUF_SIZE              10240
@@ -58,7 +55,7 @@
 #endif
 
 #define BLM_NBI8_BLQ0_Q_SIZE                    8192
-#define BLM_NBI8_BLQ1_Q_SIZE                    8192
+#define BLM_NBI8_BLQ1_Q_SIZE                    4096
 #define BLM_NBI8_BLQ2_Q_SIZE                    2048
 #define BLM_NBI8_BLQ3_Q_SIZE                    2048
 
@@ -83,32 +80,31 @@
 
 
 /* EMU Ring 0 NBI8 */
-#define BLM_NBI8_BLQ0_EMU_IMEM0_NUM_BUFS        0
-#define BLM_NBI8_BLQ0_BDSRAM_IMEM0_NUM_BUFS     0
+#define BLM_NBI8_BLQ0_EMU_IMEM0_NUM_BUFS        64
+#define BLM_NBI8_BLQ0_BDSRAM_IMEM0_NUM_BUFS     64
+#ifdef USE_EMEM1
+#define BLM_NBI8_BLQ0_EMU_IMEM0_DENSITY         2
+#define BLM_NBI8_BLQ0_EMU_EMEM0_NUM_BUFS        448
+#define BLM_NBI8_BLQ0_BDSRAM_EMEM0_NUM_BUFS     448
+#define BLM_NBI8_BLQ0_EMU_EMEM0_DENSITY         7
+#define BLM_NBI8_BLQ0_EMU_EMEM1_NUM_BUFS        448
+#define BLM_NBI8_BLQ0_BDSRAM_EMEM1_NUM_BUFS     448
+#define BLM_NBI8_BLQ0_EMU_EMEM1_DENSITY         7
+#else
 #define BLM_NBI8_BLQ0_EMU_IMEM0_DENSITY         1
+#define BLM_NBI8_BLQ0_EMU_EMEM0_NUM_BUFS        448
+#define BLM_NBI8_BLQ0_BDSRAM_EMEM0_NUM_BUFS     448
+#define BLM_NBI8_BLQ0_EMU_EMEM0_DENSITY         7
+#define BLM_NBI8_BLQ0_EMU_EMEM1_NUM_BUFS        0
+#define BLM_NBI8_BLQ0_BDSRAM_EMEM1_NUM_BUFS     0
+#define BLM_NBI8_BLQ0_EMU_EMEM1_DENSITY         0
+#endif
 #define BLM_NBI8_BLQ0_EMU_IMEM1_NUM_BUFS        0
 #define BLM_NBI8_BLQ0_BDSRAM_IMEM1_NUM_BUFS     0
 #define BLM_NBI8_BLQ0_EMU_IMEM1_DENSITY         0
-#define BLM_NBI8_BLQ0_EMU_EMEM0_NUM_BUFS        600
-#define BLM_NBI8_BLQ0_EMU_EMEM0_DENSITY         1
-/* Explicitly enable BLM */
-#ifndef BLM_NBI8_BLQ0_BDSRAM_EMEM0_NUM_BUFS
-#define BLM_NBI8_BLQ0_BDSRAM_EMEM0_NUM_BUFS     0
-#endif
-#ifdef USE_EMEM1
-#define BLM_NBI8_BLQ0_EMU_EMEM1_NUM_BUFS        150
-#define BLM_NBI8_BLQ0_EMU_EMEM1_DENSITY         1
-#define BLM_NBI8_BLQ0_BDSRAM_EMEM1_NUM_BUFS     0
-#else /* USE_EMEM1 */
-#define BLM_NBI8_BLQ0_EMU_EMEM1_NUM_BUFS        0
-#define BLM_NBI8_BLQ0_EMU_EMEM1_DENSITY         0
-#define BLM_NBI8_BLQ0_BDSRAM_EMEM1_NUM_BUFS     0
-#endif /* USE_EMEM1 */
 #define BLM_NBI8_BLQ0_EMU_EMEM2_NUM_BUFS        0
 #define BLM_NBI8_BLQ0_BDSRAM_EMEM2_NUM_BUFS     0
 #define BLM_NBI8_BLQ0_EMU_EMEM2_DENSITY         0
-
-
 /* EMU Ring 0 NBI9 */
 #define BLM_NBI9_BLQ0_EMU_IMEM0_NUM_BUFS        0
 #define BLM_NBI9_BLQ0_BDSRAM_IMEM0_NUM_BUFS     0
@@ -127,28 +123,21 @@
 #define BLM_NBI9_BLQ0_EMU_EMEM2_DENSITY         0
 
 /* EMU Ring 1 NBI8 */
-#define BLM_NBI8_BLQ1_EMU_IMEM0_NUM_BUFS        0
-#define BLM_NBI8_BLQ1_BDSRAM_IMEM0_NUM_BUFS     0
+#define BLM_NBI8_BLQ1_EMU_IMEM0_NUM_BUFS        64
+#define BLM_NBI8_BLQ1_BDSRAM_IMEM0_NUM_BUFS     64
 #define BLM_NBI8_BLQ1_EMU_IMEM0_DENSITY         1
 #define BLM_NBI8_BLQ1_EMU_IMEM1_NUM_BUFS        0
 #define BLM_NBI8_BLQ1_BDSRAM_IMEM1_NUM_BUFS     0
 #define BLM_NBI8_BLQ1_EMU_IMEM1_DENSITY         0
-#define BLM_NBI8_BLQ1_EMU_EMEM0_NUM_BUFS        600
+#define BLM_NBI8_BLQ1_EMU_EMEM0_NUM_BUFS        800
 #define BLM_NBI8_BLQ1_BDSRAM_EMEM0_NUM_BUFS     0
-#define BLM_NBI8_BLQ1_EMU_EMEM0_DENSITY         1
-#ifdef USE_EMEM1
-#define BLM_NBI8_BLQ1_EMU_EMEM1_NUM_BUFS        150
-#define BLM_NBI8_BLQ1_BDSRAM_EMEM1_NUM_BUFS     0
-#define BLM_NBI8_BLQ1_EMU_EMEM1_DENSITY         1
-#else /* USE_EMEM1 */
+#define BLM_NBI8_BLQ1_EMU_EMEM0_DENSITY         7
 #define BLM_NBI8_BLQ1_EMU_EMEM1_NUM_BUFS        0
 #define BLM_NBI8_BLQ1_BDSRAM_EMEM1_NUM_BUFS     0
 #define BLM_NBI8_BLQ1_EMU_EMEM1_DENSITY         0
-#endif /* USE_EMEM1 */
 #define BLM_NBI8_BLQ1_EMU_EMEM2_NUM_BUFS        0
 #define BLM_NBI8_BLQ1_BDSRAM_EMEM2_NUM_BUFS     0
 #define BLM_NBI8_BLQ1_EMU_EMEM2_DENSITY         0
-
 /* EMU Ring 1 NBI9 */
 #define BLM_NBI9_BLQ1_EMU_IMEM0_NUM_BUFS        0
 #define BLM_NBI9_BLQ1_BDSRAM_IMEM0_NUM_BUFS     0

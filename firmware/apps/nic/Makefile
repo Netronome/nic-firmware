@@ -52,17 +52,52 @@ $(eval $(call fwdep.add_flowenv,$(PROJECT)))
 # Add flowenv's NFP initialization routines
 $(eval $(call fwdep.add_flowenv_nfp_init_flag,$(PROJECT),-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
-# Add 1 GRO ME
-$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei4.me8,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-
+# Add GRO MEs
+$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei2.me11 mei3.me11 mei4.me11 mei0.me10,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add 1 BLM ME
 $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+
+# Add microcode datapath
+$(eval $(call dep.gen_awk,$(PROJECT),datapath,firmware/lib/nic_basic/ext_stats.h,firmware/lib/nic_basic/ext_stats.def,scripts/ext_stats_h.awk))
+$(eval $(call dep.gen_awk,$(PROJECT),datapath,firmware/lib/nic_basic/_c/ext_stats.c,firmware/lib/nic_basic/ext_stats.def,scripts/ext_stats_c.awk))
+$(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
+$(eval $(call microcode.add_tests,$(PROJECT),datapath))
+$(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.add_flags,$(PROJECT),datapath,-O))
+#$(eval $(call microcode.add_flags,$(PROJECT),datapath,-d40))
+#$(eval $(call microcode.add_flags,$(PROJECT),datapath,-verbose))
+$(eval $(call microcode.add_flags,$(PROJECT),datapath,-keep_unreachable_code))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/lib))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/apps/nic/lib))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,firmware/apps/nic/maps))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,deps/ng-nfd.hg))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,$(BLM_DIR)))
+$(eval $(call microcode.add_include,$(PROJECT),datapath,$(GRO_DIR)))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,SS=0))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=10))
+#$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
+$(eval $(call nffw.add_obj,$(PROJECT),datapath, \
+        mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5 mei0.me6 mei0.me7 mei0.me8 mei0.me9 \
+        mei1.me0 mei1.me1 mei1.me2 mei1.me3 mei1.me4 mei1.me5 mei1.me6 mei1.me7 mei1.me8 mei1.me9 \
+        mei2.me0 mei2.me1 mei2.me2 mei2.me3 mei2.me4 mei2.me5 mei2.me6 mei2.me7 mei2.me8 mei2.me9 \
+	mei3.me0 mei3.me1 mei3.me2 mei3.me3 mei3.me4 mei3.me5 mei3.me6 mei3.me7 mei3.me8 mei3.me9 \
+	mei4.me0 mei4.me1 mei4.me2 mei4.me3 mei4.me4 mei4.me5 mei4.me6 mei4.me7 mei4.me8 mei4.me9 \
+	))
 
 # Custom config to give ME list to the app master
 define NIC_ISL_ME_DEST
 ((($(1) + 32) << 4) + ($(2) + 4))
 endef
+
+NIC_APP_ISLANDS := \
+	"$(call NIC_ISL_ME_DEST, 0, 0), \
+	$(call NIC_ISL_ME_DEST, 1, 0), \
+	$(call NIC_ISL_ME_DEST, 2, 0), \
+	$(call NIC_ISL_ME_DEST, 3, 0), \
+	$(call NIC_ISL_ME_DEST, 4, 0)"
 
 NIC_APP_MES := \
         "$(call NIC_ISL_ME_DEST, 0, 0), \
@@ -75,8 +110,6 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 0, 7), \
         $(call NIC_ISL_ME_DEST, 0, 8), \
         $(call NIC_ISL_ME_DEST, 0, 9), \
-        $(call NIC_ISL_ME_DEST, 0, 10), \
-        $(call NIC_ISL_ME_DEST, 0, 11), \
         \
         $(call NIC_ISL_ME_DEST, 1, 0), \
         $(call NIC_ISL_ME_DEST, 1, 1), \
@@ -88,8 +121,6 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 1, 7), \
         $(call NIC_ISL_ME_DEST, 1, 8), \
         $(call NIC_ISL_ME_DEST, 1, 9), \
-        $(call NIC_ISL_ME_DEST, 1, 10), \
-        $(call NIC_ISL_ME_DEST, 1, 11), \
         \
         $(call NIC_ISL_ME_DEST, 2, 0), \
         $(call NIC_ISL_ME_DEST, 2, 1), \
@@ -101,8 +132,6 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 2, 7), \
         $(call NIC_ISL_ME_DEST, 2, 8), \
         $(call NIC_ISL_ME_DEST, 2, 9), \
-        $(call NIC_ISL_ME_DEST, 2, 10), \
-        $(call NIC_ISL_ME_DEST, 2, 11), \
         \
         $(call NIC_ISL_ME_DEST, 3, 0), \
         $(call NIC_ISL_ME_DEST, 3, 1), \
@@ -114,13 +143,36 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 3, 7), \
         $(call NIC_ISL_ME_DEST, 3, 8), \
         $(call NIC_ISL_ME_DEST, 3, 9), \
-        $(call NIC_ISL_ME_DEST, 3, 10), \
-        $(call NIC_ISL_ME_DEST, 3, 11)"
+		\
+        $(call NIC_ISL_ME_DEST, 4, 0), \
+        $(call NIC_ISL_ME_DEST, 4, 1), \
+        $(call NIC_ISL_ME_DEST, 4, 2), \
+        $(call NIC_ISL_ME_DEST, 4, 3), \
+        $(call NIC_ISL_ME_DEST, 4, 4), \
+        $(call NIC_ISL_ME_DEST, 4, 5), \
+        $(call NIC_ISL_ME_DEST, 4, 6), \
+        $(call NIC_ISL_ME_DEST, 4, 7), \
+        $(call NIC_ISL_ME_DEST, 4, 8), \
+        $(call NIC_ISL_ME_DEST, 4, 9)"
+
+# Add cmsg map handler 
+$(eval $(call microcode.assemble,$(PROJECT),mapcmsg,apps/nic/maps,cmsg_app.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/lib))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/apps/nic/lib))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/apps/nic/maps))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,deps/ng-nfd.hg))
+$(eval $(call microcode.add_includes,$(PROJECT),mapcmsg,$(DEPS_DIR)/flowenv.hg/me/blocks/blm))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(BLM_DIR)))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(GRO_DIR)))
+$(eval $(call microcode.add_define,$(PROJECT),mapcmsg,WORKERS_PER_ISLAND=4))
+$(eval $(call microcode.add_define,$(PROJECT),mapcmsg,GLOBAL_INIT=1))
+$(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,mei1.me10))
 
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_svc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,ila0.me2,ila0.me3))
+$(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,app_config_tables))
+$(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,mei2.me10,mei4.me10))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,nic_basic))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,link_state))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,npfw))
@@ -128,74 +180,29 @@ $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(NFD_DIR)/m
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnn_mode=1))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_WORKER_ISLAND_LIST=$(NIC_APP_ISLANDS)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,CFG_NIC_LIB_DBG_JOURNAL=1))
 
 # Add NFD for PCIE0
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue1,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_gather,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_notify,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call fwdep.add_nfd_in,$(PROJECT),0,mei4.me0)) # specify Notify ME
+$(eval $(call fwdep.add_nfd_in,$(PROJECT),0,mei3.me10)) # specify Notify ME
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_cache,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_sb,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_pd,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call fwdep.add_nfd_out,$(PROJECT),0,mei4.me1,mei4.me2 mei4.me3)) # Stage batch, then packet DMA MEs
+$(eval $(call fwdep.add_nfd_out,$(PROJECT),0,ila0.me1,ila0.me2 ila0.me3)) # Stage batch, then packet DMA MEs
 
-# Add a microcoengine named 'nic_rx' written in microC
-# Make sure it gets linked with flownenv and GRO.
-$(eval $(call micro_c.compile,$(PROJECT),nic_rx,apps/nic,nic_rx_main.c))
-$(eval $(call micro_c.add_src_lib,$(PROJECT),nic_rx,apps/nic,pkt_hdrs_cache))
-$(eval $(call micro_c.add_src_lib,$(PROJECT),nic_rx,apps/nic,rx_offload))
-$(eval $(call micro_c.add_src_lib,$(PROJECT),nic_rx,apps/nic,tx_offload))
-$(eval $(call fwdep.micro_c.add_flowenv_lib,$(PROJECT),nic_rx,pkt))
-$(eval $(call fwdep.micro_c.add_flowenv_lib,$(PROJECT),nic_rx,std))
-$(eval $(call fwdep.micro_c.add_flowenv_lib,$(PROJECT),nic_rx,net))
-$(eval $(call fwdep.micro_c.add_flowenv_lib,$(PROJECT),nic_rx,lu))
-$(eval $(call fwdep.micro_c.add_gro_lib,$(PROJECT),nic_rx))
-$(eval $(call fwdep.micro_c.add_blm_lib,$(PROJECT),nic_rx))
-$(eval $(call fwdep.micro_c.add_nfd_lib,$(PROJECT),nic_rx))
-$(eval $(call micro_c.add_fw_lib,$(PROJECT),nic_rx,infra_basic))
-$(eval $(call micro_c.add_fw_lib,$(PROJECT),nic_rx,nic_basic))
-$(eval $(call micro_c.add_define,$(PROJECT),nic_rx,FWNAME='"nic"'))
-$(eval $(call micro_c.add_flags,$(PROJECT),nic_rx,-Qnn_mode=1))
-$(eval $(call micro_c.add_flags,$(PROJECT),nic_rx,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call nffw.add_obj,$(PROJECT),nic_rx,\
-	mei2.me0 mei2.me1 mei2.me2 mei2.me3 mei2.me4 mei2.me5  \
-	mei2.me6 mei2.me7 mei2.me8 mei2.me9 mei2.me10 mei2.me11 \
-	mei3.me0 mei3.me1 mei3.me2 mei3.me3 mei3.me4 mei3.me5  \
-	mei3.me6 mei3.me7 mei3.me8 mei3.me9 mei3.me10 mei3.me11 \
-	))
 
-# Add a microcoengine named 'nic_tx' written in microC
-# Make sure it gets linked with flownenv.
-$(eval $(call micro_c.compile,$(PROJECT),nic_tx,apps/nic,nic_tx_main.c))
-$(eval $(call micro_c.add_src_lib,$(PROJECT),nic_tx,apps/nic,pkt_hdrs_cache))
-$(eval $(call micro_c.add_src_lib,$(PROJECT),nic_tx,apps/nic,tx_offload))
-$(eval $(call fwdep.micro_c.add_flowenv_lib,$(PROJECT),nic_tx,pkt))
-$(eval $(call fwdep.micro_c.add_flowenv_lib,$(PROJECT),nic_tx,std))
-$(eval $(call fwdep.micro_c.add_flowenv_lib,$(PROJECT),nic_tx,net))
-$(eval $(call fwdep.micro_c.add_flowenv_lib,$(PROJECT),nic_tx,lu))
-$(eval $(call fwdep.micro_c.add_gro_lib,$(PROJECT),nic_tx))
-$(eval $(call fwdep.micro_c.add_blm_lib,$(PROJECT),nic_tx))
-$(eval $(call fwdep.micro_c.add_nfd_lib,$(PROJECT),nic_tx))
-$(eval $(call micro_c.add_fw_lib,$(PROJECT),nic_tx,infra_basic))
-$(eval $(call micro_c.add_fw_lib,$(PROJECT),nic_tx,nic_basic))
-$(eval $(call micro_c.add_define,$(PROJECT),nic_tx,FWNAME='"nic"'))
-$(eval $(call micro_c.add_flags,$(PROJECT),nic_tx,-Qnn_mode=1))
-$(eval $(call micro_c.add_flags,$(PROJECT),nic_tx,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call nffw.add_obj,$(PROJECT),nic_tx,\
-	mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5  \
-	mei0.me6 mei0.me7 mei0.me8 mei0.me9 mei0.me10 mei0.me11 \
-	mei1.me0 mei1.me1 mei1.me2 mei1.me3 mei1.me4 mei1.me5  \
-	mei1.me6 mei1.me7 mei1.me8 mei1.me9 mei1.me10 mei1.me11 \
-	))
 
 # Add TM PM initialization (codeless)
-$(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,lib/infra_basic,init_pms.uc,-DPMS_INIT_TM=1 -DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pms.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
 
 # Link stage
 # Write the FW name to the MIP
-$(eval $(call nffw.add_rtsyms,$(PROJECT),1cNIC$(NFP_NIC_RELEASE).$(NFP_NIC_REV)))
+$(eval $(call nffw.add_rtsyms,$(PROJECT),$(FW_VER)_$(GIT_TAG)$(GIT_DIFF_UNC)))
 # TODO get link_w_analysis to work without adding a warning
-$(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx))
-$(eval $(call nffw.cat,$(PROJECT),nic_rx,nic_tx))
+$(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx,datapath))
+$(eval $(call nffw.cat,$(PROJECT),nic_rx,nic_tx,datapath))

@@ -16,7 +16,7 @@
  * - Set the number of bytes the MAC prepends data into
  * - Configure RX checksum offload so the wire can validate checksums
  */
-#define PKT_NBI_OFFSET           64
+#define PKT_NBI_OFFSET           128
 #define MAC_PREPEND_BYTES        8
 #define HOST_PREPEND_BYTES       0
 #define CFG_RX_CSUM_PREPEND
@@ -34,12 +34,11 @@
 #define NBI_DMA_BP5_BLQ_TARGET   0,0
 #define NBI_DMA_BP6_BLQ_TARGET   0,0
 #define NBI_DMA_BP7_BLQ_TARGET   0,0
-/* We use 2 islands for RX. Configure their CTM buffers for RX */
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND0   0,0,0
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND1   0,0,0
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND2   1,256,127
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND3   1,256,127
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND4   0,0,0
+#define NBI0_DMA_BPE_CONFIG_ME_ISLAND0   1,255,63
+#define NBI0_DMA_BPE_CONFIG_ME_ISLAND1   1,255,63
+#define NBI0_DMA_BPE_CONFIG_ME_ISLAND2   1,255,63
+#define NBI0_DMA_BPE_CONFIG_ME_ISLAND3   1,255,63
+#define NBI0_DMA_BPE_CONFIG_ME_ISLAND4   1,255,63
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND5   0,0,0
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND6   0,0,0
 #define NBI1_DMA_BPE_CONFIG_ME_ISLAND0   0,0,0
@@ -50,8 +49,14 @@
 #define NBI1_DMA_BPE_CONFIG_ME_ISLAND5   0,0,0
 #define NBI1_DMA_BPE_CONFIG_ME_ISLAND6   0,0,0
 /* TM */
-#define NBI_TM_NUM_SEQUENCERS    1
-#define NBI_TM_ENABLE_SEQUENCER0 1
+#define NBI_TM_NUM_SEQUENCERS    7
+#define NBI_TM_ENABLE_SEQUENCER1 1
+#define NBI_TM_ENABLE_SEQUENCER2 1
+#define NBI_TM_ENABLE_SEQUENCER3 1
+#define NBI_TM_ENABLE_SEQUENCER4 1
+#define NBI_TM_ENABLE_SEQUENCER5 1
+#define NBI_TM_ENABLE_SEQUENCER6 1
+
 
 #if (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON)
     #define NBI_TM_ENABLE_SHAPER 1
@@ -67,7 +72,7 @@
         ((NS_PLATFORM_PORT_SPEED(_port) * 100 * 1000 / NS_PLATFORM_PCLK) + PPM)
     #define NBI_TM_L2_SHAPER_THRESHOLD(_port) 0
     #define NBI_TM_L2_SHAPER_OVERSHOOT(_port) 7
-    #define NBI_TM_L2_SHAPER_RATE_ADJ(_port)  -24
+    #define NBI_TM_L2_SHAPER_RATE_ADJ(_port)  -20
 
     #define NBI_TM_L1_SHAPER_NUM(_port)                  \
         (128 + (NS_PLATFORM_MAC_CHANNEL_LO(_port) >> 3))
@@ -80,7 +85,7 @@
     #define NBI_TM_L0_SHAPER_NUM              144
     #define NBI_TM_L0_SHAPER_THRESHOLD        7
     #define NBI_TM_L0_SHAPER_OVERSHOOT        7
-    #define NBI_TM_L0_SHAPER_RATE_ADJ         -24
+    #define NBI_TM_L0_SHAPER_RATE_ADJ         -20
 
     #if NS_PLATFORM_NUM_PORTS_PER_MAC_0 == 1
         #define NBI0_TM_L0_SHAPER_RATE (NBI_TM_L1_SHAPER_RATE(0))
@@ -669,7 +674,7 @@
 /*
  * BLM configuration
  */
-#include <infra/blm_custom.h>
+#include "blm_custom.h"
 
 
 /*
@@ -677,7 +682,7 @@
  * Note: GRO_NUM_BLOCKS is expected to be passed in via a -D
  *       GRO_CTX_PER_BLOCK is computed based on GRO_NUM_BLOCKS
  */
-#define GRO_ISL					36
+#define GRO_ISL				48
 
 /* Ingress sequencer numbers (1/2/3/4) for packets from the wire will be
    mapped to GRO CTX numbers 1/3/5/7; those for packets from NFD (0/1/2/3)
