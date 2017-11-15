@@ -201,8 +201,8 @@ $(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pm
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
 
 # Link stage
-# Write the FW name to the MIP
-$(eval $(call nffw.add_rtsyms,$(PROJECT),$(FW_VER)_$(GIT_TAG)$(GIT_DIFF_UNC)))
+# Write the FW ID to the MIP
+$(eval $(call nffw.add_rtsyms,$(PROJECT),$(FW_ID)))
 # TODO get link_w_analysis to work without adding a warning
 $(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx,datapath))
 $(eval $(call nffw.cat,$(PROJECT),nic_rx,nic_tx,datapath))

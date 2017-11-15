@@ -1,0 +1,9 @@
+Package: agilio-__FW_NAME__-firmware
+Version: __VERSION__
+Architecture: all
+Maintainer: Edwin Peer <edwin.peer@netronome.com>
+Section: net
+Priority: optional
+Description: Firmware for Netronome Agilio SmartNICs
+Conflicts: ns-agilio-core-nic
+Replaces: ns-agilio-core-nic
