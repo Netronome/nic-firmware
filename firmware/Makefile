@@ -136,7 +136,34 @@ firmware_clean:
 	@rm -f $(FW_NFFW)/*.nffw
 	@rm -f $(FW_CAT)/*.cat
 	@rm -f $(FW_CAT)/*.trace
+	@rm -rf $(FIRMWARE_DIR)/pkg/deb
+	@rm -rf $(FIRMWARE_DIR)/pkg/rpm
 
 firmware_veryclean: firmware_clean firmware_clean_deps
+
+PKG_NAME = $(shell git describe --tags HEAD | sed 's/\(.*\)-\([[0-9].*[[:alnum:]]*\)/\1/')
+PKG_VER = $(shell git describe --tags HEAD | sed 's/\(.*\)-\([[0-9].*[[:alnum:]]*\)/\2/' | sed 's/%/~/g' | sed 's/-/\./g')$(GIT_DIFF_UNC)
+DEB_PKG = $(FIRMWARE_DIR)/pkg/deb/agilio-$(PKG_NAME)-firmware-$(PKG_VER)-1
+DEB_SZ = $(shell du -ck $(FW_NFFW)/*.nffw | grep total$ | cut -f 1)
+
+firmware_deb: firmware_all
+	@mkdir -p $(DEB_PKG)/{lib/firmware/netronome/$(PKG_NAME),DEBIAN}
+	@cp $(FW_NFFW)/*.nffw $(DEB_PKG)/lib/firmware/netronome/$(PKG_NAME)
+	@cat $(FIRMWARE_DIR)/pkg/deb.control | sed 's/__VERSION__/$(PKG_VER)-1/g' | sed 's/__FW_NAME__/$(PKG_NAME)/g' > $(DEB_PKG)/DEBIAN/control
+	@echo "Installed-Size: $(DEB_SZ)" >> $(DEB_PKG)/DEBIAN/control
+	@echo "#!/bin/sh" > $(DEB_PKG)/DEBIAN/postinst
+	@echo "cd /lib/firmware/netronome && ln -sf $(PKG_NAME)/*.nffw ./" >> $(DEB_PKG)/DEBIAN/postinst
+	@chmod a+x $(DEB_PKG)/DEBIAN/postinst
+	@fakeroot dpkg-deb --build $(DEB_PKG)
+
+RPM_PKG = $(FIRMWARE_DIR)/pkg/rpm
+
+firmware_rpm: firmware_all
+	@mkdir -p $(RPM_PKG)/{BUILD/lib/firmware/netronome/$(PKG_NAME),SPECS,RPMS}
+	@cp $(FW_NFFW)/*.nffw $(RPM_PKG)/BUILD/lib/firmware/netronome/$(PKG_NAME)
+	@cat $(FIRMWARE_DIR)/pkg/rpm.spec | sed 's/__VERSION__/$(PKG_VER)/g' | sed 's/__FW_NAME__/$(PKG_NAME)/g' > $(RPM_PKG)/SPECS/agilio-firmware.spec
+	@rpmbuild -bb $(RPM_PKG)/SPECS/agilio-firmware.spec --buildroot $(RPM_PKG)/BUILD --define "_rpmdir $(RPM_PKG)/RPMS"
+
+package: firmware_deb firmware_rpm
 
 $(foreach mkdep,$(FW_MKDEP_TARGETS),$(eval -include $(mkdep)))
