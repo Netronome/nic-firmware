@@ -5,6 +5,7 @@
 #include <test.uc>
 
 .if (0)
+    tx_errors_offset#:
     drop#:
     egress#:
     actions#:
