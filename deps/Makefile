@@ -1,25 +1,14 @@
 #
 # Change these revisions to suit the project
 #
-# FLOWENV_REV - Tip as of April 7 2017
-FLOWENV_REV=cc8f4831baaf
+# FLOWENV_REV - Tip as of June 26 2017
+FLOWENV_REV=74d431eeb670
 # GRO_REV  - Tip as of July 12 2016
 GRO_REV=25c868a8c724
-# NFD_REV - Tip of default branch as of 31 May 2017
-NFD_REV=1b8f7ef80f64
+# NFD_REV - Tip of default branch as of 11 July 2017
+NFD_REV=4617188a5091
 
-NFP_NIC_REV=$(shell git rev-parse HEAD)
-NFP_NIC_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
-
-ifeq ($(NFP_NIC_BRANCH),master)
-NFP_NIC_RELEASE=10
-else
-ifeq ($(NFP_NIC_BRANCH),sriov)
-NFP_NIC_RELEASE=11
-else
-NFP_NIC_RELEASE=XX
-endif
-endif
+NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
 #
 # Global variables
@@ -42,7 +31,7 @@ FLOWENV_INC = -I$(FLOWENV_DIR)/me/lib
 
 $(DEPS_DIR)/flowenv.hg:
 	hg clone -r $(FLOWENV_REV) \
-		ssh://hg//data/hg/repos/flowenv.hg $(FLOWENV_DIR)
+		ssh://$(HG_USERNAME)@hg//data/hg/repos/flowenv.hg $(FLOWENV_DIR)
 
 HG_DEPS += $(FLOWENV_DIR)
 HG_REVS += $(FLOWENV_REV)
@@ -63,7 +52,7 @@ GRO_INC = -I$(GRO_DIR)
 
 $(DEPS_DIR)/gro.hg:
 	hg clone -r $(GRO_REV) \
-		ssh://hg//data/hg/repos/gro.hg $(GRO_DIR)
+		ssh://$(HG_USERNAME)@hg//data/hg/repos/gro.hg $(GRO_DIR)
 
 HG_DEPS += $(GRO_DIR)
 HG_REVS += $(GRO_REV)
@@ -78,7 +67,10 @@ NFD_INC = -I$(NFD_DIR)/shared \
 
 $(DEPS_DIR)/ng-nfd.hg:
 	hg clone -r $(NFD_REV) \
-	       	ssh://hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
+	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
+	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../nfd_abi3.patch && cd -
+	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../bpf_stack.patch && cd -
+	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../pf_oversubscription_series.patch && cd -
 
 HG_DEPS += $(NFD_DIR)
 HG_REVS += $(NFD_REV)

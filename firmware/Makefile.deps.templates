@@ -31,7 +31,7 @@ endef
 
 #f fwdep.minus
 #
-# Subtract the second operand from the first 
+# Subtract the second operand from the first
 #
 # @param $1 first operand
 # @param $2 second operand
@@ -375,7 +375,7 @@ endef
 #
 define fwdep.add_nfd_svc
 
-$(eval $(call micro_c.compile,$1,nfd_app_master,$2,$3))
+$(eval $(call micro_c.compile_4cntxmode,$1,nfd_app_master,$2,$3))
 $(eval $(call micro_c.add_src_lib.abspath,$1,nfd_app_master,$(NFD_VNIC_DIR),libnfd))
 $(eval $(call micro_c.add_src_lib.abspath,$1,nfd_app_master,$(NFD_VNIC_DIR)/utils,libutils))
 $(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_app_master,std))

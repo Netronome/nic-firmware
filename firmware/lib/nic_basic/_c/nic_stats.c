@@ -29,348 +29,98 @@
 #include <vnic/shared/nfd_cfg.h>
 #include <vnic/pci_out.h>
 
-extern __intrinsic uint64_t swapw64(uint64_t val);
-
-/*
- * Additional counters for the NIC application
- *
- * Most of the statistics for the NIC are directly based on stats
- * maintained by the MAC.  However, some required stats are either
- * derived counts or software based counts.  This structure defines
- * these additional stats.
- *
- * DO NOT CHANGE THE ORDER!
- */
-struct nic_port_stats_extra {
-    unsigned long long rx_discards;
-    unsigned long long rx_errors;
-    unsigned long long rx_uc_octets;
-    unsigned long long rx_mc_octets;
-    unsigned long long rx_bc_octets;
-    unsigned long long rx_uc_pkts;
-    unsigned long long rx_mc_pkts;
-    unsigned long long rx_bc_pkts;
-
-    unsigned long long tx_discards;
-    unsigned long long tx_errors;
-    unsigned long long tx_uc_octets;
-    unsigned long long tx_mc_octets;
-    unsigned long long tx_bc_octets;
-    unsigned long long tx_uc_pkts;
-    unsigned long long tx_mc_pkts;
-    unsigned long long tx_bc_pkts;
-};
-/* Export for debug visibility */
-__export __shared __imem struct nic_port_stats_extra nic_stats_extra[NVNICS];
-
-/*
- * Global declarations for MAC Statistics
- */
+#include "nic_stats.h"
 
 /* How often to update the control BAR stats (in cycles) */
-#define MAC_STATS_CNTRS_INTERVAL 0x10000
-/* Divider for the TM queue drop counters accumulate */
-#define TMQ_CNTRS_ACCUM_RATE_DIV 4
+#define STATS_ACCUMULATE_INTERVAL 0x20000
+#define STATS_AGGREGATE_DIVISOR 32
 
-/* The MAC stats in the Control BAR are only a subset of the stats
- * maintained by the MACs.  We accumulate the whole stats in MU space. */
-__export __shared __imem struct macstats_port_accum nic_mac_cntrs_accum[24];
+#include "ext_stats.c"
 
-/* TM Q drop counters. */
-__export __shared __align8 __imem uint64_t          \
-    nic_tmq_drop_cntr_accum[NS_PLATFORM_NUM_PORTS];
+typedef struct {
+    union {
+        struct macstats_port_accum stats;
+        uint64_t __raw[64];
+    };
+} mac_stats_t;
 
-/* The structure of the counters in the config BAR, used to push the
- * accumulated counters to the config BAR. */
-struct cfg_bar_cntrs {
-    uint64_t discards;
-    uint64_t errors;
-    uint64_t octets;
-    uint64_t uc_octets;
-    uint64_t mc_octets;
-    uint64_t bc_octets;
-    uint64_t frames;
-    uint64_t mc_frames;
-    uint64_t bc_frames;
-};
+typedef struct {
+    union {
+        struct {
+            uint64_t rx_discards;
+            uint64_t rx_errors;
+            uint64_t rx_octets;
+            uint64_t rx_uc_octets;
+            uint64_t rx_mc_octets;
+            uint64_t rx_bc_octets;
+            uint64_t rx_frames;
+            uint64_t rx_mc_frames;
+            uint64_t rx_bc_frames;
 
-/* enable getting the MAC stats */
-#define ACC_MAC_STATS
+            uint64_t tx_discards;
+            uint64_t tx_errors;
+            uint64_t tx_octets;
+            uint64_t tx_uc_octets;
+            uint64_t tx_mc_octets;
+            uint64_t tx_bc_octets;
+            uint64_t tx_frames;
+            uint64_t tx_mc_frames;
+            uint64_t tx_bc_frames;
 
-#ifndef ACC_MAC_STATS
-#define EXTRA_CNT_INCR(cntr)        mem_incr64(cntr)
-#else
-#define EXTRA_CNT_INCR(cntr)
-#endif
+            uint64_t app0_frames;
+            uint64_t app0_bytes;
+            uint64_t app1_frames;
+            uint64_t app1_bytes;
+            uint64_t app2_frames;
+            uint64_t app2_bytes;
+            uint64_t app3_frames;
+            uint64_t app3_bytes;
+        };
+        uint64_t __raw[26];
+    };
+} bar_stats_t;
 
-/*
- * Functions for updating the counters
- */
+typedef struct {
+    union {
+        struct {
+            unsigned long long rx_discards;
+            unsigned long long rx_discards_proto;
+            unsigned long long rx_errors;
+            unsigned long long rx_errors_parse;
+            unsigned long long rx_octets;
+            unsigned long long rx_frames;
+            unsigned long long tx_discards;
+            unsigned long long tx_errors;
+            unsigned long long tx_errors_pci;
+            unsigned long long tx_octets;
+            unsigned long long tx_frames;
+        };
+        unsigned long long __raw[11];
+    };
+} global_stats_t;
 
-__intrinsic void
-nic_rx_cntrs(int port, void *da, int len)
+// working stats
+__export __shared __align8 __imem mac_stats_t _mac_stats[24];
+__export __shared __align8 __imem struct macstats_head_drop_accum _mac_stats_head_drop;
+__export __shared __align8 __imem uint64_t _tmq_stats_drop[NS_PLATFORM_NUM_PORTS];
+
+// result stats
+__export __shared __emem mac_stats_t mac_stats[24];
+
+__forceinline static void stats_accumulate(void)
 {
-    if (NIC_IS_MC_ADDR(da)) {
-
-        /* Broadcast addresses are Multicast addresses too */
-        if (NIC_IS_BC_ADDR(da)) {
-            mem_add64_imm(len, &nic_stats_extra[port].rx_bc_octets);
-            EXTRA_CNT_INCR(&nic_stats_extra[port].rx_bc_pkts);
-        } else {
-            mem_add64_imm(len, &nic_stats_extra[port].rx_mc_octets);
-            EXTRA_CNT_INCR(&nic_stats_extra[port].rx_mc_pkts);
-        }
-    } else {
-        mem_add64_imm(len, &nic_stats_extra[port].rx_uc_octets);
-        EXTRA_CNT_INCR(&nic_stats_extra[port].rx_uc_pkts);
-    }
-}
-
-__intrinsic void
-nic_tx_cntrs(int port, void *da, int len)
-{
-    if (NIC_IS_MC_ADDR(da)) {
-
-        /* Broadcast addresses are Multicast addresses too */
-        if (NIC_IS_BC_ADDR(da)) {
-            mem_add64_imm(len, &nic_stats_extra[port].tx_bc_octets);
-            EXTRA_CNT_INCR(&nic_stats_extra[port].tx_bc_pkts);
-        } else {
-            mem_add64_imm(len, &nic_stats_extra[port].tx_mc_octets);
-            EXTRA_CNT_INCR(&nic_stats_extra[port].tx_mc_pkts);
-        }
-    } else {
-        mem_add64_imm(len, &nic_stats_extra[port].tx_uc_octets);
-        mem_incr64(&nic_stats_extra[port].tx_uc_pkts);
-    }
-
-}
-
-__intrinsic void
-nic_rx_ring_cntrs(void *meta, uint16_t len, uint32_t port, uint32_t qid)
-{
-    SIGNAL sig;
-    uint32_t nfd_q;
-
-    nfd_q = nfd_out_map_queue(port, qid);
-
-    __nfd_out_cnt_pkt(NIC_PCI, nfd_q, len, ctx_swap, &sig);
-}
-
-__intrinsic void
-nic_tx_ring_cntrs(void *meta, uint32_t port, uint32_t qid)
-{
-    SIGNAL sig;
-    uint32_t nfd_q;
-    struct pcie_in_nfp_desc *in_desc = (struct pcie_in_nfp_desc *)meta;
-
-    nfd_q = NFD_BUILD_NATQ(port, qid);
-
-    __nfd_in_cnt_pkt(NIC_PCI, nfd_q, in_desc->data_len, ctx_swap, &sig);
-}
-
-__intrinsic
-void nic_rx_error_cntr(int port)
-{
-    mem_incr64(&nic_stats_extra[port].rx_errors);
-}
-
-__intrinsic
-void nic_tx_error_cntr(int port)
-{
-    mem_incr64(&nic_stats_extra[port].tx_errors);
-}
-
-__intrinsic
-void nic_rx_discard_cntr(int port)
-{
-    mem_incr64(&nic_stats_extra[port].rx_discards);
-}
-
-__intrinsic
-void nic_tx_discard_cntr(int port)
-{
-    mem_incr64(&nic_stats_extra[port].tx_discards);
-}
-
-
-/*
- * Handle stats gathering and updating
- */
-
-
-/*
- * Handle MAC statistics
- *
- * - Periodically read the stats from the MAC and accumulate them in
- *   memory (@mac_stats_accumulate()).
- *
- * - Periodically update a subset of MAC counters int the control BAR
- *   (@mac_stats_update_control_bar()).  This is done by reading the
- *   accumulated MAC stats from memory (@mac_stats_rx_counters() and
- *   @mac_stats_tx_counters()).
- */
-
-__forceinline static void
-mac_stats_accumulate(void)
-{
-    uint32_t i;
+    __gpr uint32_t    port;
+    __gpr uint32_t    qid;
+    __gpr uint32_t    tmq_cnt;
+    __gpr uint64_t    tmq_port_drop_cnt;
+    __xwrite uint32_t cnt_xw[2];
 
     /* Accumulate the port statistics for each port. */
-    for (i = 0; i < NS_PLATFORM_NUM_PORTS; ++i) {
-        macstats_port_accum(
-            NS_PLATFORM_MAC(i), NS_PLATFORM_MAC_SERDES_LO(i),
-            &nic_mac_cntrs_accum[NS_PLATFORM_MAC_SERDES_LO(i)]);
-    }
-}
-
-__forceinline static void
-nic_stats_rx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
-{
-    struct cfg_bar_cntrs bar_cntrs = {0};
-    __imem struct macstats_port_accum* port_stats;
-    __xread uint64_t read_array[8];
-    __xread uint64_t read_val;
-
-#ifdef ACC_MAC_STATS
-    /* Retrieve the corresponding MAC port stats. */
-    if (port < NS_PLATFORM_NUM_PORTS) {
-        port_stats = &nic_mac_cntrs_accum[NS_PLATFORM_MAC_SERDES_LO(port)];
-
-        mem_read64(&read_val, &port_stats->RxPIfInErrors, sizeof(read_val));
-        bar_cntrs.errors += read_val;
-        mem_read64(&read_val, &port_stats->RxPIfInOctets, sizeof(read_val));
-        bar_cntrs.octets += read_val;
-        mem_read64(&read_val, &port_stats->RxPStatsPkts, sizeof(read_val));
-        bar_cntrs.frames += read_val;
-        mem_read64(&read_val, &port_stats->RxPIfInMultiCastPkts,
-                   sizeof(read_val));
-        bar_cntrs.mc_frames += read_val;
-        mem_read64(&read_val, &port_stats->RxPIfInBroadCastPkts,
-                   sizeof(read_val));
-        bar_cntrs.bc_frames += read_val;
-    }
-#endif
-
-    mem_read64(read_array, &nic_stats_extra[port].rx_discards,
-               sizeof(read_array));
-    bar_cntrs.discards += read_array[0];
-    bar_cntrs.errors += read_array[1];
-    bar_cntrs.uc_octets += read_array[2];
-    bar_cntrs.mc_octets += read_array[3];
-    bar_cntrs.bc_octets += read_array[4];
-#ifndef ACC_MAC_STATS
-    bar_cntrs.mc_frames += read_array[6];
-    bar_cntrs.bc_frames += read_array[7];
-#endif
-
-    /* Accumulated stats */
-    bar_cntrs.octets = read_array[2] + read_array[3] + read_array[4];
-#ifndef  ACC_MAC_STATS
-    bar_cntrs.frames = read_array[5] + read_array[6] + read_array[7];
-#endif
-
-    *write_bar_cntrs = bar_cntrs;
-}
-
-__forceinline static void
-nic_stats_tx_counters(int port, __xwrite struct cfg_bar_cntrs *write_bar_cntrs)
-{
-    struct cfg_bar_cntrs bar_cntrs = {0};
-    __imem struct macstats_port_accum* port_stats;
-    __xread uint64_t read_array[8];
-    __xread uint64_t read_val;
-
-#ifdef ACC_MAC_STATS
-    /* Retrieve the corresponding MAC port stats. */
-    if (port < NS_PLATFORM_NUM_PORTS) {
-        port_stats = &nic_mac_cntrs_accum[NS_PLATFORM_MAC_SERDES_LO(port)];
-
-        mem_read64(&read_val, &port_stats->TxPIfOutErrors, sizeof(read_val));
-        bar_cntrs.errors += read_val;
-        mem_read64(&read_val, &port_stats->TxPIfOutOctets, sizeof(read_val));
-        bar_cntrs.octets += read_val;
-        mem_read64(&read_val, &port_stats->TxFramesTransmittedOK,
-                   sizeof(read_val));
-        bar_cntrs.frames += read_val;
-        mem_read64(&read_val, &port_stats->TxPIfOutMultiCastPkts,
-                   sizeof(read_val));
-        bar_cntrs.mc_frames += read_val;
-        mem_read64(&read_val, &port_stats->TxPIfOutBroadCastPkts,
-                   sizeof(read_val));
-        bar_cntrs.bc_frames += read_val;
-
-        /* Accumulate the TM Q drops */
-        mem_read64(&read_val, &nic_tmq_drop_cntr_accum[port], sizeof(uint64_t));
-        bar_cntrs.discards += swapw64(read_val);
-    }
-#endif
-
-    mem_read64(read_array, &nic_stats_extra[port].tx_discards,
-               sizeof(read_array));
-    bar_cntrs.discards += read_array[0];
-    bar_cntrs.errors += read_array[1];
-    bar_cntrs.uc_octets += read_array[2];
-    bar_cntrs.mc_octets += read_array[3];
-    bar_cntrs.bc_octets += read_array[4];
-#ifndef ACC_MAC_STATS
-    bar_cntrs.mc_frames += read_array[6];
-    bar_cntrs.bc_frames += read_array[7];
-#endif
-
-    /* Accumulated stats */
-    bar_cntrs.octets = read_array[2] + read_array[3] + read_array[4];
-#ifndef  ACC_MAC_STATS
-    bar_cntrs.frames = read_array[5] + read_array[6] + read_array[7];
-#else
-    bar_cntrs.frames = read_array[5] + bar_cntrs.mc_frames + bar_cntrs.bc_frames;
-#endif
-
-
-    *write_bar_cntrs = bar_cntrs;
-}
-
-__forceinline static void
-nic_stats_update_control_bar(void)
-{
-    __mem char *vf_bar;
-    __xwrite struct cfg_bar_cntrs write_bar_cntrs;
-    int i;
-
-    /* TODO: optimize this loop with nic_stats_rx/tx_counters
-     * reading more than one vnic/vf/port at once
-     */
-    for (i = 0; i < NVNICS; i++) {
-        vf_bar = NFD_CFG_BAR_ISL(NIC_PCI, i);
-
-        nic_stats_rx_counters(i, &write_bar_cntrs);
-        mem_write64(&write_bar_cntrs, vf_bar + NFP_NET_CFG_STATS_RX_DISCARDS,
-                    sizeof(write_bar_cntrs));
-
-        nic_stats_tx_counters(i, &write_bar_cntrs);
-        mem_write64(&write_bar_cntrs, vf_bar + NFP_NET_CFG_STATS_TX_DISCARDS,
-                    sizeof(write_bar_cntrs));
-    }
-}
-
-/*
- * Handle TM per-q drop counters.
- *
- * - Periodically read the drop counters from the TM and accumulate them in
- *   memory (@tmq_drops_accumulate()).
- */
- __forceinline static void
-nic_tmq_drops_accumulate(void)
-{
-    uint32_t    port;
-    uint32_t    qid;
-    __gpr uint32_t    tmq_cnt;
-    uint64_t    tmq_port_drop_cnt;
-    __xwrite uint64_t cnt_xw;
-
-    /* Accumulate the NBI TM queue drop counts for each port. */
     for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
-        /* Accumulate the NBI TM queue drop counts associated with the port. */
+        macstats_port_accum(NS_PLATFORM_MAC(port),
+            NS_PLATFORM_MAC_SERDES_LO(port),
+            &_mac_stats[NS_PLATFORM_MAC_SERDES_LO(port)].stats);
+
         tmq_port_drop_cnt = 0;
 
         for (qid = NS_PLATFORM_NBI_TM_QID_LO(port);
@@ -381,8 +131,293 @@ nic_tmq_drops_accumulate(void)
         }
 
         /* Store the per-port NBI TM queue drop count. */
-        cnt_xw = tmq_port_drop_cnt;
-        mem_add64(&cnt_xw, &nic_tmq_drop_cntr_accum[port], sizeof(uint64_t));
+        cnt_xw[0] = tmq_port_drop_cnt;
+        cnt_xw[1] = 0;
+        mem_add64(&cnt_xw[0], &_tmq_stats_drop[port], sizeof(cnt_xw));
+    }
+    macstats_head_drop_accum(0, 0, 0xfff, &_mac_stats_head_drop);
+}
+
+__lmem __shared ext_stats_t vnic_stats_work;
+__lmem __shared mac_stats_t mac_stats_work;
+__lmem __shared global_stats_t global_stats_work;
+__lmem __shared bar_stats_t bar_stats_work;
+
+__forceinline static void stats_aggregate()
+{
+    __xread uint32_t read_block[8];
+    __xwrite uint32_t write_block[16];
+    __mem char *addr;
+    __mem char *bar_end;
+    int size;
+    __xread uint32_t tmq_drop[2];
+    __xread uint32_t mac_head_drop[2];
+    uint32_t port;
+    uint32_t bar_stat;
+    uint32_t block_stat;
+    uint32_t vnic_stat;
+    uint32_t mac_stat;
+    uint32_t global_stat;
+    uint32_t vid;
+    uint64_t tmp;
+
+    __imem ext_stats_t *__vnic_stats = (__imem ext_stats_t *) __link_sym("__ext_stats");
+    __imem ext_stats_t *vnic_stats = (__imem ext_stats_t *) __link_sym("_ext_stats_phy_data");
+
+    // read "global" VNIC 0 stats using atomic engine
+    global_stat = 0;
+    for (addr = (__mem char *) &__vnic_stats[0].global_rx_discards;
+         addr < (__mem char *) &__vnic_stats[1];
+         addr += sizeof(read_block)) {
+
+        mem_read_atomic(&read_block, addr, sizeof(read_block));
+        block_stat = 0;
+        while (global_stat < sizeof(global_stats_work) / 8 && block_stat < sizeof(read_block) / 4) {
+             global_stats_work.__raw[global_stat++] = read_block[block_stat++] + (((uint64_t) read_block[block_stat++]) << 32);
+        }
+    }
+
+    for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+        // read MAC stats using atomic engine
+        mac_stat = 0;
+        for (addr = (__mem char *) &_mac_stats[NS_PLATFORM_MAC_SERDES_LO(port)];
+             addr < (__mem char *) &_mac_stats[NS_PLATFORM_MAC_SERDES_LO(port) + 1];
+             addr += sizeof(read_block)) {
+
+            mem_read_atomic(&read_block, addr, sizeof(read_block));
+            block_stat = 0;
+            while (mac_stat < sizeof(mac_stats_work) / 8 && block_stat < sizeof(read_block) / 4) {
+                mac_stats_work.__raw[mac_stat++] = read_block[block_stat++] + (((uint64_t) read_block[block_stat++]) << 32);
+            }
+        }
+
+        sleep(10000);
+
+        // read VNIC stats using atomic engine
+        vnic_stat = 0;
+        for (addr = (__mem char *) &__vnic_stats[port + 1];
+             addr < (__mem char *) &__vnic_stats[port + 2];
+             addr += sizeof(read_block)) {
+
+            mem_read_atomic(&read_block, addr, sizeof(read_block));
+            block_stat = 0;
+            while (vnic_stat < sizeof(vnic_stats_work) / 8 && block_stat < sizeof(read_block) / 4) {
+                vnic_stats_work.__raw[vnic_stat++] = read_block[block_stat++] + (((uint64_t) read_block[block_stat++]) << 32);
+            }
+        }
+
+        mem_read_atomic(&tmq_drop[0], &_tmq_stats_drop[port], sizeof(tmq_drop));
+        vnic_stats_work.tx_discards_tm += (((uint64_t) tmq_drop[1]) << 32) + tmq_drop[0];
+
+        mem_read_atomic(&mac_head_drop[0], &_mac_stats_head_drop.ports_drop[port], sizeof(mac_head_drop));
+
+        mac_stats_work.stats.RxMacHeadDrop += (((uint64_t) mac_head_drop[1]) << 32) + mac_head_drop[0];
+        vnic_stats_work.rx_discards_no_buf_mac = mac_stats_work.stats.RxMacHeadDrop;
+
+        vnic_stats_work.tx_frames += mac_stats_work.stats.TxFramesTransmittedOK;
+        if (vnic_stats_work.tx_frames >= mac_stats_work.stats.TxPauseMacCtlFramesTransmitted)
+            vnic_stats_work.tx_frames -= mac_stats_work.stats.TxPauseMacCtlFramesTransmitted;
+        else
+            vnic_stats_work.tx_frames = 0;
+        vnic_stats_work.tx_uc_frames += mac_stats_work.stats.TxPIfOutUniCastPkts;
+        vnic_stats_work.tx_mc_frames += mac_stats_work.stats.TxPIfOutMultiCastPkts;
+        vnic_stats_work.tx_bc_frames += mac_stats_work.stats.TxPIfOutBroadCastPkts;
+        vnic_stats_work.tx_octets += mac_stats_work.stats.TxPIfOutOctets;
+        if (vnic_stats_work.tx_octets >= 64 * mac_stats_work.stats.TxPauseMacCtlFramesTransmitted)
+            vnic_stats_work.tx_octets -= 64 * mac_stats_work.stats.TxPauseMacCtlFramesTransmitted;
+        else
+            vnic_stats_work.tx_octets = 0;
+        vnic_stats_work.tx_errors += mac_stats_work.stats.TxPIfOutErrors;
+
+        vnic_stats_work.rx_frames += mac_stats_work.stats.RxFramesReceivedOK;
+        if (vnic_stats_work.rx_frames >= mac_stats_work.stats.RxPauseMacCtlFrames)
+            vnic_stats_work.rx_frames -= mac_stats_work.stats.RxPauseMacCtlFrames;
+        else
+            vnic_stats_work.rx_frames = 0;
+        vnic_stats_work.rx_uc_frames += mac_stats_work.stats.RxPIfInUniCastPkts;
+        vnic_stats_work.rx_mc_frames += mac_stats_work.stats.RxPIfInMultiCastPkts;
+        vnic_stats_work.rx_bc_frames += mac_stats_work.stats.RxPIfInBroadCastPkts;
+        vnic_stats_work.rx_octets += mac_stats_work.stats.RxPIfInOctets;
+        if (vnic_stats_work.rx_octets >= 64 * mac_stats_work.stats.RxPauseMacCtlFrames)
+            vnic_stats_work.rx_octets -= 64 * mac_stats_work.stats.RxPauseMacCtlFrames;
+        else
+            vnic_stats_work.rx_octets = 0;
+        vnic_stats_work.rx_errors += mac_stats_work.stats.RxPIfInErrors;
+
+        vnic_stats_work.rx_discards += vnic_stats_work.rx_discards_policy;
+        vnic_stats_work.rx_discards += vnic_stats_work.rx_discards_filter_mac;
+        vnic_stats_work.rx_discards += vnic_stats_work.rx_discards_mtu;
+        vnic_stats_work.rx_discards += vnic_stats_work.rx_discards_no_buf_pci;
+        vnic_stats_work.rx_discards += vnic_stats_work.rx_discards_no_buf_mac;
+        vnic_stats_work.rx_mc_octets += 4 * vnic_stats_work.rx_mc_frames;
+        vnic_stats_work.rx_bc_octets += 4 * vnic_stats_work.rx_bc_frames;
+        vnic_stats_work.rx_uc_octets += vnic_stats_work.rx_octets;
+        if (vnic_stats_work.rx_uc_octets >= vnic_stats_work.rx_mc_octets)
+            vnic_stats_work.rx_uc_octets -= vnic_stats_work.rx_mc_octets;
+        else
+            vnic_stats_work.rx_uc_octets = 0;
+        if (vnic_stats_work.rx_uc_octets >= vnic_stats_work.rx_bc_octets)
+            vnic_stats_work.rx_uc_octets -= vnic_stats_work.rx_bc_octets;
+        else
+            vnic_stats_work.rx_uc_octets = 0;
+
+        vnic_stats_work.tx_discards += vnic_stats_work.tx_discards_policy;
+        vnic_stats_work.tx_discards += vnic_stats_work.tx_discards_tm;
+        vnic_stats_work.tx_errors += vnic_stats_work.tx_errors_mtu;
+        vnic_stats_work.tx_errors += vnic_stats_work.tx_errors_offset;
+        vnic_stats_work.tx_mc_octets += 4 * vnic_stats_work.tx_mc_frames;
+        vnic_stats_work.tx_bc_octets += 4 * vnic_stats_work.tx_bc_frames;
+        vnic_stats_work.tx_uc_octets += vnic_stats_work.tx_octets;
+        if (vnic_stats_work.tx_uc_octets >= vnic_stats_work.tx_mc_octets)
+            vnic_stats_work.tx_uc_octets -= vnic_stats_work.tx_mc_octets;
+        else
+            vnic_stats_work.tx_uc_octets = 0;
+        if (vnic_stats_work.tx_uc_octets >= vnic_stats_work.tx_bc_octets)
+            vnic_stats_work.tx_uc_octets -= vnic_stats_work.tx_bc_octets;
+        else
+            vnic_stats_work.tx_uc_octets = 0;
+
+        vnic_stats_work.bpf_pass_octets += 4 * vnic_stats_work.bpf_pass_frames;
+        vnic_stats_work.bpf_drop_octets += 4 * vnic_stats_work.bpf_drop_frames;
+        vnic_stats_work.bpf_tx_octets += 4 * vnic_stats_work.bpf_tx_frames;
+        vnic_stats_work.bpf_abort_octets += 4 * vnic_stats_work.bpf_abort_frames;
+
+        vid = NFD_VNIC2VID(NFD_VNIC_TYPE_PF, port);
+	addr = NFD_CFG_BAR_ISL(NIC_PCI, vid) + NFP_NET_CFG_STATS_RX_UC_OCTETS;
+        mem_read32(&read_block, addr, 8);
+        tmp = read_block[0] + (((uint64_t) read_block[1]) << 32);
+        if (vnic_stats_work.rx_uc_octets < tmp) {
+            vnic_stats_work.rx_uc_octets = tmp;
+        }
+        vid = NFD_VNIC2VID(NFD_VNIC_TYPE_PF, port);
+	addr = NFD_CFG_BAR_ISL(NIC_PCI, vid) + NFP_NET_CFG_STATS_TX_UC_OCTETS;
+        mem_read32(&read_block, addr, 8);
+        tmp = read_block[0] + (((uint64_t) read_block[1]) << 32);
+        if (vnic_stats_work.tx_uc_octets < tmp) {
+            vnic_stats_work.tx_uc_octets = tmp;
+        }
+
+        bar_stats_work.rx_discards = vnic_stats_work.rx_discards;
+        bar_stats_work.rx_errors = vnic_stats_work.rx_errors;
+        bar_stats_work.rx_octets = vnic_stats_work.rx_octets;
+        bar_stats_work.rx_uc_octets = vnic_stats_work.rx_uc_octets;
+        bar_stats_work.rx_mc_octets = vnic_stats_work.rx_mc_octets;
+        bar_stats_work.rx_bc_octets = vnic_stats_work.rx_bc_octets;
+        bar_stats_work.rx_frames = vnic_stats_work.rx_frames;
+        bar_stats_work.rx_mc_frames = vnic_stats_work.rx_mc_frames;
+        bar_stats_work.rx_bc_frames = vnic_stats_work.rx_bc_frames;
+
+        bar_stats_work.tx_discards = vnic_stats_work.tx_discards;
+        bar_stats_work.tx_errors = vnic_stats_work.tx_errors;
+        bar_stats_work.tx_octets = vnic_stats_work.tx_octets;
+        bar_stats_work.tx_uc_octets = vnic_stats_work.tx_uc_octets;
+        bar_stats_work.tx_mc_octets = vnic_stats_work.tx_mc_octets;
+        bar_stats_work.tx_bc_octets = vnic_stats_work.tx_bc_octets;
+        bar_stats_work.tx_frames = vnic_stats_work.tx_frames;
+        bar_stats_work.tx_mc_frames = vnic_stats_work.tx_mc_frames;
+        bar_stats_work.tx_bc_frames = vnic_stats_work.tx_bc_frames;
+
+        bar_stats_work.app0_frames = vnic_stats_work.bpf_pass_frames;
+        bar_stats_work.app0_bytes = vnic_stats_work.bpf_pass_octets;
+        bar_stats_work.app1_frames = vnic_stats_work.bpf_drop_frames;
+        bar_stats_work.app1_bytes = vnic_stats_work.bpf_drop_octets;
+        bar_stats_work.app2_frames = vnic_stats_work.bpf_tx_frames;
+        bar_stats_work.app2_bytes = vnic_stats_work.bpf_tx_octets;
+        bar_stats_work.app3_frames = vnic_stats_work.bpf_abort_frames;
+        bar_stats_work.app3_bytes = vnic_stats_work.bpf_abort_frames;
+
+	global_stats_work.rx_discards += vnic_stats_work.rx_discards +
+                                         vnic_stats_work.global_rx_discards +
+                                         vnic_stats_work.global_rx_discards_proto;
+        global_stats_work.rx_discards_proto += vnic_stats_work.global_rx_discards_proto;
+        global_stats_work.rx_errors += vnic_stats_work.rx_errors +
+                                       vnic_stats_work.global_rx_errors +
+                                       vnic_stats_work.global_rx_errors_parse;
+        global_stats_work.rx_octets += vnic_stats_work.rx_octets +
+                                       vnic_stats_work.global_rx_octets;
+        global_stats_work.rx_frames += vnic_stats_work.rx_frames +
+                                       vnic_stats_work.global_rx_frames;
+        global_stats_work.tx_discards += vnic_stats_work.tx_discards +
+                                         vnic_stats_work.global_tx_discards;
+        global_stats_work.tx_errors += vnic_stats_work.tx_errors +
+                                       vnic_stats_work.global_tx_errors +
+                                       vnic_stats_work.global_tx_errors_pci;
+        global_stats_work.tx_errors_pci += vnic_stats_work.global_tx_errors_pci;
+        global_stats_work.tx_octets += vnic_stats_work.tx_octets +
+                                       vnic_stats_work.global_tx_octets;
+        global_stats_work.tx_frames += vnic_stats_work.tx_frames +
+                                       vnic_stats_work.global_tx_frames;
+
+        // write MAC stats using bulk engine
+        mac_stat = 0;
+        for (addr = (__mem char *) &mac_stats[NS_PLATFORM_MAC_SERDES_LO(port)];
+             addr < (__mem char *) &mac_stats[NS_PLATFORM_MAC_SERDES_LO(port) + 1];
+             addr += sizeof(write_block)) {
+
+            block_stat = 0;
+            while (block_stat < sizeof(write_block) / 4 && mac_stat < sizeof(mac_stats_work) / 8) {
+                write_block[block_stat++] = mac_stats_work.__raw[mac_stat];
+                write_block[block_stat++] = mac_stats_work.__raw[mac_stat++] >> 32;
+            }
+            mem_write32(&write_block, addr, sizeof(write_block));
+        }
+
+        // write VNIC stats using bulk engine (stop before globals)
+        vnic_stat = 0;
+        for (addr = (__mem char *) &vnic_stats[port];
+             addr < (__mem char *) &vnic_stats[port].global_rx_discards;
+             addr += sizeof(write_block)) {
+
+            block_stat = 0;
+            while (block_stat < sizeof(write_block) / 4 && vnic_stat < sizeof(vnic_stats_work) / 8) {
+                write_block[block_stat++] = vnic_stats_work.__raw[vnic_stat];
+                write_block[block_stat++] = vnic_stats_work.__raw[vnic_stat++] >> 32;
+            }
+            size = ((__mem char *) &vnic_stats[port].global_rx_discards) - addr;
+            if (size > sizeof(write_block)) {
+                size = sizeof(write_block);
+            }
+            mem_write32(&write_block, addr, size);
+        }
+
+        // write bar stats using bulk engine
+        vid = NFD_VNIC2VID(NFD_VNIC_TYPE_PF, port);
+        bar_end = NFD_CFG_BAR_ISL(NIC_PCI, vid) + NFP_NET_CFG_STATS_APP3_BYTES + 8;
+        bar_stat = 0;
+        for (addr = NFD_CFG_BAR_ISL(NIC_PCI, vid) + NFP_NET_CFG_STATS_RX_DISCARDS;
+             addr < bar_end; addr += sizeof(write_block)) {
+
+            block_stat = 0;
+            while (block_stat < sizeof(write_block) / 4 && bar_stat < sizeof(bar_stats_work) / 8) {
+                write_block[block_stat++] = bar_stats_work.__raw[bar_stat];
+                write_block[block_stat++] = bar_stats_work.__raw[bar_stat++] >> 32;
+            }
+            size = bar_end - addr;
+            if (size > sizeof(write_block)) {
+                size = sizeof(write_block);
+            }
+            mem_write32(&write_block, addr, size);
+        }
+    }
+
+    // disaggregate global statistics
+    for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+        global_stat = 0;
+        for (addr = (__mem char *) &vnic_stats[port].global_rx_discards;
+             addr < (__mem char *) &vnic_stats[port + 1];
+             addr += sizeof(write_block)) {
+
+            block_stat = 0;
+            while (block_stat < sizeof(write_block) / 4 && global_stat < sizeof(global_stats_work) / 8) {
+                write_block[block_stat++] = global_stats_work.__raw[global_stat];
+                write_block[block_stat++] = global_stats_work.__raw[global_stat++] >> 32;
+            }
+            size = ((__mem char *) &vnic_stats[port + 1]) - addr;
+            if (size > sizeof(write_block)) {
+                size = sizeof(write_block);
+            }
+            mem_write32(&write_block, addr, size);
+        }
     }
 }
 
@@ -392,23 +427,18 @@ nic_stats_loop(void)
     SIGNAL sig;
     uint32_t alarms = 0;
 
-    set_alarm(MAC_STATS_CNTRS_INTERVAL, &sig);
+    set_alarm(STATS_ACCUMULATE_INTERVAL, &sig);
 
     for (;;) {
-#ifdef ACC_MAC_STATS
-        /* Accumulate the MAC statistics. */
-        mac_stats_accumulate();
-#endif
-
-        /* Push the accumulated counters to the config BAR. */
         if (signal_test(&sig)) {
-            /* Accumulate the per-q TM drop counters. */
-            if ((alarms & (TMQ_CNTRS_ACCUM_RATE_DIV-1)) == 0)
-                nic_tmq_drops_accumulate();
+            stats_accumulate();
+
+            if ((alarms & (STATS_AGGREGATE_DIVISOR-1)) == 0) {
+                stats_aggregate();
+            }
             alarms++;
 
-            nic_stats_update_control_bar();
-            set_alarm(MAC_STATS_CNTRS_INTERVAL, &sig);
+            set_alarm(STATS_ACCUMULATE_INTERVAL, &sig);
         }
         ctx_swap();
     }

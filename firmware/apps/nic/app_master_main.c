@@ -19,6 +19,7 @@
  * This implementation only handles one PCIe island.
  */
 
+
 #include <assert.h>
 #include <nfp.h>
 #include <nfp_chipres.h>
@@ -36,9 +37,9 @@
 
 #include <std/synch.h>
 #include <std/reg_utils.h>
-
 #include "nfd_user_cfg.h"
 #include <vnic/shared/nfd_cfg.h>
+#include <vnic/svc/msix.h>
 #include <vnic/pci_in.h>
 #include <vnic/pci_out.h>
 
@@ -48,6 +49,11 @@
 #include <link_state/link_state.h>
 
 #include <npfw/catamaran_app_utils.h>
+
+#include <vnic/nfd_common.h>
+
+#include "app_config_tables.h"
+#include "ebpf.h"
 
 /*
  * The application master runs on a single ME and performs a number of
@@ -83,15 +89,12 @@
 #error "NFD_PCIE0_EMEM must be defined"
 #endif
 
-/* APP Master CTXs assignments */
+/* APP Master CTXs assignments - 4 context mode */
 #define APP_MASTER_CTX_CONFIG_CHANGES   0
-#define APP_MASTER_CTX_MAC_STATS        1
-#define APP_MASTER_CTX_PERQ_STATS       2
-#define APP_MASTER_CTX_LINK_STATE       3
-#define APP_MASTER_CTX_FREE0            4
-#define APP_MASTER_CTX_FREE1            5
-#define APP_MASTER_CTX_FREE2            6
-#define APP_MASTER_CTX_FREE3            7
+#define APP_MASTER_CTX_MAC_STATS        2
+#define APP_MASTER_CTX_PERQ_STATS       4
+#define APP_MASTER_CTX_LINK_STATE       6
+
 
 /* Address of the PF Control BAR */
 
@@ -100,7 +103,11 @@
 #define NUM_PFS_VFS (NFD_MAX_PFS + NFD_MAX_VFS)
 
 /* Current value of NFP_NET_CFG_CTRL (shared between all contexts) */
-__shared __lmem volatile uint32_t nic_control_word[NS_PLATFORM_NUM_PORTS];
+/* TODO does NS_PLATFORM_NUM_PORTS equal NFD_MAX_PFS?
+ * If so should NFD_MAX_PFS be used below? */
+__shared __lmem volatile uint32_t nic_control_word[NS_PLATFORM_NUM_PORTS +
+                                                   NFD_MAX_CTRL];
+
 
 /* Current state of the link state and the pending interrupts. */
 #define LS_ARRAY_LEN           ((NUM_PFS_VFS + 31) >> 5)
@@ -133,13 +140,14 @@ __shared __lmem uint32_t pending[LS_ARRAY_LEN];
     __shared __lmem uint32_t app_mes_ids[] = {APP_MES_LIST};
 #endif
 
+
 __visible SIGNAL nfd_cfg_sig_app_master0;
 NFD_CFG_BASE_DECLARE(0);
 NFD_FLR_DECLARE;
+MSIX_DECLARE;
 
 /* A global synchronization counter to check if all APP MEs has reconfigured */
 __export __dram struct synch_cnt nic_cfg_synch;
-
 
 /*
  * Global declarations for per Q stats updates
@@ -151,18 +159,6 @@ __export __dram struct synch_cnt nic_cfg_synch;
 /*
  * Global declarations for Link state change management
  */
-
-/* TODO : REPLACE WITH HEADER FILE DIRECTIVE WHEN AVAILABLE */
-__intrinsic extern int msix_pf_send(unsigned int pcie_nr,
-                                    unsigned int bar_nr,
-                                    unsigned int entry_nr,
-                                    unsigned int mask_en);
-
-__intrinsic extern int msix_vf_send(unsigned int pcie_nr,
-                                    unsigned int bar_nr, unsigned int vf_nr,
-                                    unsigned int entry_nr, unsigned int mask_en);
-
-
 /* Amount of time between each link status check */
 #define LSC_POLL_PERIOD            10000
 
@@ -192,6 +188,22 @@ __shared __gpr volatile int mac_reg_lock = 0;
 
 #endif /* NS_PLATFORM_TYPE != NS_PLATFORM_CARBON */
 
+/* Link rate */
+#define   NFP_NET_CFG_STS_LINK_RATE_SHIFT 1
+#define   NFP_NET_CFG_STS_LINK_RATE_MASK  0xF
+#define   NFP_NET_CFG_STS_LINK_RATE       \
+	(NFP_NET_CFG_STS_LINK_RATE_MASK << NFP_NET_CFG_STS_LINK_RATE_SHIFT)
+#define   NFP_NET_CFG_STS_LINK_RATE_UNSUPPORTED   0
+#define   NFP_NET_CFG_STS_LINK_RATE_UNKNOWN       1
+#define   NFP_NET_CFG_STS_LINK_RATE_1G            2
+#define   NFP_NET_CFG_STS_LINK_RATE_10G           3
+#define   NFP_NET_CFG_STS_LINK_RATE_25G           4
+#define   NFP_NET_CFG_STS_LINK_RATE_40G           5
+#define   NFP_NET_CFG_STS_LINK_RATE_50G           6
+#define   NFP_NET_CFG_STS_LINK_RATE_100G          7
+
+
+__intrinsic void nic_local_epoch();
 
 /* Translate port speed to link rate encoding */
 __intrinsic static unsigned int
@@ -386,54 +398,91 @@ cfg_changes_loop(void)
 {
     struct nfd_cfg_msg cfg_msg;
     __xread unsigned int cfg_bar_data[2];
-    volatile __xwrite uint32_t cfg_pci_vnic;
+    /* out volatile __xwrite uint32_t cfg_pci_vnic; */
     __gpr int i;
-    uint32_t port;
+    uint32_t vid, type, vnic, port;
+    uint32_t update;
+    uint32_t control;
+    __gpr uint32_t ctx_mode = 1;
+    __emem __addr40 uint8_t *bar_base;
 
     /* Initialisation */
+    MSIX_INIT_ISL(NIC_PCI);
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
+    nic_local_init(0, 0);		/* dummy regs right now */
+
+    sleep(1000000); // wait for NN registers to come up in reflect mode
+    init_nn_tables();
+    upd_slicc_hash_table();
 
     for (;;) {
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
 
         if (cfg_msg.msg_valid) {
 
-            port = cfg_msg.vnic;
+            vid = cfg_msg.vid;
             /* read in the first 64bit of the Control BAR */
-            mem_read64(cfg_bar_data, NFD_CFG_BAR_ISL(NIC_PCI, port),
+            mem_read64(cfg_bar_data, NFD_CFG_BAR_ISL(NIC_PCI, vid),
                        sizeof cfg_bar_data);
 
-            /* Reflect the pci island and the vnic number to remote MEs */
-            cfg_pci_vnic = (NIC_PCI << 16) | port;
-            /* Reset the configuration ack counter */
-            synch_cnt_dram_reset(&nic_cfg_synch,
-                                 sizeof(app_mes_ids)/sizeof(uint32_t));
-            /* Signal all APP MEs about a config change */
-            for(i = 0; i < sizeof(app_mes_ids)/sizeof(uint32_t); i++) {
-                ct_reflect_data(app_mes_ids[i], APP_ME_CONFIG_CTX,
-                                APP_ME_CONFIG_XFER_NUM,
-                                APP_ME_CONFIG_SIGNAL_NUM,
-                                &cfg_pci_vnic, sizeof cfg_pci_vnic);
-            }
+            control = cfg_bar_data[0];
+            update = cfg_bar_data[1];
 
-            /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
-            if ((nic_control_word[port] ^ cfg_bar_data[0]) &
-                    NFP_NET_CFG_CTRL_ENABLE) {
+            NFD_VID2VNIC(type, vnic, vid);
 
-                if (cfg_bar_data[0] & NFP_NET_CFG_CTRL_ENABLE) {
-                    /* Enable the MAC RX. */
-                    mac_port_enable_rx(port);
+            if (type == NFD_VNIC_TYPE_CTRL) {
+                /* For now just set the link on. */
+                /* TODO figure out what else is required */
+                __xwrite unsigned int link_state;
+
+                nic_control_word[vid] = control;
+
+                /* Set link state */
+                if (!cfg_msg.error &&
+                    (control & NFP_NET_CFG_CTRL_ENABLE)) {
+                    link_state = NFP_NET_CFG_STS_LINK;
                 } else {
-                    /* Inhibit and disable the MAC RX. */
-                    mac_port_disable_rx(port);
+                    link_state = 0;
                 }
+	        app_config_port(vid, control, update);	/* write cmsg instr */
+    		upd_slicc_hash_table();
+
+                mem_write32(&link_state,
+                            (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg.vid) +
+                             NFP_NET_CFG_STS),
+                            sizeof link_state);
+            } else if (type == NFD_VNIC_TYPE_PF) {
+                port = vnic;
+
+                if (update & NFP_NET_CFG_UPDATE_BPF) {
+	            nic_local_bpf_reconfig(&ctx_mode, vid, vnic);
+                }
+
+                if (control & NFP_NET_CFG_CTRL_ENABLE) {
+                    app_config_port(vid, control, update);
+                    nic_local_epoch();
+                }
+
+                /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
+                if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
+                    if (control & NFP_NET_CFG_CTRL_ENABLE) {
+                        mac_port_enable_rx(port);
+                    } else {
+                        mac_port_disable_rx(port);
+                        app_config_port_down(vid);
+                        nic_local_epoch();
+                    }
+                }
+
+                /* Save the control word */
+                nic_control_word[vid] = control;
+
+                /* Wait for queues to drain / config to stabilize */
+                sleep(100000);
+
+            } else {
+                    /* This is an error, VFs aren't supported yet */
             }
-
-            /* Save the control word */
-            nic_control_word[port] = cfg_bar_data[0];
-
-            /* Wait for all APP MEs to ack the config change */
-            synch_cnt_dram_wait(&nic_cfg_synch);
 
             /* Complete the message */
             cfg_msg.msg_valid = 0;
@@ -468,20 +517,20 @@ perq_stats_loop(void)
 
     for (;;) {
         for (txq = 0;
-             txq < ((NFD_MAX_VFS * NFD_MAX_VF_QUEUES) +
-                    (NFD_MAX_PFS * NFD_MAX_PF_QUEUES));
+             txq < (NFD_TOTAL_VFQS + NFD_TOTAL_CTRLQS + NFD_TOTAL_PFQS);
              txq++) {
             __nfd_out_push_pkt_cnt(NIC_PCI, txq, ctx_swap, &txq_sig);
             sleep(PERQ_STATS_SLEEP);
         }
 
         for (rxq = 0;
-             rxq < ((NFD_MAX_VFS * NFD_MAX_VF_QUEUES) +
-                    (NFD_MAX_PFS * NFD_MAX_PF_QUEUES));
+             rxq < (NFD_TOTAL_VFQS + NFD_TOTAL_CTRLQS + NFD_TOTAL_PFQS);
              rxq++) {
             __nfd_in_push_pkt_cnt(NIC_PCI, rxq, ctx_swap, &rxq_sig);
-            sleep(PERQ_STATS_SLEEP);           
+            sleep(PERQ_STATS_SLEEP);
         }
+
+        nic_local_epoch();
     }
     /* NOTREACHED */
 }
@@ -498,9 +547,9 @@ perq_stats_loop(void)
 
 /* Send an LSC MSI-X. return 0 if done or 1 if pending */
 __inline static int
-lsc_send(int nic_intf)
+lsc_send(int vid)
 {
-    __mem char *nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, nic_intf);
+    __mem char *nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vid);
     unsigned int automask;
     __xread unsigned int tmp;
     __gpr unsigned int entry;
@@ -517,7 +566,7 @@ lsc_send(int nic_intf)
         goto out;
 
     /* Work out which masking mode we should use */
-    automask = nic_control_word[nic_intf] & NFP_NET_CFG_CTRL_MSIXAUTO;
+    automask = nic_control_word[vid] & NFP_NET_CFG_CTRL_MSIXAUTO;
 
     /* If we don't auto-mask, check the ICR */
     if (!automask) {
@@ -542,16 +591,19 @@ out:
 __inline static void
 lsc_check(int nic_intf)
 {
-    __mem char *nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, nic_intf);
+    __mem char *nic_ctrl_bar;
     __gpr enum link_state ls;
     __gpr int changed = 0;
     __xwrite uint32_t sts;
     __gpr int ret = 0;
+    uint32_t vid;
 
+    vid = NFD_PF2VID(nic_intf);
+    nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vid);
     /* XXX Only check link state once the device is up.  This is
      * temporary to avoid a system crash when the MAC gets reset after
      * FW has been loaded. */
-    if (!(nic_control_word[nic_intf] & NFP_NET_CFG_CTRL_ENABLE)) {
+    if (!(nic_control_word[vid] & NFP_NET_CFG_CTRL_ENABLE)) {
         ls = LINK_DOWN;
         goto skip_link_read;
     } else {
@@ -645,9 +697,11 @@ lsc_loop(void)
     /* NOTREACHED */
 }
 
+
 int
 main(void)
 {
+
     switch (ctx()) {
     case APP_MASTER_CTX_CONFIG_CHANGES:
         init_catamaran_chan2port_table();

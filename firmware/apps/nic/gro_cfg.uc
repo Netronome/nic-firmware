@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   gro_cfg.uc
+ * @brief  Configuration for global reorder blocks.
+ */
+
 #ifndef __GRO_CFG_UC
 #define __GRO_CFG_UC
 
@@ -11,19 +18,14 @@
 
 /* Global mandetory parameters */
 #ifndef GRO_NUM_BLOCKS
-    #define GRO_NUM_BLOCKS          1
+    #define GRO_NUM_BLOCKS          6
 #endif
 
 #ifndef GRO_CTX_PER_BLOCK
-/* We want to use the ingress sequencer number (1-4) for the GRO CTX number,
-   so we need 4 CTXs, since we use 1:1 mapping we need CTXs 1-4.
-   Assuming we need to start from 0 this ends up having 5 CTXs, the number
-   of GRO CTXs per block must be a power of 2 -> so we setup 8 CTXs.
-*/
-    #define GRO_CTX_PER_BLOCK       8
+    #define GRO_CTX_PER_BLOCK       1
 #endif
 
-
+#if 0
 #macro nfd_out_ring_declare()
     #ifdef NFD_PCIE0_EMEM
         .alloc_resource \
@@ -45,53 +47,29 @@
             nfd_out_ring_num30 NFD_PCIE3_EMEM/**/_queues global 1 1
     #endif /* NFD_PCIE3_EMEM */
 #endm
-
+#else
+    #include <nfd_out.uc>
+#endif
 
 #macro gro_config_block(BLOCKNUM, CALLER)
 
-    /* Set up the 8 GRO CTXs                        */
-    /* Using island GRO_ISL CTM for bitmaps              */
-    /* Using island 24 to hold the reorder queues   */
-    /* Size of each reorder queue is 8K             */
-    #if (GRO_CTX_PER_BLOCK > 0)
-        gro_declare_ctx(BLOCKNUM, CALLER, 0, GRO_ISL, 24, 8192)
-    #endif
+        gro_declare_ctx(BLOCKNUM, CALLER, 0, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
 
-    #if (GRO_CTX_PER_BLOCK > 1)
-        gro_declare_ctx(BLOCKNUM, CALLER, 1, GRO_ISL, 24, 8192)
-    #endif
+        gro_declare_ctx(BLOCKNUM, CALLER, 1, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
 
-    #if (GRO_CTX_PER_BLOCK > 2)
-        gro_declare_ctx(BLOCKNUM, CALLER, 2, GRO_ISL, 24, 8192)
-    #endif
+        gro_declare_ctx(BLOCKNUM, CALLER, 2, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
 
-    #if (GRO_CTX_PER_BLOCK > 3)
-        gro_declare_ctx(BLOCKNUM, CALLER, 3, GRO_ISL, 24, 8192)
-    #endif
+        gro_declare_ctx(BLOCKNUM, CALLER, 3, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
 
-    #if (GRO_CTX_PER_BLOCK > 4)
-        gro_declare_ctx(BLOCKNUM, CALLER, 4, GRO_ISL, 24, 8192)
-    #endif
+        gro_declare_ctx(BLOCKNUM, CALLER, 4, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
 
-    #if (GRO_CTX_PER_BLOCK > 5)
-        gro_declare_ctx(BLOCKNUM, CALLER, 5, GRO_ISL, 24, 8192)
-    #endif
+        gro_declare_ctx(BLOCKNUM, CALLER, 5, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
 
-    #if (GRO_CTX_PER_BLOCK > 6)
-        gro_declare_ctx(BLOCKNUM, CALLER, 6, GRO_ISL, 24, 8192)
-    #endif
-
-    #if (GRO_CTX_PER_BLOCK > 7)
-        gro_declare_ctx(BLOCKNUM, CALLER, 7, GRO_ISL, 24, 8192)
-    #endif
-
-    #if (GRO_CTX_PER_BLOCK > 8)
-        #error "GRO_CTX_PER_BLOCK > 8 not supported"
-    #endif
 
     /* Netdev wire does not send to NBI, so no NBI dest         */
     /* gro_declare_dest_nbi(BLOCKNUM, CALLER, 0, GRO_1_SEQR)    */
     /* gro_declare_dest_nbi(BLOCKNUM, CALLER, 1, GRO_1_SEQR)    */
+    gro_declare_dest_nbi(BLOCKNUM, CALLER, 0, (BLOCKNUM + 1))
 
     /* Declare the ring IDs with the same exact names as in nfd_out.h */
     /* This will allocate nfd_out_ring_num<isl>0                      */

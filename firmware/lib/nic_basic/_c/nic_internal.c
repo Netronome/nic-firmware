@@ -20,9 +20,14 @@
 #ifndef _LIBNIC_NIC_INTERNAL_C_
 #define _LIBNIC_NIC_INTERNAL_C_
 
+//#ifndef CFG_NIC_LIB_DBG_JOURNAL
+//#define CFG_NIC_LIB_DBG_JOURNAL 1
+//#endif
+
 #include <assert.h>
 #include <nfp.h>
 #include <stdint.h>
+#include <nfp_cluster_target.h>
 
 #include <nfp/me.h>
 #include <nfp/mem_atomic.h>
@@ -30,6 +35,7 @@
 #include <std/event.h>
 #include <std/reg_utils.h>
 #include <std/synch.h>
+#include <nfp/pcie.h>
 
 #include <nfp6000/nfp_cls.h>
 #include <nfp6000/nfp_event.h>
@@ -80,6 +86,7 @@ __export __dram uint64_t nic_cnt_tx_drop_mtu;
 #define NIC_LIB_CNTR(_me)
 #endif
 
+
 #define CREATE_JOURNAL(name)                                    \
     EMEM0_QUEUE_ALLOC(name##_rnum, global);                     \
     _NFP_CHIPRES_ASM(.alloc_mem name##_mem emem0 global         \
@@ -99,7 +106,7 @@ __export __dram uint64_t nic_cnt_tx_drop_mtu;
 #if defined(CFG_NIC_LIB_DBG_JOURNAL)
 
 #define NIC_LIB_DBG(name, _x)                                 \
-    mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _x);
+    mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _x)
 #define NIC_LIB_DBG4(name, _a, _b, _c, _d)                           \
     do {                                                                \
         mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _a); \
@@ -107,9 +114,12 @@ __export __dram uint64_t nic_cnt_tx_drop_mtu;
         mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _c); \
         mem_ring_journal_fast(dbg_##name##_rnum, dbg_##name##_mem, _d); \
     } while (0)
+#define PRINTDBG(name, _a)                                 \
+    mem_ring_journal(dbg_##name##_rnum, dbg_##name##_mem, _a, 4)
 #else
 #define NIC_LIB_DBG(name, _x)
 #define NIC_LIB_DBG4(name, _a, _b, _c, _d)
+#define PRINTDBG(name, _a)
 #endif
 
 
@@ -177,11 +187,6 @@ CREATE_JOURNAL(libnic_dbg);
       (((__lmem struct eth_addr *)_a)->a[0] & NET_ETH_GROUP_ADDR) \
     : (((__gpr struct eth_addr *)_a)->a[0] & NET_ETH_GROUP_ADDR))
 
-#if NFD_MAX_PFS != 0
-    #define NVNICS NFD_MAX_PFS
-#else
-    #define NVNICS 2
-#endif
 /*
  * Struct describing the current state of the NIC endpoint.
  *
@@ -242,8 +247,8 @@ swapw64(uint64_t val)
 __intrinsic void
 nic_local_init(int sig_num, int reg_num)
 {
-    __assign_relative_register((void *)&cfg_bar_change_sig, sig_num);
-    __assign_relative_register((void *)&cfg_bar_change_info, reg_num);
+    //__assign_relative_register((void *)&cfg_bar_change_sig, sig_num);
+    //__assign_relative_register((void *)&cfg_bar_change_info, reg_num);
 
 #if defined(CFG_NIC_LIB_DBG_JOURNAL)
     INIT_JOURNAL(libnic_dbg);
@@ -400,6 +405,247 @@ nic_local_reconfig_done()
     synch_cnt_dram_ack(&nic_cfg_synch);
 }
 
+#include "ebpf.h"
+
+__intrinsic int
+nic_local_cfg_bpf_is_enabled()
+{
+    __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
+
+    return !!(nic->control[0] & NFP_NET_CFG_CTRL_BPF);
+}
+
+static __intrinsic void
+ct_write_nn(unsigned int isl, unsigned int me, unsigned int nn_idx, unsigned int val)
+{
+    SIGNAL sig;
+    unsigned int addr;
+    unsigned int __xwrite xfer;
+
+    addr = (isl << 24) | (me << 17) | (1 << 9) | (nn_idx << 2);
+    xfer = val;
+
+    __asm {
+        ct[ctnn_write, xfer, addr, 0, 1], ctx_swap[sig];
+    };
+}
+
+/* XXX Move to some sort of CT reflect library */
+static __intrinsic unsigned int
+ct_read_csr(unsigned int isl, unsigned int me, unsigned int csr_addr)
+{
+    SIGNAL sig;
+    unsigned int addr;
+    unsigned int ret;
+    unsigned int __xread xfer;
+
+    addr = (isl << 24) | (1 << 16) | (me << 10) | csr_addr;
+
+    __asm {
+        ct[reflect_read_sig_init, xfer, addr, 0, 1], ctx_swap[sig];
+    };
+
+    ret = xfer;
+
+    return ret;
+}
+
+
+static __intrinsic void
+ct_write_csr(unsigned int isl, unsigned int me, unsigned int csr_addr, unsigned int val)
+{
+    SIGNAL sig;
+    unsigned int addr;
+    unsigned int __xwrite xfer;
+
+    addr = (isl << 24) | (1 << 16) | (me << 10) | csr_addr;
+    xfer = val;
+
+    __asm {
+        ct[reflect_write_sig_init, xfer, addr, 0, 1], ctx_swap[sig];
+    };
+}
+
+
+static __intrinsic void
+ct_signal(unsigned int isl, unsigned int me, unsigned int ctx, unsigned int signal)
+{
+    unsigned int addr;
+
+    addr = (isl << 24) | (me << 9) | (ctx << 6) | (signal << 2);
+
+    __asm {
+        ct[interthread_signal, --, 0, addr, --];
+    };
+}
+
+#define PKT_IO_SIG_EPOCH        8
+#define PKT_IO_SIG_NBI          9
+#define PKT_IO_SIG_NFD          10
+#define PKT_IO_SIG_NFD_RETRY    11
+#define PKT_IO_SIG_RESUME       12
+#define PKT_IO_SIG_QUIESCE_NBI  13
+#define PKT_IO_SIG_QUIESCE_NFD  14
+
+#define ME_CSR_USTORE_ADDR      0x00
+#define ME_CSR_USTORE_DATA_LO   0x04
+#define ME_CSR_USTORE_DATA_HI   0x08
+#define ME_CSR_CTX_ENABLES      0x18
+#define ME_CSR_CTX_PTR          0x20
+#define ME_CSR_IND_CTX_STS      0x40
+#define ME_CSR_IND_CTX_SGL_EVT  0x48
+#define ME_CSR_IND_CTX_WKP_EVT  0x50
+
+__shared __lmem uint32_t dp_mes_ids[] = { APP_MES_LIST };
+
+static __intrinsic void
+update_bpf_prog(__gpr uint32_t *ctx_mode, __emem __addr40 uint8_t *bar_base, uint32_t vnic)
+{
+    __xread uint32_t host_mem_bpf_cfg[3];
+    __xread uint32_t data[2];
+    __gpr uint32_t data_out;
+    __gpr unsigned int addr_hi;
+    __gpr unsigned int addr_lo;
+    __gpr unsigned int i;
+    __gpr unsigned int words;
+    __gpr unsigned int isl;
+    __gpr unsigned int me;
+    __gpr unsigned int ctx;
+    __gpr unsigned int wkp_mask;
+    __gpr unsigned int ctx_enables;
+
+    for (i = 0; i < sizeof(dp_mes_ids) / sizeof(uint32_t); i++) {
+        isl = dp_mes_ids[i] >> 4;
+        me = dp_mes_ids[i] & 0xf;
+
+        // signal threads to go quiescent
+        for (ctx = 0; ctx < 8; ctx = ctx + 2) {
+            ct_signal(isl, me, ctx, PKT_IO_SIG_QUIESCE_NBI);
+            ct_signal(isl, me, ctx, PKT_IO_SIG_QUIESCE_NFD);
+        }
+        sleep(10000);
+
+        // force any remaining threads to quiesce
+        do {
+            ctx_enables = ct_read_csr(isl, me, ME_CSR_CTX_ENABLES);
+            ctx_enables &= 0xffff00ff;
+            ct_write_csr(isl, me, ME_CSR_CTX_ENABLES, ctx_enables);
+            sleep(250);
+            for (ctx = 0; ctx < 8; ctx += 2) {
+                ct_write_csr(isl, me, ME_CSR_CTX_PTR, ctx);
+                wkp_mask = ct_read_csr(isl, me, ME_CSR_IND_CTX_WKP_EVT);
+                if (! (wkp_mask & ((1 << PKT_IO_SIG_EPOCH) | (1 << PKT_IO_SIG_RESUME))))
+                    ctx_enables |= (1 << (8 + ctx));
+            }
+            if (ctx_enables & 0xff00) {
+                ct_write_csr(isl, me, ME_CSR_CTX_ENABLES, ctx_enables);
+                sleep(1000); // shorter wait, will wait again if necessary
+            }
+        }
+        while (ctx_enables & 0xff00);
+
+        // safe to write BPF code store
+        mem_read32(host_mem_bpf_cfg, bar_base + NFP_NET_CFG_BPF_SIZE - 2, sizeof host_mem_bpf_cfg);
+
+        // note: data from the BAR comes in 4B-swapped; low is high, high is low
+        words = host_mem_bpf_cfg[0] >> 16;
+        addr_lo = host_mem_bpf_cfg[1];
+        addr_hi = host_mem_bpf_cfg[2];
+
+        pcie_c2p_barcfg_set(0 /*pci_isl0*/, PCIE_CPP2PCIE_BPF_LOAD, addr_hi, addr_lo, 0);
+
+        addr_lo >>= 3;
+
+        // set instr pointer to 'start' and enable writing. */
+        data_out = 0x80000000 + NFD_BPF_START_OFF + vnic * NFD_BPF_MAX_LEN;
+        ct_write_csr(isl, me, ME_CSR_USTORE_ADDR, data_out);
+
+        while (words--) {
+            pcie_read(&data, 4, PCIE_CPP2PCIE_BPF_LOAD, addr_hi, addr_lo << 3, sizeof(data));
+
+            addr_lo++;
+            addr_hi += addr_lo >> 29;
+            NIC_LIB_DBG(libnic_dbg, isl);
+            NIC_LIB_DBG(libnic_dbg, me);
+            data_out = data[0];
+            NIC_LIB_DBG(libnic_dbg, data_out);
+            ct_write_csr(isl, me, ME_CSR_USTORE_DATA_LO, data_out);
+            data_out = data[1];
+            NIC_LIB_DBG(libnic_dbg, data_out);
+            ct_write_csr(isl, me, ME_CSR_USTORE_DATA_HI, data_out);
+        }
+
+        // normal mode
+        data_out = 0;
+        ct_write_csr(isl, me, ME_CSR_USTORE_ADDR, data_out);
+
+        sleep(500);
+
+        ctx_enables = ct_read_csr(isl, me, ME_CSR_CTX_ENABLES);
+        ct_write_csr(isl, me, ME_CSR_CTX_ENABLES, ctx_enables | 0x5500);
+
+        sleep(500);
+
+        // kick off threads again
+        for (ctx = 0; ctx < 8; ctx += 2) {
+            ct_signal(isl, me, ctx, PKT_IO_SIG_RESUME);
+        }
+   }
+
+    return;
+}
+
+__intrinsic void
+nic_local_bpf_reconfig(__gpr uint32_t *ctx_mode, uint32_t vid, uint32_t vnic)
+{
+    __shared __lmem volatile struct nic_local_state *nic = &nic_lstate;
+    __xread uint32_t tmp2[2];
+    __emem __addr40 uint8_t *bar_base;
+
+    /* Need to read the update word from the BAR */
+
+    /* Calculate the relevant configuration BAR base address */
+    bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
+
+    update_bpf_prog(ctx_mode, bar_base, vnic);
+
+    return;
+}
+
+#define EPOCH_NN_IDX 127
+__shared __lmem uint32_t epoch = 0;
+
+__intrinsic void
+nic_local_epoch() {
+    __gpr unsigned int i;
+    __gpr unsigned int isl;
+    __gpr unsigned int me;
+    __gpr unsigned int ctx;
+    __gpr unsigned int sig_mask;
+
+    epoch++;
+
+    for (i = 0; i < sizeof(dp_mes_ids) / sizeof(uint32_t); i++) {
+        isl = dp_mes_ids[i] >> 4;
+        me = dp_mes_ids[i] & 0xf;
+
+        for (ctx = 0; ctx < 8; ctx = ctx + 2) {
+            ct_signal(isl, me, ctx, PKT_IO_SIG_EPOCH);
+        }
+
+        do {
+            sleep(250);
+            sig_mask = 0;
+            for (ctx = 0; ctx < 8; ctx += 2) {
+                ct_write_csr(isl, me, ME_CSR_CTX_PTR, ctx);
+                sig_mask |= ct_read_csr(isl, me, ME_CSR_IND_CTX_SGL_EVT);
+            }
+        }
+        while (sig_mask & (1 << PKT_IO_SIG_EPOCH));
+
+        ct_write_nn(isl, me, EPOCH_NN_IDX, epoch);
+    }
+}
 
 #endif /* _LIBNIC_NIC_INTERNAL_C_ */
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*- */
