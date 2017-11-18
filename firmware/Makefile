@@ -141,8 +141,8 @@ firmware_clean:
 
 firmware_veryclean: firmware_clean firmware_clean_deps
 
-PKG_NAME = $(shell git describe --tags HEAD | sed 's/\(.*\)-\([[0-9].*[[:alnum:]]*\)/\1/')
-PKG_VER = $(shell git describe --tags HEAD | sed 's/\(.*\)-\([[0-9].*[[:alnum:]]*\)/\2/' | sed 's/%/~/g' | sed 's/-/\./g')$(GIT_DIFF_UNC)
+PKG_NAME = $(shell git describe --tags HEAD | sed 's/\([a-zA-Z\-]*\)-\(.*[0-9].*[[:alnum:]]*\)/\1/')
+PKG_VER = $(shell git describe --tags HEAD | sed 's/\([a-zA-Z\-]*\)-\(.*[0-9].*[[:alnum:]]*\)/\2/' | sed 's/%/~/g' | sed 's/-/\./g')$(GIT_DIFF_UNC)
 DEB_PKG = $(FIRMWARE_DIR)/pkg/deb/agilio-$(PKG_NAME)-firmware-$(PKG_VER)-1
 DEB_SZ = $(shell du -ck $(FW_NFFW)/*.nffw | grep total$ | cut -f 1)
 
