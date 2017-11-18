@@ -135,21 +135,27 @@ DEB_PKG = $(FIRMWARE_DIR)/pkg/deb/agilio-$(PKG_NAME)-firmware-$(PKG_VER)-1
 DEB_SZ = $(shell du -ck $(FW_NFFW)/*.nffw | grep total$ | cut -f 1)
 
 firmware_deb: firmware_all
-	@mkdir -p $(DEB_PKG)/{lib/firmware/netronome/$(PKG_NAME),DEBIAN}
-	@cp $(FW_NFFW)/*.nffw $(DEB_PKG)/lib/firmware/netronome/$(PKG_NAME)
+	@mkdir -p $(DEB_PKG)/{lib/firmware/netronome/agilio-$(PKG_NAME),DEBIAN}
+	@cp $(FW_NFFW)/*.nffw $(DEB_PKG)/lib/firmware/netronome/agilio-$(PKG_NAME)
 	@cat $(FIRMWARE_DIR)/pkg/deb.control | sed 's/__VERSION__/$(PKG_VER)-1/g' | sed 's/__FW_NAME__/$(PKG_NAME)/g' > $(DEB_PKG)/DEBIAN/control
 	@echo "Installed-Size: $(DEB_SZ)" >> $(DEB_PKG)/DEBIAN/control
 	@echo "#!/bin/sh" > $(DEB_PKG)/DEBIAN/postinst
-	@echo "cd /lib/firmware/netronome && ln -sf $(PKG_NAME)/*.nffw ./" >> $(DEB_PKG)/DEBIAN/postinst
-	@chmod a+x $(DEB_PKG)/DEBIAN/postinst
+	@cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(PKG_NAME)/g' >> $(DEB_PKG)/DEBIAN/postinst
+	@echo "#!/bin/sh" > $(DEB_PKG)/DEBIAN/prerm
+	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(DEB_PKG)/DEBIAN/prerm
+	@chmod a+x $(DEB_PKG)/DEBIAN/postinst $(DEB_PKG)/DEBIAN/prerm
 	@fakeroot dpkg-deb --build $(DEB_PKG)
 
 RPM_PKG = $(FIRMWARE_DIR)/pkg/rpm
 
 firmware_rpm: firmware_all
-	@mkdir -p $(RPM_PKG)/{BUILD/lib/firmware/netronome/$(PKG_NAME),SPECS,RPMS}
-	@cp $(FW_NFFW)/*.nffw $(RPM_PKG)/BUILD/lib/firmware/netronome/$(PKG_NAME)
+	@mkdir -p $(RPM_PKG)/{BUILD/lib/firmware/netronome/agilio-$(PKG_NAME),SPECS,RPMS}
+	@cp $(FW_NFFW)/*.nffw $(RPM_PKG)/BUILD/lib/firmware/netronome/agilio-$(PKG_NAME)
 	@cat $(FIRMWARE_DIR)/pkg/rpm.spec | sed 's/__VERSION__/$(PKG_VER)/g' | sed 's/__FW_NAME__/$(PKG_NAME)/g' > $(RPM_PKG)/SPECS/agilio-firmware.spec
+	@echo "%post" >> $(RPM_PKG)/SPECS/agilio-firmware.spec
+	@cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(PKG_NAME)/g' >> $(RPM_PKG)/SPECS/agilio-firmware.spec
+	@echo "%preun" >> $(RPM_PKG)/SPECS/agilio-firmware.spec
+	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(RPM_PKG)/SPECS/agilio-firmware.spec
 	@rpmbuild -bb $(RPM_PKG)/SPECS/agilio-firmware.spec --buildroot $(RPM_PKG)/BUILD --define "_rpmdir $(RPM_PKG)/RPMS"
 
 package: firmware_deb firmware_rpm
