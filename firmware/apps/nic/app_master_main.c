@@ -535,16 +535,19 @@ perq_stats_loop(void)
 
 /* Send an LSC MSI-X. return 0 if done or 1 if pending */
 __inline static int
-lsc_send(int vid)
+lsc_send(int port)
 {
-    __mem char *nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vid);
+    __mem char *nic_ctrl_bar;
     unsigned int automask;
     __xread unsigned int tmp;
     __gpr unsigned int entry;
     __xread uint32_t mask_r;
     __xwrite uint32_t mask_w;
-
+    uint32_t vid;
     int ret = 0;
+
+    vid = NFD_PF2VID(port);
+    nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vid);
 
     mem_read32_le(&tmp, nic_ctrl_bar + NFP_NET_CFG_LSC, sizeof(tmp));
     entry = tmp & 0xff;
@@ -574,10 +577,8 @@ out:
     return ret;
 }
 
-/* Check the Link state and try to generate an interrupt if it changed.
- * Return 0 if everything is fine, or 1 if there is pending interrupt. */
-__inline static void
-lsc_check(int nic_intf)
+/* Check the Link state and try to generate an interrupt if it changed. */
+__inline static void lsc_check(int port)
 {
     __mem char *nic_ctrl_bar;
     __gpr enum link_state ls;
@@ -586,7 +587,7 @@ lsc_check(int nic_intf)
     __gpr int ret = 0;
     uint32_t vid;
 
-    vid = NFD_PF2VID(nic_intf);
+    vid = NFD_PF2VID(port);
     nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vid);
     /* XXX Only check link state once the device is up.  This is
      * temporary to avoid a system crash when the MAC gets reset after
@@ -601,28 +602,28 @@ lsc_check(int nic_intf)
     /* Read the current link state and if it changed set the bit in
      * the control BAR status */
     ls = mac_eth_port_link_state(
-             NS_PLATFORM_MAC(nic_intf), NS_PLATFORM_MAC_SERDES_LO(nic_intf),
-             (NS_PLATFORM_PORT_SPEED(nic_intf) > 1) ? 0 : 1);
+             NS_PLATFORM_MAC(port), NS_PLATFORM_MAC_SERDES_LO(port),
+             (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1);
 
-    if (ls != LS_READ(ls_current, nic_intf)) {
+    if (ls != LS_READ(ls_current, port)) {
         changed = 1;
         if (ls)
-            LS_SET(ls_current, nic_intf);
+            LS_SET(ls_current, port);
         else
-            LS_CLEAR(ls_current, nic_intf);
+            LS_CLEAR(ls_current, port);
     }
 
     if (changed) {
         if (ls == LINK_DOWN) {
             /* Prevent MAC TX datapath from stranding any packets. */
-            mac_port_enable_tx_flush(NS_PLATFORM_MAC(nic_intf),
-                                     NS_PLATFORM_MAC_CORE(nic_intf),
-                                     NS_PLATFORM_MAC_CORE_SERDES_LO(nic_intf));
+            mac_port_enable_tx_flush(NS_PLATFORM_MAC(port),
+                                     NS_PLATFORM_MAC_CORE(port),
+                                     NS_PLATFORM_MAC_CORE_SERDES_LO(port));
         } else {
             /* Re-enable MAC TX datapath. */
             mac_port_disable_tx_flush(
-                NS_PLATFORM_MAC(nic_intf), NS_PLATFORM_MAC_CORE(nic_intf),
-                NS_PLATFORM_MAC_CORE_SERDES_LO(nic_intf));
+                NS_PLATFORM_MAC(port), NS_PLATFORM_MAC_CORE(port),
+                NS_PLATFORM_MAC_CORE_SERDES_LO(port));
         }
     }
 
@@ -633,17 +634,17 @@ skip_link_read:
         sts = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
                NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 0;
     } else {
-        sts = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(nic_intf)) <<
+        sts = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
                NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
     }
     mem_write32(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
 
     /* If the link state changed, try to send in interrupt */
-    if (changed || LS_READ(pending, nic_intf)) {
-        if (lsc_send(nic_intf))
-            LS_SET(pending, nic_intf);
+    if (changed || LS_READ(pending, port)) {
+        if (lsc_send(port))
+            LS_SET(pending, port);
         else
-            LS_CLEAR(pending, nic_intf);
+            LS_CLEAR(pending, port);
     }
 }
 
