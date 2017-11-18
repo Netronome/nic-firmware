@@ -14,9 +14,4 @@ Firmware for Netronome Agilio SmartNICs
 %files
 %define _binaries_in_noarch_packages_terminate_build 0
 %defattr(-,root, root)
-/lib/firmware/netronome/__FW_NAME__
-
-%post
-cd /lib/firmware/netronome
-ln -sf __FW_NAME__/*.nffw ./
-
+/lib/firmware/netronome/agilio-__FW_NAME__
