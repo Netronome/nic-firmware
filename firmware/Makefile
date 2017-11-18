@@ -153,6 +153,7 @@ firmware_deb: firmware_all
 	@echo "Installed-Size: $(DEB_SZ)" >> $(DEB_PKG)/DEBIAN/control
 	@echo "#!/bin/sh" > $(DEB_PKG)/DEBIAN/postinst
 	@cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(PKG_NAME)/g' >> $(DEB_PKG)/DEBIAN/postinst
+	@echo "update-initramfs -uk all" >> $(DEB_PKG)/DEBIAN/postinst
 	@echo "#!/bin/sh" > $(DEB_PKG)/DEBIAN/prerm
 	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(DEB_PKG)/DEBIAN/prerm
 	@chmod a+x $(DEB_PKG)/DEBIAN/postinst $(DEB_PKG)/DEBIAN/prerm
@@ -166,6 +167,7 @@ firmware_rpm: firmware_all
 	@cat $(FIRMWARE_DIR)/pkg/rpm.spec | sed 's/__VERSION__/$(PKG_VER)/g' | sed 's/__FW_NAME__/$(PKG_NAME)/g' > $(RPM_PKG)/SPECS/agilio-firmware.spec
 	@echo "%post" >> $(RPM_PKG)/SPECS/agilio-firmware.spec
 	@cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(PKG_NAME)/g' >> $(RPM_PKG)/SPECS/agilio-firmware.spec
+	@echo "dracut -f" >> $(RPM_PKG)/SPECS/agilio-firmware.spec
 	@echo "%preun" >> $(RPM_PKG)/SPECS/agilio-firmware.spec
 	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(RPM_PKG)/SPECS/agilio-firmware.spec
 	@rpmbuild -bb $(RPM_PKG)/SPECS/agilio-firmware.spec --buildroot $(RPM_PKG)/BUILD --define "_rpmdir $(RPM_PKG)/RPMS"
