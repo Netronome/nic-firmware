@@ -186,7 +186,7 @@ dummy0#:
 dummy1#:
     nop
 
-    br_addr[NFD_BPF_START_OFF, ebpf_reentry#], live_regs[@dma_semaphore, t_idx_ctx, __actions_t_idx, __pkt_io_nfd_pkt_no, __pkt_io_quiescent]
+    br_addr[NFD_BPF_START_OFF], rtn[ebpf_reentry#], visits[HTAB_MAP_LOOKUP_SUBROUTINE#]
 .end
 #endm
 
