@@ -148,8 +148,8 @@ DEB_PKG = $(FIRMWARE_DIR)/pkg/deb/agilio-$(PKG_NAME)-firmware-$(PKG_VER)-1
 DEB_SZ = $(shell du -ck $(FW_NFFW)/*.nffw | grep total$ | cut -f 1)
 
 firmware_deb: firmware_all
-	@mkdir -p $(DEB_PKG)/{lib/firmware/netronome/agilio-$(PKG_NAME),DEBIAN}
-	@cp $(FW_NFFW)/*.nffw $(DEB_PKG)/lib/firmware/netronome/agilio-$(PKG_NAME)
+	@mkdir -p $(DEB_PKG)/{opt/netronome/firmware/agilio-$(PKG_NAME),DEBIAN}
+	@cp $(FW_NFFW)/*.nffw $(DEB_PKG)/opt/netronome/firmware/agilio-$(PKG_NAME)
 	@mkdir -p $(DEB_PKG)/lib/udev/rules.d
 	@cp $(SCRIPT_DIR)/agilio-nic-name-gen $(DEB_PKG)/lib/udev
 	@cp $(SCRIPT_DIR)/79-agilio-nic.rules $(DEB_PKG)/lib/udev/rules.d
@@ -168,8 +168,8 @@ firmware_deb: firmware_all
 RPM_PKG = $(FIRMWARE_DIR)/pkg/rpm
 
 firmware_rpm: firmware_all
-	@mkdir -p $(RPM_PKG)/{BUILD/lib/firmware/netronome/agilio-$(PKG_NAME),SPECS,RPMS}
-	@cp $(FW_NFFW)/*.nffw $(RPM_PKG)/BUILD/lib/firmware/netronome/agilio-$(PKG_NAME)
+	@mkdir -p $(RPM_PKG)/{BUILD/opt/netronome/firmware/agilio-$(PKG_NAME),SPECS,RPMS}
+	@cp $(FW_NFFW)/*.nffw $(RPM_PKG)/BUILD/opt/netronome/firmware/agilio-$(PKG_NAME)
 	@mkdir -p $(RPM_PKG)/BUILD/lib/udev/rules.d
 	@cp $(SCRIPT_DIR)/agilio-nic-name-gen $(RPM_PKG)/BUILD/lib/udev
 	@cp $(SCRIPT_DIR)/79-agilio-nic.rules $(RPM_PKG)/BUILD/lib/udev/rules.d
