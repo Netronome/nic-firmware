@@ -18,13 +18,13 @@ esac
 have_module nfp || exit 0
 
 # Add firmware images
-for FILE in `find /lib/firmware/netronome -maxdepth 1 -name *.nffw`; do
+for FILE in /lib/firmware/netronome/*.nffw; do
     TARGET=`readlink $FILE`
     copy_exec $TARGET /lib/firmware/netronome/
 done
 
-copy_exec /lib/udev/rules.d/*netronome.udev.rules /lib/udev/rules.d/
-copy_exec /lib/udev/nfp-port-name-gen /lib/udev/
+copy_exec /lib/udev/rules.d/79-agilio-nic.rules /lib/udev/rules.d/
+copy_exec /lib/udev/agilio-nic-name-gen /lib/udev/
 
 # Add NFP kernel module
 manual_add_modules nfp

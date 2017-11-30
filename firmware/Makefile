@@ -140,6 +140,8 @@ firmware_deb: firmware_all
 	@mkdir -p $(DEB_PKG)/lib/udev/rules.d
 	@cp $(SCRIPT_DIR)/agilio-nic-name-gen $(DEB_PKG)/lib/udev
 	@cp $(SCRIPT_DIR)/79-agilio-nic.rules $(DEB_PKG)/lib/udev/rules.d
+	@mkdir -p $(DEB_PKG)/usr/share/initramfs-tools/hooks
+	@cp $(SCRIPT_DIR)/initramfs-tools-module-setup.sh $(DEB_PKG)/usr/share/initramfs-tools/hooks/nfp
 	@cat $(FIRMWARE_DIR)/pkg/deb.control | sed 's/__VERSION__/$(PKG_VER)-1/g' | sed 's/__FW_NAME__/$(PKG_NAME)/g' > $(DEB_PKG)/DEBIAN/control
 	@echo "Installed-Size: $(DEB_SZ)" >> $(DEB_PKG)/DEBIAN/control
 	@echo "#!/bin/sh" > $(DEB_PKG)/DEBIAN/postinst
