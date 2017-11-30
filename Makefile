@@ -22,6 +22,7 @@ NETRONOME ?= /opt/netronome
 DEPS_DIR      = $(NFP_COMMON)/deps
 FIRMWARE_DIR  = $(NFP_COMMON)/firmware
 DOC_DIR       = $(NFP_COMMON)/docs
+SCRIPT_DIR    = $(NFP_COMMON)/scripts
 TEST_DIR      = test
 
 Q ?= @

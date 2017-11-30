@@ -149,6 +149,9 @@ DEB_SZ = $(shell du -ck $(FW_NFFW)/*.nffw | grep total$ | cut -f 1)
 firmware_deb: firmware_all
 	@mkdir -p $(DEB_PKG)/{lib/firmware/netronome/agilio-$(PKG_NAME),DEBIAN}
 	@cp $(FW_NFFW)/*.nffw $(DEB_PKG)/lib/firmware/netronome/agilio-$(PKG_NAME)
+	@mkdir -p $(DEB_PKG)/lib/udev/rules.d
+	@cp $(SCRIPT_DIR)/agilio-nic-name-gen $(DEB_PKG)/lib/udev
+	@cp $(SCRIPT_DIR)/79-agilio-nic.rules $(DEB_PKG)/lib/udev/rules.d
 	@cat $(FIRMWARE_DIR)/pkg/deb.control | sed 's/__VERSION__/$(PKG_VER)-1/g' | sed 's/__FW_NAME__/$(PKG_NAME)/g' > $(DEB_PKG)/DEBIAN/control
 	@echo "Installed-Size: $(DEB_SZ)" >> $(DEB_PKG)/DEBIAN/control
 	@echo "#!/bin/sh" > $(DEB_PKG)/DEBIAN/postinst
@@ -164,6 +167,9 @@ RPM_PKG = $(FIRMWARE_DIR)/pkg/rpm
 firmware_rpm: firmware_all
 	@mkdir -p $(RPM_PKG)/{BUILD/lib/firmware/netronome/agilio-$(PKG_NAME),SPECS,RPMS}
 	@cp $(FW_NFFW)/*.nffw $(RPM_PKG)/BUILD/lib/firmware/netronome/agilio-$(PKG_NAME)
+	@mkdir -p $(RPM_PKG)/BUILD/lib/udev/rules.d
+	@cp $(SCRIPT_DIR)/agilio-nic-name-gen $(RPM_PKG)/BUILD/lib/udev
+	@cp $(SCRIPT_DIR)/79-agilio-nic.rules $(RPM_PKG)/BUILD/lib/udev/rules.d
 	@cat $(FIRMWARE_DIR)/pkg/rpm.spec | sed 's/__VERSION__/$(PKG_VER)/g' | sed 's/__FW_NAME__/$(PKG_NAME)/g' > $(RPM_PKG)/SPECS/agilio-firmware.spec
 	@echo "%post" >> $(RPM_PKG)/SPECS/agilio-firmware.spec
 	@cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(PKG_NAME)/g' >> $(RPM_PKG)/SPECS/agilio-firmware.spec
