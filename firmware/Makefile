@@ -1,4 +1,4 @@
-#a Copyright (C) 2015,  Gavin J Stark.  All rights reserved.
+# Copyright (C) 2015,  Gavin J Stark.  All rights reserved.
 #
 # @file        firmware/Makefile
 # @brief       Makefile for the firmware
@@ -126,6 +126,7 @@ firmware_clean:
 	@rm -f $(FW_CAT)/*.trace
 	@rm -rf $(FIRMWARE_DIR)/pkg/deb
 	@rm -rf $(FIRMWARE_DIR)/pkg/rpm
+	@rm -rf $(FIRMWARE_DIR)/pkg/tgz
 
 firmware_veryclean: firmware_clean firmware_clean_deps
 
@@ -168,6 +169,13 @@ firmware_rpm: firmware_all
 	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(RPM_PKG)/SPECS/agilio-firmware.spec
 	@rpmbuild -bb $(RPM_PKG)/SPECS/agilio-firmware.spec --buildroot $(RPM_PKG)/BUILD --define "_rpmdir $(RPM_PKG)/RPMS"
 
-package: firmware_deb firmware_rpm
+TGZ_PKG = $(FIRMWARE_DIR)/pkg/tgz
+
+firmware_tgz: firmware_all
+	@mkdir -p $(TGZ_PKG)/agilio-$(PKG_NAME)
+	@cp $(FW_NFFW)/*.nffw $(TGZ_PKG)/agilio-$(PKG_NAME)
+	@cd $(TGZ_PKG) && tar --owner=0 --group=0 -czvf agilio-$(PKG_NAME)-firmware-$(PKG_VER).tgz agilio-$(PKG_NAME)
+
+package: firmware_tgz firmware_deb firmware_rpm
 
 $(foreach mkdep,$(FW_MKDEP_TARGETS),$(eval -include $(mkdep)))
