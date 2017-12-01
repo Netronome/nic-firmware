@@ -1,0 +1,8 @@
+Package: agilio-naming-policy
+Version: __VERSION__
+Architecture: all
+Maintainer: Edwin Peer <edwin.peer@netronome.com>
+Section: net
+Priority: optional
+Description: Consistent network device naming policy for Netronome SmartNICs. 
+Conflicts: ns-agilio-core-nic

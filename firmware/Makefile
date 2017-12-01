@@ -124,58 +124,91 @@ firmware_clean:
 	@rm -f $(FW_NFFW)/*.nffw
 	@rm -f $(FW_CAT)/*.cat
 	@rm -f $(FW_CAT)/*.trace
+	@rm -rf $(FIRMWARE_DIR)/pkg/files
 	@rm -rf $(FIRMWARE_DIR)/pkg/deb
 	@rm -rf $(FIRMWARE_DIR)/pkg/rpm
 	@rm -rf $(FIRMWARE_DIR)/pkg/tgz
+	@rm -rf $(FIRMWARE_DIR)/pkg/out
 
 firmware_veryclean: firmware_clean firmware_clean_deps
 
-PKG_NAME = $(shell git describe --tags HEAD | sed 's/\([a-zA-Z\-]*\)-\(.*[0-9].*[[:alnum:]]*\)/\1/')
-PKG_VER = $(shell git describe --tags HEAD | sed 's/\([a-zA-Z\-]*\)-\(.*[0-9].*[[:alnum:]]*\)/\2/' | sed 's/%/~/g' | sed 's/-/\./g')$(GIT_DIFF_UNC)
-DEB_PKG = $(FIRMWARE_DIR)/pkg/deb/agilio-$(PKG_NAME)-firmware-$(PKG_VER)-1
+FW_PKG_NAME = $(shell git describe --tags HEAD | sed 's/\([a-zA-Z\-]*\)-\(.*[0-9].*[[:alnum:]]*\)/\1/')
+FW_PKG_VER = $(shell git describe --tags HEAD | sed 's/\([a-zA-Z\-]*\)-\(.*[0-9].*[[:alnum:]]*\)/\2/' | sed 's/%/~/g' | sed 's/-/\./g')$(GIT_DIFF_UNC)
+DEB_FW_PKG = $(FIRMWARE_DIR)/pkg/deb/agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER)-1
+DEB_UDEV_PKG = $(FIRMWARE_DIR)/pkg/deb/agilio-naming-policy-$(FW_PKG_VER)-1
 DEB_SZ = $(shell du -ck $(FW_NFFW)/*.nffw | grep total$ | cut -f 1)
 
-firmware_deb: firmware_all
-	@mkdir -p $(DEB_PKG)/{opt/netronome/firmware/agilio-$(PKG_NAME),DEBIAN}
-	@cp $(FW_NFFW)/*.nffw $(DEB_PKG)/opt/netronome/firmware/agilio-$(PKG_NAME)
-	@mkdir -p $(DEB_PKG)/lib/udev/rules.d
-	@cp $(SCRIPT_DIR)/agilio-nic-name-gen $(DEB_PKG)/lib/udev
-	@cp $(SCRIPT_DIR)/79-agilio-nic.rules $(DEB_PKG)/lib/udev/rules.d
-	@mkdir -p $(DEB_PKG)/usr/share/initramfs-tools/hooks
-	@cp $(SCRIPT_DIR)/initramfs-tools-module-setup.sh $(DEB_PKG)/usr/share/initramfs-tools/hooks/nfp
-	@cat $(FIRMWARE_DIR)/pkg/deb.control | sed 's/__VERSION__/$(PKG_VER)-1/g' | sed 's/__FW_NAME__/$(PKG_NAME)/g' > $(DEB_PKG)/DEBIAN/control
-	@echo "Installed-Size: $(DEB_SZ)" >> $(DEB_PKG)/DEBIAN/control
-	@echo "#!/bin/sh" > $(DEB_PKG)/DEBIAN/postinst
-	@cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(PKG_NAME)/g' >> $(DEB_PKG)/DEBIAN/postinst
-	@echo "update-initramfs -uk all" >> $(DEB_PKG)/DEBIAN/postinst
-	@echo "#!/bin/sh" > $(DEB_PKG)/DEBIAN/prerm
-	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(DEB_PKG)/DEBIAN/prerm
-	@chmod a+x $(DEB_PKG)/DEBIAN/postinst $(DEB_PKG)/DEBIAN/prerm
-	@fakeroot dpkg-deb --build $(DEB_PKG)
+FW_TREE = $(FIRMWARE_DIR)/pkg/files/firmware
+UDEV_TREE = $(FIRMWARE_DIR)/pkg/files/udev
 
-RPM_PKG = $(FIRMWARE_DIR)/pkg/rpm
+firmware_tree: firmware_all
+	@mkdir -p $(FW_TREE)/opt/netronome/firmware/agilio-$(FW_PKG_NAME)
+	@cp $(FW_NFFW)/*.nffw $(FW_TREE)/opt/netronome/firmware/agilio-$(FW_PKG_NAME)
 
-firmware_rpm: firmware_all
-	@mkdir -p $(RPM_PKG)/{BUILD/opt/netronome/firmware/agilio-$(PKG_NAME),SPECS,RPMS}
-	@cp $(FW_NFFW)/*.nffw $(RPM_PKG)/BUILD/opt/netronome/firmware/agilio-$(PKG_NAME)
-	@mkdir -p $(RPM_PKG)/BUILD/lib/udev/rules.d
-	@cp $(SCRIPT_DIR)/agilio-nic-name-gen $(RPM_PKG)/BUILD/lib/udev
-	@cp $(SCRIPT_DIR)/79-agilio-nic.rules $(RPM_PKG)/BUILD/lib/udev/rules.d
-	@cat $(FIRMWARE_DIR)/pkg/rpm.spec | sed 's/__VERSION__/$(PKG_VER)/g' | sed 's/__FW_NAME__/$(PKG_NAME)/g' > $(RPM_PKG)/SPECS/agilio-firmware.spec
-	@echo "%post" >> $(RPM_PKG)/SPECS/agilio-firmware.spec
-	@cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(PKG_NAME)/g' >> $(RPM_PKG)/SPECS/agilio-firmware.spec
-	@echo "dracut -f" >> $(RPM_PKG)/SPECS/agilio-firmware.spec
-	@echo "%preun" >> $(RPM_PKG)/SPECS/agilio-firmware.spec
-	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(RPM_PKG)/SPECS/agilio-firmware.spec
-	@rpmbuild -bb $(RPM_PKG)/SPECS/agilio-firmware.spec --buildroot $(RPM_PKG)/BUILD --define "_rpmdir $(RPM_PKG)/RPMS"
+udev_tree:
+	@mkdir -p $(UDEV_TREE)/lib/udev/rules.d
+	@cp $(SCRIPT_DIR)/nfp-name-gen $(UDEV_TREE)/lib/udev
+	@cp $(SCRIPT_DIR)/79-nfp.rules $(UDEV_TREE)/lib/udev/rules.d
+
+firmware_deb: firmware_tree
+	@mkdir -p $(DEB_FW_PKG)/DEBIAN
+	@cp -r $(FW_TREE)/* $(DEB_FW_PKG)
+	@mkdir -p $(DEB_FW_PKG)/usr/share/initramfs-tools/hooks
+	@cp $(SCRIPT_DIR)/agilio-nic.initramfs-hook $(DEB_FW_PKG)/usr/share/initramfs-tools/hooks/agilio-nic-firmware
+	@cat $(FIRMWARE_DIR)/pkg/agilio-firmware.control | sed 's/__VERSION__/$(FW_PKG_VER)-1/g' | sed 's/__FW_NAME__/$(FW_PKG_NAME)/g' > $(DEB_FW_PKG)/DEBIAN/control
+	@echo "Installed-Size: $(shell du -ck $(FW_TREE) | grep total$ | cut -f 1)" >> $(DEB_FW_PKG)/DEBIAN/control
+	@echo "#!/bin/sh" > $(DEB_FW_PKG)/DEBIAN/postinst
+	@cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(FW_PKG_NAME)/g' >> $(DEB_FW_PKG)/DEBIAN/postinst
+	@echo "update-initramfs -uk all" >> $(DEB_FW_PKG)/DEBIAN/postinst
+	@echo "#!/bin/sh" > $(DEB_FW_PKG)/DEBIAN/prerm
+	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(DEB_FW_PKG)/DEBIAN/prerm
+	@chmod a+x $(DEB_FW_PKG)/DEBIAN/postinst $(DEB_FW_PKG)/DEBIAN/prerm
+	@fakeroot dpkg-deb --build $(DEB_FW_PKG)
+
+udev_deb: udev_tree
+	@mkdir -p $(DEB_UDEV_PKG)/DEBIAN
+	@cp -r $(UDEV_TREE)/* $(DEB_UDEV_PKG)
+	@mkdir -p $(DEB_UDEV_PKG)/usr/share/initramfs-tools/hooks
+	@cp $(SCRIPT_DIR)/agilio-naming.initramfs-hook $(DEB_UDEV_PKG)/usr/share/initramfs-tools/hooks/agilio-naming-policy
+	@cat $(FIRMWARE_DIR)/pkg/agilio-naming-policy.control | sed 's/__VERSION__/$(FW_PKG_VER)-1/g' > $(DEB_UDEV_PKG)/DEBIAN/control
+	@echo "Installed-Size: $(shell du -ck $(UDEV_TREE) | grep total$ | cut -f 1)" >> $(DEB_UDEV_PKG)/DEBIAN/control
+	@echo "#!/bin/sh" > $(DEB_UDEV_PKG)/DEBIAN/postinst
+	@echo "update-initramfs -uk all" >> $(DEB_UDEV_PKG)/DEBIAN/postinst
+	@chmod a+x $(DEB_UDEV_PKG)/DEBIAN/postinst
+	@fakeroot dpkg-deb --build $(DEB_UDEV_PKG)
+	
+RPM_FW_PKG = $(FIRMWARE_DIR)/pkg/rpm/firmware
+RPM_UDEV_PKG = $(FIRMWARE_DIR)/pkg/rpm/udev
+
+firmware_rpm: firmware_tree
+	@mkdir -p $(RPM_FW_PKG)/{BUILD,SPECS,RPMS}
+	@cp -r $(FW_TREE)/* $(RPM_FW_PKG)/BUILD
+	@cat $(FIRMWARE_DIR)/pkg/agilio-firmware.spec | sed 's/__VERSION__/$(FW_PKG_VER)/g' | sed 's/__FW_NAME__/$(FW_PKG_NAME)/g' > $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
+	@echo "%post" >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
+	@cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(FW_PKG_NAME)/g' >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
+	@echo "dracut -f" >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
+	@echo "%preun" >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
+	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
+	@rpmbuild -bb $(RPM_FW_PKG)/SPECS/agilio-firmware.spec --buildroot $(RPM_FW_PKG)/BUILD --define "_rpmdir $(RPM_FW_PKG)/RPMS"
+
+udev_rpm: udev_tree
+	@mkdir -p $(RPM_UDEV_PKG)/{BUILD,SPECS,RPMS}
+	@cp -r $(UDEV_TREE)/* $(RPM_UDEV_PKG)/BUILD
+	@cat $(FIRMWARE_DIR)/pkg/agilio-naming-policy.spec | sed 's/__VERSION__/$(FW_PKG_VER)/g' > $(RPM_UDEV_PKG)/SPECS/agilio-naming-policy.spec
+	@rpmbuild -bb $(RPM_UDEV_PKG)/SPECS/agilio-naming-policy.spec --buildroot $(RPM_UDEV_PKG)/BUILD --define "_rpmdir $(RPM_UDEV_PKG)/RPMS"
 
 TGZ_PKG = $(FIRMWARE_DIR)/pkg/tgz
 
 firmware_tgz: firmware_all
-	@mkdir -p $(TGZ_PKG)/agilio-$(PKG_NAME)
-	@cp $(FW_NFFW)/*.nffw $(TGZ_PKG)/agilio-$(PKG_NAME)
-	@cd $(TGZ_PKG) && tar --owner=0 --group=0 -czvf agilio-$(PKG_NAME)-firmware-$(PKG_VER).tgz agilio-$(PKG_NAME)
+	@mkdir -p $(TGZ_PKG)/agilio-$(FW_PKG_NAME)
+	@cp $(FW_NFFW)/*.nffw $(TGZ_PKG)/agilio-$(FW_PKG_NAME)
+	@cd $(TGZ_PKG) && tar --owner=0 --group=0 -czvf agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER).tgz agilio-$(FW_PKG_NAME)
 
-package: firmware_tgz firmware_deb firmware_rpm
+package: firmware_tgz firmware_deb udev_deb firmware_rpm udev_rpm
+	@mkdir -p $(FIRMWARE_DIR)/pkg/out/{tgz,deb,rpm}
+	@mv $(TGZ_PKG)/*.tgz $(FIRMWARE_DIR)/pkg/out/tgz/
+	@mv $(FIRMWARE_DIR)/pkg/deb/*.deb $(FIRMWARE_DIR)/pkg/out/deb/
+	@mv $(RPM_FW_PKG)/RPMS/noarch/*.rpm $(FIRMWARE_DIR)/pkg/out/rpm/
+	@mv $(RPM_UDEV_PKG)/RPMS/noarch/*.rpm $(FIRMWARE_DIR)/pkg/out/rpm/
 
 $(foreach mkdep,$(FW_MKDEP_TARGETS),$(eval -include $(mkdep)))
