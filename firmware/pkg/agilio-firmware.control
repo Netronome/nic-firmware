@@ -7,3 +7,4 @@ Priority: optional
 Description: Firmware for Netronome Agilio SmartNICs
 Conflicts: ns-agilio-core-nic
 Replaces: ns-agilio-core-nic
+Suggests: agilio-naming-policy

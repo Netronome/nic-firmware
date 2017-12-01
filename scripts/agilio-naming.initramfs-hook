@@ -1,0 +1,20 @@
+#!/bin/sh
+PREREQ=""
+prereqs()
+{
+  echo "$PREREQ"
+}
+
+case $1 in
+  prereqs)
+    prereqs
+    exit 0
+    ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+copy_exec /lib/udev/rules.d/79-nfp.rules /lib/udev/rules.d/
+copy_exec /lib/udev/nfp-name-gen /lib/udev/
+
+exit 0

@@ -2,6 +2,8 @@ Name: agilio-__FW_NAME__-firmware
 Summary: Firmware for Netronome Agilio SmartNICs
 License: Netronome
 Version: __VERSION__
+Conflicts: ns-agilio-corenic
+Suggests: agilio-naming-policy
 Release: 1
 BuildArch: noarch
 Vendor: Netronome Systems, Inc.
@@ -15,5 +17,3 @@ Firmware for Netronome Agilio SmartNICs
 %define _binaries_in_noarch_packages_terminate_build 0
 %defattr(-,root, root)
 /opt/netronome/firmware/agilio-__FW_NAME__
-/lib/udev/agilio-nic-name-gen
-/lib/udev/rules.d/79-agilio-nic.rules
