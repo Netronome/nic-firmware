@@ -1,3 +1,4 @@
+mkdir -p /lib/firmware/netronome
 cd /lib/firmware/netronome
 if ls *.nffw >/dev/null 2>&1; then
     mkdir -p .__pre_installed
