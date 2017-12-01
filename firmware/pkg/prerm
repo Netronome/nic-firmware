@@ -1,0 +1,7 @@
+if [ -d /lib/firmware/netronome ] ; then
+    cd /lib/firmware/netronome
+    if [ -d .__pre_installed ] ; then
+        mv .__pre_installed/* ./
+        rmdir .__pre_installed
+    fi
+fi

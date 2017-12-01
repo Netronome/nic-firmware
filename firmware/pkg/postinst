@@ -1,0 +1,6 @@
+cd /lib/firmware/netronome
+if ls *.nffw >/dev/null 2>&1; then
+    mkdir -p .__pre_installed
+    mv *.nffw .__pre_installed/
+fi
+ln -sf /opt/netronome/firmware/agilio-__FW_NAME__/*.nffw ./
