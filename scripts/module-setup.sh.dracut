@@ -1,0 +1,10 @@
+#!/bin/sh
+
+depends() {
+    return 0
+}
+
+install() {
+    inst_simple /lib/udev/nfp-name-gen
+    inst_simple /lib/udev/rules.d/79-nfp.rules
+}
