@@ -206,6 +206,8 @@ firmware_rpm: firmware_tree
 udev_rpm: udev_tree
 	@mkdir -p $(RPM_UDEV_PKG)/{BUILD,SPECS,RPMS}
 	@cp -r $(UDEV_TREE)/* $(RPM_UDEV_PKG)/BUILD
+	@mkdir -p $(RPM_UDEV_PKG)/BUILD/usr/lib/dracut/modules.d/50agilio-nic
+	@cp $(SCRIPT_DIR)/module-setup.sh.dracut $(RPM_UDEV_PKG)/BUILD/usr/lib/dracut/modules.d/50agilio-nic/module-setup.sh
 	@cat $(FIRMWARE_DIR)/pkg/agilio-naming-policy.spec | sed 's/__VERSION__/$(FW_PKG_VER)/g' > $(RPM_UDEV_PKG)/SPECS/agilio-naming-policy.spec
 	@rpmbuild -bb $(RPM_UDEV_PKG)/SPECS/agilio-naming-policy.spec --buildroot $(RPM_UDEV_PKG)/BUILD --define "_rpmdir $(RPM_UDEV_PKG)/RPMS"
 
