@@ -49,6 +49,16 @@ if [ -z "${PHYS_PORT_NAME}" ]; then
     PHYS_PORT_NAME="p$STRIDE"
 fi
 
+if [ "${UDEV_BIOSDEVNAME}" -eq 1 ] ; then
+    SLOT_NUM=$(/sbin/biosdevname -d | grep -B1 "^Kernel name: $1" | grep "^BIOS device: p" | sed 's/.*p\([0-9]*\)p[0-9]*.*/\1/')
+    if [ -n ${SLOT_NUM} ] ; then
+        PORT_NUM=${PHYS_PORT_NAME#p}
+        PORT_NUM=$(expr $PORT_NUM + 1) # biosdevname ports indexed from 1
+        echo "ID_NET_NAME_SLOT=p${SLOT_NUM}p${PORT_NUM}"
+        exit 0
+    fi
+fi
+
 # From here on, we fall back to phys-port-name-gen
 
 # On-board index based names
