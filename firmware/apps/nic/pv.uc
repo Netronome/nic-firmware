@@ -1023,6 +1023,8 @@ end#:
     bitfield_extract__sz1(udp_csum, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
     alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_A(out_vec, PV_CSUM_OFFLOAD_bf), OR, udp_csum] ; PV_CSUM_OFFLOAD_bf
 
+    alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(in_nfd_desc, NFD_IN_QID_fld), <<BF_L(PV_QUEUE_IN_bf)]
+
     // error checks near end to ensure consistent metadata (fields written below excluded) and buffer allocation
     // state (contents of CTM also excluded) in drop path
     br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), tx_errors_pci#]
@@ -1032,12 +1034,11 @@ end#:
     br_bclr[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), skip_lso#], defer[3]
         alu[BF_A(out_vec, PV_SEEK_BASE_bf), BF_A(out_vec, PV_SEEK_BASE_bf), OR, 0xff, <<BF_L(PV_SEEK_BASE_bf)] ; PV_SEEK_BASE_bf
         immed[BF_A(out_vec, PV_PARSE_STS_bf), (PV_NOT_PARSED >> 16), <<16] ; PV_PARSE_STS_bf
-        alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(in_nfd_desc, NFD_IN_QID_fld), <<BF_L(PV_QUEUE_IN_bf)]
+        immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
 
     __pv_lso_fixup(out_vec, in_nfd_desc)
 skip_lso#:
 
-    immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
 
 .end
 #endm
