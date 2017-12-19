@@ -10,7 +10,7 @@ END{
     x = log(COUNT) / log(2)
     x = 8 * 2 ** ((x == int(x)) ? x : int(x) + 1)
     print "/* This file is generated during build. Do not edit! */"
-    for (i = 0; i < COUNT; ++i) { print "#define EXT_STATS_" toupper(DATA[i]) " " i*8 }
+    for (i = 0; i < COUNT; ++i) { printf("#define EXT_STATS_%s 0x%x\n", toupper(DATA[i]), i*8) }
     print "#define EXT_STATS_SIZE " x 
     print "#if defined(__NFP_LANG_MICROC)"
     print "typedef struct {"
