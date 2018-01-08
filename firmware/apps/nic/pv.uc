@@ -992,6 +992,7 @@ end#:
     alu[pkt_len, pkt_len, -, meta_len]
 
     alu[BF_A(out_vec, PV_NUMBER_bf), pkt_len, OR, in_pkt_num, <<BF_L(PV_NUMBER_bf)]
+    alu[BF_A(out_vec, PV_BLS_bf), BF_A(out_vec, PV_BLS_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
     #if (NFD_IN_BLM_JUMBO_BLS == NFD_IN_BLM_REG_BLS)
         alu[BF_A(out_vec, PV_BLS_bf), BF_A(out_vec, PV_BLS_bf), OR, NFD_IN_BLM_REG_BLS, <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
     #else
