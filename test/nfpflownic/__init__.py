@@ -45,7 +45,9 @@ class Project(netro.testinfra.Project):
                                        ("perf_4port_no_fw_ld",
                                         NFPFlowNICPerfTest_4_no_fw_ld),
                                        ("perf_8port_no_fw_ld",
-                                        NFPFlowNICPerfTest_8_no_fw_ld)))
+                                        NFPFlowNICPerfTest_8_no_fw_ld),
+                                       ("perf_multithread_Iperf3", Performance_Multithread_Iperf3),
+                                       ("perf_multithread_netperf", Performance_Multithread_Netperf)))
 
     def _init(self):
         """
