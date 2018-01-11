@@ -178,7 +178,8 @@ __shared __gpr volatile int mac_reg_lock = 0;
     } while (0)
 
 
-#if NS_PLATFORM_TYPE == NS_PLATFORM_CARBON
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON) || \
+    (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON_1x10_1x25)
 
 #define DISABLE_GPIO_POLL 0
 

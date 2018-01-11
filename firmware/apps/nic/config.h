@@ -70,7 +70,9 @@
 #define NBI_TM_ENABLE_SEQUENCER6 1
 
 
-#if (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON)
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON) || \
+    (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON_1x10_1x25)
+
     #define NBI_TM_ENABLE_SHAPER 1
 
     /* Rate adjustment to account for oscillator PPM. */
