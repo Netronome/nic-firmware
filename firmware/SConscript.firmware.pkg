@@ -19,6 +19,7 @@ fw_cat_files = [
     # Carbon
     (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0099-0001_2x25.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0099-0001_2x25.cat"),
     (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0099-0001_2x10.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0099-0001_2x10.cat"),
+    (nfp_nic_fw_base_dst_cat_path + "nic_AMDA0099-0001_1x10_1x25.cat", nfp_nic_fw_base_src_cat_path + "nic_AMDA0099-0001_1x10_1x25.cat"),
 ]
 
 nfp_nic_fw_base_dst_nffw_path = "lib/firmware/netronome/cnic/"
@@ -36,6 +37,7 @@ fw_nffw_files = [
     # Carbon
     (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0099-0001_2x25.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0099-0001_2x25.nffw"),
     (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0099-0001_2x10.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0099-0001_2x10.nffw"),
+    (nfp_nic_fw_base_dst_nffw_path + "nic_AMDA0099-0001_1x10_1x25.nffw", nfp_nic_fw_base_src_nffw_path + "nic_AMDA0099-0001_1x10_1x25.nffw"),
 ]
 
 print "Adding firmware nffw files to ns-agilio-core-nic_base"

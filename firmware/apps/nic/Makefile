@@ -37,6 +37,10 @@ else ifeq ($(PLATFORM),Carbon_2x10)
     NS_PLATFORM_TYPE = 11
     MEDIA = 2x10
     AMDA = AMDA0099-0001
+else ifeq ($(PLATFORM),Carbon_1x10_1x25)
+    NS_PLATFORM_TYPE = 12
+    MEDIA = 1x10_1x25
+    AMDA = AMDA0099-0001
 endif
 PROJECT = nic_$(AMDA)_$(MEDIA)
 
