@@ -15,7 +15,7 @@
 SYSPATH="/sys/class/net/$1"
 PEER_PATH="${SYSPATH}/device/net/"
 DEV_ID=`cat ${SYSPATH}/dev_id`
-PHYS_PORT_NAME=`cat ${SYSPATH}/phys_port_name`
+PHYS_PORT_NAME=`cat ${SYSPATH}/phys_port_name || true`
 ADDR=`cat ${SYSPATH}/address`
 
 # If ID_NET_NAME_MAC doesn't exist, then this is the PF netdev.
@@ -49,7 +49,7 @@ if [ -z "${PHYS_PORT_NAME}" ]; then
     PHYS_PORT_NAME="p$STRIDE"
 fi
 
-if [ "${UDEV_BIOSDEVNAME}" -eq 1 ] ; then
+if [ "x${UDEV_BIOSDEVNAME}" = "x1" ] ; then
     SLOT_NUM=$(/sbin/biosdevname -d | grep -B1 "^Kernel name: $1" | grep "^BIOS device: p" | sed 's/.*p\([0-9]*\)p[0-9]*.*/\1/')
     if [ -n ${SLOT_NUM} ] ; then
         PORT_NUM=${PHYS_PORT_NAME#p}
@@ -58,6 +58,8 @@ if [ "${UDEV_BIOSDEVNAME}" -eq 1 ] ; then
         exit 0
     fi
 fi
+
+`cat /etc/centos-release 2>/dev/null | grep -iq 'CentOS Linux release 7.3'` && echo "ID_NET_NAME=\"${ID_NET_NAME_PATH%d${DEV_ID}}n${PHYS_PORT_NAME}\""
 
 # From here on, we fall back to phys-port-name-gen
 
