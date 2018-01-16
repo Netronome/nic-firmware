@@ -72,6 +72,7 @@ $(DEPS_DIR)/ng-nfd.hg:
 	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../nfd_abi3.patch && cd -
 	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../bpf_stack.patch && cd -
 	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../pf_oversubscription_series.patch && cd -
+	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../nfd_smart_round8.patch && cd -
 
 HG_DEPS += $(NFD_DIR)
 HG_REVS += $(NFD_REV)
