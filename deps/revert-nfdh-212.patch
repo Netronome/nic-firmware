@@ -1,0 +1,12 @@
+diff -r 4617188a5091 me/blocks/vnic/svc/msix_qmon.c
+--- a/me/blocks/vnic/svc/msix_qmon.c	Wed Jul 19 19:45:30 2017 -0400
++++ b/me/blocks/vnic/svc/msix_qmon.c	Mon Jan 15 16:20:57 2018 -0800
+@@ -626,7 +626,7 @@
+     queue = NFD_NATQ2BMQ(queue);
+ 
+     addr_hi = (0x84 | (pcie_isl + 4)) << 24;
+-    addr_lo = queue * NFD_OUT_ATOMICS_SZ + NFD_OUT_ATOMICS_DMA_DONE;
++    addr_lo = queue * NFD_OUT_ATOMICS_SZ + NFD_OUT_ATOMICS_SENT;
+ 
+     __asm mem[atomic_read, rdata, addr_hi, <<8, addr_lo, 1], ctx_swap[rsig];
+ 
