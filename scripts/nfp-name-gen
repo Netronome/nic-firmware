@@ -59,8 +59,6 @@ if [ "x${UDEV_BIOSDEVNAME}" = "x1" ] ; then
     fi
 fi
 
-`cat /etc/centos-release 2>/dev/null | grep -iq 'CentOS Linux release 7.3'` && echo "ID_NET_NAME=\"${ID_NET_NAME_PATH%d${DEV_ID}}n${PHYS_PORT_NAME}\""
-
 # From here on, we fall back to phys-port-name-gen
 
 # On-board index based names
