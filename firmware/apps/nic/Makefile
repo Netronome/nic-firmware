@@ -205,6 +205,7 @@ $(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pm
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
 
 # Add dump_spec (codeless)
+$(eval $(call dep.dump_spec,$(PROJECT),datapath,dump_spec.in))
 $(eval $(call microcode.assemble.codeless,$(PROJECT),dump_spec,apps/nic,dump_spec_init.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),dump_spec))
 
