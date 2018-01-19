@@ -216,6 +216,20 @@ $1__$2__$3: $4 $5
 endef
 
 
+# Add dump_spec
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+# @param $3 input file
+define dep.dump_spec
+
+GENERATED_DEPS += $1__$2__$3
+
+$1__$2__$3: $(SCRIPT_DIR)/generate_dump.py $4 $5
+	@$(SCRIPT_DIR)/generate_dump.py --file_name dump_spec --sym_prefix abi_dump_spec $(FIRMWARE_DIR)/apps/nic/$3 $(FIRMWARE_DIR)/apps/nic
+endef
+
+
 #a Microcode templates
 #f microcode.assemble.codeless.abspath
 #
