@@ -1,0 +1,304 @@
+diff --git a/me/blocks/vnic/shared/nfd_cfg.h b/me/blocks/vnic/shared/nfd_cfg.h
+index 9be7a75..90310e1 100644
+--- a/me/blocks/vnic/shared/nfd_cfg.h
++++ b/me/blocks/vnic/shared/nfd_cfg.h
+@@ -259,6 +259,25 @@ NFD_CFG_RINGS_DECL(3);
+ #define NFD_CFG_BAR_ISL(_isl, _vid )            \
+     NFD_CFG_BAR(NFD_CFG_BASE_LINK(_isl), (_vid))
+ 
++#define NFD_TLV_BASE_IND(_x) _pf##_x##_tlv_template
++#define NFD_TLV_BASE(_x) NFD_TLV_BASE_IND(_x)
++
++#define NFD_TLV_BASE_DECLARE(_isl) \
++    _NFP_CHIPRES_ASM(.alloc_mem NFD_TLV_BASE(_isl) emem global	\
++    ((NFD_MAX_VFS + NFD_MAX_CTRL + NFD_MAX_PFS) * \
++    (NFP_NET_CFG_BAR_SZ - NFD_CFG_TLV_BLOCK)) 4)
++
++#define NFD_TLV_BASE_LINK_IND1(_sym)		\
++    ((__emem char *) _link_sym(_sym))
++#define NFD_TLV_BASE_LINK_IND0(_isl) \
++    NFD_TLV_BASE_LINK_IND1(NFD_TLV_BASE(_isl))
++#define NFD_TLV_BASE_LINK(_isl) NFD_TLV_BASE_LINK_IND0(_isl)
++
++#define NFD_TLV_VID_BASE(_isl, _vid) \
++    (NFD_TLV_BASE_LINK(_isl) + \
++    _vid * (NFP_NET_CFG_BAR_SZ - NFD_CFG_TLV_BLOCK) + \
++    NFD_CFG_TLV_BLOCK)
++
+ 
+ /**
+  * @param msg_valid     message contains valid information
+diff --git a/me/blocks/vnic/shared/nfd_cfg_internal.c b/me/blocks/vnic/shared/nfd_cfg_internal.c
+index 1a6f904..1675f67 100644
+--- a/me/blocks/vnic/shared/nfd_cfg_internal.c
++++ b/me/blocks/vnic/shared/nfd_cfg_internal.c
+@@ -501,6 +501,10 @@ _nfd_cfg_init_vf_cfg_bar(unsigned int vid)
+     __xwrite unsigned int exn_lsc = 0xffffffff;
+     __xwrite unsigned int cfg2[] = {NFD_OUT_RX_OFFSET,
+                                     NFD_RSS_HASH_FUNC};
++#ifdef NFD_CFG_TLV_BLOCK
++    __xwrite unsigned int tlv_base = (NFP_NET_CFG_TLV_TYPE_RESERVED << 16) | \
++        (NFD_CFG_TLV_BLOCK - NFP_NET_CFG_TLV_BASE - 4);
++#endif
+ 
+     mem_write64(&cfg, NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFP_NET_CFG_VERSION,
+                 sizeof cfg);
+@@ -511,6 +515,13 @@ _nfd_cfg_init_vf_cfg_bar(unsigned int vid)
+     mem_write8(&cfg2,
+                NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFP_NET_CFG_RX_OFFSET,
+                sizeof cfg2);
++
++#ifdef NFD_CFG_TLV_BLOCK
++    mem_write32(&tlv_base,
++		NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFP_NET_CFG_TLV_BASE,
++		sizeof(tlv_base));
++#endif
++
+ #endif
+ }
+ 
+@@ -558,6 +569,11 @@ _nfd_cfg_init_pf_cfg_bar(unsigned int vid)
+     __xwrite unsigned int exn_lsc = 0xffffffff;
+     __xwrite unsigned int cfg2[] = {NFD_OUT_RX_OFFSET,
+                                     NFD_RSS_HASH_FUNC};
++#ifdef NFD_CFG_TLV_BLOCK
++    __xwrite unsigned int tlv_base = (NFP_NET_CFG_TLV_TYPE_RESERVED << 16) | \
++        (NFD_CFG_TLV_BLOCK - NFP_NET_CFG_TLV_BASE - 4);
++#endif
++
+ #ifdef NFD_BPF_CAPABLE
+ #ifndef NFD_BPF_ABI
+ #define NFD_BPF_ABI (NFP_NET_BPF_ABI)
+@@ -602,6 +618,12 @@ _nfd_cfg_init_pf_cfg_bar(unsigned int vid)
+                NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFP_NET_CFG_BPF_ABI,
+                sizeof bpf_cfg);
+ #endif
++
++#ifdef NFD_CFG_TLV_BLOCK
++    mem_write32(&tlv_base,
++		NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFP_NET_CFG_TLV_BASE,
++		sizeof(tlv_base));
++#endif
+ }
+ 
+ 
+diff --git a/me/blocks/vnic/shared/nfd_flr.c b/me/blocks/vnic/shared/nfd_flr.c
+index f07b91d..b3aa724 100644
+--- a/me/blocks/vnic/shared/nfd_flr.c
++++ b/me/blocks/vnic/shared/nfd_flr.c
+@@ -153,6 +153,52 @@ nfd_flr_init_cfg_queue(unsigned int pcie_isl, unsigned int vid,
+ }
+ 
+ 
++#ifdef NFD_PCIE0_EMEM
++NFD_TLV_BASE_DECLARE(0)
++#endif
++
++#ifdef NFD_PCIE1_EMEM
++NFD_TLV_BASE_DECLARE(1)
++#endif
++
++#ifdef NFD_PCIE2_EMEM
++NFD_TLV_BASE_DECLARE(2)
++#endif
++
++#ifdef NFD_PCIE3_EMEM
++NFD_TLV_BASE_DECLARE(3)
++#endif
++
++#define MIN(x, y) ((x) > (y)) ? (y) : (x)
++
++__forceinline static void
++nfd_flr_init_tlv(__emem char *isl_base, unsigned int vid)
++{
++    __xwrite unsigned int tlv_base = (NFP_NET_CFG_TLV_TYPE_RESERVED << 16) | \
++        (NFD_CFG_TLV_BLOCK - NFP_NET_CFG_TLV_BASE - 4);
++    unsigned int i, offset, size;
++    __xread unsigned int read_block[16];
++    __xwrite unsigned int write_block[16];
++
++    mem_write32(&tlv_base,
++		NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFP_NET_CFG_TLV_BASE,
++		sizeof(tlv_base));
++
++    for (offset = 0; offset < NFP_NET_CFG_BAR_SZ; offset += sizeof(read_block)) {
++        mem_read32(read_block,
++		   NFD_TLV_VID_BASE(PCIE_ISL, vid) + offset,
++		   sizeof(read_block));
++
++        for (i = 0; i < sizeof(read_block) / 4; ++i)
++	    write_block[i] = read_block[i];
++
++        size = MIN(sizeof(write_block), NFP_NET_CFG_BAR_SZ - offset);
++        mem_write32(write_block,
++		    NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFD_CFG_TLV_BLOCK + offset,
++		    size);
++    }
++}
++
+ /** Init the non-zero parts of the PF control BAR
+  * @param isl_base      start address of the CFG BARs for the PCIe island
+  * @param vid           vid number on the PCIe island
+@@ -221,6 +267,11 @@ nfd_flr_init_pf_cfg_bar(__emem char *isl_base, unsigned int vid)
+                NFD_CFG_BAR(isl_base, vid) + NFP_NET_CFG_BPF_ABI,
+                sizeof bpf_cfg);
+ #endif
++
++#ifdef NFD_CFG_TLV_BLOCK
++    nfd_flr_init_tlv(isl_base, vid);
++#endif
++
+ #endif
+ }
+ 
+@@ -310,6 +361,10 @@ nfd_flr_init_vf_cfg_bar(__emem char *isl_base, __emem char *vf_cfg_base, unsigne
+     mem_write8(&vf_cfg_wr, NFD_CFG_BAR(isl_base, vid) + NFP_NET_CFG_MACADDR,
+               NFD_VF_CFG_MAC_SZ);
+ 
++#ifdef NFD_CFG_TLV_BLOCK
++    nfd_flr_init_tlv(isl_base, vid);
++#endif
++
+ #endif
+ }
+ 
+diff --git a/me/blocks/vnic/shared/nfd_tlv.uc b/me/blocks/vnic/shared/nfd_tlv.uc
+new file mode 100644
+index 0000000..240a1e3
+--- /dev/null
++++ b/me/blocks/vnic/shared/nfd_tlv.uc
+@@ -0,0 +1,134 @@
++/*
++ * Copyright (C) 2018,  Netronome Systems, Inc.  All rights reserved.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *   http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ * @file          blocks/vnic/shared/nfd_tlv.uc
++ * @brief         NFD macros for defining BAR TLVs
++ */
++#ifndef _BLOCKS__VNIC_SHARED_NFD_TLV_UC_
++#define _BLOCKS__VNIC_SHARED_NFD_TLV_UC_
++
++// inhibit pollution of codeless list file with illegal island scoped resources
++#define __NFP_CHIPRES_H__
++
++#include <nfd_common.h>
++#include <nfd_cfg.uc>
++
++#define PCIE_ISL 0
++#while (PCIE_ISL < 4)
++    #if (strstr(NFD_PCIE/**/PCIE_ISL/**/_EMEM, emem) == 1)
++        .declare_resource nfd_cfg_base/**/PCIE_ISL/**/_res \
++            global ((NFD_MAX_VFS + NFD_MAX_PFS + NFD_MAX_CTRL) * \
++            NFP_NET_CFG_BAR_SZ) nfd_cfg_base/**/PCIE_ISL
++        #if (NFD_MAX_VFS > 0)
++            .alloc_resource _pf/**/PCIE_ISL/**/_net_vf_bar \
++                nfd_cfg_base/**/PCIE_ISL/**/_res+0 global \
++                (NFD_MAX_VFS * NFP_NET_CFG_BAR_SZ)
++        #endif
++        #if (NFD_MAX_PFS > 0)
++            #define_eval __NFD_TLV_PF_OFFSET \
++                ((NFD_MAX_VFS + NFD_MAX_CTRL) * NFP_NET_CFG_BAR_SZ)
++            .alloc_resource _pf/**/PCIE_ISL/**/_net_bar0 \
++                nfd_cfg_base/**/PCIE_ISL/**/_res+__NFD_TLV_PF_OFFSET global \
++                (NFD_MAX_PFS * NFP_NET_CFG_BAR_SZ)
++        #endif
++        .alloc_mem _pf/**/PCIE_ISL/**/_tlv_template emem global \
++            ((NFD_MAX_VFS + NFD_MAX_CTRL + NFD_MAX_PFS) * \
++             (NFP_NET_CFG_BAR_SZ - NFD_CFG_TLV_BLOCK)) 4
++        #define __NFD_TLV_VID 0
++        #while (__NFD_TLV_VID < (NFD_MAX_VFS + NFD_MAX_CTRL + NFD_MAX_PFS))
++            .alloc_mem _pf/**/PCIE_ISL/**/_/**/__NFD_TLV_VID/**/_tlv_length \
++               emem global 4 4
++            #define_eval __NFD_TLV_VID (__NFD_TLV_VID + 1)
++        #endloop
++        #undef __NFD_TLV_VID
++    #endif
++    #define_eval PCIE_ISL (PCIE_ISL + 1)
++#endloop
++#undef PCIE_ISL
++
++#define __nfd_tlv_offsets ""
++
++#macro _nfd_tlv_extract_offset(key)
++    #define_eval NFD_TLV_OFFSET strstr('__nfd_tlv_offsets', '@/**/key')
++    #if (NFD_TLV_OFFSET <= 0)
++        #define_eval NFD_TLV_OFFSET 0
++    #else
++        #define_eval __nteo_left strleft('__nfd_tlv_offsets', NFD_TLV_OFFSET - 1)
++        #define_eval __nteo_right strright('__nfd_tlv_offsets', -NFD_TLV_OFFSET)
++        #define_eval NFD_TLV_OFFSET \
++            strright('__nteo_right', -strstr('__nteo_right', ':'))
++        #if (strstr('__nteo_right', '@') <= 0)
++            #define_eval __nfd_tlv_offsets '__nteo_left'
++        #else
++            #define_eval NFD_TLV_OFFSET \
++                strleft('NFD_TLV_OFFSET', strstr('NFD_TLV_OFFSET', '@') - 1)
++            #define_eval __nteo_right \
++                strright('__nteo_right', -strstr('__nteo_right', '@'))
++            #define_eval __nfd_tlv_offsets '__nteo_left/**/@/**/__nteo_right'
++        #endif
++    #endif
++#endm
++
++#macro _nfd_tlv_store_offset(key, value)
++    _nfd_tlv_extract_offset(key)
++    #define_eval __nfd_tlv_offsets '__nfd_tlv_offsets/**/@/**/key/**/:/**/value'
++#endm
++
++
++#macro nfd_tlv_init(PCIE_ISL, vid, type, length, value)
++    #define_eval __NFD_TLV_VID (vid)
++    _nfd_tlv_extract_offset(p/**/PCIE_ISL/**/v/**/__NFD_TLV_VID)
++
++    #define_eval __nfd_tlv_template_addr \
++        ((vid * (NFP_NET_CFG_BAR_SZ - NFD_CFG_TLV_BLOCK)) + NFD_TLV_OFFSET)
++    .init _pf/**/PCIE_ISL/**/_tlv_template+__nfd_tlv_template_addr \
++        ((type << 16) | length)
++
++    #if (vid < NFD_MAX_VFS)
++        #define_eval __nfd_tlv_bar_addr \
++            ((vid * NFP_NEG_CFG_BAR_SZ) + NFD_CFG_TLV_BLOCK + NFD_TLV_OFFSET)
++        .init _pf/**/PCIE_ISL/**/_net_vf_bar+__nfd_tlv_bar_addr \
++            ((type << 16) | length)
++    #else
++        #define_eval __nfd_tlv_bar_addr \
++            ((NFD_VID2PF(vid) * NFP_NET_CFG_BAR_SZ) + \
++             NFD_CFG_TLV_BLOCK + \
++             NFD_TLV_OFFSET)
++        .init _pf/**/PCIE_ISL/**/_net_bar0+__nfd_tlv_bar_addr \
++            ((type << 16) | length)
++    #endif
++
++    #if (length > 0)
++        #define_eval __nfd_tlv_template_addr (__nfd_tlv_template_addr + 4)
++        .init _pf/**/PCIE_ISL/**/_tlv_template+__nfd_tlv_template_addr value
++        #define_eval __nfd_tlv_bar_addr (__nfd_tlv_bar_addr + 4)
++        #if (vid < NFD_MAX_VFS)
++            .init _pf/**/PCIE_ISL/**/_net_vf_bar+__nfd_tlv_bar_addr value
++        #else
++            .init _pf/**/PCIE_ISL/**/_net_bar0+__nfd_tlv_bar_addr value
++        #endif
++    #endif
++    #define_eval NFD_TLV_OFFSET (NFD_TLV_OFFSET + 4 + length)
++    #if (type == NFP_NET_CFG_TLV_TYPE_END)
++        #if (length != 0)
++            #error "NFP_NET_CFG_TLV_TYPE_END must have length = 0"
++        #endif
++        .init _pf/**/PCIE_ISL/**/_/**/__NFD_TLV_VID/**/_tlv_length NFD_TLV_OFFSET
++    #endif
++    _nfd_tlv_store_offset(p/**/PCIE_ISL/**/v/**/__NFD_TLV_VID, NFD_TLV_OFFSET)
++    #undef __NFD_TLV_VID
++#endm
++
++#endif
