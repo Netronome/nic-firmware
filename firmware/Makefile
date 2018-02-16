@@ -180,16 +180,18 @@ udev_deb: udev_tree
 RPM_FW_PKG = $(FIRMWARE_DIR)/pkg/rpm/firmware
 RPM_UDEV_PKG = $(FIRMWARE_DIR)/pkg/rpm/udev
 
-firmware_rpm: firmware_tree
-	@mkdir -p $(RPM_FW_PKG)/{BUILD,SPECS,RPMS}
-	@cp -r $(FW_TREE)/* $(RPM_FW_PKG)/BUILD
+firmware_rpm: firmware_tgz
+	@mkdir -p $(RPM_FW_PKG)/{BUILD,SPECS,SOURCES,RPMS,SRPMS}
+	echo Source: $(TGZ_PKG)/agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER).tgz
+	echo Target: $(RPM_FW_PKG)/SOURCES
+	cp $(TGZ_PKG)/agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER).tgz $(RPM_FW_PKG)/SOURCES
 	@cat $(FIRMWARE_DIR)/pkg/agilio-firmware.spec | sed 's/__VERSION__/$(FW_PKG_VER)/g' | sed 's/__FW_NAME__/$(FW_PKG_NAME)/g' > $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
 	@echo "%post" >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
 	@cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(FW_PKG_NAME)/g' >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
 	@echo "dracut -f" >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
 	@echo "%preun" >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
 	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
-	@rpmbuild -bb $(RPM_FW_PKG)/SPECS/agilio-firmware.spec --buildroot $(RPM_FW_PKG)/BUILD --define "_rpmdir $(RPM_FW_PKG)/RPMS"
+	@rpmbuild -ba $(RPM_FW_PKG)/SPECS/agilio-firmware.spec --buildroot $(RPM_FW_PKG)/BUILD --define "_rpmdir $(RPM_FW_PKG)/RPMS" --define "_sourcedir $(RPM_FW_PKG)/SOURCES" --define "_srpmdir $(RPM_FW_PKG)/SRPMS"
 
 udev_rpm: udev_tree
 	@mkdir -p $(RPM_UDEV_PKG)/{BUILD,SPECS,RPMS}
@@ -202,9 +204,9 @@ udev_rpm: udev_tree
 TGZ_PKG = $(FIRMWARE_DIR)/pkg/tgz
 
 firmware_tgz: firmware_all
-	@mkdir -p $(TGZ_PKG)/agilio-$(FW_PKG_NAME)
-	@cp $(FW_NFFW)/*.nffw $(TGZ_PKG)/agilio-$(FW_PKG_NAME)
-	@cd $(TGZ_PKG) && tar --owner=0 --group=0 -czvf agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER).tgz agilio-$(FW_PKG_NAME)
+	@mkdir -p $(TGZ_PKG)/agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER)
+	@cp $(FW_NFFW)/*.nffw $(TGZ_PKG)/agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER)
+	@cd $(TGZ_PKG) && tar --owner=0 --group=0 -czvf agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER).tgz agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER)
 
 package: firmware_tgz firmware_deb udev_deb firmware_rpm udev_rpm
 	@mkdir -p $(FIRMWARE_DIR)/pkg/out/{tgz,deb,rpm}
