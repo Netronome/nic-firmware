@@ -12,7 +12,7 @@
 #include <nfp.h>
 #include <nfp_chipres.h>
 
-#include <nic/nic.h>
+#include <nic.h>
 #include <platform.h>
 
 #include <nfp/me.h>
@@ -35,6 +35,7 @@
 
 #include <link_state/link_ctrl.h>
 #include <link_state/link_state.h>
+#include <nic_basic/nic_basic.h>
 
 #include <npfw/catamaran_app_utils.h>
 
