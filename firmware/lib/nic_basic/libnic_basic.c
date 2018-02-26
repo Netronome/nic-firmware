@@ -33,7 +33,6 @@
 #include <std/synch.h>
 
 #include "nic_basic.h"
-#include "pcie_desc.h"
 #include "shared/nfp_net_ctrl.h"
 #include "nic_ctrl.h"
 
@@ -41,8 +40,6 @@
 /* Include other C files. The order matters. nic_internal.c defines
  * global data structures. */
 #include "_c/nic_internal.c"
-#include "_c/nic_rx.c"
-#include "_c/nic_tx.c"
 #include "_c/nic_stats.c"
 
 #endif /* _NIC_LIBNIC_BASIC_C_ */
