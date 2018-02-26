@@ -1,12 +1,12 @@
 #
 # Change these revisions to suit the project
 #
-# FLOWENV_REV - Tip as of June 26 2017
-FLOWENV_REV=74d431eeb670
-# GRO_REV  - Tip as of July 12 2016
+# FLOWENV_REV - Tip as of Feb 19 2018
+FLOWENV_REV=89bcd36
+# GRO_REV - Tip as of July 12 2016
 GRO_REV=25c868a8c724
-# NFD_REV - Tip of default branch as of 11 July 2017
-NFD_REV=4617188a5091
+# NFD_REV - Feb 26 2018
+NFD_REV=f899d4074
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
@@ -26,16 +26,17 @@ GIT_REVS =
 #
 # Flowenv
 #
-FLOWENV_DIR = $(DEPS_DIR)/flowenv.hg
+FLOWENV_DIR = $(DEPS_DIR)/flowenv.git
 FLOWENV_INC = -I$(FLOWENV_DIR)/me/lib
 
-$(DEPS_DIR)/flowenv.hg:
-	hg clone -r $(FLOWENV_REV) \
-		ssh://$(HG_USERNAME)@hg//data/hg/repos/flowenv.hg $(FLOWENV_DIR)
+$(DEPS_DIR)/flowenv.git:
+	git clone -q --no-checkout \
+		ssh://hg//data/git/repos/flowenv.git $(FLOWENV_DIR)
+	cd $(FLOWENV_DIR) && git checkout $(FLOWENV_REV)
 
-HG_DEPS += $(FLOWENV_DIR)
-HG_REVS += $(FLOWENV_REV)
 
+GIT_DEPS += $(FLOWENV_DIR)
+GIT_REVS += $(FLOWENV_REV)
 
 #
 # Flowenv
@@ -61,21 +62,20 @@ HG_REVS += $(GRO_REV)
 #
 # NFD
 #
-NFD_DIR = $(DEPS_DIR)/ng-nfd.hg
+NFD_DIR = $(DEPS_DIR)/ng-nfd.git
 NFD_INC = -I$(NFD_DIR)/shared \
 	  -I$(NFD_DIR)/me/blocks/vnic
 
-$(DEPS_DIR)/ng-nfd.hg:
-	hg clone -r $(NFD_REV) \
-	       	ssh://$(HG_USERNAME)@hg//data/hg/repos/ng-nfd.hg $(NFD_DIR)
-	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../revert-nfdh-212.patch && cd -
-	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../nfd_abi3.patch && cd -
-	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../bpf_stack.patch && cd -
-	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../pf_oversubscription_series.patch && cd -
-	cd $(DEPS_DIR)/ng-nfd.hg && patch -p1 < ../nfd_smart_round8.patch && cd -
+$(DEPS_DIR)/ng-nfd.git:
+	git clone -q --no-checkout \
+		ssh://$(HG_USERNAME)@hg//data/git/repos/ng-nfd.git $(NFD_DIR)
+	cd $(NFD_DIR) && git checkout $(NFD_REV)
+	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_abi3.patch && cd -
 
-HG_DEPS += $(NFD_DIR)
-HG_REVS += $(NFD_REV)
+
+
+GIT_DEPS += $(NFD_DIR)
+GIT_REVS += $(NFD_REV)
 
 #
 # Processing for all dependencies
