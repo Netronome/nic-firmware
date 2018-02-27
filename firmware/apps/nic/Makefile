@@ -5,6 +5,7 @@ ifndef PLATFORM
     $(error PLATFORM is not set)
 endif
 
+CHIP = nfp-4xxx-B0
 ifeq ($(PLATFORM),Hydrogen)
     NS_PLATFORM_TYPE = 1
     MEDIA = 1x40
@@ -41,11 +42,22 @@ else ifeq ($(PLATFORM),Carbon_1x10_1x25)
     NS_PLATFORM_TYPE = 12
     MEDIA = 1x10_1x25
     AMDA = AMDA0099-0001
+else ifeq ($(PLATFORM),Starfighter_2x40)
+    NS_PLATFORM_TYPE = 12
+    MEDIA = 2x40
+    AMDA = AMDA0058-0011
+    CHIP = nfp-6xxx-B0
+else ifeq ($(PLATFORM),Starfighter_1x100)
+    NS_PLATFORM_TYPE = 13
+    MEDIA = 1x100
+    AMDA = AMDA0078-0011
+    CHIP = nfp-6xxx-B0
 endif
 PROJECT = nic_$(AMDA)_$(MEDIA)
 
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
 $(eval $(call nffw.set_amda,$(PROJECT),$(AMDA)))
+$(eval $(call nffw.set_chip,$(PROJECT),$(CHIP)))
 $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/include))
 $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/deps/nfp-bsp-boardconfig))
 $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/deps/npfw))

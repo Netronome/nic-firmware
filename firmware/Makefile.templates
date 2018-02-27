@@ -118,7 +118,7 @@ endef
 #
 define nffw.set_chip
 
-$1__CHIP += $2
+$1__CHIP = $2
 
 endef
 
