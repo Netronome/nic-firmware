@@ -18,8 +18,8 @@ Firmware for Netronome Agilio SmartNICs
 %setup -q
 
 %install
-mkdir -p $RPM_BUILD_ROOT/opt/netronome/firmware/agilio-abm
-cp * $RPM_BUILD_ROOT/opt/netronome/firmware/agilio-abm
+mkdir -p $RPM_BUILD_ROOT/opt/netronome/firmware/agilio-__FW_NAME__
+cp * $RPM_BUILD_ROOT/opt/netronome/firmware/agilio-__FW_NAME__
 
 %files
 %define _binaries_in_noarch_packages_terminate_build 0
