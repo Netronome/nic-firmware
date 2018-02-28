@@ -17,25 +17,7 @@ Q ?= @
 #Q ?=
 
 HG_USERNAME ?= $(shell whoami)
-GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD | cut -c1-6)
-GIT_TAG = $(shell git rev-parse HEAD | cut -c1-6)
-#Add a "+" if building with un-committed/un-added changes
-GIT_DIFF_UNC=
-ifneq ($(shell git diff --name-only),)
-	GIT_DIFF_UNC=+
-endif
-#Add a "+" if building with added (staged) but un-committed changes
-ifneq ($(shell git diff --staged --name-only),)
-	ifeq ($(GIT_DIFF_UNC),)
-		GIT_DIFF_UNC=+
-	endif
-endif
-
-ifneq ($(shell git describe --tags --exact-match HEAD 2>/dev/null),)
-FW_ID ?= $(shell git describe --tags --exact-match HEAD | sed 's/%/~/g')
-else
-FW_ID ?= $(GIT_BRANCH)-$(GIT_TAG)$(GIT_DIFF_UNC)
-endif
+FW_ID = $(shell ${SCRIPT_DIR}/describe-head.sh --fw_id)
 
 ALL: firmware_all
 

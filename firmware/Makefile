@@ -132,8 +132,8 @@ firmware_clean:
 
 firmware_veryclean: firmware_clean firmware_clean_deps
 
-FW_PKG_NAME = $(shell git describe --tags HEAD | sed 's/\([a-zA-Z\-]*\)-\(.*[0-9].*[[:alnum:]]*\)/\1/')
-FW_PKG_VER = $(shell git describe --tags HEAD | sed 's/\([a-zA-Z\-]*\)-\(.*[0-9].*[[:alnum:]]*\)/\2/' | sed 's/%/~/g' | sed 's/-/\./g')$(GIT_DIFF_UNC)
+FW_PKG_NAME = $(shell ${SCRIPT_DIR}/describe-head.sh --pkg_name)
+FW_PKG_VER = $(shell ${SCRIPT_DIR}/describe-head.sh --pkg_ver)
 DEB_FW_PKG = $(FIRMWARE_DIR)/pkg/deb/agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER)-1
 DEB_UDEV_PKG = $(FIRMWARE_DIR)/pkg/deb/agilio-naming-policy-$(FW_PKG_VER)-1
 DEB_SZ = $(shell du -ck $(FW_NFFW)/*.nffw | grep total$ | cut -f 1)
