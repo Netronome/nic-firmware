@@ -220,11 +220,17 @@ firmware_tgz: firmware_all
 	@cp $(FW_NFFW)/*.nffw $(TGZ_PKG)/agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER)
 	@cd $(TGZ_PKG) && tar --owner=0 --group=0 -czvf agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER).tgz agilio-$(FW_PKG_NAME)-firmware-$(FW_PKG_VER)
 
+ifeq ("$(FW_PKG_NAME)","nic")
 package: firmware_tgz firmware_deb udev_deb firmware_rpm udev_rpm
+else
+package: firmware_tgz firmware_deb firmware_rpm
+endif
 	@mkdir -p $(FIRMWARE_DIR)/pkg/out/{tgz,deb,rpm}
 	@mv $(TGZ_PKG)/*.tgz $(FIRMWARE_DIR)/pkg/out/tgz/
 	@mv $(FIRMWARE_DIR)/pkg/deb/*.deb $(FIRMWARE_DIR)/pkg/out/deb/
 	@mv $(RPM_FW_PKG)/RPMS/noarch/*.rpm $(FIRMWARE_DIR)/pkg/out/rpm/
+ifeq ("$(FW_PKG_NAME)","nic")
 	@mv $(RPM_UDEV_PKG)/RPMS/noarch/*.rpm $(FIRMWARE_DIR)/pkg/out/rpm/
+endif
 
 $(foreach mkdep,$(FW_MKDEP_TARGETS),$(eval -include $(mkdep)))
