@@ -871,9 +871,9 @@ skip_l4_offset#:
     .reg l4_off
     .reg lso_seq
     .reg mss
-    .reg pkt_len
     .reg tcp_seq_add
     .reg tcp_flags_mask, tcp_flags_wrd
+    .reg tmp
 
     bitfield_extract__sz1(l4_off, BF_AML(in_nfd_desc, NFD_IN_LSO2_L4_OFFS_fld)) ; NFD_IN_LSO2_L4_OFFS_fld
     mem[read32, $tcp_hdr[0], BF_A(io_vec, PV_CTM_ADDR_bf), l4_off, 4], ctx_swap[sig_read_tcp], defer[2]
@@ -928,7 +928,8 @@ ipv4#:
     ctx_arb[sig_write_tcp_seq, sig_write_tcp_flags, sig_write_ip], br[end#]
 
 ipv6#:
-    alu[$ip, --, B, ip_len, >>16]
+    alu[tmp, --, B, 40, <<16]
+    alu[$ip, ip_len, -, tmp]
     alu[l3_off, l3_off, +, IPV6_PAYLOAD_OFFS]
     mem[write8, $ip, BF_A(io_vec, PV_CTM_ADDR_bf), l3_off, 2], sig_done[sig_write_ip]
     ctx_arb[sig_write_tcp_seq, sig_write_tcp_flags, sig_write_ip]
