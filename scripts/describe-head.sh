@@ -28,7 +28,7 @@ if [ "$1" = "--fw_id" ] ; then
     TRUNC_HASH=`echo ${HASH} | cut -c1-6`
     echo ${TRUNC_NAME}-${TRUNC_HASH}${CHANGES}
   else
-    echo $TAG | sed 's/%/~/g'
+    echo ${TAG}${CHANGES} | sed 's/%/~/g'
   fi
 elif [ "$1" = "--pkg_ver" ] ; then
   if [ -z $TAG ] ; then
