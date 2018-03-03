@@ -21,6 +21,7 @@ br[ingress#]
 
 rx_discards_proto#:
     pv_stats_increment(pkt_vec, EXT_STATS_GLOBAL_RX_DISCARDS_PROTO)
+    pkt_io_drop(pkt_vec)
     br[ingress#]
 
 rx_errors_parse#:
