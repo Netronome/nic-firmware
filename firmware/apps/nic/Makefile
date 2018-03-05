@@ -226,4 +226,3 @@ $(eval $(call nffw.add_obj_codeless,$(PROJECT),dump_spec))
 $(eval $(call nffw.add_rtsyms,$(PROJECT),$(FW_ID)))
 # TODO get link_w_analysis to work without adding a warning
 $(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx,datapath))
-$(eval $(call nffw.cat,$(PROJECT),nic_rx,nic_tx,datapath))
