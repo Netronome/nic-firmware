@@ -3,8 +3,6 @@
 #
 # FLOWENV_REV - Tip as of Feb 19 2018
 FLOWENV_REV=89bcd36
-# GRO_REV - Tip as of July 12 2016
-GRO_REV=25c868a8c724
 # NFD_REV - Feb 26 2018
 NFD_REV=f899d4074
 
@@ -28,6 +26,8 @@ GIT_REVS =
 #
 FLOWENV_DIR = $(DEPS_DIR)/flowenv.git
 FLOWENV_INC = -I$(FLOWENV_DIR)/me/lib
+GRO_DIR = $(DEPS_DIR)/flowenv.git/me/blocks/gro
+GRO_INC = -I$(GRO_DIR)
 
 $(DEPS_DIR)/flowenv.git:
 	git clone -q --no-checkout \
@@ -43,21 +43,6 @@ GIT_REVS += $(FLOWENV_REV)
 #
 BLM_DIR = $(FLOWENV_DIR)/me/blocks/blm
 BLM_INC = -I$(BLM_DIR)/me/lib
-
-
-#
-# GRO
-#
-GRO_DIR = $(DEPS_DIR)/gro.hg
-GRO_INC = -I$(GRO_DIR)
-
-$(DEPS_DIR)/gro.hg:
-	hg clone -r $(GRO_REV) \
-		ssh://$(HG_USERNAME)@hg//data/hg/repos/gro.hg $(GRO_DIR)
-
-HG_DEPS += $(GRO_DIR)
-HG_REVS += $(GRO_REV)
-
 
 #
 # NFD
