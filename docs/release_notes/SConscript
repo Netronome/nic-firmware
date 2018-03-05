@@ -1,7 +1,0 @@
-# SConscript - ard
-
-Import('env')
-script_dir = env.Dir(".").srcnode().abspath
-env.MarkdownBuilder('release_notes.pdf','release_notes.md', \
-                    DOC_PATH=script_dir, \
-                    PANDOC_ARGS='-N')
