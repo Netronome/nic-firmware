@@ -410,6 +410,11 @@ cfg_changes_loop(void)
 
     /* Initialisation */
     MSIX_INIT_ISL(NIC_PCI);
+    
+    for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+        mac_port_disable_rx(port);
+    }
+
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
     nic_local_init(0, 0);		/* dummy regs right now */
 
