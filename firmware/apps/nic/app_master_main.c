@@ -398,7 +398,7 @@ cfg_changes_loop(void)
 
     /* Initialisation */
     MSIX_INIT_ISL(NIC_PCI);
-    
+
     for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
         mac_port_disable_rx(port);
     }
@@ -406,7 +406,9 @@ cfg_changes_loop(void)
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
     nic_local_init(0, 0);		/* dummy regs right now */
 
-    sleep(1000000); // wait for NN registers to come up in reflect mode
+    /* Wait for MAC disable and NN registers to come up in reflect mode */
+    sleep((NS_PLATFORM_TCLK * 1000000) / 20); // 50ms
+
     init_nn_tables();
     upd_slicc_hash_table();
 
@@ -461,20 +463,20 @@ cfg_changes_loop(void)
                 /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
                 if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
                     if (control & NFP_NET_CFG_CTRL_ENABLE) {
+                        /* Wait for config to stabilize */
+                        sleep((NS_PLATFORM_TCLK * 1000000) / 40); // 25ms
                         mac_port_enable_rx(port);
                     } else {
                         mac_port_disable_rx(port);
                         app_config_port_down(vid);
                         nic_local_epoch();
+                        /* Wait for queues to drain */
+                        sleep((NS_PLATFORM_TCLK * 1000000) / 40); // 25ms
                     }
                 }
 
                 /* Save the control word */
                 nic_control_word[vid] = control;
-
-                /* Wait for queues to drain / config to stabilize */
-                sleep(100000);
-
             } else {
                     /* This is an error, VFs aren't supported yet */
             }
