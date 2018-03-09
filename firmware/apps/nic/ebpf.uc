@@ -154,7 +154,6 @@ ebpf_init_cap_finalize()
     br_bset[rc, EBPF_RET_PASS, actions#]
 
     pv_stats_add_octets(_ebpf_pkt_vec)
-    pv_clear_egress_queue(_ebpf_pkt_vec)
     pv_get_nbi_egress_channel_mapped_to_ingress(egress_q_base, _ebpf_pkt_vec)
     pv_stats_set_tx(_ebpf_pkt_vec)
     pkt_io_tx_wire(_ebpf_pkt_vec, egress_q_base)

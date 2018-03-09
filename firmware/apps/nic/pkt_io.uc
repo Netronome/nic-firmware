@@ -119,7 +119,7 @@ skip_dispatch#:
 
 #macro pkt_io_init(out_pkt_vec)
     immed[__pkt_io_quiescent, 0]
-    alu[BF_A(out_pkt_vec, PV_QUEUE_IN_NBI_bf), --, B, 0, <<BF_L(PV_QUEUE_IN_NBI_bf)]
+    alu[BF_A(out_pkt_vec, PV_QUEUE_IN_TYPE_bf), --, B, 1, <<BF_L(PV_QUEUE_IN_TYPE_bf)]
     __pkt_io_dispatch_nbi()
 #endm
 
@@ -137,7 +137,7 @@ consume_quiesce_sig#:
 
 
 #macro pkt_io_rx(io_vec)
-    br_bclr[BF_AL(io_vec, PV_QUEUE_IN_NBI_bf), nfd_dispatch#] // previous packet was NFD, dispatch another
+    br_bset[BF_AL(io_vec, PV_QUEUE_IN_TYPE_bf), nfd_dispatch#] // previous packet was NFD, dispatch another
 
 nbi_dispatch#:
     br_signal[__pkt_io_sig_quiesce_nbi, quiesce_nbi#]

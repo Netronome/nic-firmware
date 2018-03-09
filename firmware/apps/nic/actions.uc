@@ -62,7 +62,7 @@
     .reg tmp
     .reg hi
 
-    __actions_read(stats_ctx, --, <<BF_L(PV_STATS_CTX_bf))
+    __actions_read(stats_ctx, 0xff, --)
     br[check_mac#]
 
 broadcast#:
@@ -84,9 +84,8 @@ check_mac#:
     pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
 
     br_bset[*$index, BF_L(MAC_MULTICAST_bf), multicast#], defer[2]
-        passert(BF_L(PV_STATS_CTX_bf), "EQ", 16)
         alu[BF_A(in_pkt_vec, PV_STATS_CTX_bf), BF_A(in_pkt_vec, PV_STATS_CTX_bf), AND~, BF_MASK(PV_STATS_CTX_bf), <<BF_L(PV_STATS_CTX_bf)]
-        alu[BF_A(in_pkt_vec, PV_STATS_CTX_bf), BF_A(in_pkt_vec, PV_STATS_CTX_bf), OR, stats_ctx]
+        alu[BF_A(in_pkt_vec, PV_STATS_CTX_bf), BF_A(in_pkt_vec, PV_STATS_CTX_bf), OR, stats_ctx, <<BF_L(PV_STATS_CTX_bf)]
 
     __actions_restore_t_idx()
 
@@ -246,7 +245,7 @@ skip_meta_type#:
         alu[queue_shf, 0x18, AND, hash, <<3]
         alu[--, queue_shf, OR, 0]
     alu[queue, 0xff, AND, *n$index, >>indirect]
-    pv_set_egress_queue(in_pkt_vec, queue)
+    pv_set_queue_offset(in_pkt_vec, queue)
 
 skip_rss#:
 .end
@@ -382,7 +381,7 @@ skip_checksum#:
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
     jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#], defer[2] ;actions_jump
-        immed[egress_q_mask, BF_MASK(PV_QUEUE_OUT_bf)]
+        immed[egress_q_mask, 0xffff]
         immed[ebpf_mask, 0xffff]
 
     ins_0#: br[policy_drop#]
