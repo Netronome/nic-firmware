@@ -59,10 +59,10 @@
 /* use macros to map input VNIC port to index in NIC_CFG_INSTR_TBL table */
 /* NFD_VNIC_TYPE_PF, NFD_VNIC_TYPE_CTRL, NFD_VNIC_TYPE_VF */
 #define NIC_PORT_TO_PCIE_INDEX(pcie, type, vport, queue) \
-        ((pcie << 6) | (NFD_BUILD_QID((type),(vport),(queue))&0x3f))
+        ((1 << 8) | (pcie << 6) | (NFD_BUILD_QID((type),(vport),(queue))&0x3f))
 
 #define NIC_PORT_TO_NBI_INDEX(nbi, vport) \
-        (NIC_NBI_ENTRY_START + ((nbi << 6) | (vport & 0x3f)))
+        ((nbi << 7) | (vport & 0x7f))
 
 
 /* Build output port with this macro */

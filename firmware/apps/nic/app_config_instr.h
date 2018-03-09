@@ -21,27 +21,12 @@
 #define _APP_CONFIG_INSTR_H_
 
 
-/* if NBI 1 has any ports then two NIB islands */
-#if NS_PLATFORM_NUM_PORTS_PER_MAC_1 > 0
-#define NUM_NBI 2
-#else
-#define NUM_NBI 1
-#endif
-
-#define NUM_NBI_CHANNELS    64      // channels per NBI
-#define NUM_PCIE            2       // number of PCIe islands
 #define NUM_PCIE_Q          64      // number of queues configured per PCIe
 #define NUM_PCIE_Q_PER_PORT NFD_MAX_PF_QUEUES // nr queues cfg per port
 #define NIC_MAX_INSTR       16      // max number of instructions in table
 
-#define NIC_HOST_MAX_ENTRIES  (NUM_PCIE*NUM_PCIE_Q)
-#define NIC_NBI_ENTRY_START   NIC_HOST_MAX_ENTRIES
-#define NIC_WIRE_MAX_ENTRIES  (NUM_NBI*NUM_NBI_CHANNELS)
-
-
 #define NIC_CFG_INSTR_TBL_ADDR 0x00
-#define NIC_CFG_INSTR_TBL_SIZE (((NIC_HOST_MAX_ENTRIES+NIC_WIRE_MAX_ENTRIES) \
-                                * NIC_MAX_INSTR)<<2)
+#define NIC_CFG_INSTR_TBL_SIZE 32768
 
 /* For host ports,
  *   use 0 to NIC_HOST_MAX_ENTRIES-1
