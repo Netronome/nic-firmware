@@ -43,12 +43,12 @@ else ifeq ($(PLATFORM),Carbon_1x10_1x25)
     MEDIA = 1x10_1x25
     AMDA = AMDA0099-0001
 else ifeq ($(PLATFORM),Starfighter_2x40)
-    NS_PLATFORM_TYPE = 12
+    NS_PLATFORM_TYPE = 13
     MEDIA = 2x40
     AMDA = AMDA0058-0011
     CHIP = nfp-6xxx-B0
 else ifeq ($(PLATFORM),Starfighter_1x100)
-    NS_PLATFORM_TYPE = 13
+    NS_PLATFORM_TYPE = 14
     MEDIA = 1x100
     AMDA = AMDA0078-0011
     CHIP = nfp-6xxx-B0
