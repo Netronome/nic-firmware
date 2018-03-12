@@ -377,7 +377,6 @@ define fwdep.add_nfd_svc
 
 $(eval $(call micro_c.compile_4cntxmode,$1,nfd_app_master,$2,$3))
 $(eval $(call micro_c.add_src_lib.abspath,$1,nfd_app_master,$(NFD_VNIC_DIR),libnfd))
-$(eval $(call micro_c.add_src_lib.abspath,$1,nfd_app_master,$(NFD_VNIC_DIR)/utils,libutils))
 $(eval $(call fwdep.micro_c.add_flowenv_lib,$1,nfd_app_master,std))
 $(eval $(call micro_c.add_includes,$1,nfd_app_master,		\
 	$(NFD_DIR)						\
@@ -386,9 +385,6 @@ $(eval $(call micro_c.add_includes,$1,nfd_app_master,		\
 	$(NFD_DIR)/me/blocks					\
 	$(NFD_DIR)/me/blocks/vnic				\
 	$(NFD_DIR)/me/blocks/shared				\
-	))
-$(eval $(call micro_c.add_defines,$1,nfd_app_master,		\
-	PCIE_ISL=0						\
 	))
 $(eval $(call nffw.add_obj,$1,nfd_app_master,$4))
 
@@ -414,7 +410,6 @@ $(eval $(call micro_c.add_defines,$1,nfd_svc,			\
 	NFD_CFG_SIG_NEXT_ME2="nfd_cfg_sig_app_master2"		\
 	NFD_CFG_NEXT_ME3="__nfp_idstr2meid(\"$4\")" 		\
 	NFD_CFG_SIG_NEXT_ME3="nfd_cfg_sig_app_master3"		\
-	PCIE_ISL=0						\
 	))
 $(eval $(call nffw.add_obj,$1,nfd_svc,$5))
 
@@ -585,7 +580,7 @@ $(eval $(call microcode.add_defines,$1,nfd_pcie$2_sb,		\
 	STAGE_BATCH_FIRST_WORKER=1				\
 	STAGE_BATCH_NUM_WORKERS=7				\
 	NFD_CFG_NEXT_ME="__nfp_idstr2meid(\"$$($1__NFD_SVC_ME)\")"\
-	NFD_CFG_SIG_NEXT_ME="_nfd_cfg_sig_svc_me0"		\
+	NFD_CFG_SIG_NEXT_ME="_nfd_cfg_sig_svc_me$2"		\
 	))
 $(eval $(call microcode.add_flags,$1,nfd_pcie$2_sb,-keep_unreachable_code))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_sb,$3))
