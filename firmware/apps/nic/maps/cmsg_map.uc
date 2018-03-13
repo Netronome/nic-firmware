@@ -351,8 +351,16 @@ ret#:
     .reg pkt_len
     .reg pkt_num
 
-    #if (NBI_COUNT != 1 || SS != 0)
-        #error "Only targets PCIe = 0 and NFD_OUT_NBI_wrd assumes nbi = 0"
+    #if (SS != 0)
+        #error "Only targets PCIe = 0"
+    #endif
+
+    #ifdef SPLIT_EMU_RINGS
+        // NFD supports SPLIT_EMU_RINGS (separate EMU rings for each NBI)
+        // by providing the "N" bit extending the BLS field.  In practice
+        // If SPLIT_EMU_RINGS is _not_ used, then N is simply zero for all
+        // NBIs.
+        #error "SPLIT_EMU_RINGS configuration not supported."
     #endif
 
     // Word 0

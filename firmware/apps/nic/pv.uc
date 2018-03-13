@@ -513,8 +513,12 @@ rx#:
     .reg write $meta_types
     .sig sig_meta
 
-    #if (NBI_COUNT != 1 || SS != 0)
-        #error "Only targets PCIe = 0 and NFD_OUT_NBI_wrd assumes nbi = 0"
+    #ifdef SPLIT_EMU_RINGS
+        // NFD supports SPLIT_EMU_RINGS (separate EMU rings for each NBI)
+        // by providing the "N" bit extending the BLS field.  In practice
+        // If SPLIT_EMU_RINGS is _not_ used, then N is simply zero for all
+        // NBIs.
+        #error "SPLIT_EMU_RINGS configuration not supported."
     #endif
 
     bitfield_extract__sz1(meta_len, BF_AML(in_vec, PV_META_LENGTH_bf))
