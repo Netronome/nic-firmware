@@ -179,6 +179,10 @@
 
 #define_eval PV_NOT_PARSED              ((3 << BF_L(PV_PARSE_MPD_bf)) | (3 << BF_L(PV_PARSE_VLD_bf)))
 
+#if (defined(NFD_PCIE1_EMEM) || defined(NFD_PCIE2_EMEM) || defined(NFD_PCIE3_EMEM))
+    #define PV_MULTI_PCI
+#endif
+
 #macro pv_init(io_vec, PACKET_ID)
 #if (strstr('io_vec', '*l$index') == 1)
     .alloc_mem _PKT_IO_PKT_VEC_/**/PACKET_ID lmem me (4 * (1 << log2((PV_SIZE_LW * 4), 1))) (4 * (1 << log2((PV_SIZE_LW * 4), 1)))
@@ -506,7 +510,6 @@ rx#:
     .reg offset
     .reg pkt_len
     .reg data_len
-    .reg pcie
     .reg pkt_num
     .reg tmp
     .reg queue
@@ -539,8 +542,10 @@ skip_meta#:
     ld_field_w_clr[offset, 0011, tmp, >>1]
     alu[desc, GRO_DTYPE_NFD, OR, offset, <<GRO_META_W0_META_START_BIT]
     ld_field[desc, 1100, BF_A(in_vec, PV_NUMBER_bf)] ; PV_NUMBER_bf
-    alu[pcie, 3, AND, in_queue_base, >>6]
-    alu[desc, desc, OR, pcie, <<GRO_META_DEST_shf]
+    #ifdef PV_MULTI_PCI
+        alu[tmp, 3, AND, in_queue_base, >>6]
+        alu[desc, desc, OR, tmp, <<GRO_META_DEST_shf]
+    #endif
     alu[ctm_only, 1, AND~, BF_A(in_vec, PV_SPLIT_bf), >>BF_L(PV_SPLIT_bf)] ; PV_SPLIT_bf
     alu[desc, desc, OR, ctm_only, <<NFD_OUT_CTM_ONLY_shf]
     alu[desc, desc, OR, __ISLAND, <<NFD_OUT_CTM_ISL_shf]
@@ -554,8 +559,12 @@ skip_meta#:
     #ifndef GRO_EVEN_NFD_OFFSETS_ONLY
        alu[desc, desc, OR, BF_A(in_vec, PV_OFFSET_bf), <<31] // meta_len is always even, this is safe
     #endif
-    alu[queue, in_queue_base, AND, 0x3f]
-    alu[queue, queue, +8, BF_A(in_vec, PV_QUEUE_OFFSET_bf)]
+    #ifdef PV_MULTI_PCI
+        alu[queue, in_queue_base, AND, 0x3f]
+        alu[queue, queue, +8, BF_A(in_vec, PV_QUEUE_OFFSET_bf)]
+    #else
+        alu[queue, in_queue_base, +8, BF_A(in_vec, PV_QUEUE_OFFSET_bf)]
+    #endif
     alu[out_desc[NFD_OUT_QID_wrd], desc, OR, queue, <<NFD_OUT_QID_shf]
 
     // Word 3
