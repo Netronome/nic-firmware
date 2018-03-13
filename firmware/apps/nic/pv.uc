@@ -179,9 +179,14 @@
 
 #define_eval PV_NOT_PARSED              ((3 << BF_L(PV_PARSE_MPD_bf)) | (3 << BF_L(PV_PARSE_VLD_bf)))
 
+#ifndef PV_GRO_NFD_START
+    #define PV_GRO_NFD_START            4
+#endif
+
 #if (defined(NFD_PCIE1_EMEM) || defined(NFD_PCIE2_EMEM) || defined(NFD_PCIE3_EMEM))
     #define PV_MULTI_PCI
 #endif
+
 
 #macro pv_init(io_vec, PACKET_ID)
 #if (strstr('io_vec', '*l$index') == 1)
@@ -1037,10 +1042,18 @@ end#:
     alu[BF_A(out_vec, PV_CTM_ADDR_bf), NFD_IN_DATA_OFFSET, OR, in_pkt_num, <<BF_L(PV_NUMBER_bf)]
     alu[BF_A(out_vec, PV_CTM_ADDR_bf), BF_A(out_vec, PV_CTM_ADDR_bf), OR, 1, <<BF_L(PV_CTM_ALLOCATED_bf)]
 
-    // map NFD queues to sequencers 4, 5
-    alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nfd_desc, NFD_IN_SEQN_fld), AND~, 0xfe] ; PV_SEQ_NO_bf
-    alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), +, 4] ; PV_SEQ_CTX_bf
+    // map NFD queues to sequencers starting at PV_GRO_NFD_START
+    passert(BF_L(PV_SEQ_NO_bf), "EQ", BF_L(NFD_IN_SEQN_fld) + BF_L(PV_SEQ_CTX_bf))
+    passert(BF_L(PV_SEQ_CTX_bf), "EQ", BF_L(NFD_IN_QID_fld) + BF_L(PV_SEQ_CTX_bf))
+    passert(BF_W(PV_SEQ_NO_bf), "EQ", BF_W(PV_SEQ_CTX_bf))
+    passert(BF_W(NFD_IN_SEQN_fld), "EQ", BF_W(NFD_IN_QID_fld))
+    passert(BF_L(NFD_IN_QID_fld), "EQ", 0)
+    passert(BF_L(PV_SEQ_NO_bf), "GT", BF_M(NFD_IN_QID_fld))
+    passert(NFD_IN_NUM_SEQRS, "POWER_OF_2")
+    alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nfd_desc, NFD_IN_QID_fld), AND~, (0x100 - NFD_IN_NUM_SEQRS)] ; PV_SEQ_NO_bf
+    alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), +, PV_GRO_NFD_START] ; PV_SEQ_CTX_bf
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), --, B, BF_A(out_vec, PV_SEQ_CTX_bf), <<BF_L(PV_SEQ_CTX_bf)] ; PV_SEQ_CTX_bf
+
     alu[BF_A(out_vec, PV_META_LENGTH_bf), BF_A(out_vec, PV_META_LENGTH_bf), OR, meta_len] ; PV_META_LENGTH_bf
 
     alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_MASK(PV_CSUM_OFFLOAD_bf), AND, \
