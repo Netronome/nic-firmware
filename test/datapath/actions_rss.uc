@@ -76,7 +76,7 @@ move(nn_idx, 0)
     immed[__actions_t_idx, (32 * 4)]
     pv_invalidate_cache(in_pkt_vec)
     immed[BF_A(in_pkt_vec, PV_META_LENGTH_bf), 0]
-    immed[BF_A(in_pkt_vec, PV_QUEUE_OUT_bf), 0]
+    immed[BF_A(in_pkt_vec, PV_QUEUE_OFFSET_bf), 0]
     immed[BF_A(in_pkt_vec, PV_META_TYPES_bf), 0]
 #endm
 
@@ -102,7 +102,7 @@ move(nn_idx, 0)
     CHECK($hash, expected)
     move(prev_hash, $hash)
 
-    alu[tested_queue, 0xff, AND, BF_A(pkt_vec, PV_QUEUE_OUT_bf)]
+    alu[tested_queue, 0xff, AND, BF_A(pkt_vec, PV_QUEUE_OFFSET_bf)]
     alu[expected_queue, $hash, +, 1]
     alu[expected_queue, expected_queue, AND, 0x7f]
     .if (==0)
