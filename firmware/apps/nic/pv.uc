@@ -1009,6 +1009,7 @@ end#:
     .reg addr_hi
     .reg addr_lo
     .reg meta_len
+    .reg pcie
     .reg pkt_num
     .reg pkt_len
     .reg seq_ctx
@@ -1051,6 +1052,10 @@ end#:
     passert(BF_L(PV_SEQ_NO_bf), "GT", BF_M(NFD_IN_QID_fld))
     passert(NFD_IN_NUM_SEQRS, "POWER_OF_2")
     alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nfd_desc, NFD_IN_QID_fld), AND~, (0x100 - NFD_IN_NUM_SEQRS)] ; PV_SEQ_NO_bf
+    #ifdef PV_MULTI_PCI
+        alu[pcie, 3, AND, BF_A(in_nfd_desc, NFD_IN_QID_fld), >>6]
+        alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), OR, pcie, <<(log2(NFD_IN_NUM_SEQRS))]
+    #endif
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), +, PV_GRO_NFD_START] ; PV_SEQ_CTX_bf
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), --, B, BF_A(out_vec, PV_SEQ_CTX_bf), <<BF_L(PV_SEQ_CTX_bf)] ; PV_SEQ_CTX_bf
 
