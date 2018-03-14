@@ -487,14 +487,9 @@
     BLM_NBI8_BLQ3_EMU_QID
     nbi0_dma_bpe_credits
     _pf0_net_app_id
-    __ext_stats
-    _ext_stats_phy_keys
-    _ext_stats_phy_data
-    _ext_stats_phy_blk_sz
+    _nic_stats_queue
+    _nic_stats_vnic
     _mac_stats
-    __mac_stats
-    __mac_stats_head_drop
-    __tmq_stats_drop
     _pf0_net_ctrl_bar
     _pf0_net_bar0
     _nic_cfg_synch
@@ -3641,10 +3636,8 @@
     BLM_NBI8_BLQ3_EMU_QID
     nbi0_dma_bpe_credits
     _pf0_net_app_id
-    __ext_stats
-    _ext_stats_phy_keys
-    _ext_stats_phy_data
-    _ext_stats_phy_blk_sz
+    _nic_stats_queue
+    _nic_stats_vnic
     _mac_stats
     __mac_stats
     __mac_stats_head_drop

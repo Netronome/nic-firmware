@@ -59,10 +59,10 @@
 /* use macros to map input VNIC port to index in NIC_CFG_INSTR_TBL table */
 /* NFD_VNIC_TYPE_PF, NFD_VNIC_TYPE_CTRL, NFD_VNIC_TYPE_VF */
 #define NIC_PORT_TO_PCIE_INDEX(pcie, type, vport, queue) \
-        ((1 << 8) | (pcie << 6) | (NFD_BUILD_QID((type),(vport),(queue))&0x3f))
+        ((pcie << 6) | (NFD_BUILD_QID((type),(vport),(queue))&0x3f))
 
 #define NIC_PORT_TO_NBI_INDEX(nbi, vport) \
-        ((nbi << 7) | (vport & 0x7f))
+        ((1 << 8) | (nbi << 7) | (vport & 0x7f))
 
 
 /* Build output port with this macro */
@@ -108,7 +108,6 @@ __export __emem __addr40 uint32_t debug_rss_table[100];
 Also, it is expected that it matches:
 enum instruction_type {
     INSTR_TX_DROP = 0,
-    INSTR_STATISTICS,
     INSTR_MTU,
     INSTR_MAC,
     INSTR_RSS,
@@ -497,21 +496,9 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     /*
      * RX HOST --> TX WIRE
      */
-   // reg_zero(instr, sizeof(instr));
-   // count = 0;
-
-#ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_STATISTICS];
-#else
-    instr[count].instr = INSTR_STATISTICS;
-#endif
-    instr[count++].param = (vnic + 1) << 3 | (1 << 2);
-    prev_instr = INSTR_STATISTICS;
-
 
     /* mtu */
-    mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
-                   sizeof(mtu));
+    mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU), sizeof(mtu));
 #ifdef GEN_INSTRUCTION
     instr[count].instr = instr_tbl[INSTR_MTU];
 #else
@@ -544,16 +531,6 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     count = 0;
     prev_instr = 0;
     reg_zero(instr, sizeof(instr));
-
-#ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_STATISTICS];
-#else
-    instr[count].instr = INSTR_STATISTICS;
-#endif
-
-    instr[count].param = (vnic + 1) << 3;
-    prev_instr = INSTR_STATISTICS;
-    count++;
 
 #ifdef GEN_INSTRUCTION
     instr[count].instr = instr_tbl[INSTR_MTU];

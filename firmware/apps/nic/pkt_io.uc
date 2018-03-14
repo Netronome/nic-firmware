@@ -70,20 +70,28 @@ nfd_out_send_init()
 #endm
 
 
-#macro pkt_io_tx_host(in_pkt_vec, egress_q_base)
-    pv_acquire_nfd_credit(in_pkt_vec, egress_q_base, rx_discards_no_buf_pci#)
+#macro pkt_io_tx_host(in_pkt_vec, egress_q_base, IN_LABEL)
+.begin
+    pv_acquire_nfd_credit(in_pkt_vec, egress_q_base, drop_buf_pci#)
     pv_get_gro_host_desc($__pkt_io_gro_meta, in_pkt_vec, egress_q_base)
-    pv_stats_add_octets(in_pkt_vec)
+    pv_stats_tx_host(in_pkt_vec, egress_q_base, IN_LABEL)
+
+drop_buf_pci#:
+    pv_stats_update(pkt_vec, RX_DISCARD_PCI, drop#)
+.end
 #endm
 
 
-#macro pkt_io_tx_wire(in_pkt_vec, egress_q_base)
+#macro pkt_io_tx_wire(in_pkt_vec, egress_q_base, IN_LABEL)
 .begin
     .reg pms_offset
 
-    pv_write_nbi_meta(pms_offset, in_pkt_vec, tx_errors_offset#)
+    pv_write_nbi_meta(pms_offset, in_pkt_vec, error_offset#)
     pv_get_gro_wire_desc($__pkt_io_gro_meta, in_pkt_vec, egress_q_base, pms_offset)
-    pv_stats_add_octets(in_pkt_vec)
+    pv_stats_tx_wire(in_pkt_vec, IN_LABEL)
+
+error_offset#:
+    pv_stats_update(pkt_vec, TX_ERROR_OFFSET, drop#)
 .end
 #endm
 
@@ -120,7 +128,7 @@ skip_dispatch#:
 #macro pkt_io_init(out_pkt_vec)
     immed[__pkt_io_quiescent, 0]
     alu[BF_A(out_pkt_vec, PV_QUEUE_IN_TYPE_bf), --, B, 1, <<BF_L(PV_QUEUE_IN_TYPE_bf)]
-    __pkt_io_dispatch_nbi()
+    __pkt_io_dispatch_nfd()
 #endm
 
 
@@ -137,7 +145,7 @@ consume_quiesce_sig#:
 
 
 #macro pkt_io_rx(io_vec)
-    br_bset[BF_AL(io_vec, PV_QUEUE_IN_TYPE_bf), nfd_dispatch#] // previous packet was NFD, dispatch another
+    br_bclr[BF_AL(io_vec, PV_QUEUE_IN_TYPE_bf), nfd_dispatch#] // previous packet was NFD, dispatch another
 
 nbi_dispatch#:
     br_signal[__pkt_io_sig_quiesce_nbi, quiesce_nbi#]
@@ -152,8 +160,19 @@ clear_sig_rx_nfd#:
     br_!signal[__pkt_io_sig_nfd, clear_sig_rx_nbi#] // __pkt_io_sig_nbi is asserted
 
 rx_nfd#:
-    pv_init_nfd(io_vec, __pkt_io_nfd_pkt_no, $__pkt_io_nfd_desc)
+    pv_init_nfd(io_vec, __pkt_io_nfd_pkt_no, $__pkt_io_nfd_desc, error_nfd#)
     br[end#]
+
+error_nfd#:
+    pv_stats_update(io_vec, TX_ERROR_PCI, drop#)
+
+drop_proto#:
+    // invalid protocols have no sequencer, must not go to reorder
+    pkt_io_drop(pkt_vec)
+    pv_stats_update(pkt_vec, RX_DISCARD_PROTO, ingress#)
+
+error_parse#:
+    pv_stats_update(pkt_vec, RX_ERROR_PARSE, drop#)
 
 quiesce_nbi#:
     __pkt_io_quiesce_wait_active(NBI, nbi_dispatch#, nfd, rx_nfd#, quiescence#)
@@ -178,7 +197,7 @@ clear_sig_rx_nbi#:
     br_!signal[__pkt_io_sig_nbi, clear_sig_rx_nfd#] // __pkt_io_sig_nfd is asserted
 
 rx_nbi#:
-    pv_init_nbi(io_vec, $__pkt_io_nbi_desc)
+    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, drop_proto#, error_parse#)
 
 end#:
 #endm

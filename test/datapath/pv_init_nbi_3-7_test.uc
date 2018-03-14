@@ -4,6 +4,8 @@
 #include <pv.uc>
 #include <stdmac.uc>
 
+#define SIZE_LW 8
+
 .sig s
 .reg addr
 .reg value
@@ -12,7 +14,7 @@
 .reg loop_cntr
 .reg loop_cntr1
 .reg error_expected_flag
-.reg expected[PV_SIZE_LW]
+.reg expected[SIZE_LW]
 .reg volatile read  $nbi_desc_rd[(NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))]
 .reg volatile write $nbi_desc_wr[(NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))]
 .xfer_order $nbi_desc_rd
@@ -44,9 +46,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0)
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -65,7 +67,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
     .if (loop_cntr == 0)
         br[test_fail#] // should always get error for this case, so should never get here
@@ -79,9 +81,13 @@ error_expected_ret#:
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -111,9 +117,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0)
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -127,16 +133,20 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
     alu[expected[3], temp, OR, loop_cntr, <<16]
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -170,9 +180,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -190,16 +200,20 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
     alu[expected[5], --, B, loop_cntr, <<29]
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -229,9 +243,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -244,16 +258,20 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
     alu[expected[5], --, B, loop_cntr, <<16]
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -283,9 +301,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -299,7 +317,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
     alu[temp, --, B, loop_cntr, >>1]
@@ -307,9 +325,13 @@ move(loop_cntr, 0)
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -339,9 +361,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -355,7 +377,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
     alu[temp, --, B, loop_cntr, >>1]
@@ -363,9 +385,13 @@ move(loop_cntr, 0)
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -403,9 +429,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -443,7 +469,7 @@ move(loop_cntr, 0)
 
         mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-        pv_init_nbi(pkt_vec, $nbi_desc_rd)
+        pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
         /* If OL4 is not TCP or UDP:
@@ -492,9 +518,13 @@ move(loop_cntr, 0)
 
         #define_eval _PV_CHK_LOOP 0
 
-        #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+        #while (_PV_CHK_LOOP < SIZE_LW)
 
             move(value, pkt_vec++)
+            // derived from packge
+            #if (_PV_CHK_LOOP == 4)
+               alu[value, value, AND~, 0xc]
+            #endif
 
             #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
             test_assert_equal(value, _PV_INIT_EXPECT)
@@ -530,9 +560,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -545,16 +575,20 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
     alu[expected[5], --, B, loop_cntr]
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -586,9 +620,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -602,18 +636,23 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
     move(temp, 0x1)
     alu[temp, temp, AND, loop_cntr] // mask off all but LSB
-    alu[expected[6], --, B, temp, <<30]
+    alu[expected[6], expected[6], AND~, 1, <<30]
+    alu[expected[6], expected[6], OR, temp, <<30]
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -643,9 +682,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -658,18 +697,23 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
     /* The "N" bit of the PV NBI Ingress Queue is actually an "or" of MType[0] and Port[7] */
 
-    alu[expected[6], --, B, loop_cntr, <<23]
+    alu[expected[6], expected[6], AND~, 0xff, <<23]
+    alu[expected[6], expected[6], OR, loop_cntr, <<23]
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -699,9 +743,9 @@ move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
-move(expected[4], 0x00003fc0) // Seek
+move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0)
+move(expected[6], 0x80000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -721,18 +765,23 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
     /* The "N" bit of the PV NBI Ingress Queue is actually an "or" of MType[0] and Port[7] */
 
-    alu[expected[6], --, B, loop_cntr, <<23]
+    alu[expected[6], expected[6], AND~, 0xff, <<23]
+    alu[expected[6], expected[6], OR, loop_cntr, <<23]
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -770,9 +819,9 @@ move(expected[0], 0x3fffff7)
 move(expected[1], 0xffffffff)
 move(expected[2], 0x83ff0088)
 move(expected[3], 0xffff0000)
-move(expected[4], 0x00003fc0)
+move(expected[4], 0x00000000)
 move(expected[5], 0xfeffffff)
-move(expected[6], 0x7f800000)
+move(expected[6], 0xff800000)
 move(expected[7], 0)
 
 
@@ -780,7 +829,7 @@ mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_
 
 mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-pv_init_nbi(pkt_vec, $nbi_desc_rd)
+pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 br[test_fail#] // should always get error, so should never get here
 
@@ -789,9 +838,13 @@ error_expected_ret1#:
 
 #define_eval _PV_CHK_LOOP 0
 
-#while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+#while (_PV_CHK_LOOP < SIZE_LW)
 
     move(value, pkt_vec++)
+    // derived from packge
+    #if (_PV_CHK_LOOP == 4)
+        alu[value, value, AND~, 0xc]
+    #endif
 
     #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
     test_assert_equal(value, _PV_INIT_EXPECT)
@@ -821,9 +874,9 @@ move(expected[0], 0x3fffff7)
 move(expected[1], 0xffffffff)
 move(expected[2], 0x83ff0088)
 move(expected[3], 0xffff0100)
-move(expected[4], 0x00003fc0)
+move(expected[4], 0x00000000)
 move(expected[5], 0xfeffffff)
-move(expected[6], 0x7f800000)
+move(expected[6], 0xff800000)
 move(expected[7], 0)
 
 
@@ -837,7 +890,7 @@ move(loop_cntr, 1)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
     br[test_fail#] // should always get error, so should never get here
 
@@ -845,9 +898,13 @@ error_expected_ret2#:
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP <= (PV_SIZE_LW-1))
+    #while (_PV_CHK_LOOP < SIZE_LW)
 
         move(value, pkt_vec++)
+        // derived from packge
+        #if (_PV_CHK_LOOP == 4)
+            alu[value, value, AND~, 0xc]
+        #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
         test_assert_equal(value, _PV_INIT_EXPECT)
@@ -865,7 +922,7 @@ error_expected_ret2#:
 test_pass()
 
 
-rx_discards_proto#:
+drop#:
     .if (error_expected_flag == 1)
         rtn[rtn_reg]
         nop
@@ -874,7 +931,7 @@ rx_discards_proto#:
     .endif
     br[test_fail#]
 
-rx_errors_parse#:
+fail#:
     .if (error_expected_flag == 2)
         rtn[rtn_reg]
         nop
