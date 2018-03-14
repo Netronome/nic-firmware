@@ -43,9 +43,6 @@
  *
  * Optimization assumptions
  * ------------------------
- *
- *  - Only 1 NBI used - NBI_COUNT == 1
- *  - Only 1 PCI used = SS == 0
  *  - No shared code store - SCS == 0
  *
  * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
@@ -58,14 +55,16 @@
  *    2  |A|    0    |   Packet Number   |  0  |         Offset          |
  *       +-+---------+-------------------+-----+---------+-+-------------+
  *    3  |        Sequence Number        |  0  | Seq Ctx |0| Meta Length |
- *       +-------------------------------+---+-+---------+-+-+-------+-+-+
- *    4  |         TX Host Flags         | 0 |Seek (64B algn)|  Rsv  |C|c|
- *       +-----+-------------+---+---+---+---+---------------+-------+-+-+
+ *       +-------------------------------+---+-+---------+-+-+---+-+-+-+-+
+ *    4  |         TX Host Flags         | 0 |Seek (64B algn)|Rsv|M|B|C|c|
+ *       +-----+-------------+---+---+---+---+---------------+---+-+-+-+-+
  *    5  |P_STS|L4Offset (2B)|L3I|MPD|VLD|           Checksum            |
  *       +-----+-----------+-+---+---+---+---------------+---------------+
- *    6  |  Ingress Queue  |  Reserved   | Stats Context | Queue Offset  |
- *       +-----------------+-------------+---------------+---------------+
+ *    6  |  Ingress Queue  |          Reserved           | Queue Offset  |
+ *       +-----------------+-----------------------------+---------------+
  *    7  |                    Metadata Type Fields                       |
+ *       +---------------------------------------------------------------+
+ *    8  |             Original Packet Length (if from host)             |
  *       +---------------------------------------------------------------+
  *
  * 0/1   - Intentional constants for efficient extraction and manipulation
@@ -74,6 +73,8 @@
  * CBS   - CTM Buffer Size
  * BLS   - Buffer List
  * Q     - work Queue source (0 = NFD, 1 = NBI)
+ * B     - dest MAC is broadcast
+ * M     - dest MAC is multicast
  * C     - Enable MAC offload of L3 checksum
  * c     - Enable MAC offload of L4 checksum
  * P_STS - Parse Status
@@ -106,15 +107,15 @@
  * Ingress Queue:
  *
  *       +-+---+-----------+
- * PCIE: |1|ISL|   Queue   |
+ * PCIE: |0|ISL|   Queue   |
  *       +-+---+-----------+
  *
  *       +-+-+-------------+
- * NBI:  |0|N|    Port     |
+ * NBI:  |1|N|    Port     |
  *       +-+-+-------------+
  */
 
-#define PV_SIZE_LW                      8
+#define PV_SIZE_LW                      16
 
 #define PV_LENGTH_wrd                   0
 #define PV_NUMBER_bf                    PV_LENGTH_wrd, 25, 16
@@ -148,6 +149,9 @@
 #define PV_TX_HOST_UDP_bf               PV_FLAGS_wrd, 18, 18
 #define PV_TX_HOST_CSUM_UDP_OK_bf       PV_FLAGS_wrd, 17, 17
 #define PV_SEEK_BASE_bf                 PV_FLAGS_wrd, 13, 6
+#define PV_MAC_DST_TYPE_bf              PV_FLAGS_wrd, 3, 2
+#define PV_MAC_DST_MC_bf                PV_FLAGS_wrd, 3, 3
+#define PV_MAC_DST_BC_bf                PV_FLAGS_wrd, 2, 2
 #define PV_CSUM_OFFLOAD_bf              PV_FLAGS_wrd, 1, 0
 #define PV_CSUM_OFFLOAD_L3_bf           PV_FLAGS_wrd, 1, 1
 #define PV_CSUM_OFFLOAD_L4_bf           PV_FLAGS_wrd, 0, 0
@@ -167,15 +171,13 @@
 #define PV_QUEUE_IN_NBI_PORT_bf         PV_QUEUE_wrd, 29, 23
 #define PV_QUEUE_IN_PCI_ISL_bf          PV_QUEUE_wrd, 30, 29
 #define PV_QUEUE_IN_PCI_Q_bf            PV_QUEUE_wrd, 28, 23
-#define PV_STATS_CTX_bf                 PV_QUEUE_wrd, 15, 8
-#define PV_STATS_VNIC_bf                PV_QUEUE_wrd, 15, 11
-#define PV_STATS_TX_bf                  PV_QUEUE_wrd, 10, 10
-#define PV_STATS_BC_bf                  PV_QUEUE_wrd, 9, 9
-#define PV_STATS_MC_bf                  PV_QUEUE_wrd, 8, 8
 #define PV_QUEUE_OFFSET_bf              PV_QUEUE_wrd, 7, 0
 
 #define PV_META_TYPES_wrd               7
 #define PV_META_TYPES_bf                PV_META_TYPES_wrd, 31, 0
+
+#define PV_ORIG_LENGTH_wrd              8
+#define PV_ORIG_LENGTH_bf               PV_ORIG_LENGTH_wrd, 13, 0
 
 #define_eval PV_NOT_PARSED              ((3 << BF_L(PV_PARSE_MPD_bf)) | (3 << BF_L(PV_PARSE_VLD_bf)))
 
@@ -291,123 +293,145 @@
 #endm
 
 
-#macro pv_stats_set_tx(io_vec)
-    alu[BF_A(io_vec, PV_STATS_TX_bf), BF_A(io_vec, PV_STATS_TX_bf), OR, 1, <<BF_L(PV_STATS_TX_bf)] ; PV_STATS_TX_bf
-#endm
-
-
-#macro pv_stats_set_mc(io_vec)
-    alu[BF_A(io_vec, PV_STATS_MC_bf), BF_A(io_vec, PV_STATS_MC_bf), OR, 1, <<BF_L(PV_STATS_MC_bf)] ; PV_STATS_MC_bf
-#endm
-
-
-#macro pv_stats_set_bc(io_vec)
-    alu[BF_A(io_vec, PV_STATS_BC_bf), BF_A(io_vec, PV_STATS_BC_bf), OR, 1, <<BF_L(PV_STATS_BC_bf)] ; PV_STATS_BC_bf
-#endm
-
-
-#macro pv_stats_add_octets(io_vec)
+#macro pv_stats_tx_host(io_vec, in_queue_base, IN_LABEL)
 .begin
     .reg addr
-    .reg isl
-    .reg octets
-    .reg stat_offset
-    .reg vnic
+    .reg length
+    .reg queue_idx
+    .reg stat_idx
+    .reg type_idx
+    .reg write $idx_rx
+    .reg write $idx_tx
+    .sig sig_rx
+    .sig sig_tx
 
-    alu[stat_offset, (3 << 3), AND, BF_A(io_vec, PV_STATS_CTX_bf), >>(BF_L(PV_STATS_CTX_bf) - 3)] ; PV_STATS_CTX_bf
-    beq[skip#]
-    br_bclr[BF_AL(io_vec, PV_STATS_TX_bf), rx#], defer[3] ; PV_STATS_TX_bf
-        bitfield_extract__sz1(vnic, BF_AML(io_vec, PV_STATS_VNIC_bf)) ; PV_STATS_VNIC_bf
-        alu[octets, BF_A(io_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
-        immed[isl, (__ext_stats >> 24), <<16]
-    alu[stat_offset, stat_offset, +, EXT_STATS_TX_UC_OCTETS]
+    passert(NIC_STATS_QUEUE_RX_IDX, "EQ", 0)
+    passert(log2(NIC_STATS_QUEUE_SIZE / 8), "GT", log2(BF_MASK(PV_MAC_DST_TYPE_bf) + 1))
+    alu[type_idx, BF_MASK(PV_MAC_DST_TYPE_bf), AND, BF_A(io_vec, PV_MAC_DST_TYPE_bf), >>BF_L(PV_MAC_DST_TYPE_bf)] ; PV_MAC_DST_TYPE_bf
 
-rx#:
-    alu[addr, stat_offset, OR, vnic, <<(log2(EXT_STATS_SIZE))]
-    ov_start((OV_IMMED16 | OV_LENGTH))
-    ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
-    ov_set_use(OV_IMMED16, octets) // ov_set_use() will shift IMMED16 left 16 bits, no need to mask
-    ov_clean()
-    mem[add64_imm, --, isl, <<8, addr, 1], indirect_ref
+    br_bset[BF_AL(io_vec, PV_QUEUE_IN_TYPE_bf), nbi#], defer[3]
+        immed[addr, (_nic_stats_queue >> 24), <<(24-8)]
+        alu[length, BF_A(io_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
+        ld_field[length, 1100, 2, <<16] // 32 bit unpacked addressing
 
-skip#:
+    // update egress queue's RX stats
+    alu[queue_idx, in_queue_base, +8, BF_A(io_vec, PV_QUEUE_OFFSET_bf)] ; PV_QUEUE_OFFSET_bf
+    alu[$idx_rx, type_idx, OR, queue_idx, <<(log2(NIC_STATS_QUEUE_SIZE / 8))]
+    mem[stats_log, $idx_rx, addr, <<8, length, 2], sig_done[sig_rx]
+
+    // update ingress queue's TX stats
+    alu[length, 0, +16, BF_A(io_vec, PV_ORIG_LENGTH_bf)]
+    ld_field[length, 1100, 2, <<16] // 32 bit unpacked addressing512
+    alu[stat_idx, NIC_STATS_QUEUE_TX_IDX, +, type_idx]
+    #pragma warning(disable:5009)
+    #pragma warning(disable:4700)
+    mem[stats_log, $idx_tx, addr, <<8, length, 2], sig_done[sig_tx]
+    #pragma warning(default:4700)
+    ctx_arb[sig_rx, sig_tx], br[IN_LABEL], defer[2]
+        alu[queue_idx, --, B, BF_A(io_vec, PV_QUEUE_IN_bf), >>BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
+        passert(log2(NIC_STATS_QUEUE_SIZE / 8), "GT", log2(NIC_STATS_QUEUE_TX_IDX))
+        alu[$idx_tx, stat_idx, OR, queue_idx, <<(log2(NIC_STATS_QUEUE_SIZE / 8))]
+    #pragma warning(default:5009)
+
+nbi#:
+    // update egress queue's RX stats
+    #pragma warning(disable:5009)
+    #pragma warning(disable:4700)
+    mem[stats_log, $idx_rx, addr, <<8, length, 2], sig_done[sig_rx]
+    #pragma warning(default:4700)
+    ctx_arb[sig_rx], br[IN_LABEL], defer[2]
+        alu[queue_idx, in_queue_base, +8, BF_A(io_vec, PV_QUEUE_OFFSET_bf)] ; PV_QUEUE_OFFSET_bf
+        alu[$idx_rx, type_idx, OR, queue_idx, <<(log2(NIC_STATS_QUEUE_SIZE / 8))]
+    #pragma warning(default:5009)
 .end
 #endm
 
 
-#macro pv_stats_add_octets(io_vec, stat)
+#macro pv_stats_tx_wire(io_vec, IN_LABEL)
 .begin
     .reg addr
-    .reg isl
-    .reg octets
-    .reg vnic
+    .reg length
+    .reg queue_idx
+    .reg stat_idx
+    .reg type_idx
+    .reg write $idx
+    .sig sig_stat
 
-    bitfield_extract__sz1(vnic, BF_AML(io_vec, PV_STATS_VNIC_bf)) ; PV_STATS_VNIC_bf
-    #if (isnum(stat) && stat >= 256)
-        immed[addr, stat]
-        alu[addr, addr, OR, vnic, <<(log2(EXT_STATS_SIZE))]
-    #else
-        alu[addr, stat, OR, vnic, <<(log2(EXT_STATS_SIZE))]
-    #endif
+    passert(log2(NIC_STATS_QUEUE_SIZE / 8), "GT", log2(NIC_STATS_QUEUE_TX_IDX))
 
-    alu[octets, BF_A(io_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
-    immed[isl, (__ext_stats >> 24), <<16]
-    ov_start((OV_IMMED16 | OV_LENGTH))
-    ov_set(OV_LENGTH, ((1 << 2) | (1 << 3)))
-    ov_set_use(OV_IMMED16, octets) // ov_set_use() will shift IMMED16 left 16 bits, no need to mask
-    ov_clean()
-    mem[add64_imm, --, isl, <<8, addr, 1], indirect_ref
+    br_bset[BF_AL(io_vec, PV_QUEUE_IN_TYPE_bf), IN_LABEL] // no update if packet source is NBI
+
+    immed[addr, (_nic_stats_queue >> 24), <<(24-8)]
+    alu[addr, addr, OR, 2, <<(16-8)] // 32 bit unpacked addressing
+
+    alu[length, 0, +16, BF_A(io_vec, PV_ORIG_LENGTH_bf)]
+
+    alu[type_idx, BF_MASK(PV_MAC_DST_TYPE_bf), AND, BF_A(io_vec, PV_MAC_DST_TYPE_bf), >>BF_L(PV_MAC_DST_TYPE_bf)] ; PV_MAC_DST_TYPE_bf
+    alu[queue_idx, --, B, BF_A(io_vec, PV_QUEUE_IN_bf), >>BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
+
+    #pragma warning(disable:5009)
+    #pragma warning(disable:4700)
+    mem[stats_log, $idx, addr, <<8, length, 2], sig_done[sig_stat]
+    #pragma warning(default:4700)
+    ctx_arb[sig_stat], br[IN_LABEL], defer[2]
+        alu[stat_idx, NIC_STATS_QUEUE_TX_IDX, +, type_idx]
+        alu[$idx, stat_idx, OR, queue_idx, <<(log2(NIC_STATS_QUEUE_SIZE / 8))]
+    #pragma warning(default:5009)
 .end
 #endm
 
 
-#macro pv_stats_increment(io_vec, stat)
+#macro pv_stats_update(io_vec, IN_STAT, IN_LABEL)
 .begin
     .reg addr
-    .reg isl
-    .reg vnic
+    .reg length
+    .reg queue_idx
+    .reg sig_stat
+    .reg write $idx
+    .sig sig_stat
 
-    bitfield_extract__sz1(vnic, BF_AML(io_vec, PV_STATS_VNIC_bf)) ; PV_STATS_VNIC_bf
-    #if (isnum(stat) && stat >= 256)
-        immed[addr, stat]
-        alu[addr, addr, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+    immed[addr, (_nic_stats_queue >> 24), <<(24-8)]
+    alu[addr, addr, OR, 2, <<(16-8)] // 32 bit unpacked addressing
+
+    alu[length, BF_A(io_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
+
+    #pragma warning(disable:5009)
+    #pragma warning(disable:4700)
+    #if (is_ct_const(NIC_STATS_QUEUE_/**/IN_STAT/**/_IDX))
+        #if (log2(NIC_STATS_QUEUE_/**/IN_STAT/**/_IDX, 1) < log2(NIC_STATS_QUEUE_SIZE / 8))
+            #if (streq('IN_LABEL', '--'))
+                mem[stats_log, $idx, addr, <<8, length, 2], ctx_swap[sig_stat], defer[2]
+            #else
+                mem[stats_log, $idx, addr, <<8, length, 2], sig_done[sig_stat]
+                ctx_arb[sig_stat], br[IN_LABEL], defer[2]
+            #endif
+            alu[queue_idx, --, B, BF_A(io_vec, PV_QUEUE_IN_bf), >>BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
+            alu[$idx, NIC_STATS_QUEUE_/**/IN_STAT/**/_IDX, OR, queue_idx, <<(log2(NIC_STATS_QUEUE_SIZE / 8))]
+        #else
+            alu[queue_idx, --, B, BF_A(io_vec, PV_QUEUE_IN_bf), >>BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
+            #if (streq('IN_LABEL', '--'))
+                mem[stats_log, $idx, addr, <<8, length, 2], ctx_swap[sig_stat], defer[2]
+            #else
+                mem[stats_log, $idx, addr, <<8, length, 2], sig_done[sig_stat]
+                ctx_arb[sig_stat], br[IN_LABEL], defer[2]
+            #endif
+            alu[queue_idx, --, B, queue_idx, <<(log2(NIC_STATS_QUEUE_SIZE / 8))]
+            alu[$idx, queue_idx, +, NIC_STATS_QUEUE_/**/IN_STAT/**/_IDX]
+        #endif
     #else
-        alu[addr, stat, OR, vnic, <<(log2(EXT_STATS_SIZE))]
+        alu[queue_idx, --, B, BF_A(io_vec, PV_QUEUE_IN_bf), >>BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
+        #if (streq('IN_LABEL', '--'))
+            mem[stats_log, $idx, addr, <<8, length, 2], ctx_swap[sig_stat], defer[2]
+        #else
+            mem[stats_log, $idx, addr, <<8, length, 2], sig_done[sig_stat]
+            ctx_arb[sig_stat], br[IN_LABEL], defer[2]
+        #endif
+        alu[queue_idx, --, B, queue_idx, <<(log2(NIC_STATS_QUEUE_SIZE / 8))]
+        alu[$idx, queue_idx, +, IN_STAT]
     #endif
-    immed[isl, (__ext_stats >> 24), <<16]
-    mem[incr64, --, isl, <<8, addr, 1]
+    #pragma warning(default:4700)
+    #pragma warning(default:5009)
 .end
-#endm
-
-
-#macro pv_stats_increment_rxtx(io_vec, rx_stat, tx_stat)
-.begin
-    .reg addr
-    .reg isl
-    .reg vnic
-
-    immed[isl, (__ext_stats >> 24), <<16]
-    bitfield_extract__sz1(vnic, BF_AML(io_vec, PV_STATS_VNIC_bf)) ; PV_STATS_VNIC_bf
-    #if (isnum(rx_stat) && rx_stat >= 256)
-        immed[addr, rx_stat]
-        alu[addr, addr, OR, vnic, <<(log2(EXT_STATS_SIZE))]
-    #else
-        alu[addr, rx_stat, OR, vnic, <<(log2(EXT_STATS_SIZE))]
-    #endif
-
-    br_bclr[BF_AL(io_vec, PV_STATS_TX_bf), rx#] ; PV_STATS_TX_bf
-
-    #if (isnum(tx_stat) && tx_stat >= 256)
-        immed[addr, tx_stat]
-        alu[addr, addr, OR, vnic, <<(log2(EXT_STATS_SIZE))]
-    #else
-        alu[addr, tx_stat, OR, vnic, <<(log2(EXT_STATS_SIZE))]
-    #endif
-
-rx#:
-    mem[incr64, --, isl, <<8, addr, 1]
-.end
-
 #endm
 
 
@@ -700,6 +724,16 @@ end#:
     bitfield_extract__sz1(out_seq_ctx, BF_AML(in_vec, PV_SEQ_CTX_bf)) ; PV_SEQ_CTX_bf
 #endm
 
+#macro __pv_get_mac_dst_type(out_type, io_vec)
+    pv_seek(io_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY))
+    passert(BF_L(PV_MAC_DST_MC_bf), "EQ", (BF_M(PV_MAC_DST_BC_bf) + 1))
+    alu[out_type, 1, +16, *$index++]
+    alu[out_type, --, B, out_type, >>16]
+    alu[--, *$index--, +, out_type] // carry is set if broadcast
+    alu[out_type, (1 << 1), AND, *$index, >>(BF_L(MAC_MULTICAST_bf) - 1)], no_cc // bit 1 is set if multicast
+    alu[out_type, out_type, +carry, 0] // bit 0 is set if broadcast
+#endm
+
 
 #macro pv_get_seq_no(out_seq_no, in_vec)
     bitfield_extract__sz1(out_seq_no, BF_AML(in_vec, PV_SEQ_NO_bf)) ; PV_SEQ_NO_bf
@@ -778,11 +812,13 @@ end#:
 #define MAC_PARSE_VLAN_bf               MAC_PARSE_wrd, 17, 16
 #define MAC_CSUM_bf                     MAC_PARSE_wrd, 15, 0
 
-#macro pv_init_nbi(out_vec, in_nbi_desc)
+#macro pv_init_nbi(out_vec, in_nbi_desc, DROP_LABEL, ERROR_LABEL)
 .begin
     .reg cbs
+    .reg dst_mac_bc
     .reg l4_type
     .reg l4_offset
+    .reg mac_dst_type
     .reg shift
 
     alu[BF_A(out_vec, PV_LENGTH_bf), BF_A(in_nbi_desc, CAT_CTM_NUM_bf), AND~, BF_MASK(CAT_CTM_NUM_bf), <<BF_L(CAT_CTM_NUM_bf)]
@@ -818,8 +854,6 @@ max_cbs#:
     // map NBI sequencers to 0, 1, 2, 3
     alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nbi_desc, CAT_SEQ_NO_bf), AND~, 0xff] ; PV_SEQ_NO_bf
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), AND~, 0xfc, <<8] ; PV_SEQ_CTX_bf
-
-    alu[BF_A(out_vec, PV_SEEK_BASE_bf), --, B, 0xff, <<BF_L(PV_SEEK_BASE_bf)]
 
     alu[l4_type, 0xe, AND, BF_A(in_nbi_desc, CAT_L4_TYPE_bf), >>BF_L(CAT_L4_TYPE_bf)]
     br=byte[l4_type, 0, 2, store_l4_offset#], defer[3] // use L4 offset if Catamaran has parsed TCP or UDP (Catamaran offset is valid)
@@ -857,6 +891,7 @@ skip_l4_offset#:
     alu[BF_A(out_vec, PV_QUEUE_IN_bf), 0x80, AND, BF_A(in_nbi_desc, CAT_MTYPE_bf), <<(7 - BF_L(CAT_MTYPE_bf))]
     alu[BF_A(out_vec, PV_QUEUE_IN_bf), BF_A(out_vec, PV_QUEUE_IN_bf), OR, BF_A(in_nbi_desc, CAT_PORT_bf), >>BF_L(CAT_PORT_bf)]
     alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(out_vec, PV_QUEUE_IN_bf), <<BF_L(PV_QUEUE_IN_bf)]
+    alu[BF_A(out_vec, PV_QUEUE_IN_bf), BF_A(out_vec, PV_QUEUE_IN_bf), OR, 1, <<BF_L(PV_QUEUE_IN_TYPE_bf)]
 
     // error checks after metadata is populated (will need for drop)
     #ifdef PARANOIA // should never happen, Catamaran is buggy if it does
@@ -867,14 +902,18 @@ skip_l4_offset#:
 
     immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
 
+    __pv_get_mac_dst_type(mac_dst_type, out_vec)
+    alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), --, B, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
+
     alu[--, BF_MASK(CAT_SEQ_CTX_bf), AND, BF_A(in_nbi_desc, CAT_SEQ_CTX_bf), >>BF_L(CAT_SEQ_CTX_bf)] ; CAT_SEQ_CTX_bf
-    beq[rx_discards_proto#] // drop without releasing sequence number for sequencer zero (errored packets are expected here)
+    beq[DROP_LABEL] // drop without releasing sequence number for sequencer zero (errored packets are expected here)
 
     alu[--, BF_MASK(CAT_ERRORS_bf), AND, BF_A(in_nbi_desc, CAT_ERRORS_bf), >>BF_L(CAT_ERRORS_bf)] ; CAT_ERRORS_bf
-    bne[rx_errors_parse#] // catch any other errors we miss (these appear to have valid sequence numbers)
+    bne[ERROR_LABEL] // catch any other errors we miss (these appear to have valid sequence numbers)
 
 .end
 #endm
+
 
 #macro __pv_lso_fixup(io_vec, in_nfd_desc)
 .begin
@@ -1002,10 +1041,12 @@ end#:
 #define NFD_IN_LSO_L3_OFFS_fld      3, 7, 0
 #define NFD_IN_LSO_L4_OFFS_fld      3, 15, 8
 
-#macro pv_init_nfd(out_vec, in_pkt_num, in_nfd_desc)
+
+#macro pv_init_nfd(out_vec, in_pkt_num, in_nfd_desc, ERROR_LABEL)
 .begin
     .reg addr_hi
     .reg addr_lo
+    .reg mac_dst_type
     .reg meta_len
     .reg pcie
     .reg pkt_num
@@ -1018,6 +1059,8 @@ end#:
     bitfield_extract__sz1(pkt_len, BF_AML(in_nfd_desc, NFD_IN_DATALEN_fld)) ; NFD_IN_DATALEN_fld
     bitfield_extract__sz1(meta_len, BF_AML(in_nfd_desc, NFD_IN_OFFSET_fld)) ; NFD_IN_OFFSET_fld
     alu[pkt_len, pkt_len, -, meta_len]
+
+    alu[BF_A(out_vec, PV_ORIG_LENGTH_bf), --, B, pkt_len] ; PV_ORIG_LENGTH_bf
 
     alu[BF_A(out_vec, PV_NUMBER_bf), pkt_len, OR, in_pkt_num, <<BF_L(PV_NUMBER_bf)]
     alu[BF_A(out_vec, PV_BLS_bf), BF_A(out_vec, PV_BLS_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
@@ -1057,30 +1100,30 @@ end#:
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), +, PV_GRO_NFD_START] ; PV_SEQ_CTX_bf
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), --, B, BF_A(out_vec, PV_SEQ_CTX_bf), <<BF_L(PV_SEQ_CTX_bf)] ; PV_SEQ_CTX_bf
 
-    alu[BF_A(out_vec, PV_META_LENGTH_bf), BF_A(out_vec, PV_META_LENGTH_bf), OR, meta_len] ; PV_META_LENGTH_bf
-
     alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_MASK(PV_CSUM_OFFLOAD_bf), AND, \
         BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld), >>BF_L(NFD_IN_FLAGS_TX_TCP_CSUM_fld)]
     bitfield_extract__sz1(udp_csum, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
     alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_A(out_vec, PV_CSUM_OFFLOAD_bf), OR, udp_csum] ; PV_CSUM_OFFLOAD_bf
 
-    alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(in_nfd_desc, NFD_IN_QID_fld), <<BF_L(PV_QUEUE_IN_bf)]
-    alu[BF_A(out_vec, PV_QUEUE_IN_bf), BF_A(out_vec, PV_QUEUE_IN_bf), OR, 1, <<BF_L(PV_QUEUE_IN_TYPE_bf)]
+    alu[BF_A(out_vec, PV_QUEUE_IN_bf), 0xff, AND, BF_A(in_nfd_desc, NFD_IN_QID_fld)]
+    alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(out_vec, PV_QUEUE_IN_bf), <<BF_L(PV_QUEUE_IN_bf)]
 
     // error checks near end to ensure consistent metadata (fields written below excluded) and buffer allocation
     // state (contents of CTM also excluded) in drop path
-    br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), tx_errors_pci#]
+    br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), ERROR_LABEL]
 
     pkt_buf_copy_mu_head_to_ctm(in_pkt_num, BF_A(out_vec, PV_MU_ADDR_bf), NFD_IN_DATA_OFFSET, 1)
 
+    __pv_get_mac_dst_type(mac_dst_type, out_vec)
+    alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
+
     br_bclr[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), skip_lso#], defer[3]
-        alu[BF_A(out_vec, PV_SEEK_BASE_bf), BF_A(out_vec, PV_SEEK_BASE_bf), OR, 0xff, <<BF_L(PV_SEEK_BASE_bf)] ; PV_SEEK_BASE_bf
         immed[BF_A(out_vec, PV_PARSE_STS_bf), (PV_NOT_PARSED >> 16), <<16] ; PV_PARSE_STS_bf
         immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
+        alu[BF_A(out_vec, PV_META_LENGTH_bf), BF_A(out_vec, PV_META_LENGTH_bf), OR, meta_len] ; PV_META_LENGTH_bf
 
     __pv_lso_fixup(out_vec, in_nfd_desc)
 skip_lso#:
-
 
 .end
 #endm
@@ -1144,6 +1187,7 @@ skip_ctm_buffer#:
 #define PV_SEEK_T_INDEX_ONLY (1 << 1)
 #define PV_SEEK_PAD_INCLUDED (1 << 2)
 #define PV_SEEK_REVERSE      (1 << 3)
+#define PV_SEEK_INIT         (1 << 4)
 
 .reg volatile read $__pv_pkt_data[32]
 .addr $__pv_pkt_data[0] 0
@@ -1207,9 +1251,38 @@ skip_ctm_buffer#:
     #if (! streq('out_cache_idx', '--'))
         alu[out_cache_idx, 0x1f, AND, tibi, >>2]
     #endif
+#if ((in_flags & PV_SEEK_INIT) == 0)
     br[check#], defer[2]
         local_csr_wr[T_INDEX_BYTE_INDEX, tibi]
         alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, _PV_SEEK_OFFSET]
+#endif
+
+read#:
+    #if (((in_flags) & PV_SEEK_CTM_ONLY) == 0)
+        br_bset[BF_AL(io_vec, PV_SPLIT_bf), split#], defer[2]
+    #endif
+            #if (isnum(_PV_SEEK_OFFSET))
+                immed[aligned_offset, (_PV_SEEK_OFFSET & _PV_SEEK_READ_BASE_MASK)]
+            #else
+                alu[aligned_offset, _PV_SEEK_OFFSET, AND~, _PV_SEEK_READ_OFFSET_MASK]
+            #endif
+            alu[read_offset, aligned_offset, -, 2]
+
+read_ctm#:
+    ov_single(OV_LENGTH, 32, OVF_SUBTRACT_ONE)
+    mem[read32, $__pv_pkt_data[0], BF_A(io_vec, PV_CTM_ADDR_bf), read_offset, max_32], indirect_ref, defer[2], ctx_swap[sig_ctm]
+        #if (isnum(_PV_SEEK_OFFSET))
+            immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_READ_OFFSET_MASK)]
+        #else
+            alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_READ_OFFSET_MASK]
+        #endif
+        alu[tibi, tibi, OR, t_idx_ctx]
+
+finalize#:
+    local_csr_wr[T_INDEX_BYTE_INDEX, tibi] // reload T_INDEX after ctx_swap[]
+    br[end#], defer[2]
+        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), AND~, BF_MASK(PV_SEEK_BASE_bf), <<BF_L(PV_SEEK_BASE_bf)]
+        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), OR, aligned_offset]
 
     #if (((in_flags) & PV_SEEK_CTM_ONLY) == 0)
         .reg buffer_offset
@@ -1293,54 +1366,29 @@ skip_ctm_buffer#:
 
     #endif // ((in_flags) & PV_SEEK_CTM_ONLY) == 0
 
-read#:
-    #if (((in_flags) & PV_SEEK_CTM_ONLY) == 0)
-        br_bset[BF_AL(io_vec, PV_SPLIT_bf), split#], defer[2]
-    #endif
-            #if (isnum(_PV_SEEK_OFFSET))
-                immed[aligned_offset, (_PV_SEEK_OFFSET & _PV_SEEK_READ_BASE_MASK)]
-            #else
-                alu[aligned_offset, _PV_SEEK_OFFSET, AND~, _PV_SEEK_READ_OFFSET_MASK]
-            #endif
-            alu[read_offset, aligned_offset, -, 2]
-
-read_ctm#:
-    ov_single(OV_LENGTH, 32, OVF_SUBTRACT_ONE)
-    mem[read32, $__pv_pkt_data[0], BF_A(io_vec, PV_CTM_ADDR_bf), read_offset, max_32], indirect_ref, defer[2], ctx_swap[sig_ctm]
-        #if (isnum(_PV_SEEK_OFFSET))
-            immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_READ_OFFSET_MASK)]
-        #else
-            alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_READ_OFFSET_MASK]
-        #endif
-        alu[tibi, tibi, OR, t_idx_ctx]
-
-finalize#:
-    local_csr_wr[T_INDEX_BYTE_INDEX, tibi] // reload T_INDEX after ctx_swap[]
-    br[end#], defer[2]
-        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), AND~, BF_MASK(PV_SEEK_BASE_bf), <<BF_L(PV_SEEK_BASE_bf)]
-        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), OR, aligned_offset]
-
+#if ((in_flags & PV_SEEK_INIT) == 0)
 check#:
-#if (streq('in_length', '--'))
-    #if (((in_flags & PV_SEEK_REVERSE) == 0))
-        alu[--, BF_MASK(PV_SEEK_BASE_bf), AND, outside, >>BF_L(PV_SEEK_BASE_bf)]
+    #if (streq('in_length', '--'))
+        #if (((in_flags & PV_SEEK_REVERSE) == 0))
+            alu[--, BF_MASK(PV_SEEK_BASE_bf), AND, outside, >>BF_L(PV_SEEK_BASE_bf)]
+        #else
+            alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
+        #endif
+        bne[read#]
     #else
+        .reg boundary
         alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
+        bne[read#]
+        #if (((in_flags & PV_SEEK_REVERSE) == 0))
+            alu[boundary, _PV_SEEK_OFFSET, +, in_length]
+        #else
+            alu[boundary, _PV_SEEK_OFFSET, -, in_length]
+        #endif
+        alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, boundary]
+        alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
+        bne[read#]
     #endif
-    bne[read#]
-#else
-    .reg boundary
-    alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
-    bne[read#]
-    #if (((in_flags & PV_SEEK_REVERSE) == 0))
-        alu[boundary, _PV_SEEK_OFFSET, +, in_length]
-    #else
-        alu[boundary, _PV_SEEK_OFFSET, -, in_length]
-    #endif
-    alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, boundary]
-    alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
-    bne[read#]
-#endif
+#endif // ((in_flags & PV_SEEK_INIT) == 0)
 
 end#:
 #endif // ((in_flags) & PV_SEEK_T_INDEX_ONLY) == 0

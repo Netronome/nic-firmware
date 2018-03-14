@@ -35,7 +35,6 @@
         .init NIC_CFG_INSTR_TBL 0 0
     }
 
-
 /* Instructions in the worker (actions.uc) should follow the exact same order
  * as in enum used by app config below.
  * The pipeline bit in the instruction_format is set when previous and
@@ -51,7 +50,6 @@
  */
 enum instruction_type {
     INSTR_TX_DROP = 0,
-    INSTR_STATISTICS,
     INSTR_MTU,
     INSTR_MAC,
     INSTR_RSS,
