@@ -77,16 +77,14 @@
     #endif
     alu[exp[3], exp[3], +, PV_GRO_NFD_START]
     alu[exp[3], --, B, exp[3], <<8]
-    ld_field_w_clr[tmp1, 0001, $nfd_desc[0], >>24] // meta
-    alu[tmp1, tmp1, AND, 0x7f]
-    ld_field[exp[3], 0001, tmp1]
+   .if (! drop_flag)
+        ld_field_w_clr[tmp1, 0001, $nfd_desc[0], >>24] // meta
+        alu[tmp1, tmp1, AND, 0x7f]
+        ld_field[exp[3], 0001, tmp1]
+    .endif
 
     // lword 4
-    .if (drop_flag)
-        move(exp[4], 0) // seek not set
-    .else
-        move(exp[4], 0x03fc0) // seek
-    .endif
+    move(exp[4], 0) // seek
     alu[tmp1, 3, AND, $nfd_desc[2], >>29] // tcp csum
     alu[exp[4], exp[4], OR, tmp1]
     alu[tmp1, 1, AND, $nfd_desc[2], >>28] // udp csum
@@ -102,13 +100,12 @@
     // lword 6
     alu[tmp1, $nfd_desc[0], AND, 0x7f] // qid
     alu[exp[6], --, B, tmp1, <<23]
-    alu[exp[6], exp[6], OR, 1, <<31] // q type
 
     // lword 7
     move(exp[7], 0)
 
 
-    pv_init_nfd(pkt_vec, pkt_no, $nfd_desc)
+    pv_init_nfd(pkt_vec, pkt_no, $nfd_desc, error#)
 
     .if ( drop_flag )
         test_assert_equal(i, 0xfe)
@@ -117,7 +114,7 @@
 
     br[pv_data_check#]
 
-    tx_errors_pci#:
+    error#:
         .if (!drop_flag )
             test_assert_equal(i, 0xff)
             test_fail()

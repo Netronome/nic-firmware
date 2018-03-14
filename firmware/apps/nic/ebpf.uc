@@ -131,33 +131,25 @@ ebpf_init_cap_finalize()
     .set ebpf_rc
     .reg rc
 
-    alu[rc, --, b, ebpf_rc]
+    alu[rc, --, B, ebpf_rc] // would have preferred ebpf_rc in bank B
 
-    // can this be written as an index by the eBPF code?
     alu[stat, EBPF_RET_STATS_MASK, AND, rc, >>EBPF_RET_STATS_PASS]
-
     beq[skip_ebpf_stats#]
-        ffs[stat, stat]
-        alu[stat, --, B, stat, <<4]
-        alu[stat, stat, +, EXT_STATS_BPF_PASS_FRAMES]
-        pv_stats_increment(_ebpf_pkt_vec, stat)
-        alu[stat, stat, +, 8]
-        pv_stats_add_octets(_ebpf_pkt_vec, stat)
+        ffs[stat, stat] // would have preferred stat as an index
+        alu[stat, stat, +, NIC_STATS_QUEUE_BPF_PASS_IDX]
+        pv_stats_update(_ebpf_pkt_vec, stat, --)
     skip_ebpf_stats#:
 
     br_bset[rc, EBPF_RET_DROP, drop#]
 
-    __actions_restore_t_idx()
-
     pv_set_tx_flag(_ebpf_pkt_vec, BF_L(PV_TX_HOST_RX_BPF_bf))
 
+    __actions_restore_t_idx()
     br_bset[rc, EBPF_RET_PASS, actions#]
 
-    pv_stats_add_octets(_ebpf_pkt_vec)
+    // EBF_RET_REDIR
     pv_get_nbi_egress_channel_mapped_to_ingress(egress_q_base, _ebpf_pkt_vec)
-    pv_stats_set_tx(_ebpf_pkt_vec)
-    pkt_io_tx_wire(_ebpf_pkt_vec, egress_q_base)
-    br[egress#]
+    pkt_io_tx_wire(_ebpf_pkt_vec, egress_q_base, egress#)
 .end
 #endm
 

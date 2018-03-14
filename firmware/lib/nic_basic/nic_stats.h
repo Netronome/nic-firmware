@@ -8,23 +8,21 @@
 #ifndef _LIBNIC_NIC_STATS_H_
 #define _LIBNIC_NIC_STATS_H_
 
-#include "ext_stats.h"
+#include "nfd_user_cfg.h"
+#include <nfd_ctrl.h>
+
+#include "nic_stats_gen.h"
 
 #if defined(__NFP_LANG_MICROC)
 typedef char ext_stats_key_t[32];
 
 __asm {
-    .alloc_mem __ext_stats imem+0 global ((NS_PLATFORM_NUM_PORTS + 1) * EXT_STATS_SIZE) 256
-    .alloc_mem _ext_stats_phy_data emem global (NS_PLATFORM_NUM_PORTS * EXT_STATS_SIZE) 256
-    .alloc_mem _ext_stats_phy_blk_sz emem global 8 8
+    .alloc_mem _nic_stats_queue imem+0 global (512 * NIC_STATS_QUEUE_SIZE) 256
 }
 
 #elif defined(__NFP_LANG_ASM)
 
-.alloc_mem __ext_stats imem+0 global ((NS_PLATFORM_NUM_PORTS + 1) * EXT_STATS_SIZE) 256
-.alloc_mem _ext_stats_phy_data emem global (NS_PLATFORM_NUM_PORTS * EXT_STATS_SIZE) 256
-.alloc_mem _ext_stats_phy_blk_sz emem global 8 8
-.init _ext_stats_phy_blk_sz EXT_STATS_SIZE
+.alloc_mem _nic_stats_queue imem+0 global (512 * NIC_STATS_QUEUE_SIZE) 256
 #endif
 
 #endif

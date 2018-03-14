@@ -9,9 +9,9 @@
     drop#:
     egress#:
     actions#:
-    test_fail()
+    ebpf_reentry#:
     .reentry
-    br[ebpf_reentry#]
+    test_fail()
 .endif
 
 #endif

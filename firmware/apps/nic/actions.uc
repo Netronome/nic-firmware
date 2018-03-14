@@ -56,44 +56,6 @@
 #endm
 
 
-#macro __actions_statistics(in_pkt_vec)
-.begin
-    .reg stats_ctx
-    .reg tmp
-    .reg hi
-
-    __actions_read(stats_ctx, 0xff, --)
-    br[check_mac#]
-
-broadcast#:
-    pv_stats_set_bc(in_pkt_vec)
-    br[done#]
-
-multicast#:
-    alu[hi, --, B, *$index++, <<16]
-    alu[tmp, --, B, 1, <<16]
-    alu[--, hi, +, tmp]
-    alu[--, *$index, +carry, 0]
-    __actions_restore_t_idx()
-    bcs[broadcast#]
-
-    pv_stats_set_mc(in_pkt_vec)
-    br[done#]
-
-check_mac#:
-    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
-
-    br_bset[*$index, BF_L(MAC_MULTICAST_bf), multicast#], defer[2]
-        alu[BF_A(in_pkt_vec, PV_STATS_CTX_bf), BF_A(in_pkt_vec, PV_STATS_CTX_bf), AND~, BF_MASK(PV_STATS_CTX_bf), <<BF_L(PV_STATS_CTX_bf)]
-        alu[BF_A(in_pkt_vec, PV_STATS_CTX_bf), BF_A(in_pkt_vec, PV_STATS_CTX_bf), OR, stats_ctx, <<BF_L(PV_STATS_CTX_bf)]
-
-    __actions_restore_t_idx()
-
-done#:
-.end
-#endm
-
-
 #macro __actions_check_mtu(in_pkt_vec, DROP_LABEL)
 .begin
     .reg mask
@@ -380,36 +342,36 @@ skip_checksum#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#], defer[2] ;actions_jump
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#], defer[2] ;actions_jump
         immed[egress_q_mask, 0xffff]
         immed[ebpf_mask, 0xffff]
 
-    ins_0#: br[policy_drop#]
-    ins_1#: br[statistics#]
-    ins_2#: br[mtu#]
-    ins_3#: br[mac#]
-    ins_4#: br[rss#]
-    ins_5#: br[checksum_complete#]
-    ins_6#: br[tx_host#]
-    ins_7#: br[tx_wire#]
-    ins_8#: br[cmsg#]
-    ins_9#: br[ebpf#]
-    ins_10#: br[rxcsum#]
+    ins_0#: br[drop_act#]
+    ins_1#: br[mtu#]
+    ins_2#: br[mac#]
+    ins_3#: br[rss#]
+    ins_4#: br[checksum_complete#]
+    ins_5#: br[tx_host#]
+    ins_6#: br[tx_wire#]
+    ins_7#: br[cmsg#]
+    ins_8#: br[ebpf#]
+    ins_9#: br[rxcsum#]
 
-policy_drop#:
-    pv_stats_increment_rxtx(in_pkt_vec, EXT_STATS_RX_DISCARDS_POLICY, EXT_STATS_TX_DISCARDS_POLICY)
-    br[drop#]
+drop_mtu#:
+    pv_stats_update(pkt_vec, RX_DISCARD_MTU, drop#)
 
-statistics#:
-    __actions_statistics(in_pkt_vec)
-    __actions_next()
+drop_addr#:
+    pv_stats_update(pkt_vec, RX_DISCARD_ADDR, drop#)
+
+drop_act#:
+    pv_stats_update(in_pkt_vec, RX_DISCARD_ACT, drop#)
 
 mtu#:
-    __actions_check_mtu(in_pkt_vec, rx_discards_mtu#)
+    __actions_check_mtu(in_pkt_vec, drop_mtu#)
     __actions_next()
 
 mac#:
-    __actions_check_mac(in_pkt_vec, rx_discards_filter_mac#)
+    __actions_check_mac(in_pkt_vec, drop_addr#)
     __actions_next()
 
 rss#:
@@ -422,13 +384,11 @@ checksum_complete#:
 
 tx_host#:
     __actions_read(egress_q_base, egress_q_mask, --)
-    pkt_io_tx_host(in_pkt_vec, egress_q_base)
-    br[EGRESS_LABEL]
+    pkt_io_tx_host(in_pkt_vec, egress_q_base, EGRESS_LABEL)
 
 tx_wire#:
     __actions_read(egress_q_base, egress_q_mask, --)
-    pkt_io_tx_wire(in_pkt_vec, egress_q_base)
-    br[EGRESS_LABEL]
+    pkt_io_tx_wire(in_pkt_vec, egress_q_base, EGRESS_LABEL)
 
 cmsg#:
     cmsg_desc_workq($__pkt_io_gro_meta, in_pkt_vec, EGRESS_LABEL)
@@ -443,13 +403,6 @@ rxcsum#:
 
 .end
 #endm
-
-
-.if (0)
-    ebpf_reentry#:
-    ebpf_reentry()
-.endif
-
 
 #endif
 
