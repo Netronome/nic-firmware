@@ -23,7 +23,7 @@ Q ?= @
 HG_USERNAME ?= $(shell whoami)
 FW_ID = $(shell ${SCRIPT_DIR}/describe-head.sh --fw_id)
 
-ALL: tool_version_check firmware_all
+ALL: firmware_all
 
 clean: firmware_clean
 

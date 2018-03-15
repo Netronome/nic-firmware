@@ -77,7 +77,7 @@ include $(FIRMWARE_DIR)/Makefile.templates
 include $(FIRMWARE_DIR)/Makefile.deps.templates
 include $(FIRMWARE_DIR)/Makefile.apps
 
-firmware_all: firmware_fetch_deps all_nffw all_cat
+firmware_all: tool_version_check firmware_fetch_deps all_nffw all_cat
 
 firmware_fetch_deps:
 
