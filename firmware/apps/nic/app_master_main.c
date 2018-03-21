@@ -126,6 +126,7 @@ __shared __lmem volatile uint32_t nic_control_word[NS_PLATFORM_NUM_PORTS +
         _state[LS_IDX(_vnic)] |= LS_MASK(_vnic); \
     } while (0)
 
+__shared __lmem uint32_t vs_current[LS_ARRAY_LEN];
 __shared __lmem uint32_t ls_current[LS_ARRAY_LEN];
 __shared __lmem uint32_t pending[LS_ARRAY_LEN];
 
@@ -326,6 +327,21 @@ enable_port_tx_datapath(unsigned int nbi, unsigned int start_q,
 
 
 __inline static void
+mac_port_enable_rx(unsigned int port)
+{
+    unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
+    unsigned int mac_core      = NS_PLATFORM_MAC_CORE(port);
+    unsigned int mac_core_port = NS_PLATFORM_MAC_CORE_SERDES_LO(port);
+
+    LOCAL_MUTEX_LOCK(mac_reg_lock);
+
+    mac_eth_enable_rx(mac_nbi_isl, mac_core, mac_core_port);
+
+    LOCAL_MUTEX_UNLOCK(mac_reg_lock);
+}
+
+
+__inline static void
 mac_port_disable_rx(unsigned int port)
 {
     unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
@@ -337,47 +353,33 @@ mac_port_disable_rx(unsigned int port)
 
     mac_eth_disable_rx(mac_nbi_isl, mac_core, mac_core_port, num_lanes);
 
-    /* Disable the port TX. */
-    disable_port_tx_datapath(mac_nbi_isl, NS_PLATFORM_NBI_TM_QID_LO(port),
-                             NS_PLATFORM_NBI_TM_QID_HI(port));
-
-    /* Flush TX datapath to prevent stranding any packets. */
-    mac_eth_enable_tx_flush(mac_nbi_isl, mac_core, mac_core_port);
-
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
 
 
 __inline static void
-mac_port_disable_tx_flush(unsigned int mac, unsigned int mac_core,
-                          unsigned int mac_core_port)
-{
-    LOCAL_MUTEX_LOCK(mac_reg_lock);
-
-    mac_eth_disable_tx_flush(mac, mac_core, mac_core_port);
-
-    LOCAL_MUTEX_UNLOCK(mac_reg_lock);
-}
-
-
-__inline static void
-mac_port_enable_rx(unsigned int port)
+mac_port_enable_tx(unsigned int port)
 {
     unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
-    unsigned int mac_core      = NS_PLATFORM_MAC_CORE(port);
-    unsigned int mac_core_port = NS_PLATFORM_MAC_CORE_SERDES_LO(port);
 
     LOCAL_MUTEX_LOCK(mac_reg_lock);
 
-    /* Re-enable TX datapath before enabling RX datapath. */
-    mac_eth_disable_tx_flush(mac_nbi_isl, mac_core, mac_core_port);
-
-    /* Enable the port TX. */
     enable_port_tx_datapath(mac_nbi_isl, NS_PLATFORM_NBI_TM_QID_LO(port),
                             NS_PLATFORM_NBI_TM_QID_HI(port));
 
-    /* Enable the port RX. */
-    mac_eth_enable_rx(mac_nbi_isl, mac_core, mac_core_port);
+    LOCAL_MUTEX_UNLOCK(mac_reg_lock);
+}
+
+
+__inline static void
+mac_port_disable_tx(unsigned int port)
+{
+    unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
+
+    LOCAL_MUTEX_LOCK(mac_reg_lock);
+
+    disable_port_tx_datapath(mac_nbi_isl, NS_PLATFORM_NBI_TM_QID_LO(port),
+                             NS_PLATFORM_NBI_TM_QID_HI(port));
 
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
@@ -390,6 +392,18 @@ mac_port_enable_tx_flush(unsigned int mac, unsigned int mac_core,
     LOCAL_MUTEX_LOCK(mac_reg_lock);
 
     mac_eth_enable_tx_flush(mac, mac_core, mac_core_port);
+
+    LOCAL_MUTEX_UNLOCK(mac_reg_lock);
+}
+
+
+__inline static void
+mac_port_disable_tx_flush(unsigned int mac, unsigned int mac_core,
+                          unsigned int mac_core_port)
+{
+    LOCAL_MUTEX_LOCK(mac_reg_lock);
+
+    mac_eth_disable_tx_flush(mac, mac_core, mac_core_port);
 
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
@@ -475,6 +489,7 @@ cfg_changes_loop(void)
                 /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
                 if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
                     if (control & NFP_NET_CFG_CTRL_ENABLE) {
+			mac_port_enable_tx(port);
                         /* Wait for config to stabilize */
                         sleep((NS_PLATFORM_TCLK * 1000000) / 40); // 25ms
                         mac_port_enable_rx(port);
@@ -484,6 +499,7 @@ cfg_changes_loop(void)
                         nic_local_epoch();
                         /* Wait for queues to drain */
                         sleep((NS_PLATFORM_TCLK * 1000000) / 40); // 25ms
+			mac_port_disable_tx(port);
                     }
                 }
 
@@ -603,6 +619,7 @@ __inline static void lsc_check(int port)
 {
     __mem char *nic_ctrl_bar;
     __gpr enum link_state ls;
+    __gpr enum link_state vs;
     __gpr int changed = 0;
     __xwrite uint32_t sts;
     __gpr int ret = 0;
@@ -610,21 +627,14 @@ __inline static void lsc_check(int port)
 
     vid = NFD_PF2VID(port);
     nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vid);
-    /* XXX Only check link state once the device is up.  This is
-     * temporary to avoid a system crash when the MAC gets reset after
-     * FW has been loaded. */
-    if (!(nic_control_word[vid] & NFP_NET_CFG_CTRL_ENABLE)) {
-        ls = LINK_DOWN;
-        goto skip_link_read;
-    } else {
-        __critical_path();
-    }
 
-    /* Read the current link state and if it changed set the bit in
-     * the control BAR status */
-    ls = mac_eth_port_link_state(
-             NS_PLATFORM_MAC(port), NS_PLATFORM_MAC_SERDES_LO(port),
-             (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1);
+    /* link state according to MAC */
+    ls = mac_eth_port_link_state(NS_PLATFORM_MAC(port),
+				 NS_PLATFORM_MAC_SERDES_LO(port),
+                                 (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1);
+
+    /* link state according to VNIC */
+    vs = nic_control_word[vid] & NFP_NET_CFG_CTRL_ENABLE;
 
     if (ls != LS_READ(ls_current, port)) {
         changed = 1;
@@ -632,6 +642,17 @@ __inline static void lsc_check(int port)
             LS_SET(ls_current, port);
         else
             LS_CLEAR(ls_current, port);
+    }
+
+    if (vs != LS_READ(vs_current, port)) {
+	changed = 1;
+	if (vs)
+	    LS_SET(vs_current, port);
+	else {
+            /* a disabled VNIC overrides MAC link state */
+            ls = LINK_DOWN;
+	    LS_CLEAR(vs_current, port);
+        }
     }
 
     if (changed) {
@@ -648,7 +669,6 @@ __inline static void lsc_check(int port)
         }
     }
 
-skip_link_read:
     /* Make sure the status bit reflects the link state. Write this
      * every time to avoid a race with resetting the BAR state. */
     if (ls == LINK_DOWN) {
