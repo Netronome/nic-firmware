@@ -1,3 +1,5 @@
+#!/bin/bash
+
 FILTER=$1
 shift
 TEST_DIR=$1
@@ -8,15 +10,12 @@ shift
 #set -x
 PASSED=0
 FAILED=0
-if [ "${COLOR}" == "no" ] ; then
-    COLOR_PASS=""
-    COLOR_FAIL=""
-    COLOR_WARN=""
-else
-    COLOR_PASS="\033[1;32m"
-    COLOR_FAIL="\033[1;31m"
-    COLOR_WARN="\033[1;33m"
-fi
+
+COLOR_PASS=${COLOR_PASS:-"\033[1;32m"}
+COLOR_FAIL=${COLOR_FAIL:-"\033[1;31m"}
+COLOR_WARN=${COLOR_WARN:-"\033[1;33m"}
+COLOR_RESET=${COLOR_RESET:-"\e[0m"}
+
 for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
     if echo ${t} | grep -v ${FILTER} > /dev/null ; then
         continue
@@ -38,7 +37,7 @@ for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
     done
     RESULT=`nfp-reg mecsr:i32.me0.Mailbox0 | cut -d= -f2`
     if [[ ${RESULT} -eq "1" ]] ; then
-        echo -e "${COLOR_PASS}PASS" ; tput sgr0
+        echo -e "${COLOR_PASS}PASS${COLOR_RESET}"
         PASSED=$(( ${PASSED} + 1 ))
     else
         TESTED=`nfp-reg mecsr:i32.me0.Mailbox2 | cut -d= -f2`
@@ -55,19 +54,19 @@ for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
         ISL=$(( (STS >> 25) & 0x3f ))
         ME=$(( ((STS >> 3) & 0xf) - 4 ))
         CTX=$(( STS & 0x7 ))
-        echo -en "${COLOR_FAIL}FAIL " ; tput sgr0
+        echo -en "${COLOR_FAIL}FAIL${COLOR_RESET}"
         if [[ ${RESULT} -eq 0 ]] ; then
             echo "(timed out)"
         else
             echo "@ i${ISL}.me${ME}.ctx${CTX}:${PC} ${DETAIL}"
         fi
         FAILED=$(( ${FAILED} + 1 ))
-    fi 
+    fi
 done
 if [[ ${FAILED} -eq 0 ]] && [[ ${PASSED} -ge 1 ]] ; then
-    echo -e "Summary : ${COLOR_PASS}${PASSED} passed, no failures" ; tput sgr0
+    echo -e "Summary : ${COLOR_PASS}${PASSED} passed, no failures${COLOR_RESET}"
     exit 0
 else
-    echo -e "Summary : ${COLOR_WARN}${PASSED} passed, ${FAILED} failed" ; tput sgr0
+    echo -e "Summary : ${COLOR_WARN}${PASSED} passed, ${FAILED} failed${COLOR_RESET}"
     exit 1
 fi
