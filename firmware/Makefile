@@ -191,7 +191,7 @@ firmware_rpm: firmware_tgz
 	@echo "dracut -f" >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
 	@echo "%preun" >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
 	@cat $(FIRMWARE_DIR)/pkg/prerm >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
-	@rpmbuild -ba $(RPM_FW_PKG)/SPECS/agilio-firmware.spec --buildroot $(RPM_FW_PKG)/BUILD --define "_rpmdir $(RPM_FW_PKG)/RPMS" --define "_sourcedir $(RPM_FW_PKG)/SOURCES" --define "_srpmdir $(RPM_FW_PKG)/SRPMS"
+	@rpmbuild -ba $(RPM_FW_PKG)/SPECS/agilio-firmware.spec --buildroot $(RPM_FW_PKG)/BUILD --define "_rpmdir $(RPM_FW_PKG)/RPMS" --define "_sourcedir $(RPM_FW_PKG)/SOURCES" --define "_srpmdir $(RPM_FW_PKG)/SRPMS" 2>&1 | grep -v "Arch dependent binaries"
 
 udev_rpm: udev_tree
 	@mkdir -p $(RPM_UDEV_PKG)/{BUILD,SPECS,RPMS}
