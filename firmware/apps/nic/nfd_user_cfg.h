@@ -188,4 +188,6 @@
 #define NFD_OUT_FL_BUFS_PER_QUEUE      1024
 #define NFD_PCIE0_FL_CACHE_MEM         emem0_cache_upper
 
+#define NFD_CFG_TLV_BLOCK 0x1800
+
 #endif /* !_NFD_USER_CFG_H_ */
