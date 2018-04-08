@@ -215,8 +215,6 @@ $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_sb,-DNS_PLATFORM_TYPE=$(N
 $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_pd,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call fwdep.add_nfd_out,$(PROJECT),0,ila0.me1,ila0.me2 ila0.me3)) # Stage batch, then packet DMA MEs
 
-
-
 # Add TM PM initialization (codeless)
 $(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pms.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
@@ -225,6 +223,10 @@ $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
 $(eval $(call dep.dump_spec,$(PROJECT),datapath,dump_spec.in))
 $(eval $(call microcode.assemble.codeless,$(PROJECT),dump_spec,apps/nic,dump_spec_init.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),dump_spec))
+
+# Add NFD config BAR TLVs
+$(eval $(call microcode.assemble.codeless,$(PROJECT),nfd_tlv_init,apps/nic,init_tlv.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call nffw.add_obj_codeless,$(PROJECT),nfd_tlv_init))
 
 # Link stage
 # Write the FW ID to the MIP
