@@ -1328,6 +1328,7 @@ class LinkState(Test):
         _, out = self.src.cmd('nfp-hwinfo | grep mac')
         re_str = 'eth(\d+).mac=%s' % src_mac
         port_id_list = re.findall(re_str, out)
+        print "port_id_list:%s" % port_id_list
         if port_id_list:
             port_id = int(port_id_list[0])
         else:
@@ -1348,12 +1349,16 @@ class LinkState(Test):
         hydrogen_str = 'AMDA0081'
         lithium_str = 'AMDA0096'
         beryllium_str = 'AMDA0097'
+        carbon_str = 'AMDA0099'
         chip_cmd = 'nfp-hwinfo | grep -o "AMDA.*$"'
         _, chip_model = self.src.cmd(chip_cmd)
         if hydrogen_str in chip_model:
             sd_family = 0
             sd_family_lane = port_id
         elif lithium_str in chip_model:
+            sd_family = port_id
+            sd_family_lane = 0
+        elif carbon_str in chip_model:
             sd_family = port_id
             sd_family_lane = 0
         elif beryllium_str in chip_model:
