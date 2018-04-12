@@ -1,0 +1,62 @@
+# Ubuntu 16.04 Buildbot worker Dockerfile
+# This worker is intended to be able to build driver/firmware and run NTI tests
+#
+
+FROM ubuntu:16.04
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        autoconf automake \
+        bc bison \
+        cppcheck curl \
+        debhelper dh-autoreconf dh-systemd dkms dpkg-dev \
+        ethtool \
+        fakeroot flex \
+        g++ gawk gcc git gzip \
+        host \
+        libjansson4 libtool linux-headers-`uname -r` \
+        make \
+        pkg-config python python-dev python-pip python-setuptools \
+        openssl \
+        rsync \
+        ssh sudo \
+        tcpdump \
+        vim \
+        unzip \
+        wget
+RUN pip install --upgrade pip==9.0.3 && \
+        pip install \
+            buildbot-worker \
+            Flask Flask-SQLAlchemy Flask-WTF \
+            paramiko pyelftools python-dateutil pyOpenSSL==16.2.0 \
+            scapy
+RUN rm /bin/sh && ln -sf /bin/bash /bin/sh
+
+ARG SDK_DPKG_LOCATION
+RUN wget $SDK_DPKG_LOCATION -O /tmp/nfp-sdk.deb && \
+    dpkg --install /tmp/nfp-sdk.deb
+
+RUN groupadd -r buildbot && useradd -m -r -g buildbot buildbot && \
+    mkdir /worker && chown buildbot:buildbot /worker
+USER buildbot
+WORKDIR /worker
+
+ARG SSH_KEY
+RUN mkdir -p ~/.ssh/ && \
+    echo -e "StrictHostKeyChecking no\n" >> ~/.ssh/config && \
+    echo "$SSH_KEY" > ~/.ssh/id_rsa && \
+    chmod 700 ~/.ssh/id_rsa
+
+ARG BUILDMASTER
+ARG BUILDMASTER_PORT
+ARG WORKERNAME
+ARG WORKERPASS
+
+RUN git config --global user.email "$WORKERNAME@netronome.com" && \
+    git config --global user.name "$WORKERNAME"
+
+RUN master_ip=$(host $BUILDMASTER | gawk '{ print $NF }') && \
+    buildbot-worker create-worker --umask=022 . $master_ip:$BUILDMASTER_PORT $WORKERNAME $WORKERPASS && \
+    echo "bbslave <bbslave@netronome.com>" > info/admin && \
+    echo "CoreNIC Builder: $WORKERNAME" > info/host
+
+ENTRYPOINT ["/usr/local/bin/buildbot-worker"]
+CMD ["start", "--nodaemon"]

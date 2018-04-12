@@ -1,0 +1,186 @@
+CoreNIC Buildbot
+----------------
+At the time of writing, the CoreNIC 2.0+ buildbot instance is running on the
+'corenic-build'/172.22.1.20 server based in CA.
+
+The intention of this buildbot instance is to run CoreNIC 2.0 (including
+variants such as ABM, BPF etc.) builds and unit tests. There is a future
+requirement to add CoreNIC tests to this buildbot instance.
+
+Furthermore, the Sprite driver builds and unit tests are also executed from this
+buildbot instance. This is quite orthogonal to the CoreNIC codebase, however,
+it is practical and convenient to have this included here.
+
+The buildbot directory contains the following files:
+- master.cfg:              Buildbot master configuration file.
+- buildbot_ctrl.sh         Script providing general tasks for buildbot
+                           maintenance. Refer to the usage output of the script.
+- Dockerfile.ubuntu1604    Dockerfile to generate a docker worker.
+- README                   You are here.
+
+Dependencies:
+-------------
+The buildbot installation has only been tested on an Ubuntu host. CentOS should
+also work, however, you may need to fudge the Debian package build somehow.
+
+As such, we only provide the expected dependencies on an Ubuntu host:
+    $ apt-get install autoconf automake \
+        bc bison build-essential \
+        debhelper dh-autoreconf dh-systemd dkms dpkg-dev docker docker.io \
+        fakeroot flex \
+        g++ gawk gcc git gzip \
+        host \
+        libjansson4 libtool linux-headers-`uname -r` \
+        make mercurial \
+        pkg-config python python-all python-dev python-pip \
+        python-setuptools python-wheel \
+        rpm rpm2cpio rpm-common rsync \
+        wget
+    $ pip install --upgrade pip
+    $ pip install buildbot-worker \
+        Flask Flask-SQLAlchemy Flask-WTF \
+        paramiko pyelftools python-dateutil \
+        scapy
+    $ <Install appropriate version of nfp-sdk/nfp-bsp>
+
+Creating the Buildbot instance:
+-------------------------------
+If the buildbot master needs to be recreated, the buildbot_ctrl.sh script can
+be used. The expectation is that all the files within the buildbot directory is
+copied to the location of the intended build master base directory and all the
+package dependencies above are installed. Then:
+    $ mkdir -p ~/buildbot/corenic
+    $ cp <path_to_repo>/nfp-nic/buildbot/* ~/buildbot/corenic/
+    $ cd ~/buildbot/corenic
+    $ ./buildbot_ctrl.sh -A
+
+Refer to the ./buildbot_ctrl -h usage info for details on how to modify your
+setup. The default should be fine in most cases.
+
+Note that there the 'netronome.com' search domain must be added to the
+resolv.conf file if not already present to avoid a warning in the CoreNIC
+packaging steps.
+
+Conventions:
+------------
+The following conventions are followed in the buildbot configuration and
+hopefully this can be kept consistent:
+- Docker workers should be used wherever possible. As of this time, the CoreNIC
+  builds require NFP access (yes docker can provide this too) and is convenient
+  to use LocalWorkers from within buildbot.
+- LocalWorkers that need the NFP must use the nfp_lock to synchronize access.
+  This not only prevents builds from trampling each other, but also prevents the
+  build machine from being hung up by the NFP being clobbered.
+- Slaves all have access to the ssh key of the host. If you need to have
+  passwordless access to another server, install the host ssh key and all will
+  be well.
+- Always use rsync -rlv for copying files. This is just nice and consistent.
+- The build master has the following directories available and should be used
+  whenever needed:
+    ./transfers: If you need to transfer files between workers and master.
+    ./nti_configs: Store NTI configuration files here. Test builders are
+                   expected to copy it's appropriate configuration file and run
+                   with that.
+    ./patches: If you need to store temporary patches that are required within
+               a build, e.g. NTI patches etc. Obviously don't put patches that
+               gets added to the repo being build for a release - that needs to
+               be committed to the appropriate repo.
+
+NTI Tests:
+----------
+To attempt to run the NTI tests in a simple and reproducible manner, we always
+run NTI tests from the docker workers.
+
+The worker must at least:
+1) Clone the NTI repo;
+2) Copy over the configuration file from the host;
+3) Determine the DUT IP from the configuration file;
+4) Prepare the DUT in whatever way it needs;
+5) Execute the test;
+
+The NTI configuration file should preferably be set with a property value with
+an appropriate default. The benefit of this is that one can change the selected
+config via the 'Force Build' option on the GUI.
+
+Refer to the driverTestFactory as an example of this.
+
+Below is an example of a suitable NTI configuration file for driver tests,
+note the '__WORKER_DIR__' placeholder which will be expanded to the worker's
+base directory:
+
+    [General]
+    installed_drv: True
+    local_dirs: True
+    tun_net: 100.100.2.
+    rm_fw_dir: True
+
+    [DUT]
+    name: 172.22.2.116
+    ethX: enp4s0np0 enp4s0np1
+    addrX: 13.1.1.1/24 13.2.1.1/24
+    addr6X: fc00:2:3:3::1/64 fc00:3:3:3::1/64
+
+    samples=__WORKER_DIR__/tests/samples/
+    netdevfw=__WORKER_DIR__/firmware/nic_AMDA0097-0001_2x40.nffw
+    netdevfw_dir=__WORKER_DIR__/firmware/
+    serial=00:15:4d:13:17:fa
+
+    [HostA]
+    name: 172.22.2.179
+    ethA: enp4s0np0 enp4s0np1
+    addrA: 13.1.1.2/24 13.2.1.2/24
+    addr6A: fc00:2:3:3::2/64 fc00:3:3:3::2/64
+
+Try Schedulers:
+---------------
+The buildbot try scheduler is a really handy feature. To use this, there must
+be a TryScheduler listening on a job directory. By default, the following
+job directories are created, jobs_corenic, jobs_abm, jobs_bpf,
+jobs_nfp-drv-kmods and jobs_sprite.
+
+To use this, one can execute a command similar to the one below. The properties
+to set will depend on the specific builder requirements. This particular
+example will execute the driver unit tests with CoreNIC 2.0.7 firmware, using
+the NTI configuration file nti_configs/dirk-dut_001.cfg after applying the
+trytest.patch patch.
+
+    $ host="corenic-build.netronome.com"
+    $ user="root"
+    $ jobdir_base="/home/buildbot/corenic/"
+    $ who="$(git config --global user.name) <$(git config --global user.email)>"
+    $ level=1
+    $ jobdir="jobs_nfp-drv-kmods"
+    $ nti_test="tests.unit"
+    $ nti_config="dirk-dut_001.cfg"
+    $ firmware="http://pahome.netronome.com/releases-intern/nic/builds/2.0/tgz/agilio-nic-firmware-2.0.7.tgz"
+    $ upstream="False"
+    $ properties="nti_test=$nti_test,nti_config=$nti_config,firmware=$firmware,upstream=$upstream"
+    $ builder="nfp-drv-kmods-test"
+    $ patch="/home/jsmith/trytest.patch"
+    $ buildbot try --connect=ssh --vc=git --who="$who" --host="$host" \
+        --username="$user" --jobdir="$jobdir_base/$jobdir" \
+        --builder="$builder" --properties="$properties" --patchlevel=$level \
+        --diff="$patch"
+
+Refer to the buildbot try help page for more options and ways to use this
+command.
+
+The following builders are available at this stage (more could be added in the
+future, so always check the master.cfg file for a complete list):
+- corenic-build
+- bpf-build
+- abm-build
+- nfp-drv-kmods-test
+- sprite-build
+- sprite-test
+
+Additional Notes:
+-----------------
+
+When configuring docker for use with docker workers, take note of the
+following:
+  https://docs.docker.com/config/daemon/#troubleshoot-conflicts-between-the-daemonjson-and-startup-scripts
+
+At the time of development, the docker configuration was set to:
+    "hosts": ["fd://", "tcp://0.0.0.0:2375"],
+    "graph": "/home/buildbot/docker_images/"
