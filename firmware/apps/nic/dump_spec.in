@@ -488,7 +488,6 @@
     nbi0_dma_bpe_credits
     _pf0_net_app_id
     _nic_stats_queue
-    _nic_stats_vnic
     _mac_stats
     _pf0_net_ctrl_bar
     _pf0_net_bar0
@@ -3637,7 +3636,6 @@
     nbi0_dma_bpe_credits
     _pf0_net_app_id
     _nic_stats_queue
-    _nic_stats_vnic
     _mac_stats
     __mac_stats
     __mac_stats_head_drop
