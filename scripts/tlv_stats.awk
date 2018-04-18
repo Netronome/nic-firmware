@@ -34,8 +34,14 @@ END{
     printf(" 0x%08x", COUNT)
 
     for (i = 0; i < COUNT; ++i) {
-        if (substr(DATA[i], 0, 3) == "rx_") dir[i % 4] = 2
-	else if (substr(DATA[i], 0, 3) == "tx_") dir[i % 4] = 3
+        if (substr(DATA[i], 1, 3) == "rx_") {
+            DATA[i] = substr(DATA[i], 4)
+            dir[i % 4] = 2
+        }
+	else if (substr(DATA[i], 1, 3) == "tx_") {
+            DATA[i] = substr(DATA[i], 4)
+            dir[i % 4] = 3
+        }
 	else dir[i % 4] = 1
 
 	if (i % 4 == 3)
