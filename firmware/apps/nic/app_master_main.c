@@ -31,9 +31,11 @@
 #include <nfp/mem_bulk.h>
 #include <nfp/macstats.h>
 #include <nfp/remote_me.h>
+#include <nfp/tmq.h>
 #include <nfp/xpb.h>
 #include <nfp6000/nfp_mac.h>
 #include <nfp6000/nfp_me.h>
+#include <nfp6000/nfp_nbi_tm.h>
 
 #include <std/synch.h>
 #include <std/reg_utils.h>
@@ -614,6 +616,8 @@ out:
     return ret;
 }
 
+#define TMQ_DRAIN_RETRIES 10
+
 /* Check the Link state and try to generate an interrupt if it changed. */
 __inline static void lsc_check(int port)
 {
@@ -621,9 +625,12 @@ __inline static void lsc_check(int port)
     __gpr enum link_state ls;
     __gpr enum link_state vs;
     __gpr int changed = 0;
+    __gpr int occupied = 1;
+    __gpr int queue;
+    __xread struct nfp_nbi_tm_queue_status tmq_status;
     __xwrite uint32_t sts;
     __gpr int ret = 0;
-    uint32_t vid;
+    uint32_t vid, i;
 
     vid = NFD_PF2VID(port);
     nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vid);
@@ -652,6 +659,22 @@ __inline static void lsc_check(int port)
             /* a disabled VNIC overrides MAC link state */
             ls = LINK_DOWN;
 	    LS_CLEAR(vs_current, port);
+
+	    /* wait for TM queues to drain */
+	    for (i = 0; occupied && i < TMQ_DRAIN_RETRIES; ++i) {
+	        occupied = 0;
+	        for (queue = NS_PLATFORM_NBI_TM_QID_LO(port);
+	             queue <= NS_PLATFORM_NBI_TM_QID_HI(port);
+		     queue++) {
+			tmq_status_read(&tmq_status, NS_PLATFORM_MAC(port),
+					queue, 1);
+			if (tmq_status.queuelevel) {
+			    occupied = 1;
+			    break;
+			}
+	        }
+	        sleep(NS_PLATFORM_TCLK * 1000); // 1ms
+	    }
         }
     }
 
