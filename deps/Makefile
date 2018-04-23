@@ -1,8 +1,8 @@
 #
 # Change these revisions to suit the project
 #
-# FLOWENV_REV - Tip as of Feb 19 2018
-FLOWENV_REV=89bcd36
+# FLOWENV_REV - Tip as of Apr 23 2018
+FLOWENV_REV=4765e48
 # NFD_REV - Feb 26 2018
 NFD_REV=f899d4074
 
