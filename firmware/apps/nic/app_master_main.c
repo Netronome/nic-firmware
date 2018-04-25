@@ -492,6 +492,11 @@ cfg_changes_loop(void)
 
 			/* stop receiving packets */
                         mac_port_disable_rx(port);
+
+			/* allow workers to drain RX queue */
+			sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
+
+			/* stop processing packets: drop action */
                         app_config_port_down(vid);
                         nic_local_epoch();
 
