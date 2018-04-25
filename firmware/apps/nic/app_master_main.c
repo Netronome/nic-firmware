@@ -493,8 +493,10 @@ cfg_changes_loop(void)
                 if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
                     if (control & NFP_NET_CFG_CTRL_ENABLE) {
 			mac_port_enable_tx(port);
+
                         /* Wait for config to stabilize */
-                        sleep((NS_PLATFORM_TCLK * 1000000) / 40); // 25ms
+                        sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
+
                         mac_port_enable_rx(port);
                     } else {
 			__xread struct nfp_nbi_tm_queue_status tmq_status;
