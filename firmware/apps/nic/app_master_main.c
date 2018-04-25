@@ -518,6 +518,9 @@ cfg_changes_loop(void)
 			}
 
 			mac_port_disable_tx(port);
+
+			/* give Arbitrator ME time to react */
+			sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
                     }
                 }
 
