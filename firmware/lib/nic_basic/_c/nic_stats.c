@@ -250,18 +250,17 @@ __forceinline static void update_vnic_bar_stats(uint32_t vid)
 }
 
 
-__forceinline static void vnic_stats_swap(__lmem uint64_t *dst_stat,
-					  __lmem uint64_t *dst_total,
-					  __lmem uint64_t *src_stat,
-					  __lmem uint64_t *src_total)
+__forceinline static void vnic_stats_remap(__lmem uint64_t *dst_stat,
+					   __lmem uint64_t *dst_total,
+					   __lmem uint64_t *src_stat,
+					   __lmem uint64_t *src_total)
 {
-    __lmem uint64_t delta = *src_stat - *dst_stat;
-    *src_stat -= delta;
-    *dst_stat += delta;
-    if (src_total)
-	    *src_total -= delta;
-    if (dst_total)
-	    *dst_total += delta;
+    if (*src_total)
+	    *src_total -= *src_stat;
+    if (*dst_total)
+	    *dst_total += *src_stat;
+    *dst_stat += *src_stat;
+    *src_stat = 0;
 }
 
 __forceinline static void vnic_stats_accumulate()
@@ -328,17 +327,17 @@ __forceinline static void vnic_stats_accumulate()
 
 	    /* RX is TX for these PCIe queue exceptions */
 	    if (queue < (1 << 8)) {
-		vnic_stats_swap(&_vnic_stats.tx_error_mtu_pkts, &_vnic_stats.tx_errors,
-				&_vnic_stats.rx_discard_mtu_pkts, &_vnic_stats.rx_discards);
+		vnic_stats_remap(&_vnic_stats.tx_error_mtu_pkts, &_vnic_stats.tx_errors,
+				 &_vnic_stats.rx_discard_mtu_pkts, &_vnic_stats.rx_discards);
 
-		vnic_stats_swap(&_vnic_stats.tx_error_mtu_bytes, 0,
-				&_vnic_stats.rx_discard_mtu_bytes, 0);
+		vnic_stats_remap(&_vnic_stats.tx_error_mtu_bytes, &_vnic_stats.tx_errors,
+				 &_vnic_stats.rx_discard_mtu_bytes, &_vnic_stats.rx_discards);
 
-		vnic_stats_swap(&_vnic_stats.tx_discard_act_pkts, &_vnic_stats.tx_discards,
-				&_vnic_stats.rx_discard_act_pkts, &_vnic_stats.rx_discards);
+		vnic_stats_remap(&_vnic_stats.tx_discard_act_pkts, &_vnic_stats.tx_discards,
+				 &_vnic_stats.rx_discard_act_pkts, &_vnic_stats.rx_discards);
 
-		vnic_stats_swap(&_vnic_stats.tx_discard_act_bytes, 0,
-				&_vnic_stats.rx_discard_act_bytes, 0);
+		vnic_stats_remap(&_vnic_stats.tx_discard_act_bytes, &_vnic_stats.tx_discards,
+				 &_vnic_stats.rx_discard_act_bytes, &_vnic_stats.rx_discards);
 	    }
 	}
 
