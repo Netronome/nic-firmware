@@ -340,7 +340,7 @@ __forceinline static void vnic_stats_accumulate()
             }
 
 	    /* incorporate MAC drops into PF VNIC stats */
-	    delta =  _mac_drops[port].rx_discards - _vnic_stats.rx_discard_mac_pkts;
+	    delta = _mac_drops[port].rx_discards - _vnic_stats.rx_discard_mac_pkts;
 	    _vnic_stats.rx_discard_mac_pkts += delta;
 	    _vnic_stats.rx_discards += delta;
 
