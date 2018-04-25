@@ -53,7 +53,7 @@ typedef struct {
 // working stats
 __shared __align8 __imem struct macstats_port_accum _mac_stats[NS_PLATFORM_NUM_PORTS];
 __shared __align8 __imem struct macstats_head_drop_accum _mac_stats_head_drop;
-__lmem __shared mac_drops_t _mac_drops[NS_PLATFORM_NUM_PORTS];
+__lmem __shared mac_drops_t _mac_drops[NS_PLATFORM_NUM_PORTS] = { 0 };
 __lmem __shared nic_stats_vnic_t _vnic_stats;
 
 // result stats
@@ -87,7 +87,6 @@ __forceinline static void mac_stats_accumulate(void)
 			sizeof(head_drops));
         _mac_drops[port].rx_discards = swapw64(head_drops);
 
-        _mac_drops[port].tx_discards = 0;
         for (i = NS_PLATFORM_NBI_TM_QID_LO(port);
              i <= NS_PLATFORM_NBI_TM_QID_HI(port);
              ++i) {
