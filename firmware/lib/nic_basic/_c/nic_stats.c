@@ -104,9 +104,9 @@ __forceinline static void mac_stats_accumulate(void)
                     write_block[i] = swapw64(_mac_drops[port].tx_discards);
 		else {
 		    if (stat == &_mac_stats[port].TxPIfOutErrors)
-		        _mac_drops[port].tx_errors = read_block[i];
+			_mac_drops[port].tx_errors = swapw64(read_block[i]);
                     else if (stat == &_mac_stats[port].RxPIfInErrors)
-			_mac_drops[port].rx_errors = read_block[i];
+			_mac_drops[port].rx_errors = swapw64(read_block[i]);
 		    write_block[i] = read_block[i];
 		}
 	    }
