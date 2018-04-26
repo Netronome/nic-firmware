@@ -23,4 +23,15 @@ byte_align_be[--, *$index++]
 byte_align_be[tested, *$index]
 test_assert_equal(tested, expected)
 
+// EXIT_LABEL version should also agree
+pv_seek(pkt_vec, 14, PV_SEEK_CTM_ONLY, done#)
+
+#pragma warning(disable:4702)
+test_fail()
+#pragma warning(default:4702)
+
+done#:
+move(tested, *$index)
+test_assert_equal(tested, expected)
+
 test_pass()
