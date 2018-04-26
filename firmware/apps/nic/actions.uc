@@ -297,7 +297,7 @@ w/**/LOOP_UNROLL#:
     alu[carries, carries, +carry, 0] // accumulate carries that would be lost to looping construct alu[]s
 
 start#:
-    pv_seek(idx, in_pkt_vec, offset, --, PV_SEEK_PAD_INCLUDED)
+    pv_seek(idx, in_pkt_vec, offset, --, PV_SEEK_PAD_INCLUDED, --)
 
     alu[remaining_words, remaining_words, -, iteration_words]
     beq[last_bits#]
