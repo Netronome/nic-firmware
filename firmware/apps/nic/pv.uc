@@ -1189,7 +1189,7 @@ skip_ctm_buffer#:
 .reg volatile read $__pv_pkt_data[32]
 .addr $__pv_pkt_data[0] 0
 .xfer_order $__pv_pkt_data
-#macro pv_seek(out_cache_idx, io_vec, in_offset, in_length, in_flags)
+#macro pv_seek(out_cache_idx, io_vec, in_offset, in_length, in_flags, EXIT_LABEL)
 .begin
     .reg tibi // T_INDEX_BYTE_INDEX
     .reg write $reflect
@@ -1232,12 +1232,16 @@ skip_ctm_buffer#:
 
 #if (((in_flags) & PV_SEEK_T_INDEX_ONLY) != 0)
     local_csr_wr[T_INDEX_BYTE_INDEX, tibi]
+#if (! streq('EXIT_LABEL', '--'))
+    br[EXIT_LABEL], defer[2]
+#else
+    nop
+#endif
     #if (! streq('out_cache_idx', '--'))
         alu[out_cache_idx, 0x1f, AND, tibi, >>2]
     #else
         nop
     #endif
-    nop
     nop
 #else
     .reg outside
@@ -1249,10 +1253,35 @@ skip_ctm_buffer#:
         alu[out_cache_idx, 0x1f, AND, tibi, >>2]
     #endif
 #if ((in_flags & PV_SEEK_INIT) == 0)
+#if (streq('EXIT_LABEL', '--'))
     br[check#], defer[2]
+#endif
         local_csr_wr[T_INDEX_BYTE_INDEX, tibi]
         alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, _PV_SEEK_OFFSET]
 #endif
+
+#if ((in_flags & PV_SEEK_INIT) == 0 && !streq('EXIT_LABEL', '--'))
+    #if (streq('in_length', '--'))
+        #if (((in_flags & PV_SEEK_REVERSE) == 0))
+            alu[--, BF_MASK(PV_SEEK_BASE_bf), AND, outside, >>BF_L(PV_SEEK_BASE_bf)]
+        #else
+            alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
+        #endif
+        beq[EXIT_LABEL]
+    #else
+        .reg boundary
+        alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
+        bne[read#]
+        #if (((in_flags & PV_SEEK_REVERSE) == 0))
+            alu[boundary, _PV_SEEK_OFFSET, +, in_length]
+        #else
+            alu[boundary, _PV_SEEK_OFFSET, -, in_length]
+        #endif
+        alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, boundary]
+        alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
+        beq[EXIT_LABEL]
+    #endif
+#endif // ((in_flags & PV_SEEK_INIT) == 0 && !streq('EXIT_LABEL', '--'))
 
 read#:
     #if (((in_flags) & PV_SEEK_CTM_ONLY) == 0)
@@ -1277,7 +1306,11 @@ read_ctm#:
 
 finalize#:
     local_csr_wr[T_INDEX_BYTE_INDEX, tibi] // reload T_INDEX after ctx_swap[]
+#if (streq('EXIT_LABEL', '--'))
     br[end#], defer[2]
+#else
+    br[EXIT_LABEL], defer[2]
+#endif
         alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), AND~, BF_MASK(PV_SEEK_BASE_bf), <<BF_L(PV_SEEK_BASE_bf)]
         alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), OR, aligned_offset]
 
@@ -1363,7 +1396,7 @@ finalize#:
 
     #endif // ((in_flags) & PV_SEEK_CTM_ONLY) == 0
 
-#if ((in_flags & PV_SEEK_INIT) == 0)
+#if ((in_flags & PV_SEEK_INIT) == 0 && streq('EXIT_LABEL', '--'))
 check#:
     #if (streq('in_length', '--'))
         #if (((in_flags & PV_SEEK_REVERSE) == 0))
@@ -1385,7 +1418,7 @@ check#:
         alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
         bne[read#]
     #endif
-#endif // ((in_flags & PV_SEEK_INIT) == 0)
+#endif // ((in_flags & PV_SEEK_INIT) == 0 && streq('EXIT_LABEL', '--'))
 
 end#:
 #endif // ((in_flags) & PV_SEEK_T_INDEX_ONLY) == 0
@@ -1398,17 +1431,22 @@ end#:
 
 
 #macro pv_seek(io_vec, in_offset)
-    pv_seek(--, io_vec, in_offset, --, 0)
+    pv_seek(--, io_vec, in_offset, --, 0, --)
 #endm
 
 
 #macro pv_seek(io_vec, in_offset, in_flags)
-    pv_seek(--, io_vec, in_offset, --, in_flags)
+    pv_seek(--, io_vec, in_offset, --, in_flags, --)
 #endm
 
 
-#macro pv_seek(io_vec, in_offset, in_length, in_flags)
-    pv_seek(--, io_vec, in_offset, in_length, in_flags)
+#macro pv_seek(io_vec, in_offset, in_flags, EXIT_LABEL)
+    pv_seek(--, io_vec, in_offset, --, in_flags, EXIT_LABEL)
+#endm
+
+
+#macro pv_seek(io_vec, in_offset, in_length, in_flags, EXIT_LABEL)
+    pv_seek(--, io_vec, in_offset, in_length, in_flags, EXIT_LABEL)
 #endm
 
 
