@@ -171,19 +171,6 @@ $$($1__$2__LIST): $3/$4 $(GENERATED_DEPS)
 
 endef
 
-FILTER = test 
-
-define microcode.add_tests
-
-
-$1_$2_test: $$($1__$2__LIST)
-	scripts/run_tests.sh $(FILTER) $(TEST_DIR)/$2 $(FW_BUILD)/$2 $$($1__$2__FLAGS) $$($1__$2__DEFS) $$($1__$2__INC) 
-
-FW_TEST_TARGETS += $1_$2_test
-
-endef
-
-
 
 #a Microcode templates
 #f microcode.assemble
@@ -381,6 +368,24 @@ endef
 define microcode.add_fw_includes
 
 $(foreach path,$2,$(eval $(call microcode.add_fw_include,$1,$(path))))
+
+endef
+
+
+#f microcode.add_tests
+#
+# Run microcode unit tests
+#
+# @param $1 firmware name
+# @param $2 object descriptor
+#
+FILTER = test
+define microcode.add_tests
+
+$1_$2_test: $$($1__$2__LIST)
+	scripts/run_tests.sh $(FILTER) $(TEST_DIR)/$2 $(FW_BUILD)/$2 \
+          $$($1__$2__FLAGS) $$($1__$2__DEFS) $$($1__$2__INC)
+FW_U_TEST_TARGETS += $1_$2_test
 
 endef
 
@@ -767,6 +772,24 @@ endef
 define micro_c.set_nctx
 
 $1__$2__NCTX = $3
+
+endef
+
+
+#f micro_c.add_tests
+#
+# Run micro_c unit tests
+#
+# @param $1 firmware name
+# @param $2 component name
+#
+FILTER = test
+define micro_c.add_tests
+
+$1_$2_test: $$($1__$2__LIST)
+	scripts/run_tests.sh $(FILTER) $(TEST_DIR)/$2 $(FW_BUILD)/$2 $$($1__$2__INC) \
+	 -I$(NETRONOME)/components/standardlibrary/microc/src
+FW_C_TEST_TARGETS += $1_$2_test
 
 endef
 

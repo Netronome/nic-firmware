@@ -82,7 +82,8 @@ FW_BUILD_DIRS =
 FW_BUILD_TARGETS =
 FW_LOAD_TARGETS =
 FW_LIST_TARGETS =
-FW_TEST_TARGETS =
+FW_U_TEST_TARGETS =
+FW_C_TEST_TARGETS =
 FW_MKDEP_TARGETS =
 
 include $(FIRMWARE_DIR)/Makefile.templates
@@ -98,7 +99,14 @@ all_nffw:
 all_cat:
 
 test: FORCE_TESTS
-	@make `echo $(FW_TEST_TARGETS) | sed 's/\ .*//g'`
+	@make `echo $(FW_U_TEST_TARGETS) | sed 's/\ .*//g'`
+	@make `echo $(FW_C_TEST_TARGETS) | sed 's/\ .*//g'`
+
+test_u: FORCE_TESTS
+	@make `echo $(FW_U_TEST_TARGETS) | sed 's/\ .*//g'`
+
+test_c: FORCE_TESTS
+	@make `echo $(FW_C_TEST_TARGETS) | sed 's/\ .*//g'`
 
 FORCE_TESTS:
  
@@ -188,7 +196,7 @@ udev_deb: udev_tree
 	@echo "update-initramfs -uk all" >> $(DEB_UDEV_PKG)/DEBIAN/postinst
 	@chmod a+x $(DEB_UDEV_PKG)/DEBIAN/postinst
 	@fakeroot dpkg-deb --build $(DEB_UDEV_PKG)
-	
+
 RPM_FW_PKG = $(FIRMWARE_DIR)/pkg/rpm/firmware
 RPM_UDEV_PKG = $(FIRMWARE_DIR)/pkg/rpm/udev
 

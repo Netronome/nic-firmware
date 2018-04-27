@@ -16,12 +16,16 @@ COLOR_FAIL=${COLOR_FAIL:-"\033[1;31m"}
 COLOR_WARN=${COLOR_WARN:-"\033[1;33m"}
 COLOR_RESET=${COLOR_RESET:-"\e[0m"}
 
-for t in `find ${TEST_DIR} -iname '*_test.uc'` ; do
+for t in `find ${TEST_DIR} -iname '*_test.uc' -o -iname '*_test.c'` ; do
     if echo ${t} | grep -v ${FILTER} > /dev/null ; then
         continue
     fi
     FILE_BASE=`basename ${t%.*}`
-    nfas -Itest/include -I test/lib $* -o ${BUILD_DIR}/${FILE_BASE}.list $t || exit 1
+    if echo ${t} | grep '.uc' > /dev/null ; then
+        nfas -Itest/include -Itest/lib $* -o ${BUILD_DIR}/${FILE_BASE}.list $t || exit 1
+    else
+        nfcc -Itest/include -Itest/lib $* -o ${BUILD_DIR}/${FILE_BASE}.list $t || exit 1
+    fi
     nfld -chip nfp-4xxx-b0 -mip -rtsyms -u i32.me0 ${BUILD_DIR}/${FILE_BASE}.list || exit 1
     nfp-nffw unload || exit 1
     nfp-nffw load -S ${BUILD_DIR}/${FILE_BASE}.nffw || exit 1
