@@ -34,12 +34,28 @@
         #endif
     #else
         #if (streq('in_shf', '--'))
-            alu[out_data, in_mask, AND, *$index++]
+            #if (is_ct_const(in_mask) && in_mask == 0xffff)
+                alu[out_data, 0, +16, *$index++]
+            #else
+                alu[out_data, in_mask, AND, *$index++]
+            #endif
         #else
             alu[out_data, in_mask, AND, *$index++, in_shf]
         #endif
     #endif
     alu[__actions_t_idx, __actions_t_idx, +, 4]
+#endm
+
+#macro __actions_read(out_data, in_mask)
+    __actions_read(out_data, in_mask, --)
+#endm
+
+#macro __actions_read(out_data)
+    __actions_read(out_data, --, --)
+#endm
+
+#macro __actions_read()
+    __actions_read(--, --, --)
 #endm
 
 
@@ -62,8 +78,7 @@
     .reg mtu
     .reg pkt_len
 
-    immed[mask, 0x3fff]
-    __actions_read(mtu, mask, --)
+    __actions_read(mtu, 0xffff)
     pv_check_mtu(in_pkt_vec, mtu, DROP_LABEL)
 .end
 #endm
@@ -74,8 +89,8 @@
     .reg mac[2]
     .reg tmp
 
-    __actions_read(mac[0], --, --)
-    __actions_read(mac[1], --, --)
+    __actions_read(mac[0], 0xffff)
+    __actions_read(mac[1])
 
     pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
 
@@ -116,8 +131,8 @@ pass#:
     .reg udp_delta
     .reg write $metadata
 
-    __actions_read(opcode, --, --)
-    __actions_read(key, --, --)
+    __actions_read(opcode, 0xffff)
+    __actions_read(key)
 
     br_bset[BF_AL(in_pkt_vec, PV_QUEUE_SELECTED_bf), queue_selected#]
 
@@ -231,7 +246,7 @@ end#:
 
 
 #macro __actions_rxcsum(in_pkt_vec)
-   __actions_read(--, --, --)
+   __actions_read()
    pv_propagate_mac_csum_status(in_pkt_vec)
 #endm
 
@@ -256,7 +271,7 @@ end#:
 
     .sig sig_read
 
-    __actions_read(--, --, --)
+    __actions_read()
 
     immed[checksum, 0]
     immed[carries, 0]
@@ -351,16 +366,12 @@ skip_checksum#:
 #macro actions_execute(in_pkt_vec, EGRESS_LABEL)
 .begin
     .reg ebpf_addr
-    .reg ebpf_mask
     .reg jump_idx
     .reg egress_q_base
-    .reg egress_q_mask
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#], defer[2] ;actions_jump
-        immed[egress_q_mask, 0xffff]
-        immed[ebpf_mask, 0xffff]
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#] ;actions_jump
 
     ins_0#: br[drop_act#]
     ins_1#: br[mtu#]
@@ -399,18 +410,18 @@ checksum_complete#:
     __actions_next()
 
 tx_host#:
-    __actions_read(egress_q_base, egress_q_mask, --)
+    __actions_read(egress_q_base, 0xffff)
     pkt_io_tx_host(in_pkt_vec, egress_q_base, EGRESS_LABEL)
 
 tx_wire#:
-    __actions_read(egress_q_base, egress_q_mask, --)
+    __actions_read(egress_q_base, 0xffff)
     pkt_io_tx_wire(in_pkt_vec, egress_q_base, EGRESS_LABEL)
 
 cmsg#:
     cmsg_desc_workq($__pkt_io_gro_meta, in_pkt_vec, EGRESS_LABEL)
 
 ebpf#:
-    __actions_read(ebpf_addr, ebpf_mask, --)
+    __actions_read(ebpf_addr, 0xffff)
     ebpf_call(in_pkt_vec, ebpf_addr)
 
 rxcsum#:
