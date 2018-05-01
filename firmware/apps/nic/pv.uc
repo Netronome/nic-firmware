@@ -110,9 +110,9 @@
  * PCIE: |0|ISL|   Queue   |
  *       +-+---+-----------+
  *
- *       +-+-+-------------+
- * NBI:  |1|N|    Port     |
- *       +-+-+-------------+
+ *       +-+---------------+
+ * NBI:  |1|     Port      |
+ *       +-+---------------+
  */
 
 #define PV_SIZE_LW                      16
@@ -885,10 +885,8 @@ store_l4_offset#:
     alu[BF_A(out_vec, PV_PARSE_L4_OFFSET_bf), BF_A(out_vec, PV_PARSE_L4_OFFSET_bf), OR, l4_offset, <<BF_L(PV_PARSE_L4_OFFSET_bf)]
 
 skip_l4_offset#:
-    alu[BF_A(out_vec, PV_QUEUE_IN_bf), 0x80, AND, BF_A(in_nbi_desc, CAT_MTYPE_bf), <<(7 - BF_L(CAT_MTYPE_bf))]
-    alu[BF_A(out_vec, PV_QUEUE_IN_bf), BF_A(out_vec, PV_QUEUE_IN_bf), OR, BF_A(in_nbi_desc, CAT_PORT_bf), >>BF_L(CAT_PORT_bf)]
-    alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(out_vec, PV_QUEUE_IN_bf), <<BF_L(PV_QUEUE_IN_bf)]
-    alu[BF_A(out_vec, PV_QUEUE_IN_bf), BF_A(out_vec, PV_QUEUE_IN_bf), OR, 1, <<BF_L(PV_QUEUE_IN_TYPE_bf)]
+    dbl_shf[BF_A(out_vec, PV_QUEUE_IN_bf), 1, BF_A(in_nbi_desc, CAT_PORT_bf), >>BF_L(CAT_PORT_bf)] ; CAT_PORT_bf
+    alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(out_vec, PV_QUEUE_IN_bf), <<BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
 
     // error checks after metadata is populated (will need for drop)
     #ifdef PARANOIA // should never happen, Catamaran is buggy if it does
