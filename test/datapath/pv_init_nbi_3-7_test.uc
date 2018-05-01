@@ -642,7 +642,6 @@ move(loop_cntr, 0)
     move(temp, 0x1)
     alu[temp, temp, AND, loop_cntr] // mask off all but LSB
     alu[expected[6], expected[6], AND~, 1, <<30]
-    alu[expected[6], expected[6], OR, temp, <<30]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -700,8 +699,6 @@ move(loop_cntr, 0)
     pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
 
 
-    /* The "N" bit of the PV NBI Ingress Queue is actually an "or" of MType[0] and Port[7] */
-
     alu[expected[6], expected[6], AND~, 0xff, <<23]
     alu[expected[6], expected[6], OR, loop_cntr, <<23]
 
@@ -757,18 +754,13 @@ move(loop_cntr, 0)
     .else
         move($nbi_desc_wr[2], 0x100)
     .endif
-
-    alu[temp, loop_cntr, AND, 0x7f]
-    alu[$nbi_desc_wr[4], --, B, temp, <<24]
+    alu[$nbi_desc_wr[4], --, B, loop_cntr, <<24]
 
     mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
     pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
-
-
-    /* The "N" bit of the PV NBI Ingress Queue is actually an "or" of MType[0] and Port[7] */
 
     alu[expected[6], expected[6], AND~, 0xff, <<23]
     alu[expected[6], expected[6], OR, loop_cntr, <<23]
