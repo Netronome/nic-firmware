@@ -13,6 +13,7 @@
 .reg rtn_reg
 .reg loop_cntr
 .reg loop_cntr1
+.reg mtu
 .reg error_expected_flag
 .reg expected[SIZE_LW]
 .reg volatile read  $nbi_desc_rd[(NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))]
@@ -23,6 +24,7 @@
 #define pkt_vec *l$index1
 
 move(error_expected_flag, 0)
+move(mtu, 0xfff)
 
 load_addr[rtn_reg, error_expected_ret#]
 
@@ -30,12 +32,11 @@ pv_init(pkt_vec, 0)
 
 move(addr, 0x80)
 
-
 /* Test PV Seq Ctx field */
 
 move($nbi_desc_wr[0], 64)
 move($nbi_desc_wr[1], 0)
-move($nbi_desc_wr[2], 0)
+move($nbi_desc_wr[2], 0x200)
 move($nbi_desc_wr[3], 0)
 move($nbi_desc_wr[4], 0)
 move($nbi_desc_wr[5], 0)
@@ -45,13 +46,13 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0)
+move(expected[3], 0x20000)
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
-move(loop_cntr, 0)
+move(loop_cntr, 1)
 
 .while (loop_cntr <= 0x7)
 
@@ -67,12 +68,11 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
     .if (loop_cntr == 0)
         br[test_fail#] // should always get error for this case, so should never get here
     .endif
-
 
 error_expected_ret#:
 
@@ -100,8 +100,6 @@ error_expected_ret#:
 
 .endw
 
-
-
 /* Test PV Sequence Number field */
 
 move($nbi_desc_wr[0], 64)
@@ -119,7 +117,7 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0)
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -133,8 +131,8 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
-
+    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
     alu[expected[3], temp, OR, loop_cntr, <<16]
 
@@ -160,9 +158,7 @@ move(loop_cntr, 0)
 .endw
 
 
-
 /* PV Seek already tested, rest of word doesn't apply for nbi */
-
 
 
 /* Test PV P_STS field */
@@ -182,7 +178,7 @@ move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -200,7 +196,8 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
     alu[expected[5], --, B, loop_cntr, <<29]
@@ -227,7 +224,6 @@ move(loop_cntr, 0)
 .endw
 
 
-
 /* Test PV L3I, MPD and VLD fields */
 
 move($nbi_desc_wr[0], 64)
@@ -245,7 +241,7 @@ move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -258,7 +254,8 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
     alu[expected[5], --, B, loop_cntr, <<16]
@@ -285,7 +282,6 @@ move(loop_cntr, 0)
 .endw
 
 
-
 /* Test PV L4 Offset fields using OL4 = TCP */
 
 move($nbi_desc_wr[0], 64)
@@ -303,7 +299,7 @@ move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -317,7 +313,8 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
     alu[temp, --, B, loop_cntr, >>1]
@@ -343,7 +340,6 @@ move(loop_cntr, 0)
     alu[loop_cntr, loop_cntr, +, 1]
 
 .endw
-
 
 
 /* Test PV L4 Offset fields using OL4 = UDP */
@@ -363,7 +359,7 @@ move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -377,7 +373,8 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
     alu[temp, --, B, loop_cntr, >>1]
@@ -403,7 +400,6 @@ move(loop_cntr, 0)
     alu[loop_cntr, loop_cntr, +, 1]
 
 .endw
-
 
 
 /* Test PV L4 Offset fields using OL4 fields other than TCP and UDP */
@@ -431,7 +427,7 @@ move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -469,7 +465,8 @@ move(loop_cntr, 0)
 
         mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-        pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+        pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
+        pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
         /* If OL4 is not TCP or UDP:
@@ -544,7 +541,6 @@ cont_loop#:
 .endw
 
 
-
 /* Test PV Checksum field */
 
 move($nbi_desc_wr[0], 64)
@@ -562,7 +558,7 @@ move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -575,7 +571,8 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
     alu[expected[5], --, B, loop_cntr]
@@ -602,7 +599,6 @@ move(loop_cntr, 0)
 .endw
 
 
-
 /* Test PV Ingress Queue field */
 
 /* First try MType field in Metadata */
@@ -622,7 +618,7 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -636,7 +632,8 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
     move(temp, 0x1)
@@ -665,7 +662,6 @@ move(loop_cntr, 0)
 .endw
 
 
-
 /* Now try Port field in Metadata */
 
 move($nbi_desc_wr[0], 64)
@@ -683,7 +679,7 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -696,7 +692,9 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+    alu[temp, --, B, loop_cntr, <<6]
+    pv_set_ingress_queue__sz1(pkt_vec, temp, 64)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
     alu[expected[6], expected[6], AND~, 0xff, <<23]
@@ -722,7 +720,6 @@ move(loop_cntr, 0)
     alu[loop_cntr, loop_cntr, +, 1]
 
 .endw
-
 
 
 /* Now try 7-bit Port field and LSB of MType field in Metadata */
@@ -742,7 +739,7 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000100) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x80000000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -760,7 +757,9 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+    alu[temp, --, B, loop_cntr, <<6]
+    pv_set_ingress_queue__sz1(pkt_vec, temp, 64)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
     alu[expected[6], expected[6], AND~, 0xff, <<23]
     alu[expected[6], expected[6], OR, loop_cntr, <<23]
@@ -785,7 +784,6 @@ move(loop_cntr, 0)
     alu[loop_cntr, loop_cntr, +, 1]
 
 .endw
-
 
 
 /* PV Metadata Type Fields word always set to 0, already tested */
@@ -813,7 +811,7 @@ move(expected[2], 0x83ff0088)
 move(expected[3], 0xffff0000)
 move(expected[4], 0x00000000)
 move(expected[5], 0xfeffffff)
-move(expected[6], 0xff800000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 
@@ -821,7 +819,8 @@ mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_
 
 mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
+pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 br[test_fail#] // should always get error, so should never get here
 
@@ -846,14 +845,13 @@ error_expected_ret1#:
 #endloop
 
 
-
 /* Test all fields in PV are filled in when any "rx_errors_parse#" occurs */
 
 move(error_expected_flag, 2)
 
 load_addr[rtn_reg, error_expected_ret2#]
 
-move($nbi_desc_wr[0], 0x03ffffff)
+move($nbi_desc_wr[0], 0x03ff00ff)
 move($nbi_desc_wr[1], 0x9fffffff)
 move($nbi_desc_wr[2], 0xffff0100)
 move($nbi_desc_wr[3], 0x3000)
@@ -862,13 +860,13 @@ move($nbi_desc_wr[5], 0)
 move($nbi_desc_wr[6], 0)
 move($nbi_desc_wr[7], 0xe03fffff)
 
-move(expected[0], 0x3fffff7)
-move(expected[1], 0xffffffff)
+move(expected[0], 0x3ff00f7)
+move(expected[1], 0xbfffffff)
 move(expected[2], 0x83ff0088)
 move(expected[3], 0xffff0100)
 move(expected[4], 0x00000000)
 move(expected[5], 0xfeffffff)
-move(expected[6], 0xff800000)
+move(expected[6], 0x00000000)
 move(expected[7], 0)
 
 
@@ -882,7 +880,8 @@ move(loop_cntr, 1)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, drop#, fail#)
+    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
     br[test_fail#] // should always get error, so should never get here
 
@@ -909,8 +908,6 @@ error_expected_ret2#:
 
 .endw
 
-
-
 test_pass()
 
 
@@ -935,4 +932,3 @@ fail#:
 test_fail#:
 
 test_fail()
-

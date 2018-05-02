@@ -17,6 +17,7 @@
 .reg i
 .reg tmp1, tmp2
 .reg daddr
+.reg mtu
 .reg value
 .reg pkt_no
 .reg drop_flag
@@ -24,6 +25,7 @@
 .reg volatile read $nfd_desc[NFD_IN_META_SIZE_LW]
 .xfer_order $nfd_desc
 
+ move(mtu, 6000)
  move(daddr, 0x00)
  move(i,0)
 
@@ -98,14 +100,14 @@
     .endif
 
     // lword 6
-    alu[tmp1, $nfd_desc[0], AND, 0x7f] // qid
+    alu[tmp1, $nfd_desc[0], AND, 0xff] // qid
     alu[exp[6], --, B, tmp1, <<23]
+    alu[tmp1, --, B, tmp1, <<6] //(NIC_MAX_INSTR * 4)
+    pv_set_ingress_queue__sz1(pkt_vec, tmp1, 64)
+    pv_init_nfd(pkt_vec, pkt_no, $nfd_desc, mtu, error#, error#)
 
     // lword 7
     move(exp[7], 0)
-
-
-    pv_init_nfd(pkt_vec, pkt_no, $nfd_desc, error#)
 
     .if ( drop_flag )
         test_assert_equal(i, 0xfe)
@@ -130,7 +132,9 @@
 
         #define_eval _PV_TEST_EXPECT 'exp[/**/_PV_TEST_LOOP/**/]'
 
+        #pragma warning(disable:4701)
         test_assert_equal(value, _PV_TEST_EXPECT)
+        #pragma warning(default:4701)
 
         #define_eval _PV_TEST_LOOP (_PV_TEST_LOOP + 1)
 

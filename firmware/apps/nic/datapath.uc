@@ -13,6 +13,8 @@
 #include "actions.uc"
 #include "pkt_io.uc"
 
+.reg act_addr
+
 pv_init(pkt_vec, 0)
 
 // kick off processing loop
@@ -26,8 +28,8 @@ egress#:
     pkt_io_reorder(pkt_vec)
 
 ingress#:
-    pkt_io_rx(pkt_vec)
-    actions_load(pkt_vec)
+    pkt_io_rx(act_addr, pkt_vec)
+    actions_load(pkt_vec, act_addr)
 
 actions#:
     actions_execute(pkt_vec, egress#)

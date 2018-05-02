@@ -70,6 +70,14 @@ nfd_out_send_init()
 #endm
 
 
+#macro pkt_io_rx_host(io_vec, in_mtu, ERROR_MTU_LABEL, ERROR_PCI_LABEL)
+    #pragma warning(push)
+    #pragma warning(disable:5009) // rx_host is only invoked when $__pkt_io_nfd_desc ready
+    pv_init_nfd(io_vec, __pkt_io_nfd_pkt_no, $__pkt_io_nfd_desc, in_mtu, ERROR_MTU_LABEL, ERROR_PCI_LABEL)
+    #pragma warning(pop)
+#endm
+
+
 #macro pkt_io_tx_host(in_pkt_vec, egress_q_base, IN_LABEL)
 .begin
     pv_acquire_nfd_credit(in_pkt_vec, egress_q_base, drop_buf_pci#)
@@ -81,6 +89,13 @@ drop_buf_pci#:
 .end
 #endm
 
+
+#macro pkt_io_rx_wire(io_vec, in_mtu, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+    #pragma warning(push)
+    #pragma warning(disable:5009) // rx_wire is only invoked when $__pkt_io_nbi_desc ready
+    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, in_mtu, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+    #pragma warning(pop)
+#endm
 
 #macro pkt_io_tx_wire(in_pkt_vec, egress_q_base, IN_LABEL)
 .begin
@@ -144,7 +159,7 @@ consume_quiesce_sig#:
 #endm
 
 
-#macro pkt_io_rx(io_vec)
+#macro pkt_io_rx(out_act_addr, io_vec)
     br_bclr[BF_AL(io_vec, PV_QUEUE_IN_TYPE_bf), nfd_dispatch#] // previous packet was NFD, dispatch another
 
 nbi_dispatch#:
@@ -160,19 +175,10 @@ clear_sig_rx_nfd#:
     br_!signal[__pkt_io_sig_nfd, clear_sig_rx_nbi#] // __pkt_io_sig_nbi is asserted
 
 rx_nfd#:
-    pv_init_nfd(io_vec, __pkt_io_nfd_pkt_no, $__pkt_io_nfd_desc, error_nfd#)
-    br[end#]
-
-error_nfd#:
-    pv_stats_update(io_vec, TX_ERROR_PCI, drop#)
-
-drop_proto#:
-    // invalid protocols have no sequencer, must not go to reorder
-    pkt_io_drop(pkt_vec)
-    pv_stats_update(pkt_vec, RX_DISCARD_PROTO, ingress#)
-
-error_parse#:
-    pv_stats_update(pkt_vec, RX_ERROR_PARSE, drop#)
+    br[end#], defer[2]
+        passert(NIC_CFG_INSTR_TBL_ADDR, "EQ", 0)
+        alu[out_act_addr, 0xff, AND, BF_A($__pkt_io_nfd_desc, NFD_IN_QID_fld)]
+        alu[out_act_addr, --, B, out_act_addr, <<(log2(NIC_MAX_INSTR * 4))]
 
 quiesce_nbi#:
     __pkt_io_quiesce_wait_active(NBI, nbi_dispatch#, nfd, rx_nfd#, quiescence#)
@@ -197,7 +203,9 @@ clear_sig_rx_nbi#:
     br_!signal[__pkt_io_sig_nbi, clear_sig_rx_nfd#] // __pkt_io_sig_nfd is asserted
 
 rx_nbi#:
-    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, drop_proto#, error_parse#)
+    passert(NIC_CFG_INSTR_TBL_ADDR, "EQ", 0)
+    dbl_shf[out_act_addr, 1, BF_A($__pkt_io_nbi_desc, CAT_PORT_bf), >>BF_L(CAT_PORT_bf)] ; CAT_PORT_bf
+    alu[out_act_addr, --, B, out_act_addr, <<(log2(NIC_MAX_INSTR * 4))]
 
 end#:
 #endm
