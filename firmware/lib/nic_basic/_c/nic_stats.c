@@ -349,7 +349,7 @@ __forceinline static void vnic_stats_accumulate()
 	    _vnic_stats.rx_errors += delta;
 
 	    delta = _mac_drops[port].tx_discards - _vnic_stats.tx_discard_mac_pkts;
-	    _vnic_stats.tx_discard_mac_pkts = delta;
+	    _vnic_stats.tx_discard_mac_pkts += delta;
 	    _vnic_stats.tx_discards += delta;
 
 	    delta = _mac_drops[port].tx_errors - _vnic_stats.tx_error_mac_pkts;
