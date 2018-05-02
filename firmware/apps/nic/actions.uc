@@ -54,6 +54,7 @@
     __actions_read(out_data, --, --)
 #endm
 
+
 #macro __actions_read()
     __actions_read(--, --, --)
 #endm
@@ -72,14 +73,24 @@
 #endm
 
 
-#macro __actions_check_mtu(in_pkt_vec, DROP_LABEL)
+#macro __actions_rx_wire(out_pkt_vec, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
 .begin
-    .reg mask
     .reg mtu
-    .reg pkt_len
 
     __actions_read(mtu, 0xffff)
-    pv_check_mtu(in_pkt_vec, mtu, DROP_LABEL)
+    pkt_io_rx_wire(out_pkt_vec, mtu, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+    __actions_restore_t_idx()
+.end
+#endm
+
+
+#macro __actions_rx_host(out_pkt_vec, ERROR_MTU_LABEL, ERROR_PCI_LABEL)
+.begin
+    .reg mtu
+
+    __actions_read(mtu, 0xffff)
+    pkt_io_rx_host(out_pkt_vec, mtu, ERROR_MTU_LABEL, ERROR_PCI_LABEL)
+    __actions_restore_t_idx()
 .end
 #endm
 
@@ -341,19 +352,17 @@ skip_checksum#:
 #endm
 
 
-#macro actions_load(in_pkt_vec)
+#macro actions_load(io_pkt_vec, in_addr)
 .begin
-    .reg addr
     .sig sig_actions
 
-    pv_get_instr_addr(addr, in_pkt_vec, (NIC_MAX_INSTR * 4))
     ov_start(OV_LENGTH)
     ov_set_use(OV_LENGTH, 16, OVF_SUBTRACT_ONE)
     ov_clean()
-    cls[read, $__actions[0], 0, addr, max_16], indirect_ref, defer[2], ctx_swap[sig_actions]
+    cls[read, $__actions[0], 0, in_addr, max_16], indirect_ref, defer[2], ctx_swap[sig_actions]
         .reg_addr __actions_t_idx 28 B
         alu[__actions_t_idx, t_idx_ctx, OR, &$__actions[0], <<2]
-        nop
+        pv_set_ingress_queue__sz1(io_pkt_vec, in_addr, (NIC_MAX_INSTR * 4))
 
     local_csr_wr[T_INDEX, __actions_t_idx]
     nop
@@ -363,7 +372,7 @@ skip_checksum#:
 #endm
 
 
-#macro actions_execute(in_pkt_vec, EGRESS_LABEL)
+#macro actions_execute(io_pkt_vec, EGRESS_LABEL)
 .begin
     .reg ebpf_addr
     .reg jump_idx
@@ -371,61 +380,80 @@ skip_checksum#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#] ;actions_jump
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#]
 
     ins_0#: br[drop_act#]
-    ins_1#: br[mtu#]
+    ins_1#: br[rx_wire#]
     ins_2#: br[mac#]
     ins_3#: br[rss#]
     ins_4#: br[checksum_complete#]
     ins_5#: br[tx_host#]
-    ins_6#: br[tx_wire#]
-    ins_7#: br[cmsg#]
-    ins_8#: br[ebpf#]
-    ins_9#: br[rxcsum#]
+    ins_6#: br[rx_host#]
+    ins_7#: br[tx_wire#]
+    ins_8#: br[cmsg#]
+    ins_9#: br[ebpf#]
+    ins_10#: br[rxcsum#]
+
+drop_proto#:
+    // invalid protocols have no sequencer, must not go to reorder
+    pkt_io_drop(pkt_vec)
+    pv_stats_update(io_pkt_vec, RX_DISCARD_PROTO, ingress#)
+
+error_parse#:
+    pv_stats_update(io_pkt_vec, RX_ERROR_PARSE, drop#)
+
+error_pci#:
+    pv_stats_update(io_pkt_vec, TX_ERROR_PCI, drop#)
+
+error_mtu#:
+    pv_stats_update(io_pkt_vec, TX_ERROR_MTU, drop#)
 
 drop_mtu#:
-    pv_stats_update(pkt_vec, RX_DISCARD_MTU, drop#)
+    pv_stats_update(io_pkt_vec, RX_DISCARD_MTU, drop#)
 
 drop_addr#:
-    pv_stats_update(pkt_vec, RX_DISCARD_ADDR, drop#)
+    pv_stats_update(io_pkt_vec, RX_DISCARD_ADDR, drop#)
 
 drop_act#:
-    pv_stats_update(in_pkt_vec, RX_DISCARD_ACT, drop#)
+    pv_stats_update(io_pkt_vec, RX_DISCARD_ACT, drop#)
 
-mtu#:
-    __actions_check_mtu(in_pkt_vec, drop_mtu#)
+rx_wire#:
+    __actions_rx_wire(io_pkt_vec, drop_mtu#, drop_proto#, error_parse#)
     __actions_next()
 
 mac#:
-    __actions_check_mac(in_pkt_vec, drop_addr#)
+    __actions_check_mac(io_pkt_vec, drop_addr#)
     __actions_next()
 
 rss#:
-    __actions_rss(in_pkt_vec)
+    __actions_rss(io_pkt_vec)
     __actions_next()
 
 checksum_complete#:
-    __actions_checksum_complete(in_pkt_vec)
+    __actions_checksum_complete(io_pkt_vec)
     __actions_next()
 
 tx_host#:
     __actions_read(egress_q_base, 0xffff)
-    pkt_io_tx_host(in_pkt_vec, egress_q_base, EGRESS_LABEL)
+    pkt_io_tx_host(io_pkt_vec, egress_q_base, EGRESS_LABEL)
+
+rx_host#:
+    __actions_rx_host(io_pkt_vec, error_mtu#, error_pci#)
+    __actions_next()
 
 tx_wire#:
     __actions_read(egress_q_base, 0xffff)
-    pkt_io_tx_wire(in_pkt_vec, egress_q_base, EGRESS_LABEL)
+    pkt_io_tx_wire(io_pkt_vec, egress_q_base, EGRESS_LABEL)
 
 cmsg#:
-    cmsg_desc_workq($__pkt_io_gro_meta, in_pkt_vec, EGRESS_LABEL)
+    cmsg_desc_workq($__pkt_io_gro_meta, io_pkt_vec, EGRESS_LABEL)
 
 ebpf#:
     __actions_read(ebpf_addr, 0xffff)
-    ebpf_call(in_pkt_vec, ebpf_addr)
+    ebpf_call(io_pkt_vec, ebpf_addr)
 
 rxcsum#:
-    __actions_rxcsum(in_pkt_vec)
+    __actions_rxcsum(io_pkt_vec)
     br[next#] // last instruction in code will not pipe
 
 .end

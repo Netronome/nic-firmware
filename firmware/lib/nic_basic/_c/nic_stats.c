@@ -315,12 +315,6 @@ __forceinline static void vnic_stats_accumulate()
 
 	    /* RX is TX for these PCIe queue exceptions */
 	    if (queue < (1 << 8)) {
-		vnic_stats_remap(&_vnic_stats.tx_error_mtu_pkts, &_vnic_stats.tx_errors,
-				 &_vnic_stats.rx_discard_mtu_pkts, &_vnic_stats.rx_discards);
-
-		vnic_stats_remap(&_vnic_stats.tx_error_mtu_bytes, &_vnic_stats.tx_errors,
-				 &_vnic_stats.rx_discard_mtu_bytes, &_vnic_stats.rx_discards);
-
 		vnic_stats_remap(&_vnic_stats.tx_discard_act_pkts, &_vnic_stats.tx_discards,
 				 &_vnic_stats.rx_discard_act_pkts, &_vnic_stats.rx_discards);
 
