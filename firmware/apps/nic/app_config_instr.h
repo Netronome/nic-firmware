@@ -62,11 +62,12 @@
  */
 enum instruction_type {
     INSTR_TX_DROP = 0,
-    INSTR_MTU,
+    INSTR_RX_WIRE,
     INSTR_MAC,
     INSTR_RSS,
     INSTR_CHECKSUM_COMPLETE,
     INSTR_TX_HOST,
+    INSTR_RX_HOST,
     INSTR_TX_WIRE,
     INSTR_CMSG,
     INSTR_EBPF,

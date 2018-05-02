@@ -258,10 +258,9 @@
 #endm
 
 
-#macro pv_get_instr_addr(out_addr, in_vec, IN_LIST_SIZE)
-    passert(NIC_CFG_INSTR_TBL_ADDR, "EQ", 0)
-    passert(IN_LIST_SIZE, "POWER_OF_2")
-    alu[out_addr, (IN_LIST_SIZE - 1), ~AND, BF_A(in_vec, PV_QUEUE_IN_bf), >>(BF_L(PV_QUEUE_IN_bf) - log2(IN_LIST_SIZE))]
+#macro pv_set_ingress_queue__sz1(out_pkt_vec, in_addr, IN_SIZE)
+    passert(IN_SIZE, "POWER_OF_2")
+    alu[BF_A(out_pkt_vec, PV_QUEUE_IN_bf), --, B, in_addr, <<(BF_L(PV_QUEUE_IN_bf) - log2(IN_SIZE))]
 #endm
 
 
@@ -432,7 +431,7 @@ nbi#:
 #endm
 
 
-#macro pv_check_mtu(in_vec, in_mtu, FAIL_LABEL)
+#macro __pv_mtu_check(in_vec, in_mtu, FAIL_LABEL)
 .begin
     .reg max_vlan
     .reg len
@@ -809,7 +808,7 @@ end#:
 #define MAC_PARSE_VLAN_bf               MAC_PARSE_wrd, 17, 16
 #define MAC_CSUM_bf                     MAC_PARSE_wrd, 15, 0
 
-#macro pv_init_nbi(out_vec, in_nbi_desc, DROP_LABEL, ERROR_LABEL)
+#macro pv_init_nbi(out_vec, in_nbi_desc, in_mtu, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
 .begin
     .reg cbs
     .reg dst_mac_bc
@@ -885,9 +884,6 @@ store_l4_offset#:
     alu[BF_A(out_vec, PV_PARSE_L4_OFFSET_bf), BF_A(out_vec, PV_PARSE_L4_OFFSET_bf), OR, l4_offset, <<BF_L(PV_PARSE_L4_OFFSET_bf)]
 
 skip_l4_offset#:
-    dbl_shf[BF_A(out_vec, PV_QUEUE_IN_bf), 1, BF_A(in_nbi_desc, CAT_PORT_bf), >>BF_L(CAT_PORT_bf)] ; CAT_PORT_bf
-    alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(out_vec, PV_QUEUE_IN_bf), <<BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
-
     // error checks after metadata is populated (will need for drop)
     #ifdef PARANOIA // should never happen, Catamaran is buggy if it does
        br_bset[BF_AL(in_nbi_desc, CAT_VALID_bf), valid#] ; CAT_VALID_bf
@@ -900,11 +896,13 @@ skip_l4_offset#:
     __pv_get_mac_dst_type(mac_dst_type, out_vec)
     alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), --, B, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
 
+    __pv_mtu_check(out_vec, in_mtu, DROP_MTU_LABEL)
+
     alu[--, BF_MASK(CAT_SEQ_CTX_bf), AND, BF_A(in_nbi_desc, CAT_SEQ_CTX_bf), >>BF_L(CAT_SEQ_CTX_bf)] ; CAT_SEQ_CTX_bf
-    beq[DROP_LABEL] // drop without releasing sequence number for sequencer zero (errored packets are expected here)
+    beq[DROP_PROTO_LABEL] // drop without releasing sequence number for sequencer zero (errored packets are expected here)
 
     alu[--, BF_MASK(CAT_ERRORS_bf), AND, BF_A(in_nbi_desc, CAT_ERRORS_bf), >>BF_L(CAT_ERRORS_bf)] ; CAT_ERRORS_bf
-    bne[ERROR_LABEL] // catch any other errors we miss (these appear to have valid sequence numbers)
+    bne[ERROR_PARSE_LABEL] // catch any other errors we miss (these appear to have valid sequence numbers)
 
 .end
 #endm
@@ -1037,7 +1035,7 @@ end#:
 #define NFD_IN_LSO_L4_OFFS_fld      3, 15, 8
 
 
-#macro pv_init_nfd(out_vec, in_pkt_num, in_nfd_desc, ERROR_LABEL)
+#macro pv_init_nfd(out_vec, in_pkt_num, in_nfd_desc, in_mtu, ERROR_MTU_LABEL, ERROR_PCI_LABEL)
 .begin
     .reg addr_hi
     .reg addr_lo
@@ -1100,12 +1098,11 @@ end#:
     bitfield_extract__sz1(udp_csum, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
     alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_A(out_vec, PV_CSUM_OFFLOAD_bf), OR, udp_csum] ; PV_CSUM_OFFLOAD_bf
 
-    alu[BF_A(out_vec, PV_QUEUE_IN_bf), 0xff, AND, BF_A(in_nfd_desc, NFD_IN_QID_fld)]
-    alu[BF_A(out_vec, PV_QUEUE_IN_bf), --, B, BF_A(out_vec, PV_QUEUE_IN_bf), <<BF_L(PV_QUEUE_IN_bf)]
-
     // error checks near end to ensure consistent metadata (fields written below excluded) and buffer allocation
     // state (contents of CTM also excluded) in drop path
-    br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), ERROR_LABEL]
+    br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), ERROR_PCI_LABEL]
+
+    __pv_mtu_check(out_vec, in_mtu, ERROR_MTU_LABEL)
 
     pkt_buf_copy_mu_head_to_ctm(in_pkt_num, BF_A(out_vec, PV_MU_ADDR_bf), NFD_IN_DATA_OFFSET, 1)
 

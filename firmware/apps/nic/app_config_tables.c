@@ -501,14 +501,14 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     /* mtu */
     mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU), sizeof(mtu));
 #ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_MTU];
+    instr[count].instr = instr_tbl[INSTR_RX_HOST];
 #else
-    instr[count].instr = INSTR_MTU;
+    instr[count].instr = INSTR_RX_HOST;
 #endif
     // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
     instr[count].param = mtu + NET_ETH_LEN + 1;
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_MTU);
-    prev_instr = INSTR_MTU;
+    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_HOST);
+    prev_instr = INSTR_RX_HOST;
 
     /* tx wire */
 #ifdef GEN_INSTRUCTION
@@ -534,14 +534,14 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     reg_zero(instr, sizeof(instr));
 
 #ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_MTU];
+    instr[count].instr = instr_tbl[INSTR_RX_WIRE];
 #else
-    instr[count].instr = INSTR_MTU;
+    instr[count].instr = INSTR_RX_WIRE;
 #endif
     // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
     instr[count].param = mtu + NET_ETH_LEN + 1;
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_MTU);
-    prev_instr = INSTR_MTU;
+    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_WIRE);
+    prev_instr = INSTR_RX_WIRE;
 
     if (!(control & NFP_NET_CFG_CTRL_PROMISC)) {
         /* MAC address */
