@@ -37,6 +37,7 @@ nfd_out_send_init()
 .sig volatile __pkt_io_sig_nbi
 .addr __pkt_io_sig_nbi 9
 .reg volatile read $__pkt_io_nbi_desc[(NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))]
+.addr $__pkt_io_nbi_desc[0] 52
 .xfer_order $__pkt_io_nbi_desc
 
 .reg volatile __pkt_io_nfd_pkt_no
@@ -48,6 +49,7 @@ nfd_out_send_init()
 .set_sig __pkt_io_sig_nfd_retry
 .addr __pkt_io_sig_nfd_retry 11
 .reg volatile read $__pkt_io_nfd_desc[NFD_IN_META_SIZE_LW]
+.addr $__pkt_io_nfd_desc[0] 48
 .xfer_order $__pkt_io_nfd_desc
 
 #define __PKT_IO_QUIESCE_NBI 1
