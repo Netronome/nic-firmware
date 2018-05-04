@@ -239,7 +239,7 @@
     alu[BF_A(io_vec, PV_TX_FLAGS_bf), BF_A(io_vec, PV_TX_FLAGS_bf), OR, 1, <<flag]
 #endm
 
-#macro pv_set_queue_offset(io_vec, in_queue)
+#macro pv_set_queue_offset__sz1(io_vec, in_queue)
     ld_field[BF_A(io_vec, PV_QUEUE_OFFSET_bf), 0001, in_queue] ; PV_QUEUE_OFFSET_bf
 #endm
 
