@@ -167,8 +167,10 @@ queue_selected#:
     alu[max_queue, key, AND, 0x3f]
     bitfield_extract__sz1(queue, BF_AML(in_pkt_vec, PV_QUEUE_OFFSET_bf))
     alu[--, max_queue, -, queue]
-    bmi[begin#]
-    br[end#]
+    bhs[end#]
+
+    br[begin#], defer[1]
+        pv_set_queue_offset__sz1(in_pkt_vec, 0)
 
 process_l4#:
     bitfield_extract__sz1(parse_status, BF_AML(in_pkt_vec, PV_PARSE_STS_bf))
@@ -221,7 +223,7 @@ skip_meta_type#:
         alu[queue_shf, 0x18, AND, hash, <<3]
         alu[--, queue_shf, OR, 0]
     alu[queue, 0xff, AND, *n$index, >>indirect]
-    pv_set_queue_offset(in_pkt_vec, queue)
+    pv_set_queue_offset__sz1(in_pkt_vec, queue)
 
 end#:
 .end
