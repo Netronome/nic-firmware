@@ -464,9 +464,10 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     __xread uint32_t nic_mac[2];
     __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
     __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
+    __xread uint32_t rx_rings[2];
     __lmem union instruction_format instr[NIC_MAX_INSTR];
     SIGNAL sig1, sig2;
-    uint32_t rss_flags;
+    uint32_t rss_flags, rss_rings;
     uint32_t rss_tbl_nnidx;
     uint32_t byte_off;
     uint32_t count;
@@ -587,6 +588,8 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
                 sig_done, &sig2);
         wait_for_all(&sig1, &sig2);
 
+        mem_read64(rx_rings, (__mem void*)(bar_base + NFP_NET_CFG_RXRS_ENABLE), sizeof(uint64_t));
+        rss_rings = (~rx_rings[0]) ? ffs(~rx_rings[0]) : 32 + ffs(~rx_rings[1]);
         rss_flags = extract_rss_flags(rss_ctrl[0]);
 
 #ifdef GEN_INSTRUCTION
@@ -601,8 +604,8 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
         instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RSS);
         prev_instr = INSTR_RSS;
 
-        /* RSS key: provide rss key with hash. Use only first word */
-        instr[count++].value = rss_key[0];
+        /* RSS key: provide rss key with hash. Use only first 26 bits */
+        instr[count++].value = (rss_key[0] & ~0x3fu) | (rss_rings - 1);
     }
 
     if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {
