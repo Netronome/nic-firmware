@@ -72,8 +72,8 @@
 
 
 #macro ebpf_init_cap_empty(type)
-    #define_eval __EBPF_CAP_DATA '__EBPF_CAP_DATA,(type)'
-    #define_eval __EBPF_CAP_LENGTH (__EBPF_CAP_LENGTH + 4)
+    #define_eval __EBPF_CAP_DATA '__EBPF_CAP_DATA,(type),0'
+    #define_eval __EBPF_CAP_LENGTH (__EBPF_CAP_LENGTH + 8)
 #endm
 
 #macro ebpf_init_cap_finalize()
