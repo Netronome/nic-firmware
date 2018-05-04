@@ -55,9 +55,9 @@
  *    2  |A|    0    |   Packet Number   |  0  |         Offset          |
  *       +-+---------+-------------------+-----+---------+-+-------------+
  *    3  |        Sequence Number        |  0  | Seq Ctx |0| Meta Length |
- *       +-------------------------------+---+-+---------+-+-+---+-+-+-+-+
- *    4  |         TX Host Flags         | 0 |Seek (64B algn)|Rsv|M|B|C|c|
- *       +-----+-------------+---+---+---+---+---------------+---+-+-+-+-+
+ *       +-------------------------------+---+-+---------+-+-+-+-+-+-+-+-+
+ *    4  |         TX Host Flags         | 0 |Seek (64B algn)|R|Q|M|B|C|c|
+ *       +-----+-------------+---+---+---+---+---------------+-+-+-+-+-+-+
  *    5  |P_STS|L4Offset (2B)|L3I|MPD|VLD|           Checksum            |
  *       +-----+-----------+-+---+---+---+---------------+---------------+
  *    6  |  Ingress Queue  |          Reserved           | Queue Offset  |
@@ -72,9 +72,9 @@
  * A     - 1 if CTM buffer is allocated (ie. packet number and CTM address valid)
  * CBS   - CTM Buffer Size
  * BLS   - Buffer List
- * Q     - work Queue source (0 = NFD, 1 = NBI)
- * B     - dest MAC is broadcast
+ * Q     - Queue offset selected (overrides RSS)
  * M     - dest MAC is multicast
+ * B     - dest MAC is broadcast
  * C     - Enable MAC offload of L3 checksum
  * c     - Enable MAC offload of L4 checksum
  * P_STS - Parse Status
@@ -149,6 +149,7 @@
 #define PV_TX_HOST_UDP_bf               PV_FLAGS_wrd, 18, 18
 #define PV_TX_HOST_CSUM_UDP_OK_bf       PV_FLAGS_wrd, 17, 17
 #define PV_SEEK_BASE_bf                 PV_FLAGS_wrd, 13, 6
+#define PV_QUEUE_SELECTED_bf            PV_FLAGS_wrd, 4, 4
 #define PV_MAC_DST_TYPE_bf              PV_FLAGS_wrd, 3, 2
 #define PV_MAC_DST_MC_bf                PV_FLAGS_wrd, 3, 3
 #define PV_MAC_DST_BC_bf                PV_FLAGS_wrd, 2, 2
@@ -238,12 +239,8 @@
     alu[BF_A(io_vec, PV_TX_FLAGS_bf), BF_A(io_vec, PV_TX_FLAGS_bf), OR, 1, <<flag]
 #endm
 
-#macro pv_set_queue_offset(io_vec, in_delta)
-    #ifdef PARANOIA
-        alu[BF_A(io_vec, PV_QUEUE_OFFSET_bf), BF(io_vec, PV_QUEUE_OFFSET_bf), AND~, BF_MASK(PV_QUEUE_OFFSET_bf)]
-        alu[in_delta, in_delta, AND, BF_MASK(PV_QUEUE_OFFSET_bf)]
-    #endif
-    alu[BF_A(io_vec, PV_QUEUE_OFFSET_bf), BF_A(io_vec, PV_QUEUE_OFFSET_bf), OR, in_delta]
+#macro pv_set_queue_offset(io_vec, in_queue)
+    ld_field[BF_A(io_vec, PV_QUEUE_OFFSET_bf), 0001, in_queue] ; PV_QUEUE_OFFSET_bf
 #endm
 
 

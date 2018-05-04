@@ -106,6 +106,7 @@ pass#:
     .reg l3_info
     .reg l3_offset
     .reg l4_offset
+    .reg max_queue
     .reg opcode
     .reg parse_status
     .reg pkt_type // 0 - IPV6_TCP, 1 - IPV6_UDP, 2 - IPV4_TCP, 3 - IPV4_UDP
@@ -118,16 +119,19 @@ pass#:
     __actions_read(opcode, --, --)
     __actions_read(key, --, --)
 
+    br_bset[BF_AL(in_pkt_vec, PV_QUEUE_SELECTED_bf), queue_selected#]
+
+begin#:
     // skip RSS for unkown L3
     bitfield_extract__sz1(l3_info, BF_AML(in_pkt_vec, PV_PARSE_L3I_bf))
-    beq[skip_rss#]
+    beq[end#]
 
     // skip RSS for MPLS
     bitfield_extract__sz1(--, BF_AML(in_pkt_vec, PV_PARSE_MPD_bf))
-    bne[skip_rss#]
+    bne[end#]
 
     // skip RSS for 2 or more VLANs (Catamaran L4 offsets unreliable)
-    br_bset[BF_A(in_pkt_vec, PV_PARSE_VLD_bf), BF_M(PV_PARSE_VLD_bf), skip_rss#]
+    br_bset[BF_A(in_pkt_vec, PV_PARSE_VLD_bf), BF_M(PV_PARSE_VLD_bf), end#]
 
     local_csr_wr[CRC_REMAINDER, key]
 
@@ -149,12 +153,22 @@ pass#:
 
     // hash 5 more words for IPv6
     #define_eval LOOP (0)
-    #while (LOOP < 5)
+    #while (LOOP < 4)
         nop
         crc_be[crc_32, --, *$index++]
         #define_eval LOOP (LOOP + 1)
     #endloop
     #undef LOOP
+
+    br[process_l4#], defer[1]
+        crc_be[crc_32, --, *$index++]
+
+queue_selected#:
+    alu[max_queue, key, AND, 0x3f]
+    bitfield_extract__sz1(queue, BF_AML(in_pkt_vec, PV_QUEUE_OFFSET_bf))
+    alu[--, max_queue, -, queue]
+    bmi[begin#]
+    br[end#]
 
 process_l4#:
     bitfield_extract__sz1(parse_status, BF_AML(in_pkt_vec, PV_PARSE_STS_bf))
@@ -209,7 +223,7 @@ skip_meta_type#:
     alu[queue, 0xff, AND, *n$index, >>indirect]
     pv_set_queue_offset(in_pkt_vec, queue)
 
-skip_rss#:
+end#:
 .end
 #endm
 
