@@ -47,7 +47,9 @@ local_csr_rd[CTX_ENABLES]
 immed[ctxs, 0]
 alu[ctxs, ctxs, AND~, 0x7]
 alu[ctxs, ctxs, OR, 0x2]
+alu[ctxs, ctxs, OR, 1, <<30]
 local_csr_wr[CTX_ENABLES, ctxs]
+local_csr_wr[PSEUDO_RANDOM_NUMBER, 42]
 
 // cache the context bits for T_INDEX
 .reg volatile t_idx_ctx
