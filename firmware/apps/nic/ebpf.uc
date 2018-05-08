@@ -91,12 +91,12 @@
 #endm
 
 
+ebpf_init_cap_empty(NFP_BPF_CAP_TYPE_RANDOM)
+ebpf_init_cap_empty(NFP_BPF_CAP_TYPE_QUEUE_SELECT)
 ebpf_init_cap_adjust_head(EBPF_CAP_ADJUST_HEAD_FLAG_NO_META, 44, 248, 84, 112)
 ebpf_init_cap_maps(((1 << BPF_MAP_TYPE_HASH)+(1<<BPF_MAP_TYPE_ARRAY)), HASHMAP_MAX_TID_EBPF, HASHMAP_TOTAL_ENTRIES, HASHMAP_MAX_KEYS_SZ, HASHMAP_MAX_VALU_SZ, \
                    (HASHMAP_KEYS_VALU_SZ))
 ebpf_init_cap_func(EBPF_CAP_FUNC_ID_LOOKUP, HTAB_MAP_LOOKUP_SUBROUTINE#)
-ebpf_init_cap_empty(NFP_BPF_CAP_TYPE_RANDOM)
-ebpf_init_cap_empty(NFP_BPF_CAP_TYPE_QUEUE_SELECT)
 ebpf_init_cap_finalize()
 
 #define EBPF_STACK_SIZE 512
