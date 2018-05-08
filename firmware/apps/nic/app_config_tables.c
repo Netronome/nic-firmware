@@ -569,14 +569,14 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     }
 
     /* RSS */
-    if (control & NFP_NET_CFG_CTRL_RSS_ANY) {
+    if (control & NFP_NET_CFG_CTRL_RSS_ANY || control & NFP_NET_CFG_CTRL_BPF) {
 
         /* RSS remapping table with NN register index as start offset */
         rss_tbl_nnidx = vnic * NFP_NET_CFG_RSS_ITBL_SZ_wrd;
 
         /* Udate the RSS NN table but only if RSS has changed
         * If vnic_port x write at x*32 NN register */
-        if (update & NFP_NET_CFG_UPDATE_RSS) {
+        if (update & NFP_NET_CFG_UPDATE_RSS || update & NFP_NET_CFG_CTRL_BPF) {
             upd_rss_table(rss_tbl_nnidx, bar_base, vnic);
         }
 
