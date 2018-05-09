@@ -53,42 +53,62 @@
  *    1  |S|CBS|           MU Buffer Address [39:11]                     |
  *       +-+---+-----+-------------------+-----+-------------------------+
  *    2  |A|    0    |   Packet Number   |  0  |         Offset          |
- *       +-+---------+-------------------+-----+---------+-+-------------+
- *    3  |        Sequence Number        |  0  | Seq Ctx |0| Meta Length |
- *       +-------------------------------+---+-+---------+-+-+-+-+-+-+-+-+
+ *       +-+---------+-------------------+-----+---------+---------------+
+ *    3  |        Sequence Number        |  0  | Seq Ctx |   Protocol    |
+ *       +-------------------------------+---+-+---------+---+-+-+-+-+-+-+
  *    4  |         TX Host Flags         | 0 |Seek (64B algn)|R|Q|M|B|C|c|
- *       +-----+-------------+---+---+---+---+---------------+-+-+-+-+-+-+
- *    5  |P_STS|L4Offset (2B)|L3I|MPD|VLD|           Checksum            |
- *       +-----+-----------+-+---+---+---+---------------+---------------+
- *    6  |  Ingress Queue  |          Reserved           | Queue Offset  |
- *       +-----------------+-----------------------------+---------------+
+ *       +-------------------------------+---+---------------+-+-+-+-+-+-+
+ *    5  |       8B Header Offsets (stacked outermost to innermost)      |
+ *       +-----------------+-------------+---------------+---------------+
+ *    6  |  Ingress Queue  | Meta Length |   Reserved    | Queue Offset  |
+ *       +-----------------+-------------+---------------+---------------+
  *    7  |                    Metadata Type Fields                       |
  *       +---------------------------------------------------------------+
  *    8  |             Original Packet Length (if from host)             |
  *       +---------------------------------------------------------------+
+ *    9  |                           Reserved                            |
+ *       +-----+-+-+-+-+-+-+-+---+---+---+-------------------------------+
+ *   10  |P_STS|M|E|A|F|D|R|H|L3I|MPD|VLD|           Checksum            |
+ *       +-----+-+-+-+-+-+-+-+---+---+---+-------------------------------+
  *
- * 0/1   - Intentional constants for efficient extraction and manipulation
+ * 0     - Intentionally zero for efficient extraction and manipulation
  * S     - Split packet
  * A     - 1 if CTM buffer is allocated (ie. packet number and CTM address valid)
  * CBS   - CTM Buffer Size
  * BLS   - Buffer List
  * Q     - Queue offset selected (overrides RSS)
+ * V     - One or more VLANs present
  * M     - dest MAC is multicast
  * B     - dest MAC is broadcast
  * C     - Enable MAC offload of L3 checksum
  * c     - Enable MAC offload of L4 checksum
- * P_STS - Parse Status
- *         (0 = no data,
- *          1 = ESP,
- *          2 = TCP CSUM OK,
- *          3 = TCP CSUM FAIL,
- *          4 = UDP CSUM OK,
- *          5 = UDP CSUM FAIL,
- *          6 = AH,
- *          7 = FRAG)
- * L3I   - MAC L3 Information (0 = unkown, 1 = IPv6, 2 = IPv4 CSUM FAIL, 3 = IPv4 OK)
- * MPD   - MPLS Tag Depth (3 = unknown)
- * VLD   - VLAN Tag Depth (3 = unknown)
+ *
+ * Protocol - Parsed Packet Type
+ *             0x00 - IPv6:TCP
+ *             0x01 - IPv6:UDP
+ *             0x02 - IPv4:TCP
+ *             0x03 - IPv4:UDP
+ *             0x04 - IPv6:Unknown
+ *             0x05 - IPv6:Fragment
+ *             0x06 - IPv4:Unknown
+ *             0x07 - IPv4:Fragment
+ *             0x20 - IPv6:UDP:VXLAN:IPv6:TCP
+ *             0x41 - IPv6:UDP:VXLAN:IPv6:UDP
+ *             0x42 - IPv6:UDP:VXLAN:IPv4:TCP
+ *             0x43 - IPV6:UDP:VXLAN:IPv4:UDP
+ *             0x44 - IPV6:UDP:VXLAN:IPv6:Unknown
+ *             0x45 - IPV6:UDP:VXLAN:IPv6:Fragment
+ *             0x46 - IPV6:UDP:VXLAN:IPv4:Unknown
+ *             0x47 - IPV6:UDP:VXLAN:IPv4:Fragment
+ *             0x60 - IPv4:UDP:VXLAN:IPv6:TCP
+ *             0x61 - IPv4:UDP:VXLAN:IPv6:UDP
+ *             0x62 - IPv4:UDP:VXLAN:IPv4:TCP
+ *             0x63 - IPV4:UDP:VXLAN:IPv4:UDP
+ *             0x64 - IPV4:UDP:VXLAN:IPv6:Unknown
+ *             0x65 - IPV4:UDP:VXLAN:IPv6:Fragment
+ *             0x66 - IPV4:UDP:VXLAN:IPv4:Unknown
+ *             0x67 - IPV4:UDP:VXLAN:IPv4:Fragment
+ *             0xff - Unknown (br=byte[])
  *
  * TX host flags:
  *       +-------------------------------+
@@ -135,7 +155,7 @@
 #define PV_SEQ_wrd                      3
 #define PV_SEQ_NO_bf                    PV_SEQ_wrd, 31, 16
 #define PV_SEQ_CTX_bf                   PV_SEQ_wrd, 12, 8
-#define PV_META_LENGTH_bf               PV_SEQ_wrd, 6, 0
+#define PV_PROTO_bf                     PV_SEQ_wrd, 7, 0
 
 #define PV_FLAGS_wrd                    4
 #define PV_TX_FLAGS_bf                  PV_FLAGS_wrd, 31, 16
@@ -157,13 +177,14 @@
 #define PV_CSUM_OFFLOAD_L3_bf           PV_FLAGS_wrd, 1, 1
 #define PV_CSUM_OFFLOAD_L4_bf           PV_FLAGS_wrd, 0, 0
 
-#define PV_PARSE_wrd                    5
-#define PV_PARSE_STS_bf                 PV_PARSE_wrd, 31, 29
-#define PV_PARSE_L4_OFFSET_bf           PV_PARSE_wrd, 28, 22
-#define PV_PARSE_L3I_bf                 PV_PARSE_wrd, 21, 20
-#define PV_PARSE_MPD_bf                 PV_PARSE_wrd, 19, 18
-#define PV_PARSE_VLD_bf                 PV_PARSE_wrd, 17, 16
-#define PV_CSUM_bf                      PV_PARSE_wrd, 15, 0
+#define PV_HEADER_STACK_wrd             5
+#define PV_HEADER_STACK_bf              PV_HEADER_STACK_wrd, 31, 0
+#define PV_HEADER_OFFSET_4_bf           PV_HEADER_STACK_wrd, 31, 24
+#define PV_HEADER_OFFSET_3_bf           PV_HEADER_STACK_wrd, 23, 16
+#define PV_HEADER_OFFSET_2_bf           PV_HEADER_STACK_wrd, 15, 8
+#define PV_HEADER_OFFSET_L3_bf          PV_HEADER_STACK_wrd, 15, 8
+#define PV_HEADER_OFFSET_1_bf           PV_HEADER_STACK_wrd, 7, 0
+#define PV_HEADER_OFFSET_L4_bf          PV_HEADER_STACK_wrd, 7, 0
 
 #define PV_QUEUE_wrd                    6
 #define PV_QUEUE_IN_bf                  PV_QUEUE_wrd, 31, 23
@@ -172,6 +193,7 @@
 #define PV_QUEUE_IN_NBI_PORT_bf         PV_QUEUE_wrd, 29, 23
 #define PV_QUEUE_IN_PCI_ISL_bf          PV_QUEUE_wrd, 30, 29
 #define PV_QUEUE_IN_PCI_Q_bf            PV_QUEUE_wrd, 28, 23
+#define PV_META_LENGTH_bf               PV_QUEUE_wrd, 22, 16
 #define PV_QUEUE_OFFSET_bf              PV_QUEUE_wrd, 7, 0
 
 #define PV_META_TYPES_wrd               7
@@ -180,7 +202,10 @@
 #define PV_ORIG_LENGTH_wrd              8
 #define PV_ORIG_LENGTH_bf               PV_ORIG_LENGTH_wrd, 13, 0
 
-#define_eval PV_NOT_PARSED              ((3 << BF_L(PV_PARSE_MPD_bf)) | (3 << BF_L(PV_PARSE_VLD_bf)))
+#define PV_CSUM_wrd                     10
+#define PV_CSUM_bf                      PV_CSUM_wrd, 15, 0
+#define PV_VLD_bf                       PV_CSUM_wrd, 17, 16
+#define PV_MPD_bf                       PV_CSUM_wrd, 19, 18
 
 #ifndef PV_GRO_NFD_START
     #define PV_GRO_NFD_START            4
@@ -250,7 +275,7 @@
 #endm
 
 
-#macro pv_meta_push_type(io_vec, in_type)
+#macro pv_meta_push_type__sz1(io_vec, in_type)
     alu[BF_A(io_vec, PV_META_TYPES_bf), in_type, OR, BF_A(io_vec, PV_META_TYPES_bf), <<4]
 #endm
 
@@ -261,10 +286,11 @@
     .reg meta_len
     .sig sig_meta
 
-    alu[BF_A(io_vec, PV_META_LENGTH_bf), BF_A(io_vec, PV_META_LENGTH_bf), +, in_length]
-    bitfield_extract__sz1(meta_len, BF_AML(io_vec, PV_META_LENGTH_bf))
-    alu[addr, BF_A(io_vec, PV_CTM_ADDR_bf), -, meta_len]
-    mem[write32, in_metadata, addr, 0, (in_length >> 2)], ctx_swap[sig_meta]
+    bitfield_extract__sz1(meta_len, BF_AML(io_vec, PV_META_LENGTH_bf)) ; PV_META_LENGTH_bf
+    alu[meta_len, meta_len, +, in_length]
+    alu[addr, BF_A(io_vec, PV_CTM_ADDR_bf), -, meta_len] ; PV_CTM_ADDR_bf
+    mem[write32, in_metadata, addr, 0, (in_length >> 2)], ctx_swap[sig_meta], defer[2]
+        bitfield_insert__sz2(BF_AML(io_vec, PV_META_LENGTH_bf), meta_len) ; PV_META_LENGTH_bf
 .end
 #endm
 
@@ -411,7 +437,7 @@ nbi#:
 #endm
 
 
-#macro __pv_mtu_check(in_vec, in_mtu, FAIL_LABEL)
+#macro __pv_mtu_check(in_vec, in_mtu, in_vlan_len, FAIL_LABEL)
 .begin
     .reg max_vlan
     .reg len
@@ -419,8 +445,7 @@ nbi#:
     alu[len, BF_A(in_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)]
     alu[len, len, -, in_mtu]
 
-    alu[max_vlan, (3 << 2), AND, BF_A(in_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)]
-    alu[len, len, -, max_vlan]
+    alu[len, len, -, in_vlan_len]
 
     br_bclr[len, BF_L(PV_BLS_bf), FAIL_LABEL]
 .end
@@ -735,11 +760,24 @@ end#:
  *       +-+-+-+-+-+-+-+-+---------------+-------------------------------+
  *    6  |                           Timestamp                           |
  *       +-----+-+-+-+-+-+-+-+-------------------------------------------+
- *    7  |P_STS|M|E|A|F|D|R|H|L3 |MPL|VLN|           Checksum            |
+ *    7  |P_STS|M|E|A|F|D|R|H|L3 |MPL|VLN|           Checksum            | (not currently maintained)
  *       +-----+-+-+-+-+-+-+-+-------------------------------------------+
  *      S -> 1 if packet is split between CTM and MU data
  *      BLS -> Buffer List
  *
+ * P_STS - Parse Status
+ *         (0 = no data,
+ *          1 = ESP,
+ *          2 = TCP CSUM OK,
+ *          3 = TCP CSUM FAIL,
+ *          4 = UDP CSUM OK,
+ *          5 = UDP CSUM FAIL,
+ *          6 = AH,
+ *          7 = FRAG)
+ *
+ * L3    - MAC L3 Information (0 = unkown, 1 = IPv6, 2 = IPv4 CSUM FAIL, 3 = IPv4 OK)
+ * MPL   - MPLS Tag Depth (3 = 3 or more)
+ * VLN   - VLAN Tag Depth (3 = 3 or more)
  */
 
 #define CAT_PKT_NUM_wrd                 0
@@ -761,13 +799,20 @@ end#:
 
 #define CAT_PROTO_wrd                   3
 #define CAT_ETERM_bf                    CAT_PROTO_wrd, 18, 18 // early termination
-#define CAT_L4_TYPE_bf                  CAT_PROTO_wrd, 15, 12 // 2 = UDP, 3 = TCP
-#define CAT_L3_TYPE_bf                  CAT_PROTO_wrd, 11, 8 // (L3_TYPE & 0xd) => 4 = IPv4, 5 = IPv6
+#define CAT_L4_CLASS_bf                 CAT_PROTO_wrd, 15, 12 // 2 = UDP, 3 = TCP
+#define CAT_L4_TYPE_bf                  CAT_PROTO_wrd, 13, 12
+#define CAT_L3_CLASS_bf                 CAT_PROTO_wrd, 11, 8 // (L3_TYPE & 0xd) => 4 = IPv4, 5 = IPv6
+#define CAT_L3_TYPE_bf                  CAT_PROTO_wrd, 11, 10
+#define CAT_L3_IP_VER_bf                CAT_PROTO_wrd, 8, 8
+
+#define CAT_L3_TYPE_UNKNOWN             0
+#define CAT_L3_TYPE_IP                  1
+#define CAT_L3_TYPE_MPLS                2
 
 #define CAT_PORT_wrd                    4
 #define CAT_PORT_bf                     CAT_PORT_wrd, 31, 24
 #define CAT_L4_OFFSET_bf                CAT_PORT_wrd, 15, 8
-#define CAT_FRAG_bf                     CAT_PORT_wrd, 7, 7
+#define CAT_V4_FRAG_bf                  CAT_PORT_wrd, 7, 7
 
 #define CAT_FLAGS_wrd                   5
 #define CAT_ERRORS_bf                   CAT_FLAGS_wrd, 31, 30
@@ -776,6 +821,7 @@ end#:
 #define CAT_PKT_WARN_bf                 CAT_FLAGS_wrd, 29, 29 // IPv4 CSUM err, local src, multicast src, class E, TTL=0, IPv6 HL=0/1
 #define CAT_SPECIAL_bf                  CAT_FLAGS_wrd, 28, 28 // IPv6 hop-by-hop, MPLS OAM
 #define CAT_VLANS_bf                    CAT_FLAGS_wrd, 27, 26
+#define CAT_L3_OFFSET_bf                CAT_FLAGS_wrd, 23, 16
 
 #define MAC_TIMESTAMP_wrd               6
 #define MAC_TIMESTAMP_bf                MAC_TIMESTAMP_wrd, 31, 0
@@ -783,6 +829,7 @@ end#:
 #define MAC_PARSE_wrd                   7
 #define MAC_PARSE_STS_bf                MAC_PARSE_wrd, 31, 29
 #define MAC_PARSE_V6_OPT_bf             MAC_PARSE_wrd, 28, 22
+#define MAC_PARSE_V6_FRAG_bf            MAC_PARSE_wrd, 25, 25
 #define MAC_PARSE_L3_bf                 MAC_PARSE_wrd, 21, 20
 #define MAC_PARSE_MPLS_bf               MAC_PARSE_wrd, 19, 18
 #define MAC_PARSE_VLAN_bf               MAC_PARSE_wrd, 17, 16
@@ -792,14 +839,19 @@ end#:
 .begin
     .reg cbs
     .reg dst_mac_bc
+    .reg not_frag
+    .reg ip_ver
     .reg l3_csum_tbl
     .reg l3_flags
+    .reg l3_offset
+    .reg l3_type
     .reg l4_csum_tbl
     .reg l4_flags
     .reg l4_type
     .reg l4_offset
     .reg mac_dst_type
     .reg shift
+    .reg vlan_len
 
     alu[BF_A(out_vec, PV_LENGTH_bf), BF_A(in_nbi_desc, CAT_CTM_NUM_bf), AND~, BF_MASK(CAT_CTM_NUM_bf), <<BF_L(CAT_CTM_NUM_bf)]
     alu[BF_A(out_vec, PV_LENGTH_bf), BF_A(out_vec, PV_LENGTH_bf), -, MAC_PREPEND_BYTES]
@@ -832,7 +884,7 @@ max_cbs#:
     alu[BF_A(out_vec, PV_MU_ADDR_bf), BF_A(out_vec, PV_MU_ADDR_bf), OR, cbs, <<BF_L(PV_CBS_bf)]
 
     // map NBI sequencers to 0, 1, 2, 3
-    alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nbi_desc, CAT_SEQ_NO_bf), AND~, 0xff] ; PV_SEQ_NO_bf
+    alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nbi_desc, CAT_SEQ_NO_bf), OR, 0xff] ; PV_SEQ_NO_bf
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), AND~, 0xfc, <<8] ; PV_SEQ_CTX_bf
 
     // set TX host flags
@@ -845,11 +897,26 @@ max_cbs#:
     alu[l3_flags, 0x3, AND, l3_csum_tbl, >>indirect]
     alu[BF_A(out_vec, PV_TX_HOST_L3_bf), BF_A(out_vec, PV_TX_HOST_L3_bf), OR, l3_flags, <<BF_L(PV_TX_HOST_L3_bf)] ; PV_TX_HOST_L3_bf
 
-    alu[l4_type, 0xe, AND, BF_A(in_nbi_desc, CAT_L4_TYPE_bf), >>BF_L(CAT_L4_TYPE_bf)]
-    br=byte[l4_type, 0, 2, store_l4_offset#], defer[3] // use L4 offset if Catamaran has parsed TCP or UDP (Catamaran offset is valid)
-        alu[BF_A(out_vec, PV_PARSE_STS_bf), BF_A(in_nbi_desc, MAC_PARSE_STS_bf), AND~, BF_MASK(PV_PARSE_L4_OFFSET_bf), <<BF_L(PV_PARSE_L4_OFFSET_bf)]
-        alu[BF_A(out_vec, PV_CTM_ADDR_bf), BF_A(out_vec, PV_NUMBER_bf), OR, 1, <<BF_L(PV_CTM_ALLOCATED_bf)]
-        ld_field[BF_A(out_vec, PV_CTM_ADDR_bf), 0011, (PKT_NBI_OFFSET + MAC_PREPEND_BYTES)]
+    bitfield_extract__sz1(l3_type, BF_AML(in_nbi_desc, CAT_L3_TYPE_bf)) ; CAT_L3_TYPE_bf
+    br!=byte[l3_type, 0, CAT_L3_TYPE_IP, skip_proto#], defer[3]
+       immed[BF_A(out_vec, PV_HEADER_STACK_bf), 0]
+       alu[BF_A(out_vec, PV_CTM_ADDR_bf), BF_A(out_vec, PV_NUMBER_bf), OR, 1, <<BF_L(PV_CTM_ALLOCATED_bf)]
+       ld_field[BF_A(out_vec, PV_CTM_ADDR_bf), 0011, (PKT_NBI_OFFSET + MAC_PREPEND_BYTES)]
+
+    // packet is IP
+
+    // store L3 offset
+    bitfield_extract__sz1(l3_offset, BF_AML(in_nbi_desc, CAT_L3_OFFSET_bf)) ; CAT_L3_OFFSET_bf
+    alu[BF_A(out_vec, PV_HEADER_STACK_bf), l3_offset, -, MAC_PREPEND_BYTES]
+    alu[BF_A(out_vec, PV_HEADER_STACK_bf), --, B, BF_A(out_vec, PV_HEADER_STACK_bf), <<8]
+
+    // handle fragments
+    alu[not_frag, 1, AND~, BF_A(in_nbi_desc, CAT_V4_FRAG_bf), >>BF_L(CAT_V4_FRAG_bf)] ; CAT_V4_FRAG_bf
+    alu[not_frag, not_frag, AND~, BF_A(in_nbi_desc, MAC_PARSE_V6_FRAG_bf), >>BF_L(MAC_PARSE_V6_FRAG_bf)] ; MAC_PARSE_V6_FRAG_bf
+    beq[skip_proto#], defer[3] // skip L4 for fragments
+        alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, not_frag]
+        alu[ip_ver, 0x7c, OR, BF_A(in_nbi_desc, CAT_L3_IP_VER_bf), >>BF_L(CAT_L3_IP_VER_bf)] ; CAT_L3_IP_VER_bf
+        alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, ip_ver, <<1] ; PV_PROTO_bf
 
     /* Catamaran doesn't know that it sometimes has the correct offset for certain IPv6 extention headers
      * Thus, do not rely on CAT_L4_TYPE if the packet is not recognized as TCP/UDP and check the exceptions
@@ -858,26 +925,28 @@ max_cbs#:
      */
 
     // Catamaran does not have L4 offset if there are MPLS tags
-    bitfield_extract__sz1(--, BF_AML(out_vec, PV_PARSE_MPD_bf))
-    bne[skip_l4_offset#]
+    bitfield_extract__sz1(--, BF_AML(out_vec, MAC_PARSE_MPLS_bf))
+    bne[skip_proto#]
 
     // Catamaran does not reliably have L4 offset for nested VLAN tags
-    br_bset[BF_A(out_vec, PV_PARSE_VLD_bf), BF_M(PV_PARSE_VLD_bf), skip_l4_offset#]
-
-    // No L4 offset if L3 is unkown
-    bitfield_extract__sz1(--, BF_AML(out_vec, PV_PARSE_L3I_bf))
-    beq[skip_l4_offset#]
+    br_bset[BF_A(out_vec, MAC_PARSE_VLAN_bf), BF_M(MAC_PARSE_VLAN_bf), skip_proto#]
 
     // permit IPv6 hop-by-hop, routing and destination extention headers (Catamaran provides valid L4 offsets for these)
     alu[--, 0x78, AND, BF_A(in_nbi_desc, MAC_PARSE_V6_OPT_bf), >>BF_L(MAC_PARSE_V6_OPT_bf)] ; MAC_PARSE_V6_OPT_bf
-    bne[skip_l4_offset#]
+    bne[skip_proto#]
 
-store_l4_offset#:
-    alu[l4_offset, 0x7f, AND, BF_A(in_nbi_desc, CAT_L4_OFFSET_bf), >>(BF_L(CAT_L4_OFFSET_bf) + 1)]
-    alu[l4_offset, l4_offset, -, (MAC_PREPEND_BYTES / 2)] // L4 offset is already divided by 2 above
-    alu[BF_A(out_vec, PV_PARSE_L4_OFFSET_bf), BF_A(out_vec, PV_PARSE_L4_OFFSET_bf), OR, l4_offset, <<BF_L(PV_PARSE_L4_OFFSET_bf)]
+    // packet is TCP/UDP
 
-skip_l4_offset#:
+    alu[l4_type, 1, AND~, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>(BF_L(MAC_PARSE_STS_bf) + 1)]
+    alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), OR, l4_type]
+    alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, 1, <<2] // L4 is known
+
+    // store L4 offset
+    bitfield_extract__sz1(l4_offset, BF_AML(in_nbi_desc, CAT_L4_OFFSET_bf)) ; CAT_L4_OFFSET_bf
+    alu[l4_offset, l4_offset, -, MAC_PREPEND_BYTES]
+    alu[BF_A(out_vec, PV_HEADER_STACK_bf), l4_offset, OR, BF_A(out_vec, PV_HEADER_STACK_bf)]
+
+skip_proto#:
     // error checks after metadata is populated (will need for drop)
     #ifdef PARANOIA // should never happen, Catamaran is buggy if it does
        br_bset[BF_AL(in_nbi_desc, CAT_VALID_bf), valid#] ; CAT_VALID_bf
@@ -886,16 +955,18 @@ skip_l4_offset#:
     #endif
 
     immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
+    alu[out_vec[PV_FLAGS_wrd], --, B, 0]
 
     __pv_get_mac_dst_type(mac_dst_type, out_vec)
-    alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), --, B, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
+    bits_set__sz1(BF_AL(out_vec, PV_MAC_DST_TYPE_bf), mac_dst_type)
 
-    __pv_mtu_check(out_vec, in_mtu, DROP_MTU_LABEL)
+    alu[vlan_len, (3 << 2), AND, BF_A(in_nbi_desc, MAC_PARSE_VLAN_bf), >>(BF_L(MAC_PARSE_VLAN_bf) - 2)]
+    __pv_mtu_check(out_vec, in_mtu, vlan_len, DROP_MTU_LABEL)
 
-    alu[--, BF_MASK(CAT_SEQ_CTX_bf), AND, BF_A(in_nbi_desc, CAT_SEQ_CTX_bf), >>BF_L(CAT_SEQ_CTX_bf)] ; CAT_SEQ_CTX_bf
+    bitfield_extract__sz1(--, BF_AML(in_nbi_desc, CAT_SEQ_CTX_bf)) ; CAT_SEQ_CTX_bf
     beq[DROP_PROTO_LABEL] // drop without releasing sequence number for sequencer zero (errored packets are expected here)
 
-    alu[--, BF_MASK(CAT_ERRORS_bf), AND, BF_A(in_nbi_desc, CAT_ERRORS_bf), >>BF_L(CAT_ERRORS_bf)] ; CAT_ERRORS_bf
+    bitfield_extract__sz1(--, BF_AML(in_nbi_desc, CAT_ERRORS_bf)) ; CAT_ERRORS_bf
     bne[ERROR_PARSE_LABEL] // catch any other errors we miss (these appear to have valid sequence numbers)
 
 .end
@@ -1085,7 +1156,7 @@ end#:
         alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), OR, pcie, <<(log2(NFD_IN_NUM_SEQRS))]
     #endif
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), +, PV_GRO_NFD_START] ; PV_SEQ_CTX_bf
-    alu[BF_A(out_vec, PV_SEQ_CTX_bf), --, B, BF_A(out_vec, PV_SEQ_CTX_bf), <<BF_L(PV_SEQ_CTX_bf)] ; PV_SEQ_CTX_bf
+    alu[BF_A(out_vec, PV_SEQ_CTX_bf), 0xff, OR, BF_A(out_vec, PV_SEQ_CTX_bf), <<BF_L(PV_SEQ_CTX_bf)] ; PV_SEQ_CTX_bf
 
     alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_MASK(PV_CSUM_OFFLOAD_bf), AND, \
         BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld), >>BF_L(NFD_IN_FLAGS_TX_TCP_CSUM_fld)]
@@ -1096,7 +1167,7 @@ end#:
     // state (contents of CTM also excluded) in drop path
     br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), ERROR_PCI_LABEL]
 
-    __pv_mtu_check(out_vec, in_mtu, ERROR_MTU_LABEL)
+    __pv_mtu_check(out_vec, in_mtu, (4 * 3), ERROR_MTU_LABEL)
 
     pkt_buf_copy_mu_head_to_ctm(in_pkt_num, BF_A(out_vec, PV_MU_ADDR_bf), NFD_IN_DATA_OFFSET, 1)
 
@@ -1104,9 +1175,9 @@ end#:
     alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
 
     br_bclr[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), skip_lso#], defer[3]
-        immed[BF_A(out_vec, PV_PARSE_STS_bf), (PV_NOT_PARSED >> 16), <<16] ; PV_PARSE_STS_bf
+        immed[BF_A(out_vec, PV_HEADER_STACK_bf), 0]
         immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
-        alu[BF_A(out_vec, PV_META_LENGTH_bf), BF_A(out_vec, PV_META_LENGTH_bf), OR, meta_len] ; PV_META_LENGTH_bf
+        bits_set__sz1(BF_AL(out_vec, PV_META_LENGTH_bf), meta_len) ; PV_META_LENGTH_bf
 
     __pv_lso_fixup(out_vec, in_nfd_desc)
 skip_lso#:

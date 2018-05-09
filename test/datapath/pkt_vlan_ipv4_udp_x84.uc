@@ -13,9 +13,7 @@
 aggregate_zero(pkt_vec, PV_SIZE_LW)
 move(pkt_vec[0], 0x40)
 move(pkt_vec[2], 0x84)
+move(pkt_vec[3], 3)
 move(pkt_vec[4], 0x3fc0)
-move(pkt_vec[5], ((4 << BF_L(PV_PARSE_STS_bf)) |
-                  (((14 + 4 + 20) / 2) << BF_L(PV_PARSE_L4_OFFSET_bf)) |
-                  (3 << BF_L(PV_PARSE_L3I_bf)) |
-                  (1 << BF_L(PV_PARSE_VLD_bf))))
-
+move(pkt_vec[5], (((14 + 4) << BF_L(PV_HEADER_OFFSET_L3_bf)) |
+                  ((14 + 4 + 20) << BF_L(PV_HEADER_OFFSET_L4_bf))))
