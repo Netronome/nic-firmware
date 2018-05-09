@@ -597,15 +597,18 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
 #else
         instr[count].instr = INSTR_RSS;
 #endif
-        instr[count].param = (rss_tbl_nnidx << 8) | (rss_flags & 0x0f);
-		if ((NFD_CFG_MAJOR_PF < 4) && !(control & NFP_NET_CFG_CTRL_CHAIN_META)) {
+        instr[count].param = ((rss_rings - 1) << 19) | ((rss_flags & 0x0f) << 5) | 3;
+        if ((NFD_CFG_MAJOR_PF < 4) && !(control & NFP_NET_CFG_CTRL_CHAIN_META)) {
             instr[count].param |= (1 << INSTR_RSS_V1_META_BIT);
         }
         instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RSS);
         prev_instr = INSTR_RSS;
 
+	instr[count++].value =
+		(0xff << 24) | (0x1f << 17) | (0x18 << 12) | (rss_tbl_nnidx << 5) | 2;
+
         /* RSS key: provide rss key with hash. Use only first 26 bits */
-        instr[count++].value = (rss_key[0] & ~0x3fu) | (rss_rings - 1);
+        instr[count++].value = rss_key[0];
     }
 
     if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {

@@ -1,8 +1,8 @@
 /* Test for macro pv_init_nfd. Not testing lso_fixup */
-;TEST_INIT_EXEC nfp-mem i32.ctm:0x000  0xc3020344 0x05060708 0xa5320b0c 0x02030401
-;TEST_INIT_EXEC nfp-mem i32.ctm:0x010  0x00000000 0x6200fff0 0xff00ffff 0x00ffffff
-;TEST_INIT_EXEC nfp-mem i32.ctm:0x020  0x01020304 0x85060708 0x090a0b0c 0x0d0e0f10
-;TEST_INIT_EXEC nfp-mem i32.ctm:0x030  0x01020304 0x05060708 0x090a0b0c 0x0d0e0f10
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x000  0x43020344 0x05060708 0xa5320b0c 0x02030401
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x010  0x43020344 0x05060708 0xa5320b0c 0x02030401
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x020  0x23020304 0x85060708 0x090a0b0c 0x02000f10
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x030  0x33020304 0x05060708 0x090a0b0c 0x020e0f10
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0x040  0x03faaa37 0x0401abc0 0x00000b0c 0x01112222
 
 #include <single_ctx_test.uc>
@@ -79,9 +79,10 @@
     #endif
     alu[exp[3], exp[3], +, PV_GRO_NFD_START]
     alu[exp[3], --, B, exp[3], <<8]
+    alu[tmp1, --, B, 0xff]
+    ld_field[exp[3], 0001, tmp1]
    .if (! drop_flag)
-        ld_field_w_clr[tmp1, 0001, $nfd_desc[0], >>24] // meta
-        alu[tmp1, tmp1, AND, 0x7f]
+        alu[tmp1, --, B, 0xff]
         ld_field[exp[3], 0001, tmp1]
     .endif
 
@@ -94,20 +95,27 @@
 
     // lword 5
     .if (drop_flag)
-        move(exp[5],0x000f0000) // MPD,VLD not set, but
+        move(exp[5],0x00000000) // stacked offsets - to be added
     .else                       //  also not cleared from prior iteration
-        move(exp[5],0x000f0000) // MPD,VLD not parsed
+        move(exp[5],0x00000000) // stacked offsets - to be added
     .endif
 
     // lword 6
-    alu[tmp1, $nfd_desc[0], AND, 0xff] // qid
-    alu[exp[6], --, B, tmp1, <<23]
+    .if (! drop_flag)
+        alu[tmp1, 0x7f, AND, $nfd_desc[0], >>24] // meta
+        alu[exp[6], --, B, tmp1, <<16]
+    .else
+        move(exp[6], 0)
+    .endif
+    alu[tmp1, $nfd_desc[0], AND, 0x7f] // qid
+    alu[exp[6], exp[6], OR, tmp1, <<23]
     alu[tmp1, --, B, tmp1, <<6] //(NIC_MAX_INSTR * 4)
     pv_set_ingress_queue__sz1(pkt_vec, tmp1, 64)
-    pv_init_nfd(pkt_vec, pkt_no, $nfd_desc, mtu, error#, error#)
 
     // lword 7
     move(exp[7], 0)
+
+    pv_init_nfd(pkt_vec, pkt_no, $nfd_desc, mtu, error#, error#)
 
     .if ( drop_flag )
         test_assert_equal(i, 0xfe)
