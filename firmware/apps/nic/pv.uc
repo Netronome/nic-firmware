@@ -215,26 +215,6 @@
 #endm
 
 
-#macro pv_propagate_mac_csum_status(io_vec)
-.begin
-    .reg shift
-    .reg l3_csum_tbl
-    .reg l4_csum_tbl
-    .reg l3_flags
-    .reg l4_flags
-
-    immed[l4_csum_tbl, 0x238c, <<8]
-    alu[shift, (7 << 2), AND, BF_A(io_vec, PV_PARSE_STS_bf), >>(BF_L(PV_PARSE_STS_bf) - 2)] ; PV_PARSE_STS_bf
-    alu[l3_csum_tbl, shift, B, 0xe0]
-    alu[l4_flags, 0xf, AND, l4_csum_tbl, >>indirect]
-    alu[shift, (3 << 1), AND, BF_A(io_vec, PV_PARSE_L3I_bf), >>(BF_L(PV_PARSE_L3I_bf) - 1)]
-    alu[--,  shift, OR, 0]
-    alu[l3_flags, 0x3, AND, l3_csum_tbl, >>indirect]
-    alu[BF_A(io_vec, PV_TX_HOST_L4_bf), BF_A(io_vec, PV_TX_HOST_L4_bf), OR, l4_flags, <<BF_L(PV_TX_HOST_L4_bf)]
-    alu[BF_A(io_vec, PV_TX_HOST_L3_bf), BF_A(io_vec, PV_TX_HOST_L3_bf), OR, l3_flags, <<BF_L(PV_TX_HOST_L3_bf)]
-.end
-#endm
-
 #macro pv_set_tx_flag(io_vec, flag)
     alu[BF_A(io_vec, PV_TX_FLAGS_bf), BF_A(io_vec, PV_TX_FLAGS_bf), OR, 1, <<flag]
 #endm
@@ -812,6 +792,10 @@ end#:
 .begin
     .reg cbs
     .reg dst_mac_bc
+    .reg l3_csum_tbl
+    .reg l3_flags
+    .reg l4_csum_tbl
+    .reg l4_flags
     .reg l4_type
     .reg l4_offset
     .reg mac_dst_type
@@ -850,6 +834,16 @@ max_cbs#:
     // map NBI sequencers to 0, 1, 2, 3
     alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nbi_desc, CAT_SEQ_NO_bf), AND~, 0xff] ; PV_SEQ_NO_bf
     alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), AND~, 0xfc, <<8] ; PV_SEQ_CTX_bf
+
+    // set TX host flags
+    immed[l4_csum_tbl, 0x238c, <<8]
+    alu[shift, (7 << 2), AND, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>(BF_L(MAC_PARSE_STS_bf) - 2)] ; MAC_PARSE_STS_bf
+    alu[l3_csum_tbl, shift, B, 0xe0]
+    alu[l4_flags, 0xf, AND, l4_csum_tbl, >>indirect]
+    alu[shift, (3 << 1), AND, BF_A(in_nbi_desc, MAC_PARSE_L3_bf), >>(BF_L(MAC_PARSE_L3_bf) - 1)] ; MAC_PARSE_L3_bf
+    alu[BF_A(out_vec, PV_TX_HOST_L4_bf), shift, B, l4_flags, <<BF_L(PV_TX_HOST_L4_bf)] ; PV_TX_HOST_L4_bf
+    alu[l3_flags, 0x3, AND, l3_csum_tbl, >>indirect]
+    alu[BF_A(out_vec, PV_TX_HOST_L3_bf), BF_A(out_vec, PV_TX_HOST_L3_bf), OR, l3_flags, <<BF_L(PV_TX_HOST_L3_bf)] ; PV_TX_HOST_L3_bf
 
     alu[l4_type, 0xe, AND, BF_A(in_nbi_desc, CAT_L4_TYPE_bf), >>BF_L(CAT_L4_TYPE_bf)]
     br=byte[l4_type, 0, 2, store_l4_offset#], defer[3] // use L4 offset if Catamaran has parsed TCP or UDP (Catamaran offset is valid)

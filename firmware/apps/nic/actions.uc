@@ -256,12 +256,6 @@ end#:
 #endm
 
 
-#macro __actions_rxcsum(in_pkt_vec)
-   __actions_read()
-   pv_propagate_mac_csum_status(in_pkt_vec)
-#endm
-
-
 #macro __actions_checksum_complete(in_pkt_vec)
 .begin
     .reg available_words
@@ -380,7 +374,7 @@ skip_checksum#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#]
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#]
 
     ins_0#: br[drop_act#]
     ins_1#: br[rx_wire#]
@@ -392,7 +386,6 @@ next#:
     ins_7#: br[tx_wire#]
     ins_8#: br[cmsg#]
     ins_9#: br[ebpf#]
-    ins_10#: br[rxcsum#]
 
 drop_proto#:
     // invalid protocols have no sequencer, must not go to reorder
@@ -451,10 +444,6 @@ cmsg#:
 ebpf#:
     __actions_read(ebpf_addr, 0xffff)
     ebpf_call(io_pkt_vec, ebpf_addr)
-
-rxcsum#:
-    __actions_rxcsum(io_pkt_vec)
-    br[next#] // last instruction in code will not pipe
 
 .end
 #endm
