@@ -71,7 +71,6 @@ enum instruction_type {
     INSTR_TX_WIRE,
     INSTR_CMSG,
     INSTR_EBPF,
-    INSTR_RXCSUM
 };
 
 /* Instruction format of NIC_CFG_INSTR_TBL table.
