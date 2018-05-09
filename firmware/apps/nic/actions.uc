@@ -123,74 +123,76 @@ pass#:
 
 #macro __actions_rss(in_pkt_vec)
 .begin
+    .reg args[3]
+    .reg cfg_proto
+    .reg col_msk
+    .reg data
     .reg hash
     .reg hash_type
-    .reg ipv4_delta
-    .reg ipv6_delta
-    .reg rss_table_idx
-    .reg key
-    .reg l3_info
     .reg l3_offset
     .reg l4_offset
     .reg max_queue
-    .reg opcode
-    .reg parse_status
-    .reg pkt_type // 0 - IPV6_TCP, 1 - IPV6_UDP, 2 - IPV4_TCP, 3 - IPV4_UDP
+    .reg proto_delta
+    .reg proto_shf
     .reg queue
+    .reg queue_msk
     .reg queue_shf
-    .reg queue_off
-    .reg udp_delta
+    .reg row_msk
+    .reg rss_table_addr
+    .reg rss_table_idx
     .reg write $metadata
 
-    __actions_read(opcode, 0xffff)
-    __actions_read(key)
+    __actions_read(args[0])
+    __actions_read(args[1])
+    __actions_read(args[2])
 
     br_bset[BF_AL(in_pkt_vec, PV_QUEUE_SELECTED_bf), queue_selected#]
 
 begin#:
-    // skip RSS for unkown L3
-    bitfield_extract__sz1(l3_info, BF_AML(in_pkt_vec, PV_PARSE_L3I_bf))
-    beq[end#]
+    bitfield_extract__sz1(l3_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_L3_bf)) ; PV_HEADER_OFFSET_L3_bf
+    beq[end#] // unknown L3
 
-    // skip RSS for MPLS
-    bitfield_extract__sz1(--, BF_AML(in_pkt_vec, PV_PARSE_MPD_bf))
-    bne[end#]
-
-    // skip RSS for 2 or more VLANs (Catamaran L4 offsets unreliable)
-    br_bset[BF_A(in_pkt_vec, PV_PARSE_VLD_bf), BF_M(PV_PARSE_VLD_bf), end#]
-
-    local_csr_wr[CRC_REMAINDER, key]
-
-    // seek to L3 source address
-    alu[l3_offset, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_VLD_bf), >>(BF_L(PV_PARSE_VLD_bf) - 2)] // 4 bytes for VLAN
-    alu[l3_offset, l3_offset, +, (14 + 8 + 2)] // 14 bytes for Ethernet, 8 bytes of IP header, 2 bytes seek align
-    alu[ipv4_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PARSE_L3I_bf), >>(BF_M(PV_PARSE_L3I_bf) - 2)] // 4 bytes extra for IPv4
-    alu[l3_offset, l3_offset, +, ipv4_delta]
+    // seek to IP source address
+    alu[l3_offset, l3_offset, +, (8 + 2)] // 8 bytes of IP header, 2 bytes seek align
+    alu[proto_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PROTO_bf), <<1] // 4 bytes extra for IPv4
+    alu[l3_offset, l3_offset, +, proto_delta]
     pv_seek(in_pkt_vec, l3_offset, (PV_SEEK_CTM_ONLY | PV_SEEK_PAD_INCLUDED))
 
-    br_bset[BF_A(in_pkt_vec, PV_PARSE_L3I_bf), BF_M(PV_PARSE_L3I_bf), process_l4#], defer[3] // branch if IPv4, 2 words hashed
-        crc_be[crc_32, --, *$index++]
-        immed[hash_type, 1]
-        crc_be[crc_32, --, *$index++]
+    local_csr_wr[CRC_REMAINDER, BF_A(args, INSTR_RSS_KEY_bf)]
+    immed[hash_type, 1]
+    byte_align_be[--, *$index++]
+    byte_align_be[data, *$index++]
+    br_bset[BF_A(in_pkt_vec, PV_PROTO_bf), 1, check_l4#], defer[3] // branch if IPv4, 2 words hashed
+        crc_be[crc_32, --, data]
+        byte_align_be[data, *$index++]
+        crc_be[crc_32, --, data]
 
-    // IPv6
-    alu[hash_type, hash_type, +, 1]
-    crc_be[crc_32, --, *$index++]
-
-    // hash 5 more words for IPv6
+    // hash 6 more words for IPv6
     #define_eval LOOP (0)
-    #while (LOOP < 4)
-        nop
-        crc_be[crc_32, --, *$index++]
+    #while (LOOP < 6)
+        byte_align_be[data, *$index++]
+        crc_be[crc_32, --, data]
         #define_eval LOOP (LOOP + 1)
     #endloop
     #undef LOOP
 
-    br[process_l4#], defer[1]
-        crc_be[crc_32, --, *$index++]
+    alu[hash_type, hash_type, +, 1]
+
+check_l4#:
+    // skip L4 if RSS not configured for protocol (this will also skip fragments)
+    bitfield_extract(cfg_proto, BF_AML(args, INSTR_RSS_CFG_PROTO_bf)) ; INSTR_RSS_CFG_PROTO_bf
+    alu[--, BF_A(in_pkt_vec, PV_PROTO_bf), OR, 0] ; PV_PROTO_bf
+    alu[--, cfg_proto, AND, 1, <<indirect]
+    beq[skip_l4#], defer[1]
+        bitfield_extract__sz1(rss_table_addr, BF_AML(args, INSTR_RSS_TABLE_ADDR_bf)) ; INSTR_RSS_TABLE_ADDR_bf
+
+    bitfield_extract__sz1(l4_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_L4_bf)) ; PV_HEADER_OFFSET_L4_bf
+    beq[end#] // unknown L4
+
+    pv_seek(in_pkt_vec, l4_offset, PV_SEEK_T_INDEX_ONLY, process_l4#)
 
 queue_selected#:
-    alu[max_queue, key, AND, 0x3f]
+    bitfield_extract__sz1(max_queue, BF_AML(args, INSTR_RSS_MAX_QUEUE_bf))
     bitfield_extract__sz1(queue, BF_AML(in_pkt_vec, PV_QUEUE_OFFSET_bf))
     alu[--, max_queue, -, queue]
     bhs[end#]
@@ -199,58 +201,43 @@ queue_selected#:
         pv_set_queue_offset__sz1(in_pkt_vec, 0)
 
 process_l4#:
-    bitfield_extract__sz1(parse_status, BF_AML(in_pkt_vec, PV_PARSE_STS_bf))
+    byte_align_be[--, *$index++]
+    byte_align_be[data, *$index++]
+    crc_be[crc_32, --, data]
 
-    // skip L4 if not configured (per packet type enable/disable: IPV4_UDP, IPV4_TCP, IPV6_UDP, IPV6_TCP)
-    alu[pkt_type, l3_info, AND, 2]
-    alu[pkt_type, pkt_type, OR, parse_status, >>2]
-    alu[--, pkt_type, OR, 0]
-    alu[--, opcode, AND, 1, <<indirect]
-    beq[skip_l4#], defer[1]
-        alu[rss_table_idx, 0x7f, AND, opcode, >>8]
-
-    // skip L4 if offset unknown
-    alu[l4_offset, 0xfe, AND, BF_A(in_pkt_vec, PV_PARSE_L4_OFFSET_bf), >>(BF_L(PV_PARSE_L4_OFFSET_bf) - 1)]
-    beq[skip_l4#] // zero for unsupported protocols or unparsable IP extention headers
-
-    // preemptive seek to avoid local_csr_wr[T_INDEX, ...] update latency in normal case
-    pv_seek(in_pkt_vec, l4_offset, PV_SEEK_T_INDEX_ONLY)
-
-        // skip L4 if unknown
-        br=byte[parse_status, 0, 0, skip_l4#]
-
-        // skip L4 if packet is fragmented
-        br=byte[parse_status, 0, 7, skip_l4#]
-
-        alu[udp_delta, (1 << 1), AND, parse_status, >>1]
-
-    crc_be[crc_32, --, *$index++]
-
-        alu[udp_delta, udp_delta, OR, parse_status, >>2]
-        alu[hash_type, hash_type, +, 3]
-        alu[hash_type, hash_type, +, udp_delta]
+    alu[proto_shf, BF_A(in_pkt_vec, PV_PROTO_bf), AND, 1]
+    alu[proto_delta, proto_shf, B, 3]
+    alu[proto_delta, --, B, proto_delta, <<indirect]
+    alu[hash_type, hash_type, +, proto_delta]
 
 skip_l4#:
-    pv_meta_push_type(in_pkt_vec, hash_type)
-    br_bset[opcode, INSTR_RSS_V1_META_BIT, skip_meta_type#], defer[3]
+    br_bset[BF_AL(args, INSTR_RSS_V1_META_bf), skip_meta_type#], defer[3]
+        pv_meta_push_type__sz1(in_pkt_vec, hash_type)
         local_csr_rd[CRC_REMAINDER]
         immed[hash, 0]
-        alu[$metadata, --, B, hash]
 
-    pv_meta_push_type(in_pkt_vec, NFP_NET_META_HASH)
+    pv_meta_push_type__sz1(in_pkt_vec, NFP_NET_META_HASH)
 
 skip_meta_type#:
-    pv_meta_prepend(in_pkt_vec, $metadata, 4]
+    // index into RSS table rows
+    bitfield_extract__sz1(row_msk, BF_AML(args, INSTR_RSS_ROW_MASK_bf)) ; INSTR_RSS_ROW_MASK_bf
+    alu[--, BF_A(args, INSTR_RSS_ROW_SHIFT_bf), OR, 0]
+    alu[rss_table_idx, row_msk, AND, hash, >>indirect]
+    alu[rss_table_addr, rss_table_addr, +, rss_table_idx]
+    local_csr_wr[NN_GET, rss_table_addr]
 
-    alu[queue_off, 0x1f, AND, hash, >>2]
-    alu[rss_table_idx, rss_table_idx, +, queue_off]
-    local_csr_wr[NN_GET, rss_table_idx]
-        __actions_restore_t_idx()
-        alu[queue_shf, 0x18, AND, hash, <<3]
-        alu[--, queue_shf, OR, 0]
-    alu[queue, 0xff, AND, *n$index, >>indirect]
+    // index into RSS table column
+    bitfield_extract__sz1(col_msk, BF_AML(args, INSTR_RSS_COL_MASK_bf)) ; INSTR_RSS_COL_MASK_bf
+    alu[$metadata, BF_A(args, INSTR_RSS_COL_SHIFT_bf), B, hash]
+    alu[queue_shf, col_msk, AND, hash, <<indirect]
+    passert(BF_M(INSTR_RSS_QUEUE_MASK_bf), "EQ", 31)
+    alu[queue_msk, queue_shf, B, BF_A(args, INSTR_RSS_QUEUE_MASK_bf), >>BF_L(INSTR_RSS_QUEUE_MASK_bf)]
+    alu[queue, queue_msk, AND, *n$index, >>indirect]
     pv_set_queue_offset__sz1(in_pkt_vec, queue)
 
+    pv_meta_prepend(in_pkt_vec, $metadata, 4)
+
+    __actions_restore_t_idx()
 end#:
 .end
 #endm
@@ -323,7 +310,7 @@ consume_available#:
         alu[offset, offset, +, iteration_bytes]
 
 last_bits#:
-    pv_meta_push_type(in_pkt_vec, NFP_NET_META_CSUM)
+    pv_meta_push_type__sz1(in_pkt_vec, NFP_NET_META_CSUM)
     alu[last_bits, (3 << 3), AND, data_len, <<3]
     beq[finalize#]
 
@@ -449,4 +436,3 @@ ebpf#:
 #endm
 
 #endif
-

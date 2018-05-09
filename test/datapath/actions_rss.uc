@@ -1,5 +1,5 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xc0ffee
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xdeadbeef
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xc0ffee
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_35=0xdeadbeef
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_96=0x04030201
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_97=0x08070605
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_98=0x0c0b0a09
@@ -45,8 +45,8 @@
 
 local_csr_wr[NN_GET, 96]
 
-test_assert_equal($__actions[1], 0xc0ffee)
-test_assert_equal($__actions[2], 0xdeadbeef)
+test_assert_equal($__actions[2], 0xc0ffee)
+test_assert_equal($__actions[3], 0xdeadbeef)
 
 .reg nn_idx
 .reg nn_entry
@@ -141,4 +141,3 @@ move(nn_idx, 0)
     .endw
 .end
 #endm
-

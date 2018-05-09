@@ -37,7 +37,7 @@ alu[$nbi_desc_wr[6], --, B, 0]
 alu[$nbi_desc_wr[7], --, B, 0]
 
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -106,7 +106,7 @@ alu[$nbi_desc_wr[7], --, B, 0]
 
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -164,7 +164,7 @@ alu[$nbi_desc_wr[6], --, B, 0]
 alu[$nbi_desc_wr[7], --, B, 0]
 
 move(expected[1], 0)
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -233,7 +233,7 @@ alu[$nbi_desc_wr[7], --, B, 0]
 
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -305,7 +305,7 @@ alu[$nbi_desc_wr[7], --, B, 0]
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -361,7 +361,7 @@ alu[$nbi_desc_wr[7], --, B, 0]
 
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)

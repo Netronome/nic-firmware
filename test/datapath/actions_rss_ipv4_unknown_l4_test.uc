@@ -1,4 +1,5 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x600f
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x7fe3
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xff3f8c02
 
 #include "pkt_ipv4_udp_x88.uc"
 
@@ -6,7 +7,7 @@
 #include <bitfields.uc>
 #include "actions_rss.uc"
 
-bitfield_insert__sz2(BF_AML(pkt_vec, PV_PARSE_STS_bf), 0)
+bitfield_insert__sz2(BF_AML(pkt_vec, PV_PROTO_bf), 0x6)
 
 .reg pkt_len
 pv_get_length(pkt_len, pkt_vec)

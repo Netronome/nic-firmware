@@ -1,4 +1,5 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x600f
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x7fe3
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xff3f8c02
 
 #include <actions.uc>
 #include "actions_rss.uc"
@@ -8,6 +9,8 @@ aggregate_zero(pkt_vec, 8)
 
 rss_reset_test(pkt_vec)
 __actions_rss(pkt_vec)
+
+bitfield_insert__sz2(BF_AML(pkt_vec, PV_PROTO_bf), 0xff)
 
 test_assert_equal(BF_A(pkt_vec, PV_META_TYPES_bf), 0)
 test_assert_equal(BF_A(pkt_vec, PV_QUEUE_OFFSET_bf), 0)

@@ -78,6 +78,7 @@ error_expected_ret#:
 
     alu[expected[3], --, B, loop_cntr, <<8]
     alu[expected[3], expected[3], AND, 3, <<8]
+    alu[expected[3], expected[3], OR, 0xff]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -135,6 +136,7 @@ move(loop_cntr, 0)
     pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
     alu[expected[3], temp, OR, loop_cntr, <<16]
+    alu[expected[3], expected[3], OR, 0xff]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -162,7 +164,6 @@ move(loop_cntr, 0)
 
 
 /* Test PV P_STS field */
-
 move($nbi_desc_wr[0], 64)
 move($nbi_desc_wr[1], 0)
 move($nbi_desc_wr[2], 0x100)
@@ -175,7 +176,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -200,7 +201,7 @@ move(loop_cntr, 0)
     pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
-    alu[expected[5], --, B, loop_cntr, <<29]
+    //alu[expected[5], --, B, loop_cntr, <<29]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -238,7 +239,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -258,7 +259,7 @@ move(loop_cntr, 0)
     pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
-    alu[expected[5], --, B, loop_cntr, <<16]
+    //alu[expected[5], --, B, loop_cntr, <<16]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -296,7 +297,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -318,7 +319,7 @@ move(loop_cntr, 0)
 
 
     alu[temp, --, B, loop_cntr, >>1]
-    alu[expected[5], --, B, temp, <<22]
+    //alu[expected[5], --, B, temp, <<22]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -356,7 +357,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -378,7 +379,7 @@ move(loop_cntr, 0)
 
 
     alu[temp, --, B, loop_cntr, >>1]
-    alu[expected[5], --, B, temp, <<22]
+    //alu[expected[5], --, B, temp, <<22]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -424,7 +425,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -478,7 +479,7 @@ move(loop_cntr, 0)
          */
 
         /* Assume the L4 Offset will be written */
-        alu[expected[5], --, B, 0x7b, <<22]
+        //alu[expected[5], --, B, 0x7b, <<22]
 
         move(temp, 0)
 
@@ -501,17 +502,17 @@ move(loop_cntr, 0)
         /* Or in L3, MPL, VLN bits */
 
         alu[temp, loop_cntr1, AND, 3]
-        .if (loop_cntr1 < 4)
-            alu[expected[5], expected[5], OR, temp, <<16] // VLD
-            alu[expected[5], expected[5], OR, 1, <<20] // had to set L3 to something other than 0 to test VLN
-        .elif (loop_cntr1 < 8)
-            alu[expected[5], expected[5], OR, temp, <<18] // MPD
-            alu[expected[5], expected[5], OR, 1, <<20] // had to set L3 to something other than 0 to test MPL
-        .elif (loop_cntr1 < 12)
-            alu[expected[5], expected[5], OR, temp, <<20] // L3I
-        .else
-            alu[expected[5], expected[5], OR, 1, <<20] // had to set L3 to something other than 0 to test IPv6 bits
-        .endif
+        //.if (loop_cntr1 < 4)
+        //    alu[expected[5], expected[5], OR, temp, <<16] // VLD
+        //    alu[expected[5], expected[5], OR, 1, <<20] // had to set L3 to something other than 0 to test VLN
+        //.elif (loop_cntr1 < 8)
+        //    alu[expected[5], expected[5], OR, temp, <<18] // MPD
+        //    alu[expected[5], expected[5], OR, 1, <<20] // had to set L3 to something other than 0 to test MPL
+        //.elif (loop_cntr1 < 12)
+        //    alu[expected[5], expected[5], OR, temp, <<20] // L3I
+        //.else
+        //    alu[expected[5], expected[5], OR, 1, <<20] // had to set L3 to something other than 0 to test IPv6 bits
+        //.endif
 
         #define_eval _PV_CHK_LOOP 0
 
@@ -555,7 +556,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -575,7 +576,7 @@ move(loop_cntr, 0)
     pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
 
 
-    alu[expected[5], --, B, loop_cntr]
+    //alu[expected[5], --, B, loop_cntr]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -615,7 +616,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -676,7 +677,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -736,7 +737,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000100) // Seq
+move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -808,9 +809,9 @@ move($nbi_desc_wr[7], 0xe03fffff)
 move(expected[0], 0x3fffff7)
 move(expected[1], 0xffffffff)
 move(expected[2], 0x83ff0088)
-move(expected[3], 0xffff0000)
+move(expected[3], 0xffff00ff)
 move(expected[4], 0x00000000)
-move(expected[5], 0xfeffffff)
+move(expected[5], 0)
 move(expected[6], 0x00000000)
 move(expected[7], 0)
 
@@ -863,9 +864,9 @@ move($nbi_desc_wr[7], 0xe03fffff)
 move(expected[0], 0x3ff00f7)
 move(expected[1], 0xbfffffff)
 move(expected[2], 0x83ff0088)
-move(expected[3], 0xffff0100)
+move(expected[3], 0xffff01ff)
 move(expected[4], 0x00000000)
-move(expected[5], 0xfeffffff)
+move(expected[5], 0)
 move(expected[6], 0x00000000)
 move(expected[7], 0)
 
