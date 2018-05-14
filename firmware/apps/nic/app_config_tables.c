@@ -362,37 +362,68 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
     return;
 }
 
+__lmem __shared uint32_t rss_tmp[32];
 
-__intrinsic void
-upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base,
-              uint32_t vnic_port)
+//for each port there must be call to this.
+//for each port size of tbale must be known and configured accordingly
+__intrinsic void upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base, uint32_t vnic_port)
 {
-    __xread uint32_t xrd_rss_tbl[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
-    __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
-    uint32_t i;
+    __xread uint32_t rss_rd[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
+    __xwrite uint32_t rss_wr[32];
+    uint32_t i, j, tmp, data, shf, rows, cols;
 
-	if ( (start_offset + NFP_NET_CFG_RSS_ITBL_SZ_wrd) > SLICC_HASH_PAD_NN_IDX) {
-		cfg_error_rss_cntr++;
-		return;
-	}
-    /* Read all 32 words of RSS table */
-    mem_read32_swap(xrd_rss_tbl,
-                    bar_base + NFP_NET_CFG_RSS_ITBL,
-                    sizeof(xrd_rss_tbl));
-
-    for (i = 0; i < NFP_NET_CFG_RSS_ITBL_SZ_wrd; i++) {
-        if ((xrd_rss_tbl[i] & 0xff) >= NFD_MAX_PF_QUEUES) continue;
-        if (((xrd_rss_tbl[i] >> 8) & 0xff) >= NFD_MAX_PF_QUEUES) continue;
-        if (((xrd_rss_tbl[i] >> 16) & 0xff) >= NFD_MAX_PF_QUEUES) continue;
-        if (((xrd_rss_tbl[i] >> 24) & 0xff) >= NFD_MAX_PF_QUEUES) continue;
-        xwr_nn_info[i] = xrd_rss_tbl[i];
+    if (((start_offset + (RSS_TBL_SIZE_LW / NS_PLATFORM_NUM_PORTS)) > SLICC_HASH_PAD_NN_IDX) || (vnic_port > NS_PLATFORM_NUM_PORTS)) {
+	cfg_error_rss_cntr++;
+	return;
     }
 
-    /* Write at NN register start_offset for all worker MEs */
-    upd_nn_table_instr(xwr_nn_info,  start_offset,
-                        NFP_NET_CFG_RSS_ITBL_SZ_wrd);
+    mem_read32(rss_rd, bar_base + NFP_NET_CFG_RSS_ITBL, sizeof(rss_rd));
 
-    return;
+    #if (NFD_MAX_PF_QUEUES <= 4)
+        #define ACTION_RSS_COL_MASK  0x1e
+        #define ACTION_RSS_ROW_MASK  0x7
+        #define ACTION_RSS_COL_SHIFT 0x1
+        #define ACTION_RSS_ROW_SHIFT 0x4
+        #define ACTION_RSS_Q_MASK    0x3
+        rows = 8;
+        cols = 16;
+    #elif (NFD_MAX_PF_QUEUES <= 16)
+        #define ACTION_RSS_COL_MASK  0x1c
+        #define ACTION_RSS_ROW_MASK  0xf
+        #define ACTION_RSS_COL_SHIFT 0x2
+        #define ACTION_RSS_ROW_SHIFT 0x3
+        #define ACTION_RSS_Q_MASK    0xf
+	rows = 16;
+	cols = 8;
+    #else
+        #define ACTION_RSS_COL_MASK  0x18
+        #define ACTION_RSS_ROW_MASK  0x1f
+        #define ACTION_RSS_COL_SHIFT 0x3
+        #define ACTION_RSS_ROW_SHIFT 0x2
+        #define ACTION_RSS_Q_MASK    0xff
+	rows = 32;
+	cols = 4;
+    #endif
+
+    shf = 32 / cols;
+    for (i = 0; i < rows; ++i) {
+	rss_tmp[i] = 0;
+        for (j = 0; j < cols; ++j) {
+	    uint32_t idx = i * cols + j;
+	    __gpr uint32_t tmp = rss_rd[idx / 4]; // coerce rss_rd[idx / 4] into GPR, see THSDK-4039
+	    tmp = (tmp >> ((idx % 4) * 8)) & ((1 << shf) - 1);
+	    if (tmp >= NFD_MAX_PF_QUEUES)
+	       continue;
+	    rss_tmp[i] |= (tmp << (j * shf));
+        }
+    }
+
+    // separate loop for rss_wr[i] to avoid T_INDEX bug, see THSDK-4040
+    for (i = 0; i < rows; ++i) {
+	rss_wr[i] = rss_tmp[i];
+    }
+
+    upd_nn_table_instr(rss_wr, start_offset, rows);
 }
 
 __intrinsic void
@@ -465,6 +496,7 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
     __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
     __xread uint32_t rx_rings[2];
+    instr_rss_t instr_rss;
     __lmem union instruction_format instr[NIC_MAX_INSTR];
     SIGNAL sig1, sig2;
     uint32_t rss_flags, rss_rings;
@@ -572,7 +604,7 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     if (control & NFP_NET_CFG_CTRL_RSS_ANY || control & NFP_NET_CFG_CTRL_BPF) {
 
         /* RSS remapping table with NN register index as start offset */
-        rss_tbl_nnidx = vnic * NFP_NET_CFG_RSS_ITBL_SZ_wrd;
+        rss_tbl_nnidx = vnic * (RSS_TBL_SIZE_LW / NS_PLATFORM_NUM_PORTS);
 
         /* Udate the RSS NN table but only if RSS has changed
         * If vnic_port x write at x*32 NN register */
@@ -597,18 +629,23 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
 #else
         instr[count].instr = INSTR_RSS;
 #endif
-        instr[count].param = ((rss_rings - 1) << 19) | ((rss_flags & 0x0f) << 5) | 3;
         if ((NFD_CFG_MAJOR_PF < 4) && !(control & NFP_NET_CFG_CTRL_CHAIN_META)) {
-            instr[count].param |= (1 << INSTR_RSS_V1_META_BIT);
+		instr_rss.v1_meta = 1;
         }
+        instr_rss.max_queue = rss_rings - 1;
+        instr_rss.cfg_proto = rss_flags;
+        instr_rss.col_shf = ACTION_RSS_COL_SHIFT;
+        instr_rss.queue_mask = ACTION_RSS_Q_MASK;
+        instr_rss.row_mask = ACTION_RSS_ROW_MASK;
+        instr_rss.col_mask = ACTION_RSS_COL_MASK;
+        instr_rss.table_addr = rss_tbl_nnidx;
+        instr_rss.row_shf = ACTION_RSS_ROW_SHIFT;
+        instr_rss.key = rss_key[0];
+        instr[count].param = instr_rss.__raw[0];
         instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RSS);
         prev_instr = INSTR_RSS;
-
-	instr[count++].value =
-		(0xff << 24) | (0x1f << 17) | (0x18 << 12) | (rss_tbl_nnidx << 5) | 2;
-
-        /* RSS key: provide rss key with hash. Use only first 26 bits */
-        instr[count++].value = rss_key[0];
+        instr[count++].value = instr_rss.__raw[1];
+        instr[count++].value = instr_rss.__raw[2];
     }
 
     if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {
@@ -687,7 +724,7 @@ app_config_port_down(uint32_t vid)
         	union debug_instr_journal data;
         	data.value = 0x00;
         	data.event = PORT_DOWN;
-        	data.param = vnic_port;
+		data.param = vnic;
         	JDBG(app_debug_jrn, data.value);
     	}
 #endif

@@ -28,6 +28,8 @@
 #define NIC_CFG_INSTR_TBL_ADDR 0x00
 #define NIC_CFG_INSTR_TBL_SIZE 32768
 
+#define RSS_TBL_SIZE_LW     64
+
 /* For host ports,
  *   use 0 to NIC_HOST_MAX_ENTRIES-1
  * For wire ports,
@@ -175,12 +177,29 @@ union instruction_format {
     };
     uint32_t value;
 };
+
+typedef union {
+    struct {
+        uint32_t instr : 15;
+        uint32_t pipeline : 1;
+        uint32_t v1_meta : 1;
+        uint32_t max_queue : 6;
+        uint32_t cfg_proto : 4;
+        uint32_t col_shf : 5;
+        uint32_t queue_mask : 8;
+        uint32_t row_mask : 7;
+        uint32_t col_mask : 5;
+        uint32_t table_addr : 7;
+        uint32_t row_shf : 5;
+	uint32_t key;
+    };
+    uint32_t __raw[3];
+} instr_rss_t;
 #endif
 
 #define INSTR_PIPELINE_BIT 16
 #define INSTR_OPCODE_LSB   17
 
-#define INSTR_RSS_V1_META_BIT   15
 #define INSTR_RSS_V1_META_bf    0, 15, 15
 #define INSTR_RSS_MAX_QUEUE_bf  0, 14, 9
 #define INSTR_RSS_CFG_PROTO_bf  0, 8, 5
