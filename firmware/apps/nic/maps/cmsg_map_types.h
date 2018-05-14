@@ -7,6 +7,9 @@
 	#define CMSG_PORT		0xffffffff
 #endif
 
+//SR-IOV VLAN-MAC Table ID
+#define SRIOV_TID               (HASHMAP_MAX_TID - 1)
+
 /*
  * enhancement:  add field length to support variable size
  */
