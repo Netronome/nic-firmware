@@ -935,6 +935,9 @@ max_cbs#:
     alu[--, 0x78, AND, BF_A(in_nbi_desc, MAC_PARSE_V6_OPT_bf), >>BF_L(MAC_PARSE_V6_OPT_bf)] ; MAC_PARSE_V6_OPT_bf
     bne[skip_proto#]
 
+    alu[--, --, B, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>BF_L(MAC_PARSE_STS_bf)]
+    beq[skip_proto#]
+
     // packet is TCP/UDP
 
     alu[l4_type, 1, AND~, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>(BF_L(MAC_PARSE_STS_bf) + 1)]
