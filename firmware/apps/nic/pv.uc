@@ -56,7 +56,7 @@
  *       +-+---------+-------------------+-----+---------+---------------+
  *    3  |        Sequence Number        |  0  | Seq Ctx |   Protocol    |
  *       +-------------------------------+---+-+---------+---+-+-+-+-+-+-+
- *    4  |         TX Host Flags         | 0 |Seek (64B algn)|R|Q|M|B|C|c|
+ *    4  |         TX Host Flags         | 0 |Seek (64B algn)|-|Q|M|B|C|c|
  *       +-------------------------------+---+---------------+-+-+-+-+-+-+
  *    5  |       8B Header Offsets (stacked outermost to innermost)      |
  *       +-----------------+-------------+---------------+---------------+
@@ -65,9 +65,9 @@
  *    7  |                    Metadata Type Fields                       |
  *       +---------------------------------------------------------------+
  *    8  |             Original Packet Length (if from host)             |
- *       +---------------------------------------------------------------+
- *    9  |                           Reserved                            |
- *       +-----+-+-+-+-+-+-+-+---+---+---+-------------------------------+
+ *       +---------------+-----------+-+-+-------+-----------------------+
+ *    9  |    Next VF    | Reserved  |B|P|   0   |        VLAN ID        |
+ *       +-----+-+-+-+-+-+-+-+---+---+-+-+-------+-----------------------+
  *   10  |P_STS|M|E|A|F|D|R|H|L3I|MPD|VLD|           Checksum            |
  *       +-----+-+-+-+-+-+-+-+---+---+---+-------------------------------+
  *
@@ -201,6 +201,12 @@
 
 #define PV_ORIG_LENGTH_wrd              8
 #define PV_ORIG_LENGTH_bf               PV_ORIG_LENGTH_wrd, 13, 0
+
+#define PV_VLAN_wrd                     9
+#define PV_BROADCAST_NEXT_VF_bf         PV_VLAN_wrd, 31, 24
+#define PV_BROADCAST_ACTIVE_bf          PV_VLAN_wrd, 17, 17
+#define PV_BROADCAST_PROMISC_bf         PV_VLAN_wrd, 16, 16
+#define PV_VLAN_ID_bf                   PV_VLAN_wrd, 11, 0
 
 #define PV_CSUM_wrd                     10
 #define PV_CSUM_bf                      PV_CSUM_wrd, 15, 0
@@ -726,13 +732,15 @@ end#:
 #endm
 
 #macro __pv_get_mac_dst_type(out_type, io_vec)
-    pv_seek(io_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY))
+.begin
+    .reg tmp
     passert(BF_L(PV_MAC_DST_MC_bf), "EQ", (BF_M(PV_MAC_DST_BC_bf) + 1))
-    alu[out_type, 1, +16, *$index++]
-    alu[out_type, --, B, out_type, >>16]
-    alu[--, *$index--, +, out_type] // carry is set if broadcast
-    alu[out_type, (1 << 1), AND, *$index, >>(BF_L(MAC_MULTICAST_bf) - 1)], no_cc // bit 1 is set if multicast
+    alu[out_type, (1 << 1), AND, *$index, >>(BF_L(MAC_MULTICAST_bf) - 1)] // bit 1 is set if multicast
+    alu[tmp, 1, +16, *$index++]
+    alu[tmp, --, B, tmp, >>16]
+    alu[--, *$index++, +, tmp] // carry is set if broadcast
     alu[out_type, out_type, +carry, 0] // bit 0 is set if broadcast
+.end
 #endm
 
 
@@ -852,6 +860,7 @@ end#:
     .reg mac_dst_type
     .reg shift
     .reg vlan_len
+    .reg vlan_id
 
     alu[BF_A(out_vec, PV_LENGTH_bf), BF_A(in_nbi_desc, CAT_CTM_NUM_bf), AND~, BF_MASK(CAT_CTM_NUM_bf), <<BF_L(CAT_CTM_NUM_bf)]
     alu[BF_A(out_vec, PV_LENGTH_bf), BF_A(out_vec, PV_LENGTH_bf), -, MAC_PREPEND_BYTES]
@@ -958,12 +967,20 @@ skip_proto#:
     #endif
 
     immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
-    alu[out_vec[PV_FLAGS_wrd], --, B, 0]
 
-    __pv_get_mac_dst_type(mac_dst_type, out_vec)
-    bits_set__sz1(BF_AL(out_vec, PV_MAC_DST_TYPE_bf), mac_dst_type)
-
+    pv_seek(out_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY))
+    __pv_get_mac_dst_type(mac_dst_type, out_vec) // advances *$index by 2 words
+    alu[out_vec[PV_FLAGS_wrd], *$index++, B, 0]
     alu[vlan_len, (3 << 2), AND, BF_A(in_nbi_desc, MAC_PARSE_VLAN_bf), >>(BF_L(MAC_PARSE_VLAN_bf) - 2)]
+    beq[skip_vlan#], defer[3]
+        bits_set__sz1(BF_AL(out_vec, PV_MAC_DST_TYPE_bf), mac_dst_type)
+        alu[vlan_id, *$index++, B, 1, <<12]
+        alu[BF_A(out_vec, PV_VLAN_ID_bf), vlan_id, -, 1] ; PV_VLAN_ID_bf
+
+    alu[vlan_id, --, B, *$index, >>16]
+    alu[BF_A(out_vec, PV_VLAN_ID_bf), BF_A(out_vec, PV_VLAN_ID_bf), AND, vlan_id]
+skip_vlan#:
+
     __pv_mtu_check(out_vec, in_mtu, vlan_len, DROP_MTU_LABEL)
 
     bitfield_extract__sz1(--, BF_AML(in_nbi_desc, CAT_SEQ_CTX_bf)) ; CAT_SEQ_CTX_bf
@@ -1174,7 +1191,8 @@ end#:
 
     pkt_buf_copy_mu_head_to_ctm(in_pkt_num, BF_A(out_vec, PV_MU_ADDR_bf), NFD_IN_DATA_OFFSET, 1)
 
-    __pv_get_mac_dst_type(mac_dst_type, out_vec)
+    pv_seek(out_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY))
+    __pv_get_mac_dst_type(mac_dst_type, out_vec) // advances *$index by 2 words
     alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
 
     br_bclr[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), skip_lso#], defer[3]

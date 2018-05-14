@@ -575,20 +575,20 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_WIRE);
     prev_instr = INSTR_RX_WIRE;
 
-    if (!(control & NFP_NET_CFG_CTRL_PROMISC)) {
-        /* MAC address */
-        mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
+    /* MAC address */
+    mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
                     sizeof(nic_mac));
 #ifdef GEN_INSTRUCTION
-        instr[count].instr = instr_tbl[INSTR_MAC];
+    instr[count].instr = instr_tbl[INSTR_MAC];
 #else
-        instr[count].instr = INSTR_MAC;
+    instr[count].instr = INSTR_MAC;
 #endif
-        instr[count].param = (nic_mac[0] >> 16);
-        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_MAC);
-        prev_instr = INSTR_MAC;
-        instr[count++].value = (nic_mac[0] << 16) | (nic_mac[1] >> 16);
-    }
+    instr[count].param = (control & NFP_NET_CFG_CTRL_PROMISC) ? 0xffff :
+                         (nic_mac[0] >> 16);
+    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_MAC);
+    prev_instr = INSTR_MAC;
+    instr[count++].value = (control & NFP_NET_CFG_CTRL_PROMISC) ? 0xffffffff :
+                           ((nic_mac[0] << 16) | (nic_mac[1] >> 16));
 
     if (control & NFP_NET_CFG_CTRL_BPF) {
         instr[count].param = NFD_BPF_START_OFF + vnic * NFD_BPF_MAX_LEN;

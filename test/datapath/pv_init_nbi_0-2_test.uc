@@ -4,7 +4,7 @@
 #include <pv.uc>
 #include <stdmac.uc>
 
-#define SIZE_LW 8
+#define SIZE_LW 16
 
 .sig s
 .reg addr
@@ -19,6 +19,12 @@
 .xfer_order $nbi_desc_wr
 
 #define pkt_vec *l$index1
+
+move(loop_cntr, 0)
+.while (loop_cntr < 1024)
+    move(pkt_vec++, 0)
+    alu[loop_cntr, loop_cntr, +, 1]
+.endw
 
 pv_init(pkt_vec, 0)
 
@@ -42,6 +48,14 @@ move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
 move(expected[7], 0)
+move(expected[8], 0)
+move(expected[9], 0xfff)
+move(expected[10], 0)
+move(expected[11], 0)
+move(expected[12], 0)
+move(expected[13], 0)
+move(expected[14], 0)
+move(expected[15], 0)
 
 move(loop_cntr, 64)
 
@@ -111,6 +125,8 @@ move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
 move(expected[7], 0)
+move(expected[8], 0)
+move(expected[9], 0xfff)
 
 move(loop_cntr, 0)
 

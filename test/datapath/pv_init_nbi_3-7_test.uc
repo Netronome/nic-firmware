@@ -4,7 +4,7 @@
 #include <pv.uc>
 #include <stdmac.uc>
 
-#define SIZE_LW 8
+#define SIZE_LW 16
 
 .sig s
 .reg addr
@@ -22,6 +22,12 @@
 .xfer_order $nbi_desc_wr
 
 #define pkt_vec *l$index1
+
+move(loop_cntr, 0)
+.while (loop_cntr < 1024)
+    move(pkt_vec++, 0)
+    alu[loop_cntr, loop_cntr, +, 1]
+.endw
 
 move(error_expected_flag, 0)
 move(mtu, 0xfff)
@@ -51,6 +57,14 @@ move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
 move(expected[7], 0)
+move(expected[8], 0)
+move(expected[9], 0xfff)
+move(expected[10], 0)
+move(expected[11], 0)
+move(expected[12], 0)
+move(expected[13], 0)
+move(expected[14], 0)
+move(expected[15], 0)
 
 move(loop_cntr, 1)
 
@@ -120,6 +134,8 @@ move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
 move(expected[7], 0)
+move(expected[8], 0)
+move(expected[9], 0xfff)
 
 move(loop_cntr, 0)
 
@@ -223,382 +239,6 @@ move(loop_cntr, 0)
     alu[loop_cntr, loop_cntr, +, 1]
 
 .endw
-
-
-/* Test PV L3I, MPD and VLD fields */
-
-move($nbi_desc_wr[0], 64)
-move($nbi_desc_wr[1], 0)
-move($nbi_desc_wr[2], 0x100)
-alu[$nbi_desc_wr[3], --, B, 2, <<12] // TCP
-alu[$nbi_desc_wr[4], --, B, MAC_PREPEND_BYTES, <<8] // L4 Offset
-move($nbi_desc_wr[5], 0)
-move($nbi_desc_wr[6], 0)
-move($nbi_desc_wr[7], 0)
-
-move(expected[0], (64 - MAC_PREPEND_BYTES))
-move(expected[1], 0)
-move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x000001ff) // Seq
-move(expected[4], 0x00000000) // Seek
-move(expected[5], 0)
-move(expected[6], 0x00000000)
-move(expected[7], 0)
-
-move(loop_cntr, 0)
-
-.while (loop_cntr <= 0x3f)
-
-    alu[$nbi_desc_wr[7], --, B, loop_cntr, <<16]
-
-    mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-    mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
-
-
-    //alu[expected[5], --, B, loop_cntr, <<16]
-
-    #define_eval _PV_CHK_LOOP 0
-
-    #while (_PV_CHK_LOOP < SIZE_LW)
-
-        move(value, pkt_vec++)
-        // derived from packge
-        #if (_PV_CHK_LOOP == 4)
-            alu[value, value, AND~, 0xc]
-        #endif
-
-        #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
-        test_assert_equal(value, _PV_INIT_EXPECT)
-
-        #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
-
-    #endloop
-
-    alu[loop_cntr, loop_cntr, +, 1]
-
-.endw
-
-
-/* Test PV L4 Offset fields using OL4 = TCP */
-
-move($nbi_desc_wr[0], 64)
-move($nbi_desc_wr[1], 0)
-move($nbi_desc_wr[2], 0x100)
-alu[$nbi_desc_wr[3], --, B, 3, <<12] // TCP
-move($nbi_desc_wr[4], 0)
-move($nbi_desc_wr[5], 0)
-move($nbi_desc_wr[6], 0)
-move($nbi_desc_wr[7], 0)
-
-move(expected[0], (64 - MAC_PREPEND_BYTES))
-move(expected[1], 0)
-move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x000001ff) // Seq
-move(expected[4], 0x00000000) // Seek
-move(expected[5], 0)
-move(expected[6], 0x00000000)
-move(expected[7], 0)
-
-move(loop_cntr, 0)
-
-.while (loop_cntr <= (0xff-MAC_PREPEND_BYTES))
-
-    alu[temp, loop_cntr, +, MAC_PREPEND_BYTES]
-    alu[$nbi_desc_wr[4], --, B, temp, <<8]
-
-    mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-    mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
-
-
-    alu[temp, --, B, loop_cntr, >>1]
-    //alu[expected[5], --, B, temp, <<22]
-
-    #define_eval _PV_CHK_LOOP 0
-
-    #while (_PV_CHK_LOOP < SIZE_LW)
-
-        move(value, pkt_vec++)
-        // derived from packge
-        #if (_PV_CHK_LOOP == 4)
-            alu[value, value, AND~, 0xc]
-        #endif
-
-        #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
-        test_assert_equal(value, _PV_INIT_EXPECT)
-
-        #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
-
-    #endloop
-
-    alu[loop_cntr, loop_cntr, +, 1]
-
-.endw
-
-
-/* Test PV L4 Offset fields using OL4 = UDP */
-
-move($nbi_desc_wr[0], 64)
-move($nbi_desc_wr[1], 0)
-move($nbi_desc_wr[2], 0x100)
-alu[$nbi_desc_wr[3], --, B, 2, <<12] // UDP
-move($nbi_desc_wr[4], 0)
-move($nbi_desc_wr[5], 0)
-move($nbi_desc_wr[6], 0)
-move($nbi_desc_wr[7], 0)
-
-move(expected[0], (64 - MAC_PREPEND_BYTES))
-move(expected[1], 0)
-move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x000001ff) // Seq
-move(expected[4], 0x00000000) // Seek
-move(expected[5], 0)
-move(expected[6], 0x00000000)
-move(expected[7], 0)
-
-move(loop_cntr, 0)
-
-.while (loop_cntr <= (0xff-MAC_PREPEND_BYTES))
-
-    alu[temp, loop_cntr, +, MAC_PREPEND_BYTES]
-    alu[$nbi_desc_wr[4], --, B, temp, <<8]
-
-    mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-    mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
-
-
-    alu[temp, --, B, loop_cntr, >>1]
-    //alu[expected[5], --, B, temp, <<22]
-
-    #define_eval _PV_CHK_LOOP 0
-
-    #while (_PV_CHK_LOOP < SIZE_LW)
-
-        move(value, pkt_vec++)
-        // derived from packge
-        #if (_PV_CHK_LOOP == 4)
-            alu[value, value, AND~, 0xc]
-        #endif
-
-        #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
-        test_assert_equal(value, _PV_INIT_EXPECT)
-
-        #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
-
-    #endloop
-
-    alu[loop_cntr, loop_cntr, +, 1]
-
-.endw
-
-
-/* Test PV L4 Offset fields using OL4 fields other than TCP and UDP */
-
-/* If OL4 is not TCP or UDP:
- * If the PV VLD bits are >= 2    the L4 Offset will not be written
- * If the PV MPD bits are not = 0 the L4 Offset will not be written
- * If the PV L3I bits are = 0     the L4 Offset will not be written
- * If there are IPv6 Extension Headers other than hop-by-hop(H), routing(R) and destination(D) the L4 Offset will not be written
- * Otherwise the L4 offset field will be written
- */
-
-move($nbi_desc_wr[0], 64)
-move($nbi_desc_wr[1], 0)
-move($nbi_desc_wr[2], 0x100)
-move($nbi_desc_wr[3], 0)
-alu[$nbi_desc_wr[4], --, B, 0xff, <<8] // HP-Off0
-move($nbi_desc_wr[5], 0)
-move($nbi_desc_wr[6], 0)
-move($nbi_desc_wr[7], 0)
-
-move(expected[0], (64 - MAC_PREPEND_BYTES))
-move(expected[1], 0)
-move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x000001ff) // Seq
-move(expected[4], 0x00000000) // Seek
-move(expected[5], 0)
-move(expected[6], 0x00000000)
-move(expected[7], 0)
-
-move(loop_cntr, 0)
-
-.while (loop_cntr <= 0xf)
-
-    .if ((loop_cntr == 2) || (loop_cntr == 3))
-        br[cont_loop#]
-    .endif
-
-    alu[$nbi_desc_wr[3], --, B, loop_cntr, <<12]
-
-    move(loop_cntr1, 0)
-
-    .while (loop_cntr1 <= 18) // PV VLD(4) + PV MPD(4) + PV L3I(4) + Meta IPv6(7)
-
-        alu[temp, loop_cntr1, AND, 3]
-        .if (loop_cntr1 < 4)
-            alu[temp, temp, OR, 1, <<4] // have to set L3 to something other than 0 to test VLN
-            alu[$nbi_desc_wr[7], --, B, temp, <<16] // VLN
-        .elif (loop_cntr1 < 8)
-            alu[temp, temp, OR, 1, <<2] // have to set L3 to something other than 0 to test MPL
-            alu[$nbi_desc_wr[7], --, B, temp, <<18] // MPL
-        .elif (loop_cntr1 < 12)
-            alu[$nbi_desc_wr[7], --, B, temp, <<20] // L3
-        .else
-            alu[temp, loop_cntr1, +, 10]
-            alu[--, temp, B, 0]
-            alu[temp, --, B, 1, <<indirect]
-            alu[temp, temp, OR, 1, <<20] // have to set L3 to something other than 0 to test IPv6 bits
-            alu[$nbi_desc_wr[7], --, B, temp]
-        .endif
-
-        mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-        mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-        pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-        pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
-
-
-        /* If OL4 is not TCP or UDP:
-         * If the PV VLD bits are >= 2    the L4 Offset will not be written
-         * If the PV MPD bits are not = 0 the L4 Offset will not be written
-         * If the PV L3I bits are = 0     the L4 Offset will not be written
-         * If there are IPv6 Extension Headers other than hop-by-hop(H), routing(R) and destination(D) the L4 Offset will not be written
-         * Otherwise the L4 offset field will be written
-         */
-
-        /* Assume the L4 Offset will be written */
-        //alu[expected[5], --, B, 0x7b, <<22]
-
-        move(temp, 0)
-
-        .if ((loop_cntr1 > 1) && (loop_cntr1 < 4))
-            move(temp, 1)
-        .endif
-        .if ((loop_cntr1 > 4) && (loop_cntr1 < 8))
-            move(temp, 1)
-        .endif
-        .if (loop_cntr1 == 8)
-            move(temp, 1)
-        .endif
-        .if (loop_cntr1 > 14)
-            move(temp, 1)
-        .endif
-        .if (temp == 1)
-            move(expected[5], 0)
-        .endif
-
-        /* Or in L3, MPL, VLN bits */
-
-        alu[temp, loop_cntr1, AND, 3]
-        //.if (loop_cntr1 < 4)
-        //    alu[expected[5], expected[5], OR, temp, <<16] // VLD
-        //    alu[expected[5], expected[5], OR, 1, <<20] // had to set L3 to something other than 0 to test VLN
-        //.elif (loop_cntr1 < 8)
-        //    alu[expected[5], expected[5], OR, temp, <<18] // MPD
-        //    alu[expected[5], expected[5], OR, 1, <<20] // had to set L3 to something other than 0 to test MPL
-        //.elif (loop_cntr1 < 12)
-        //    alu[expected[5], expected[5], OR, temp, <<20] // L3I
-        //.else
-        //    alu[expected[5], expected[5], OR, 1, <<20] // had to set L3 to something other than 0 to test IPv6 bits
-        //.endif
-
-        #define_eval _PV_CHK_LOOP 0
-
-        #while (_PV_CHK_LOOP < SIZE_LW)
-
-            move(value, pkt_vec++)
-            // derived from packge
-            #if (_PV_CHK_LOOP == 4)
-               alu[value, value, AND~, 0xc]
-            #endif
-
-            #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
-            test_assert_equal(value, _PV_INIT_EXPECT)
-
-            #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
-
-        #endloop
-
-xxx#:
-        alu[loop_cntr1, loop_cntr1, +, 1]
-
-    .endw
-
-cont_loop#:
-    alu[loop_cntr, loop_cntr, +, 1]
-
-.endw
-
-
-/* Test PV Checksum field */
-
-move($nbi_desc_wr[0], 64)
-move($nbi_desc_wr[1], 0)
-move($nbi_desc_wr[2], 0x100)
-move($nbi_desc_wr[3], 0)
-move($nbi_desc_wr[4], 0)
-move($nbi_desc_wr[5], 0)
-move($nbi_desc_wr[6], 0)
-move($nbi_desc_wr[7], 0)
-
-move(expected[0], (64 - MAC_PREPEND_BYTES))
-move(expected[1], 0)
-move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x000001ff) // Seq
-move(expected[4], 0x00000000) // Seek
-move(expected[5], 0)
-move(expected[6], 0x00000000)
-move(expected[7], 0)
-
-move(loop_cntr, 0)
-
-.while (loop_cntr <= 0xffff)
-
-    alu[$nbi_desc_wr[7], --, B, loop_cntr]
-
-    mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-    mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
-
-
-    //alu[expected[5], --, B, loop_cntr]
-
-    #define_eval _PV_CHK_LOOP 0
-
-    #while (_PV_CHK_LOOP < SIZE_LW)
-
-        move(value, pkt_vec++)
-        // derived from packge
-        #if (_PV_CHK_LOOP == 4)
-            alu[value, value, AND~, 0xc]
-        #endif
-
-        #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
-        test_assert_equal(value, _PV_INIT_EXPECT)
-
-        #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
-
-    #endloop
-
-    alu[loop_cntr, loop_cntr, +, 1]
-
-.endw
-
 
 /* Test PV Ingress Queue field */
 
@@ -839,7 +479,9 @@ error_expected_ret1#:
     #endif
 
     #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
+#if (_PV_CHK_LOOP < 8)
     test_assert_equal(value, _PV_INIT_EXPECT)
+#endif
 
     #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
 
@@ -890,7 +532,7 @@ error_expected_ret2#:
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP < SIZE_LW)
+    #while (_PV_CHK_LOOP < PV_SIZE_LW)
 
         move(value, pkt_vec++)
         // derived from packge
@@ -899,8 +541,9 @@ error_expected_ret2#:
         #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
+#if (_PV_CHK_LOOP < 8)
         test_assert_equal(value, _PV_INIT_EXPECT)
-
+#endif
         #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
 
     #endloop
