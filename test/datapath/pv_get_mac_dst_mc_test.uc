@@ -7,6 +7,7 @@
 #include <pv.uc>
 
 .reg type
+pv_seek(pkt_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY))
 __pv_get_mac_dst_type(type, pkt_vec)
 
 test_assert_equal(type, 2)

@@ -17,6 +17,7 @@ rx_discard_proto
 
 rx_errors
 rx_error_parse
+rx_error_veb
 
 tx_discards
 tx_discard_act

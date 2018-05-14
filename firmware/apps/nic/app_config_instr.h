@@ -98,12 +98,14 @@ enum instruction_type {
  *       N = Parse NVGRE
  *       VXLAN = Parse VXLAN for N ports
  *
- * INSTR_MATCH_MAC:
+ * INSTR_MAC_CLASSIFY:
  *       +-----------------------------+-+-------------------------------+
  *    0  |              2              |P|            MAC HI             |
  *       +-----------------------------+-+-------------------------------+
  *    1  |                            MAC LO                             |
  *       +---------------------------------------------------------------+
+ *
+ * Passing MAC = 0xffffff enabled promiscuous mode
  *
  * INSTR_RSS:
  * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0

@@ -20,6 +20,10 @@
 #include "pkt_io.uc"
 #include "ebpf.uc"
 
+#define NULL_VLAN 0xfff
+
+.alloc_mem __actions_sriov_keys lmem me 32 64
+
 .reg volatile read $__actions[NIC_MAX_INSTR]
 .addr $__actions[0] 32
 .xfer_order $__actions
@@ -95,27 +99,104 @@
 #endm
 
 
-#macro __actions_check_mac(in_pkt_vec, DROP_LABEL)
+/* VEB lookup key:
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-------------------------------+-------+-----------------------+
+ *    0  |         MAC ADDR HI           |   0   |       VLAN ID         |
+ *       +-------------------------------+-------+-----------------------+
+ *    1  |                           MAC ADDR LO                         |
+ *       +---------+-------------------------------------------+---------+
+ */
+
+#macro __actions_mac_classify(in_pkt_vec, DROP_LABEL)
 .begin
-    .reg mac[2]
+    .reg act_broadcast
+    .reg ins_addr[2]
+    .reg key_addr
+    .reg mac_hi
+    .reg mac_lo
+    .reg port_mac[2]
+    .reg promisc
+    .reg tid
     .reg tmp
+    .reg vlan_id
 
-    __actions_read(mac[0], 0xffff)
-    __actions_read(mac[1])
+    .sig sig_read
 
-    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
+    __actions_read(port_mac[0], 0xffff)
+    __actions_read(port_mac[1])
 
-    // permit multicast and broadcast addresses to pass
-    br_bset[*$index, BF_L(MAC_MULTICAST_bf), pass#]
+    br_bset[BF_AL(in_pkt_vec, PV_MAC_DST_MC_bf), multicast#]
+    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY, mac_match_check#)
 
-    alu[tmp, mac[0], XOR, *$index++]
-    alu[--, --, B, tmp, <<16]
-    bne[DROP_LABEL]
+multicast#:
+    br[end#], defer[2]
+        alu[act_broadcast, --, B, 1, <<BF_L(PV_BROADCAST_ACTIVE_bf)]
+        alu[BF_A(in_pkt_vec, PV_BROADCAST_ACTIVE_bf), BF_A(in_pkt_vec, PV_BROADCAST_ACTIVE_bf), OR, act_broadcast]
 
-    alu[--, mac[1], XOR, *$index++]
-    bne[DROP_LABEL]
+veb_error#:
+    pv_stats_update(in_pkt_vec, RX_ERROR_VEB, DROP_LABEL)
 
-pass#:
+veb_miss#:
+    br_bclr[BF_AL(in_pkt_vec, PV_QUEUE_IN_TYPE_bf), end#] // continue processing actions for packets from VF
+    br_bset[promisc, BF_L(PV_BROADCAST_PROMISC_bf), end#] // continue processing actions in promisc mode
+    pv_stats_update(in_pkt_vec, RX_DISCARD_ADDR, DROP_LABEL)
+
+veb_lookup#:
+    immed[key_addr, __actions_sriov_keys]
+    alu[key_addr, key_addr, OR, t_idx_ctx, >>5]
+    local_csr_wr[ACTIVE_LM_ADDR_0, key_addr]
+
+        passert(BF_L(PV_BROADCAST_PROMISC_bf), "EQ", 16)
+        alu[promisc, port_mac[1], +, 1]
+        alu[promisc, port_mac[0], +carry, 0]
+        alu[tid, --, B, SRIOV_TID]
+
+    alu[tmp, --, B, *$index++, <<16]
+    alu[*l$index0++, tmp, +16, BF_A(in_pkt_vec, PV_VLAN_ID_bf)]
+    alu[*l$index0, --, B, *$index]
+
+    #define HASHMAP_RXFR_COUNT 4
+    #define MAP_RDXR $__pv_pkt_data
+    // hashmap_ops will overwrite the packet cache, we MUST invalidate
+    pv_invalidate_cache(in_pkt_vec)
+    hashmap_ops(tid,
+                key_addr,
+                --,
+                HASHMAP_OP_LOOKUP,
+                veb_error#, // invalid map - should never happen
+                veb_miss#, // sriov miss
+                HASHMAP_RTN_ADDR,
+                --,
+                --,
+                ins_addr,
+                swap)
+    #undef MAP_RDXR
+    #undef HASHMAP_RXFR_COUNT
+
+veb_hit#:
+    //Load a new set of instructions as pointed by the returned address.
+    //Note that from this point on the original instructions list is overwritten and
+    //we no longer process instructions from current list.
+    ov_start(OV_LENGTH)
+    ov_set_use(OV_LENGTH, 16, OVF_SUBTRACT_ONE)
+    ov_clean()
+    mem[read32, $__actions[0], ins_addr[0], <<8, ins_addr[1], max_16], indirect_ref, sig_done[sig_read]
+
+    .reg_addr __actions_t_idx 28 B
+    alu[__actions_t_idx, t_idx_ctx, OR, &$__actions[0], <<2]
+
+    ctx_arb[sig_read], br[end#], defer[2]
+        alu[promisc, promisc, AND, 1, <<BF_L(PV_BROADCAST_PROMISC_bf)]
+        alu[BF_A(in_pkt_vec, PV_BROADCAST_PROMISC_bf), BF_A(in_pkt_vec, PV_BROADCAST_PROMISC_bf), OR, promisc]
+
+mac_match_check#:
+    alu[mac_hi, port_mac[0], XOR, *$index++]
+    alu[mac_lo, port_mac[1], XOR, *$index--]
+    alu[--, mac_lo, OR, mac_hi, <<16]
+    bne[veb_lookup#]
+
+end#:
     __actions_restore_t_idx()
 .end
 #endm
@@ -391,9 +472,6 @@ error_mtu#:
 drop_mtu#:
     pv_stats_update(io_pkt_vec, RX_DISCARD_MTU, drop#)
 
-drop_addr#:
-    pv_stats_update(io_pkt_vec, RX_DISCARD_ADDR, drop#)
-
 drop_act#:
     pv_stats_update(io_pkt_vec, RX_DISCARD_ACT, drop#)
 
@@ -402,7 +480,7 @@ rx_wire#:
     __actions_next()
 
 mac#:
-    __actions_check_mac(io_pkt_vec, drop_addr#)
+    __actions_mac_classify(io_pkt_vec, drop#)
     __actions_next()
 
 rss#:
