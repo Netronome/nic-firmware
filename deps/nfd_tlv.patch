@@ -1,5 +1,5 @@
 diff --git a/me/blocks/vnic/shared/nfd_cfg.h b/me/blocks/vnic/shared/nfd_cfg.h
-index 9be7a75..90310e1 100644
+index 9be7a75c..90310e11 100644
 --- a/me/blocks/vnic/shared/nfd_cfg.h
 +++ b/me/blocks/vnic/shared/nfd_cfg.h
 @@ -259,6 +259,25 @@ NFD_CFG_RINGS_DECL(3);
@@ -29,7 +29,7 @@ index 9be7a75..90310e1 100644
  /**
   * @param msg_valid     message contains valid information
 diff --git a/me/blocks/vnic/shared/nfd_cfg_internal.c b/me/blocks/vnic/shared/nfd_cfg_internal.c
-index 1a6f904..1675f67 100644
+index 1a6f9047..1675f673 100644
 --- a/me/blocks/vnic/shared/nfd_cfg_internal.c
 +++ b/me/blocks/vnic/shared/nfd_cfg_internal.c
 @@ -501,6 +501,10 @@ _nfd_cfg_init_vf_cfg_bar(unsigned int vid)
@@ -83,7 +83,7 @@ index 1a6f904..1675f67 100644
  
  
 diff --git a/me/blocks/vnic/shared/nfd_flr.c b/me/blocks/vnic/shared/nfd_flr.c
-index f07b91d..b3aa724 100644
+index f07b91d9..440366f3 100644
 --- a/me/blocks/vnic/shared/nfd_flr.c
 +++ b/me/blocks/vnic/shared/nfd_flr.c
 @@ -153,6 +153,52 @@ nfd_flr_init_cfg_queue(unsigned int pcie_isl, unsigned int vid,
@@ -121,7 +121,7 @@ index f07b91d..b3aa724 100644
 +		NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFP_NET_CFG_TLV_BASE,
 +		sizeof(tlv_base));
 +
-+    for (offset = 0; offset < NFP_NET_CFG_BAR_SZ; offset += sizeof(read_block)) {
++    for (offset = 0; offset < NFP_NET_CFG_BAR_SZ - NFD_CFG_TLV_BLOCK; offset += sizeof(read_block)) {
 +        mem_read32(read_block,
 +		   NFD_TLV_VID_BASE(PCIE_ISL, vid) + offset,
 +		   sizeof(read_block));
@@ -129,7 +129,7 @@ index f07b91d..b3aa724 100644
 +        for (i = 0; i < sizeof(read_block) / 4; ++i)
 +	    write_block[i] = read_block[i];
 +
-+        size = MIN(sizeof(write_block), NFP_NET_CFG_BAR_SZ - offset);
++        size = MIN(sizeof(write_block), NFP_NET_CFG_BAR_SZ - NFD_CFG_TLV_BLOCK - offset);
 +        mem_write32(write_block,
 +		    NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFD_CFG_TLV_BLOCK + offset,
 +		    size);
@@ -164,7 +164,7 @@ index f07b91d..b3aa724 100644
  
 diff --git a/me/blocks/vnic/shared/nfd_tlv.uc b/me/blocks/vnic/shared/nfd_tlv.uc
 new file mode 100644
-index 0000000..240a1e3
+index 00000000..240a1e37
 --- /dev/null
 +++ b/me/blocks/vnic/shared/nfd_tlv.uc
 @@ -0,0 +1,134 @@
