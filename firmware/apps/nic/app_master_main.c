@@ -760,7 +760,7 @@ lsc_loop(void)
     /* NOTREACHED */
 }
 
-
+#ifndef UNIT_TEST
 int
 main(void)
 {
@@ -785,3 +785,4 @@ main(void)
     }
     /* NOTREACHED */
 }
+#endif

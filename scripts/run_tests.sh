@@ -4,8 +4,10 @@ FILTER=$1
 shift
 TEST_DIR=$1
 shift
-BUILD_DIR=$1
-mkdir -p ${BUILD_DIR}
+TEST_BUILD_DIR=$1
+mkdir -p ${TEST_BUILD_DIR}
+shift
+FW_BUILD_DIR=$1
 shift
 #set -x
 PASSED=0
@@ -22,14 +24,20 @@ for t in `find ${TEST_DIR} -iname '*_test.uc' -o -iname '*_test.c'` ; do
     fi
     FILE_BASE=`basename ${t%.*}`
     if echo ${t} | grep '.uc' > /dev/null ; then
-        nfas -Itest/include -Itest/lib $* -o ${BUILD_DIR}/${FILE_BASE}.list $t || exit 1
+        nfas -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t || exit 1
+        nfld -chip nfp-4xxx-b0 -mip -rtsyms -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list || exit 1
     else
-        nfcc -Itest/include -Itest/lib $* -o ${BUILD_DIR}/${FILE_BASE}.list $t || exit 1
+        of=" "
+        for obj in `find ${FW_BUILD_DIR} -iname '*.obj'` ; do
+            of=$of" "$obj
+        done
+        nfcc -chip nfp-4xxx-b0 -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t ${of} || exit 1
+        nfld -chip nfp-4xxx-b0 -mip -rtsyms -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list || exit 1
     fi
-    nfld -chip nfp-4xxx-b0 -mip -rtsyms -u i32.me0 ${BUILD_DIR}/${FILE_BASE}.list || exit 1
+
     nfp-nffw unload || exit 1
-    nfp-nffw load -S ${BUILD_DIR}/${FILE_BASE}.nffw || exit 1
-    awk '$0~/;TEST_INIT_EXEC/{system(gensub(";TEST_INIT_EXEC ", "", 1))}' < ${BUILD_DIR}/${FILE_BASE}.list || exit 1
+    nfp-nffw load -S ${TEST_BUILD_DIR}/${FILE_BASE}.nffw || exit 1
+    awk '$0~/;TEST_INIT_EXEC/{system(gensub(";TEST_INIT_EXEC ", "", 1))}' < ${TEST_BUILD_DIR}/${FILE_BASE}.list || exit 1
     nfp-nffw start
     TIMEOUT=10
     echo -n "${FILE_BASE} : "
