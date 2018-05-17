@@ -2,7 +2,8 @@
     test support functions
 */
 
-#include <rtl.c>
+#include <nfp.h>
+#include <rtl.h>
 
 /* stop all threads except thread 0 */
 __intrinsic void single_ctx_test() {
