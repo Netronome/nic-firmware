@@ -7,6 +7,9 @@
 	#define CMSG_PORT		0xffffffff
 #endif
 
+#define HASHMAP_MAX_TID 255  /* must agree with same definition in hashmap.uc,
+                                or include this file in hashmap.uc */
+
 //SR-IOV VLAN-MAC Table ID
 #define SRIOV_TID               (HASHMAP_MAX_TID - 1)
 
@@ -313,7 +316,8 @@ struct cmsg_req_map_op {
 			uint32_t tid;
 			uint32_t count;
 			uint32_t flags;					/* 0 if any (add if not existed), 1 is update only */
-			struct cmsg_key_value[11];		/* max number of key+value pair per pkt */
+			uint32_t key[CMSG_MAP_KEY_VALUE_LW];
+			uint32_t value[CMSG_MAP_KEY_VALUE_LW];
 		};
 		uint32_t __raw[353];				/* 4 - 353 LW */
 	};
@@ -327,7 +331,8 @@ struct cmsg_reply_map_op {
 			uint32_t rc;					/* rc cummulative */
 			uint32_t count;					/* # of successful ops */
 			uint32_t reserve;
-			struct cmsg_key_value[11];		/* max number of key+value pair per pkt */
+			uint32_t key[CMSG_MAP_KEY_VALUE_LW];
+			uint32_t value[CMSG_MAP_KEY_VALUE_LW];
 		};
 		uint32_t __raw[353];				/* 4 - 353 LW */
 
