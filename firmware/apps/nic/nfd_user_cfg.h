@@ -28,6 +28,9 @@
 
 #define NFD_USE_OVERSUBSCRIPTION
 
+/* The absolute max number of VNICs we can support */
+#define NVNICS_ABSOLUTE_MAX 64
+
 #if NS_PLATFORM_NUM_PORTS > 1
 #if NS_PLATFORM_NUM_PORTS > 8  /* NS_PLATFORM_NUM_PORTS > 8 */
 
@@ -123,6 +126,12 @@
      NFP_NET_CFG_CTRL_GATHER   | NFP_NET_CFG_CTRL_LSO2 |          \
      NFP_NET_CFG_CTRL_IRQMOD   | NFP_NET_CFG_CTRL_BPF |           \
      NFP_NET_CFG_CTRL_LIVE_ADDR)
+
+/* Set Core NIC ABI version and supported VF configuration capabilities. */
+#define NFD_VF_CFG_ABI_VER      2
+#define NFD_VF_CFG_CAP                                       \
+    (NFD_VF_CFG_MB_CAP_MAC | NFD_VF_CFG_MB_CAP_VLAN |        \
+     NFD_VF_CFG_MB_CAP_SPOOF | NFD_VF_CFG_MB_CAP_LINK_STATE)
 
 #define NFD_RSS_HASH_FUNC NFP_NET_CFG_RSS_CRC32
 
