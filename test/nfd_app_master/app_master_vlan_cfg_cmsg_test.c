@@ -27,6 +27,28 @@
 
 __cls __align(4) struct ctm_pkt_credits pkt_buf_ctm_credits;
 
+/* initialize blm buffer ring for test */
+#define BLM_TEST_BUF_SIZE (1 << 11)
+#define BLM_TEST_BUFFERS 16
+__declspec(shared export emem0 aligned(BLM_TEST_BUF_SIZE)) \
+uint32_t blm_test_mem[BLM_TEST_BUFFERS][BLM_TEST_BUF_SIZE];
+
+static void blm_test_init() {
+    int i;
+
+    mem_ring_setup(__link_sym("BLM_NBI8_BLQ1_EMU_QID"),
+                   (__mem void *)__link_sym("_BLM_NBI8_BLQ1_EMU_Q_BASE"),
+                   4096);
+
+    for (i = 0; i < BLM_TEST_BUFFERS; i++) {
+        __xrw uint32_t addr = (uint32_t)((uint64_t)&blm_test_mem[i] >> 11);
+        mem_ring_put(__link_sym("BLM_NBI8_BLQ1_EMU_QID"),
+                     MEM_RING_GET_MEMADDR(_BLM_NBI8_BLQ1_EMU_Q_BASE),
+                     &addr,
+                     sizeof(addr));
+    }
+}
+
 void main() {
 
     int rv, pass, i;
@@ -49,6 +71,8 @@ void main() {
     single_ctx_test();
 
     pkt_ctm_init_credits(&pkt_buf_ctm_credits, 20, 20);
+
+    blm_test_init();
 
     for (pass = 0; pass < 8; pass++) {
 
