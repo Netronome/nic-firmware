@@ -197,6 +197,7 @@ $(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,mei2.me10,
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,nic_basic))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,link_state))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,npfw))
+$(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,nic_tables))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,app_mac_vlan_config_cmsg))
 $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(NFD_DIR)/me/blocks/vnic/svc,msix))
 $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(DEPS_DIR)/flowenv.git/me/blocks/blm,libblm))

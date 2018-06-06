@@ -30,6 +30,7 @@
 #include "app_config_tables.h"
 #include "app_config_instr.h"
 #include "ebpf.h"
+#include "nic_tables.h"
 
 /*
  * Global declarations for configuration change management
@@ -367,7 +368,7 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
 __lmem __shared uint32_t rss_tmp[32];
 
 //for each port there must be call to this.
-//for each port size of tbale must be known and configured accordingly
+//for each port size of table must be known and configured accordingly
 __intrinsic void upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base, uint32_t vnic_port)
 {
     __xread uint32_t rss_rd[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
@@ -510,23 +511,127 @@ upd_vxlan_table(__emem __addr40 uint8_t *bar_base, uint32_t vnic_port)
 #define SET_PIPELINE_BIT(prev, current) \
     ((current) - (prev) == 1) ? 1 : 0;
 
-/*vnic_port == vid */
+/* vnic_port == vid */
+
+
+/*
+    common routine to configure BPF, RSS, CSUM, and TX HOST instructions
+    for pf destination port
+*/
+__intrinsic void
+app_config_pf_common(uint32_t vid,
+                     __lmem union instruction_format instr[NIC_MAX_INSTR],
+                     uint32_t *_count,
+                     uint32_t control, uint32_t update)
+{
+    __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
+    uint32_t type, vnic;
+    SIGNAL sig1, sig2;
+    uint32_t rss_flags, rss_rings;
+    __xread uint32_t rss_ctrl[2];
+    __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
+    uint32_t rss_tbl_nnidx;
+    __xread uint32_t rx_rings[2];
+    instr_rss_t instr_rss;
+    uint32_t count = *_count;
+    uint32_t prev_instr = 0;
+
+    NFD_VID2VNIC(type, vnic, vid);
+
+    /* BPF */
+    if (control & NFP_NET_CFG_CTRL_BPF) {
+        instr[count].param = NFD_BPF_START_OFF + vnic * NFD_BPF_MAX_LEN;
+#ifdef GEN_INSTRUCTION
+        instr[count++].instr = instr_tbl[INSTR_EBPF];
+#else
+        instr[count++].instr = INSTR_EBPF;
+#endif
+        prev_instr = INSTR_EBPF;
+    }
+
+    /* RSS */
+    if (control & NFP_NET_CFG_CTRL_RSS_ANY || control & NFP_NET_CFG_CTRL_BPF) {
+
+        /* RSS remapping table with NN register index as start offset */
+        rss_tbl_nnidx = vnic * (RSS_TBL_SIZE_LW / NS_PLATFORM_NUM_PORTS);
+
+        /* Update the RSS NN table but only if RSS has changed
+        * If vnic_port x write at x*32 NN register */
+        if (update & NFP_NET_CFG_UPDATE_RSS || update & NFP_NET_CFG_CTRL_BPF) {
+            upd_rss_table(rss_tbl_nnidx, bar_base, vnic);
+        }
+
+        /* RSS flags: read rss_ctrl but only first word is used */
+        __mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
+                sizeof(rss_ctrl), sizeof(rss_ctrl), sig_done, &sig1);
+        __mem_read64(rss_key, bar_base + NFP_NET_CFG_RSS_KEY,
+                NFP_NET_CFG_RSS_KEY_SZ, NFP_NET_CFG_RSS_KEY_SZ,
+                sig_done, &sig2);
+        wait_for_all(&sig1, &sig2);
+
+        mem_read64(rx_rings, (__mem void*)(bar_base + NFP_NET_CFG_RXRS_ENABLE), sizeof(uint64_t));
+        rss_rings = (~rx_rings[0]) ? ffs(~rx_rings[0]) : 32 + ffs(~rx_rings[1]);
+        rss_flags = extract_rss_flags(rss_ctrl[0]);
+
+#ifdef GEN_INSTRUCTION
+        instr[count].instr = instr_tbl[INSTR_RSS];
+#else
+        instr[count].instr = INSTR_RSS;
+#endif
+        if ((NFD_CFG_MAJOR_PF < 4) && !(control & NFP_NET_CFG_CTRL_CHAIN_META)) {
+		instr_rss.v1_meta = 1;
+        }
+        instr_rss.max_queue = rss_rings - 1;
+        instr_rss.cfg_proto = rss_flags;
+        instr_rss.col_shf = ACTION_RSS_COL_SHIFT;
+        instr_rss.queue_mask = ACTION_RSS_Q_MASK;
+        instr_rss.row_mask = ACTION_RSS_ROW_MASK;
+        instr_rss.col_mask = ACTION_RSS_COL_MASK;
+        instr_rss.table_addr = rss_tbl_nnidx;
+        instr_rss.row_shf = ACTION_RSS_ROW_SHIFT;
+        instr_rss.key = rss_key[0];
+        instr[count].param = instr_rss.__raw[0];
+        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RSS);
+        prev_instr = INSTR_RSS;
+        instr[count++].value = instr_rss.__raw[1];
+        instr[count++].value = instr_rss.__raw[2];
+    }
+
+    /* CSUM Complete */
+    if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {
+        /* calculate checksum and drop if mismatch */
+#ifdef GEN_INSTRUCTION
+        instr[count].instr = instr_tbl[INSTR_CHECKSUM_COMPLETE];
+#else
+        instr[count].instr = INSTR_CHECKSUM_COMPLETE;
+#endif
+        instr[count++].pipeline =
+            SET_PIPELINE_BIT(prev_instr, INSTR_CHECKSUM_COMPLETE);
+        prev_instr = INSTR_CHECKSUM_COMPLETE;
+    }
+
+    /* TX Host */
+#ifdef GEN_INSTRUCTION
+    instr[count].instr = instr_tbl[INSTR_TX_HOST];
+#else
+    instr[count].instr = INSTR_TX_HOST;
+#endif
+    instr[count].param = NFD_VID2QID(vid, 0);
+    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
+    prev_instr = INSTR_TX_HOST;
+
+    *_count = count;
+}
+
 __intrinsic void
 app_config_port(uint32_t vid, uint32_t control, uint32_t update)
 {
     __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
-    __xread uint32_t rss_ctrl[2];
     __xread uint32_t mtu;
     __xread uint32_t nic_mac[2];
-    __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
     __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
-    __xread uint32_t rx_rings[2];
-    instr_rss_t instr_rss;
-    instr_rx_wire_t instr_rx_wire;
     __lmem union instruction_format instr[NIC_MAX_INSTR];
-    SIGNAL sig1, sig2;
-    uint32_t rss_flags, rss_rings;
-    uint32_t rss_tbl_nnidx;
+    instr_rx_wire_t instr_rx_wire;
     uint32_t byte_off;
     uint32_t count;
     uint32_t type, vnic;
@@ -631,83 +736,8 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     instr[count++].value = (control & NFP_NET_CFG_CTRL_PROMISC) ? 0xffffffff :
                            ((nic_mac[0] << 16) | (nic_mac[1] >> 16));
 
-    if (control & NFP_NET_CFG_CTRL_BPF) {
-        instr[count].param = NFD_BPF_START_OFF + vnic * NFD_BPF_MAX_LEN;
-#ifdef GEN_INSTRUCTION
-        instr[count++].instr = instr_tbl[INSTR_EBPF];
-#else
-        instr[count++].instr = INSTR_EBPF;
-#endif
-        prev_instr = INSTR_EBPF;
-    }
-
-    /* RSS */
-    if (control & NFP_NET_CFG_CTRL_RSS_ANY || control & NFP_NET_CFG_CTRL_BPF) {
-
-        /* RSS remapping table with NN register index as start offset */
-        rss_tbl_nnidx = vnic * (RSS_TBL_SIZE_LW / NS_PLATFORM_NUM_PORTS);
-
-        /* Udate the RSS NN table but only if RSS has changed
-        * If vnic_port x write at x*32 NN register */
-        if (update & NFP_NET_CFG_UPDATE_RSS || update & NFP_NET_CFG_CTRL_BPF) {
-            upd_rss_table(rss_tbl_nnidx, bar_base, vnic);
-        }
-
-        /* RSS flags: read rss_ctrl but only first word is used */
-        __mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
-                sizeof(rss_ctrl), sizeof(rss_ctrl), sig_done, &sig1);
-        __mem_read64(rss_key, bar_base + NFP_NET_CFG_RSS_KEY,
-                NFP_NET_CFG_RSS_KEY_SZ, NFP_NET_CFG_RSS_KEY_SZ,
-                sig_done, &sig2);
-        wait_for_all(&sig1, &sig2);
-
-        mem_read64(rx_rings, (__mem void*)(bar_base + NFP_NET_CFG_RXRS_ENABLE), sizeof(uint64_t));
-        rss_rings = (~rx_rings[0]) ? ffs(~rx_rings[0]) : 32 + ffs(~rx_rings[1]);
-        rss_flags = extract_rss_flags(rss_ctrl[0]);
-
-#ifdef GEN_INSTRUCTION
-        instr[count].instr = instr_tbl[INSTR_RSS];
-#else
-        instr[count].instr = INSTR_RSS;
-#endif
-        if ((NFD_CFG_MAJOR_PF < 4) && !(control & NFP_NET_CFG_CTRL_CHAIN_META)) {
-		instr_rss.v1_meta = 1;
-        }
-        instr_rss.max_queue = rss_rings - 1;
-        instr_rss.cfg_proto = rss_flags;
-        instr_rss.col_shf = ACTION_RSS_COL_SHIFT;
-        instr_rss.queue_mask = ACTION_RSS_Q_MASK;
-        instr_rss.row_mask = ACTION_RSS_ROW_MASK;
-        instr_rss.col_mask = ACTION_RSS_COL_MASK;
-        instr_rss.table_addr = rss_tbl_nnidx;
-        instr_rss.row_shf = ACTION_RSS_ROW_SHIFT;
-        instr_rss.key = rss_key[0];
-        instr[count].param = instr_rss.__raw[0];
-        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RSS);
-        prev_instr = INSTR_RSS;
-        instr[count++].value = instr_rss.__raw[1];
-        instr[count++].value = instr_rss.__raw[2];
-    }
-
-    if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {
-        /* calculate checksum and drop if mismatch */
-#ifdef GEN_INSTRUCTION
-        instr[count].instr = instr_tbl[INSTR_CHECKSUM_COMPLETE];
-#else
-        instr[count].instr = INSTR_CHECKSUM_COMPLETE;
-#endif
-        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_CHECKSUM_COMPLETE);
-        prev_instr = INSTR_CHECKSUM_COMPLETE;
-    }
-
-#ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_TX_HOST];
-#else
-    instr[count].instr = INSTR_TX_HOST;
-#endif
-    instr[count].param = NFD_VID2QID(vid, 0);
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
-    prev_instr = INSTR_TX_HOST;
+    /* BPF, RSS, CSUM Complete, TX Host */
+    app_config_pf_common(vid, instr, &count, control, update);
 
     reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
 
@@ -730,6 +760,85 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     return;
 }
 
+void
+app_config_sriov_port(uint32_t vid, __lmem uint32_t *action_list,
+                      uint32_t control, uint32_t update)
+{
+    __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
+     uint32_t type, vnic;
+    __xread uint32_t mtu;
+    __lmem union instruction_format instr[NIC_MAX_INSTR];
+    uint32_t count = 0;
+    uint32_t prev_instr = 0;
+    __xread struct nfp_vnic_setup_entry entry;
+
+    reg_zero(instr, sizeof(instr));
+
+    NFD_VID2VNIC(type, vnic, vid);
+
+    mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
+	       sizeof(mtu));
+
+    if (NFD_VID_IS_VF(vid)){
+        /* DestVNIC is a VF
+        *      RX_VEB
+        *      Strip VLAN (No RSS)
+        *      CSUM
+        *      Translate (DestVNIC, RSS_Q=0) to NFD Natural Q number (use NATQ)
+        *      TX HOST
+        */
+
+	/* rx veb */
+	instr[count].instr = INSTR_RX_VEB;
+        /*  add eth hdrlen + 1 to cause borrow on subtract of MTU from pktlen */
+        instr[count].param = mtu + NET_ETH_LEN + 1;
+        instr[count++].pipeline = 0;
+        prev_instr = INSTR_RX_VEB;
+
+        /* strip VLAN */
+        if ( (load_vnic_setup_entry(vid, &entry) == 0 )
+             && (entry.vlan != NIC_NO_VLAN_ID )) {
+            instr[count].instr = INSTR_STRIP_VLAN;
+            instr[count].pipeline = 0;
+            prev_instr = INSTR_STRIP_VLAN;
+            count++;
+        }
+
+        if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {
+            /* calculate checksum and drop if mismatch */
+            instr[count].instr = INSTR_CHECKSUM_COMPLETE;
+            instr[count++].pipeline = 0;
+            prev_instr = INSTR_CHECKSUM_COMPLETE;
+        }
+
+        /* tx host */
+        instr[count].instr = INSTR_TX_HOST;
+        instr[count].param = NFD_VID2QID(vid, 0);
+        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
+
+    } else {
+        /* Dest VNIC is a PF
+         *      RX_VEB
+         *      BPF
+         *      RSS
+         *      CSUM
+         *      TX HOST
+         */
+
+	/* rx veb */
+	instr[count].instr = INSTR_RX_VEB;
+        /*  add eth hdrlen + 1 to cause borrow on subtract of MTU from pktlen */
+        instr[count].param = mtu + NET_ETH_LEN + 1;
+        instr[count++].pipeline = 0;
+        prev_instr = INSTR_RX_VEB;
+
+	/* BPF, RSS, CSUM Complete, TX Host */
+        app_config_pf_common(vid, instr, &count, control, update);
+    }
+
+    reg_cp(action_list, instr, sizeof(instr));
+    return;
+}
 
 __intrinsic void
 app_config_port_down(uint32_t vid)
