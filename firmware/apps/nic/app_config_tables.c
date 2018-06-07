@@ -709,7 +709,7 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     else {
 	instr_rx_wire.parse_vxlans = 0;
     }
-    instr_rx_wire.vxlan_nn_idx = VXLAN_PORTS_NN_IDX; 
+    instr_rx_wire.vxlan_nn_idx = VXLAN_PORTS_NN_IDX;
 
     instr_rx_wire.parse_nvgre = (control & NFP_NET_CFG_CTRL_NVGRE) ? 1 : 0;
 

@@ -21,6 +21,17 @@
 void app_config_port(unsigned int vnic_port, unsigned int control,
                         unsigned int update);
 
+/**
+ * Handle SRIOV port config from PCIe. Configure the hashmap SRIOV
+ * config instruction tables for wire and host.
+ *
+ * @vid             VNIC
+ * @action_list     Pointer to action list
+ * @control         First word of the BAR data
+ * @update          Second word of the BAR data
+ */
+void app_config_sriov_port(uint32_t vid, __lmem uint32_t *action_list,
+			   uint32_t control, uint32_t update);
 
 /**
  * Handle port down from PCIe. Configure the config instruction tables
