@@ -44,6 +44,7 @@
 #include <vnic/svc/msix.h>
 #include <vnic/pci_in.h>
 #include <vnic/pci_out.h>
+#include <vnic/shared/nfd_vf_cfg_iface.h>
 
 #include <shared/nfp_net_ctrl.h>
 
@@ -58,6 +59,25 @@
 #include "app_config_tables.h"
 #include "ebpf.h"
 
+#include "app_mac_vlan_config_cmsg.h"
+#include "maps/cmsg_map_types.h"
+#include "nic_tables.h"
+
+/* from linux errno-base.h */
+#define	ENOSPC	28
+#define	EINVAL	22
+
+enum cfg_msg_err {
+    NO_ERROR = 0,
+
+    /* Note: Negative values are errors. */
+    MAC_VLAN_ADD_FAIL = ENOSPC,
+    MAC_VLAN_WRONG_VF = -2,
+
+    /* Note: Positive values are warnings. */
+    MAC_VLAN_DELETE_WARN = 1,
+};
+
 /*
  * The application master runs on a single ME and performs a number of
  * functions:
@@ -65,7 +85,7 @@
  * - Handle configuration changes.  The PCIe MEs (NFD) notify a single
  *   ME (this ME) of any changes to the configuration BAR.  It is then
  *   up to this ME to disseminate these configuration changes to any
- *   application MEs which need to be informed.  On context in this
+ *   application MEs which need to be informed.  One context in this
  *   handles this.
  *
  * - Periodically read and update the stats maintained by the NFP
@@ -300,6 +320,229 @@ ct_reflect_data(unsigned int dst_me, unsigned int dst_ctx,
         ct[reflect_write_sig_remote, *src_xfer, addr, 0, \
            __ct_const_val(count)], indirect_ref;
     };
+}
+
+/* MAC address building macros */
+#define VEB_KEY_MAC_HI_FROM_BAR(_hi)      (((_hi) >> 16) & 0xffff)
+#define VEB_KEY_MAC_LO_FROM_BAR(_hi, _lo) ((((_hi) << 16) & 0xffff0000) | (_lo))
+#define VEB_KEY_MAC_HI_FROM_SETUP(_mac64) (((_mac64) >> 48) & 0xffff)
+#define VEB_KEY_MAC_LO_FROM_SETUP(_mac64) ((((_mac64) >> 16) & 0xffff0000) |\
+                                             (_mac64 & 0xffff))
+#define MAC_SETUP_FROM_BAR(_hi, _lo)   (((uint64_t)_hi << 32) | ((_lo) & 0xffff))
+
+/**
+ * Handle VF configuration changes (MAC and VLAN)
+ * These changes are communicated via the VF config symbol _pfX_net_vf_cfgY
+ *
+ * @param   pf_vid      The VNIC vid of the relevant PF
+ * @param   pf_control  1st word in nfd mailbox cmd
+ * @param   pf_update   2nd word in nfd mailbox cmd
+ *
+ * @return  Returns an error code for whether the operation was successful
+ */
+void
+handle_sriov_update(uint32_t pf_vid, uint32_t pf_control, uint32_t pf_update)
+{
+    __xread struct sriov_mb sriov_mb_data;
+    __xread struct sriov_cfg sriov_cfg_data;
+    uint64_t new_mac_addr;
+    __xwrite uint64_t new_mac_addr_wr[NFD_VF_CFG_MAC_SZ];
+    __gpr struct nfp_vnic_setup_entry vnic_entry;
+    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
+    __xwrite struct nfp_vnic_setup_entry vnic_entry_wr;
+    __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
+    __shared __lmem struct nic_mac_vlan_key lkp_key;
+    __shared __lmem uint32_t sriov_act_list[NIC_MAC_VLAN_RESULT_SIZE_LW];
+    __xread struct nic_mac_vlan_entry entry_xr;
+    __xwrite enum cfg_msg_err err_code = NO_ERROR;
+
+
+    /*
+     * 1. Load the VF update info from the config mailbox and entry
+     */
+    mem_read32(&sriov_mb_data, vf_cfg_base, sizeof(struct sriov_mb));
+
+    mem_read32(&sriov_cfg_data, NFD_VF_CFG_ADDR(vf_cfg_base, sriov_mb_data.vf),
+               sizeof(struct sriov_cfg));
+
+    reg_zero(&lkp_key, sizeof(struct nic_mac_vlan_key));
+    reg_zero(sriov_act_list, sizeof(sriov_act_list));
+
+    /* input check: make sure the driver is not passing a bad
+     * request */
+    if (!NFD_VID_IS_VF(sriov_mb_data.vf)) {
+        err_code = EINVAL;
+        goto done;
+    }
+
+    /* Build SRIOV action list*/
+    app_config_sriov_port(NFD_VNIC2VID(NFD_VNIC_TYPE_VF,sriov_mb_data.vf),
+                          sriov_act_list, pf_control, pf_update);
+
+
+    /*
+     * 2. Check what has changed using the NFP_NET_CFG_SRIOV_UPDATE_FLAGS
+     *    (or as it called in the doc : NFP_NET_CFG_VF_CHANGE_BMSK).
+     *
+     *    We can have one of three changes:
+     */
+    load_vnic_setup_entry(sriov_mb_data.vf, &vnic_entry_rd);
+    reg_cp(&vnic_entry, &vnic_entry_rd, sizeof(struct nfp_vnic_setup_entry));
+
+    /*    A. NFP_NET_CFG_SRIOV_UPDATE_MAC (MAC change)
+     *       If MAC was not already set (read the nic_vnic_setup_map_tbl entry)
+     *          Add entry to the ‘MAC+VLAN’ lkp table using MAC from the BAR
+     *          and VLAN from nic_vnic_setup_map_tbl table
+     *       Else (MAC was already set in the past)
+     *          Remove the entry from the ‘MAC+VLAN’ lkp table using old MAC
+     *          and old VLAN (both are in nic_vnic_setup_map_tbl table)
+     *          NOTE : We assume “MAC == 0” indicates VF went down...
+     *          If new MAC != 0
+     *             Add entry to the ‘MAC+VLAN’ lkp table using new MAC from the
+     *             BAR and VLAN from nic_vnic_setup_map_tbl table
+     *
+     *       Update the nic_vnic_setup_map_tbl table
+     */
+    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_MAC) {
+        new_mac_addr = MAC_SETUP_FROM_BAR(sriov_cfg_data.mac_hi,
+                                          sriov_cfg_data.mac_lo);
+
+        /* Fail if mac is 0, broadcast, or multicast */
+        if ((!sriov_cfg_data.mac_hi && !sriov_cfg_data.mac_lo) ||
+            (sriov_cfg_data.mac_hi == 0xffffffff &&
+             sriov_cfg_data.mac_lo == 0xffff ) ||
+            sriov_cfg_data.mac_hi & 0x01000000) {
+            err_code = MAC_VLAN_ADD_FAIL;
+            goto done;
+        }
+
+        /* Add a new entry to the 'MAC+VLAN' lkp table using MAC from the
+         * BAR and VLAN from nic_vnic_setup_map_tbl table
+         */
+        lkp_key.s_not_c = 0;
+        lkp_key.vlan_id = vnic_entry_rd.vlan;
+        lkp_key.mac_addr_hi = VEB_KEY_MAC_HI_FROM_BAR(sriov_cfg_data.mac_hi);
+        lkp_key.mac_addr_lo = VEB_KEY_MAC_LO_FROM_BAR(sriov_cfg_data.mac_hi,
+                                              sriov_cfg_data.mac_lo);
+
+        if (nic_mac_vlan_entry_op_cmsg(&lkp_key, sriov_act_list,
+                                CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL) {
+            err_code = MAC_VLAN_ADD_FAIL;
+            goto done;
+        }
+
+
+        /* src_mac == 0 means mac was not yet setup
+         * src_mac == new_mac_addr means there is already an entry set up
+         */
+        if ((vnic_entry_rd.src_mac != 0) &&
+            (vnic_entry_rd.src_mac != new_mac_addr)) {
+
+            /* Remove the entry from the ?MAC+VLAN? lkp table using old MAC
+             * and old VLAN (both are in nic_vnic_setup_map_tbl table)
+             */
+            lkp_key.mac_addr_hi =
+                   VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
+            lkp_key.mac_addr_lo =
+                   VEB_KEY_MAC_LO_FROM_SETUP(vnic_entry_rd.src_mac);
+
+            if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
+                            CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
+                /* Issue a warning, but continue operation. */
+                err_code = MAC_VLAN_DELETE_WARN;
+            }
+        }
+
+        /* Update the nic_vnic_setup_map_tbl table, at this point we assume
+         * the mac address is NOT broadcast/multicast/0 */
+        vnic_entry.src_mac = new_mac_addr;
+
+        /* Write the MAC to the VF BAR so it is ready to use even
+         * without an FLR */
+        reg_cp(&new_mac_addr_wr, &sriov_cfg_data, sizeof(new_mac_addr_wr));
+        mem_write8(&new_mac_addr_wr,
+                   NFD_CFG_BAR_ISL(NIC_PCI, sriov_mb_data.vf) +
+                   NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
+    }
+
+    /*    B. NFP_NET_CFG_SRIOV_UPDATE_VLAN (VLAN change)
+     *       NOTE : Use NIC_NO_VLAN_ID for non VLAN (4095)
+     *       If MAC was already set (read nic_vnic_setup_map_tbl entry)
+     *          Remove old entry from the MAC+VLAN lkp table (Get the “old”
+     *           MAC+VLAN from the nic_vnic_setup_map_tbl table)
+     *          Add a new entry in the MAC+VLAN lkp table using the new VLAN
+     *           (Get the “old” MAC from nic_vnic_setup_map_tbl table)
+     *
+     *       Update the nic_vnic_setup_map_tbl table
+     *       Update the VLAN-to-VNICs bitmap(nic_vlan_to_vnics_map_tbl)
+     *           i. Remove the vNIC from the list of vNICs that belong to the
+     *              “old” VLAN
+     *          ii. Add the vNIC to the list of vNICs that belong to the
+     *              “new” VLAN
+     */
+    else if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_VLAN) {
+        /* Driver should handle the no-vlan value and set it to
+         * NIC_NO_VLAN_ID (4095) */
+        if (vnic_entry_rd.src_mac != 0) {
+            /* Add a new entry */
+            lkp_key.s_not_c = 0;
+            lkp_key.vlan_id = sriov_cfg_data.vlan_id;
+            lkp_key.mac_addr_hi =
+                VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
+            lkp_key.mac_addr_lo =
+                VEB_KEY_MAC_LO_FROM_SETUP(vnic_entry_rd.src_mac);
+
+            if (nic_mac_vlan_entry_op_cmsg(&lkp_key, sriov_act_list,
+				CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL) {
+                err_code = MAC_VLAN_ADD_FAIL;
+                goto done;
+            }
+
+            /* Remove the old entry if different vlan */
+            if ( sriov_cfg_data.vlan_id != vnic_entry_rd.vlan ) {
+                lkp_key.vlan_id = vnic_entry_rd.vlan;
+                if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
+                      CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
+                /* this would be a FW bug, no point in rolling back
+                 * the recent addition or reporting to the driver
+                 * TODO: log it somewhere? */
+                }
+            }
+        } else {
+            /* Can't configure a vlan unless mac is configured */
+            err_code = MAC_VLAN_ADD_FAIL;
+            goto done;
+        }
+
+        vnic_entry.vlan = sriov_cfg_data.vlan_id;
+    }
+
+    /*    C. NFP_NET_CFG_SRIOV_UPDATE_CTRL_FLAGS (control flags change)
+     *       Read the NFP_NET_CFG_SRIOV_CTRL_FLAGS byte from the BAR
+     *       Update the nic_vnic_setup_map_tbl entry with the values there
+     *       (those are Spoof enable bit and link state modes bits)
+     */
+    else if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_SPOOF) {
+        vnic_entry.spoof_chk = sriov_cfg_data.ctrl_spoof;
+    }
+    else if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_LINK_STATE) {
+        vnic_entry.link_state_mode = sriov_cfg_data.ctrl_link_state;
+
+        /* Update the list of VFs to be notified of link state changes. */
+        /* TODO
+        update_vf_lsc_list(APP_PVN2PHYS(pf_vid), sriov_mb_data.vf,
+                                          vnic_entry.link_state_mode);
+        */
+    }
+
+    reg_cp(&vnic_entry_wr, &vnic_entry, sizeof(struct nfp_vnic_setup_entry));
+    write_vnic_setup_entry(sriov_mb_data.vf, &vnic_entry_wr);
+
+
+done:
+    mem_write8_le(&err_code,
+                  (__mem void*)(vf_cfg_base + NFD_VF_CFG_MB_RET_ofs),
+                  2);
 }
 
 
