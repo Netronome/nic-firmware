@@ -2,7 +2,7 @@
  * Copyright 2016-2017 Netronome, Inc.
  *
  * @file          apps/nic/app_mac_vlan_config_cmsg.c
- * @brief         NIC application MAC+VLAN lookup table config request 
+ * @brief         NIC application MAC+VLAN lookup table config request
  *                via cmsg_map ME
  */
 
