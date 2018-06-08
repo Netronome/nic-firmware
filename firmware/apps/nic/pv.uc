@@ -15,13 +15,17 @@
 #include <ov.uc>
 #include <passert.uc>
 #include <stdmac.uc>
+#include <net/eth.h>
+#include <net/ip.h>
 #include <net/tcp.h>
+#include <net/vxlan.h>
 #include <nic_basic/nic_stats.h>
 #include <nfp_net_ctrl.h>
 
 #include "pkt_buf.uc"
 
 #include "protocols.h"
+#include "app_config_instr.h"
 
 #define BF_MASK(w, m, l) ((1 << (m + 1 - l)) - 1)
 
@@ -83,32 +87,7 @@
  * C     - Enable MAC offload of L3 checksum
  * c     - Enable MAC offload of L4 checksum
  *
- * Protocol - Parsed Packet Type
- *             0x00 - IPv6:TCP
- *             0x01 - IPv6:UDP
- *             0x02 - IPv4:TCP
- *             0x03 - IPv4:UDP
- *             0x04 - IPv6:Unknown
- *             0x05 - IPv6:Fragment
- *             0x06 - IPv4:Unknown
- *             0x07 - IPv4:Fragment
- *             0x20 - IPv6:UDP:VXLAN:IPv6:TCP
- *             0x41 - IPv6:UDP:VXLAN:IPv6:UDP
- *             0x42 - IPv6:UDP:VXLAN:IPv4:TCP
- *             0x43 - IPV6:UDP:VXLAN:IPv4:UDP
- *             0x44 - IPV6:UDP:VXLAN:IPv6:Unknown
- *             0x45 - IPV6:UDP:VXLAN:IPv6:Fragment
- *             0x46 - IPV6:UDP:VXLAN:IPv4:Unknown
- *             0x47 - IPV6:UDP:VXLAN:IPv4:Fragment
- *             0x60 - IPv4:UDP:VXLAN:IPv6:TCP
- *             0x61 - IPv4:UDP:VXLAN:IPv6:UDP
- *             0x62 - IPv4:UDP:VXLAN:IPv4:TCP
- *             0x63 - IPV4:UDP:VXLAN:IPv4:UDP
- *             0x64 - IPV4:UDP:VXLAN:IPv6:Unknown
- *             0x65 - IPV4:UDP:VXLAN:IPv6:Fragment
- *             0x66 - IPV4:UDP:VXLAN:IPv4:Unknown
- *             0x67 - IPV4:UDP:VXLAN:IPv4:Fragment
- *             0xff - Unknown (br=byte[])
+ * Protocol - Parsed Packet Type (see defines below)
  *
  * TX host flags:
  *       +-------------------------------+
@@ -179,12 +158,10 @@
 
 #define PV_HEADER_STACK_wrd             5
 #define PV_HEADER_STACK_bf              PV_HEADER_STACK_wrd, 31, 0
-#define PV_HEADER_OFFSET_4_bf           PV_HEADER_STACK_wrd, 31, 24
-#define PV_HEADER_OFFSET_3_bf           PV_HEADER_STACK_wrd, 23, 16
-#define PV_HEADER_OFFSET_2_bf           PV_HEADER_STACK_wrd, 15, 8
-#define PV_HEADER_OFFSET_L3_bf          PV_HEADER_STACK_wrd, 15, 8
-#define PV_HEADER_OFFSET_1_bf           PV_HEADER_STACK_wrd, 7, 0
-#define PV_HEADER_OFFSET_L4_bf          PV_HEADER_STACK_wrd, 7, 0
+#define PV_HEADER_OFFSET_OUTER_IP_bf    PV_HEADER_STACK_wrd, 31, 24
+#define PV_HEADER_OFFSET_OUTER_L4_bf    PV_HEADER_STACK_wrd, 23, 16
+#define PV_HEADER_OFFSET_INNER_IP_bf    PV_HEADER_STACK_wrd, 15, 8
+#define PV_HEADER_OFFSET_INNER_L4_bf    PV_HEADER_STACK_wrd, 7, 0
 
 #define PV_QUEUE_wrd                    6
 #define PV_QUEUE_IN_bf                  PV_QUEUE_wrd, 31, 23
@@ -212,6 +189,83 @@
 #define PV_CSUM_bf                      PV_CSUM_wrd, 15, 0
 #define PV_VLD_bf                       PV_CSUM_wrd, 17, 16
 #define PV_MPD_bf                       PV_CSUM_wrd, 19, 18
+
+#define PROTO_IPV6_TCP                          0x00
+#define PROTO_IPV6_UDP                          0x01
+#define PROTO_IPV4_TCP                          0x02
+#define PROTO_IPV4_UDP                          0x03
+#define PROTO_IPV6_UNKNOWN                      0x04
+#define PROTO_IPV6_FRAGMENT                     0x05
+#define PROTO_IPV4_UNKNOWN                      0x06
+#define PROTO_IPV4_FRAGMENT                     0x07
+#define PROTO_IPV6_UDP_VXLAN_IPV6_TCP           0x20
+#define PROTO_IPV6_UDP_VXLAN_IPV6_UDP           0x21
+#define PROTO_IPV6_UDP_VXLAN_IPV4_TCP           0x22
+#define PROTO_IPV6_UDP_VXLAN_IPV4_UDP           0x23
+#define PROTO_IPV6_UDP_VXLAN_IPV6_UNKNOWN       0x24
+#define PROTO_IPV6_UDP_VXLAN_IPV6_FRAGMENT      0x25
+#define PROTO_IPV6_UDP_VXLAN_IPV4_UNKNOWN       0x26
+#define PROTO_IPV6_UDP_VXLAN_IPV4_FRAGMENT      0x27
+#define PROTO_MPLS_IPV6_TCP                     0x40
+#define PROTO_MPLS_IPV6_UDP                     0x41
+#define PROTO_MPLS_IPV4_TCP                     0x42
+#define PROTO_MPLS_IPV4_UDP                     0x43
+#define PROTO_MPLS_IPV6_UNKNOWN                 0x44
+#define PROTO_MPLS_IPV6_FRAGMENT                0x45
+#define PROTO_MPLS_IPV4_UNKNOWN                 0x46
+#define PROTO_MPLS_IPV4_FRAGMENT                0x47
+#define PROTO_IPV4_UDP_VXLAN_IPV6_TCP           0x60
+#define PROTO_IPV4_UDP_VXLAN_IPV6_UDP           0x61
+#define PROTO_IPV4_UDP_VXLAN_IPV4_TCP           0x62
+#define PROTO_IPV4_UDP_VXLAN_IPV4_UDP           0x63
+#define PROTO_IPV4_UDP_VXLAN_IPV6_UNKNOWN       0x64
+#define PROTO_IPV4_UDP_VXLAN_IPV6_FRAGMENT      0x65
+#define PROTO_IPV4_UDP_VXLAN_IPV4_UNKNOWN       0x66
+#define PROTO_IPV4_UDP_VXLAN_IPV4_FRAGMENT      0x67
+#define PROTO_IPV6_GRE_IPV6_TCP                 0x80
+#define PROTO_IPV6_GRE_IPV6_UDP                 0x81
+#define PROTO_IPV6_GRE_IPV4_TCP                 0x82
+#define PROTO_IPV6_GRE_IPV4_UDP                 0x83
+#define PROTO_IPV6_GRE_IPV6_UNKNOWN             0x84
+#define PROTO_IPV6_GRE_IPV6_FRAGMENT            0x85
+#define PROTO_IPV6_GRE_IPV4_UNKNOWN             0x86
+#define PROTO_IPV6_GRE_IPV4_FRAGMENT            0x87
+#define PROTO_IPV6_UDP_GENEVE_IPV6_TCP          0xA0
+#define PROTO_IPV6_UDP_GENEVE_IPV6_UDP          0xA1
+#define PROTO_IPV6_UDP_GENEVE_IPV4_TCP          0xA2
+#define PROTO_IPV6_UDP_GENEVE_IPV4_UDP          0xA3
+#define PROTO_IPV6_UDP_GENEVE_IPV6_UNKNOWN      0xA4
+#define PROTO_IPV6_UDP_GENEVE_IPV6_FRAGMENT     0xA5
+#define PROTO_IPV6_UDP_GENEVE_IPV4_UNKNOWN      0xA6
+#define PROTO_IPV6_UDP_GENEVE_IPV4_FRAGMENT     0xA7
+#define PROTO_IPV4_GRE_IPV6_TCP                 0xC0
+#define PROTO_IPV4_GRE_IPV6_UDP                 0xC1
+#define PROTO_IPV4_GRE_IPV4_TCP                 0xC2
+#define PROTO_IPV4_GRE_IPV4_UDP                 0xC3
+#define PROTO_IPV4_GRE_IPV6_UNKNOWN             0xC4
+#define PROTO_IPV4_GRE_IPV6_FRAGMENT            0xC5
+#define PROTO_IPV4_GRE_IPV4_UNKNOWN             0xC6
+#define PROTO_IPV4_GRE_IPV4_FRAGMENT            0xC7
+#define PROTO_IPV4_UDP_GENEVE_IPV6_TCP          0xE0
+#define PROTO_IPV4_UDP_GENEVE_IPV6_UDP          0xE1
+#define PROTO_IPV4_UDP_GENEVE_IPV4_TCP          0xE2
+#define PROTO_IPV4_UDP_GENEVE_IPV4_UDP          0xE3
+#define PROTO_IPV4_UDP_GENEVE_IPV6_UNKNOWN      0xE4
+#define PROTO_IPV4_UDP_GENEVE_IPV6_FRAGMENT     0xE5
+#define PROTO_IPV4_UDP_GENEVE_IPV4_UNKNOWN      0xE6
+#define PROTO_IPV4_UDP_GENEVE_IPV4_FRAGMENT     0xE7
+
+#define PROTO_TCP                          (0x0 << 0)
+#define PROTO_UDP                          (0x1 << 0)
+#define PROTO_IPV6                         (0x0 << 1)
+#define PROTO_IPV4                         (0x1 << 1)
+#define PROTO_MPLS                         (0x1 << 6)
+#define PROTO_L4_UNKNOWN                   (0x1 << 2)
+#define PROTO_FRAG                         (0x5 << 0)
+#define PROTO_GRE                          (0x4 << 5)
+#define PROTO_GENEVE                       (0x5 << 5)
+#define TUNNEL_SHF                         5
+#define PROTO_UNKNOWN                      0xFF
 
 #ifndef PV_GRO_NFD_START
     #define PV_GRO_NFD_START            4
@@ -843,7 +897,7 @@ end#:
 #define MAC_PARSE_VLAN_bf               MAC_PARSE_wrd, 17, 16
 #define MAC_CSUM_bf                     MAC_PARSE_wrd, 15, 0
 
-#macro pv_init_nbi(out_vec, in_nbi_desc, in_mtu, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+#macro pv_init_nbi(out_vec, in_nbi_desc, in_mtu, in_tunnel_args, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
 .begin
     .reg cbs
     .reg dst_mac_bc
@@ -859,6 +913,7 @@ end#:
     .reg l4_offset
     .reg mac_dst_type
     .reg shift
+    .reg tunnel
     .reg vlan_len
     .reg vlan_id
 
@@ -892,10 +947,6 @@ end#:
 max_cbs#:
     alu[BF_A(out_vec, PV_MU_ADDR_bf), BF_A(out_vec, PV_MU_ADDR_bf), OR, cbs, <<BF_L(PV_CBS_bf)]
 
-    // map NBI sequencers to 0, 1, 2, 3
-    alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nbi_desc, CAT_SEQ_NO_bf), OR, 0xff] ; PV_SEQ_NO_bf
-    alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), AND~, 0xfc, <<8] ; PV_SEQ_CTX_bf
-
     // set TX host flags
     immed[l4_csum_tbl, 0x238c, <<8]
     alu[shift, (7 << 2), AND, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>(BF_L(MAC_PARSE_STS_bf) - 2)] ; MAC_PARSE_STS_bf
@@ -906,69 +957,15 @@ max_cbs#:
     alu[l3_flags, 0x3, AND, l3_csum_tbl, >>indirect]
     alu[BF_A(out_vec, PV_TX_HOST_L3_bf), BF_A(out_vec, PV_TX_HOST_L3_bf), OR, l3_flags, <<BF_L(PV_TX_HOST_L3_bf)] ; PV_TX_HOST_L3_bf
 
-    bitfield_extract__sz1(l3_type, BF_AML(in_nbi_desc, CAT_L3_TYPE_bf)) ; CAT_L3_TYPE_bf
-    br!=byte[l3_type, 0, CAT_L3_TYPE_IP, skip_proto#], defer[3]
-       immed[BF_A(out_vec, PV_HEADER_STACK_bf), 0]
-       alu[BF_A(out_vec, PV_CTM_ADDR_bf), BF_A(out_vec, PV_NUMBER_bf), OR, 1, <<BF_L(PV_CTM_ALLOCATED_bf)]
-       ld_field[BF_A(out_vec, PV_CTM_ADDR_bf), 0011, (PKT_NBI_OFFSET + MAC_PREPEND_BYTES)]
+    alu[BF_A(out_vec, PV_CTM_ADDR_bf), BF_A(out_vec, PV_NUMBER_bf), OR, 1, <<BF_L(PV_CTM_ALLOCATED_bf)]
+    ld_field[BF_A(out_vec, PV_CTM_ADDR_bf), 0011, (PKT_NBI_OFFSET + MAC_PREPEND_BYTES)]
 
-    // packet is IP
+    pv_seek(out_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY), skip_hdr_parse#)
 
-    // store L3 offset
-    bitfield_extract__sz1(l3_offset, BF_AML(in_nbi_desc, CAT_L3_OFFSET_bf)) ; CAT_L3_OFFSET_bf
-    alu[BF_A(out_vec, PV_HEADER_STACK_bf), l3_offset, -, MAC_PREPEND_BYTES]
-    alu[BF_A(out_vec, PV_HEADER_STACK_bf), --, B, BF_A(out_vec, PV_HEADER_STACK_bf), <<8]
+hdr_parse#:
+    pv_hdr_parse(out_vec, in_tunnel_args, finalize#)
 
-    // handle fragments
-    alu[not_frag, 1, AND~, BF_A(in_nbi_desc, CAT_V4_FRAG_bf), >>BF_L(CAT_V4_FRAG_bf)] ; CAT_V4_FRAG_bf
-    alu[not_frag, not_frag, AND~, BF_A(in_nbi_desc, MAC_PARSE_V6_FRAG_bf), >>BF_L(MAC_PARSE_V6_FRAG_bf)] ; MAC_PARSE_V6_FRAG_bf
-    beq[skip_proto#], defer[3] // skip L4 for fragments
-        alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, not_frag]
-        alu[ip_ver, 0x7c, OR, BF_A(in_nbi_desc, CAT_L3_IP_VER_bf), >>BF_L(CAT_L3_IP_VER_bf)] ; CAT_L3_IP_VER_bf
-        alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, ip_ver, <<1] ; PV_PROTO_bf
-
-    /* Catamaran doesn't know that it sometimes has the correct offset for certain IPv6 extention headers
-     * Thus, do not rely on CAT_L4_TYPE if the packet is not recognized as TCP/UDP and check the exceptions
-     * individually. Fortunately, the branch above should be taken for the bulk of interesting packets, so
-     * enumerating the exceptions is not unduely expensive.
-     */
-
-    // Catamaran does not have L4 offset if there are MPLS tags
-    bitfield_extract__sz1(--, BF_AML(out_vec, MAC_PARSE_MPLS_bf))
-    bne[skip_proto#]
-
-    // Catamaran does not reliably have L4 offset for nested VLAN tags
-    br_bset[BF_A(out_vec, MAC_PARSE_VLAN_bf), BF_M(MAC_PARSE_VLAN_bf), skip_proto#]
-
-    // permit IPv6 hop-by-hop, routing and destination extention headers (Catamaran provides valid L4 offsets for these)
-    alu[--, 0x78, AND, BF_A(in_nbi_desc, MAC_PARSE_V6_OPT_bf), >>BF_L(MAC_PARSE_V6_OPT_bf)] ; MAC_PARSE_V6_OPT_bf
-    bne[skip_proto#]
-
-    alu[--, --, B, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>BF_L(MAC_PARSE_STS_bf)]
-    beq[skip_proto#]
-
-    // packet is TCP/UDP
-
-    alu[l4_type, 1, AND~, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>(BF_L(MAC_PARSE_STS_bf) + 1)]
-    alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), OR, l4_type]
-    alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, 1, <<2] // L4 is known
-
-    // store L4 offset
-    bitfield_extract__sz1(l4_offset, BF_AML(in_nbi_desc, CAT_L4_OFFSET_bf)) ; CAT_L4_OFFSET_bf
-    alu[l4_offset, l4_offset, -, MAC_PREPEND_BYTES]
-    alu[BF_A(out_vec, PV_HEADER_STACK_bf), l4_offset, OR, BF_A(out_vec, PV_HEADER_STACK_bf)]
-
-skip_proto#:
-    // error checks after metadata is populated (will need for drop)
-    #ifdef PARANOIA // should never happen, Catamaran is buggy if it does
-       br_bset[BF_AL(in_nbi_desc, CAT_VALID_bf), valid#] ; CAT_VALID_bf
-           fatal_error("INVALID CATAMARAN METADATA") // fatal error, can't safely drop without valid sequencer info
-       valid#:
-    #endif
-
-    immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
-
-    pv_seek(out_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY))
+skip_hdr_parse#:
     __pv_get_mac_dst_type(mac_dst_type, out_vec) // advances *$index by 2 words
     alu[out_vec[PV_FLAGS_wrd], *$index++, B, 0]
     alu[vlan_len, (3 << 2), AND, BF_A(in_nbi_desc, MAC_PARSE_VLAN_bf), >>(BF_L(MAC_PARSE_VLAN_bf) - 2)]
@@ -979,7 +976,60 @@ skip_proto#:
 
     alu[vlan_id, --, B, *$index, >>16]
     alu[BF_A(out_vec, PV_VLAN_ID_bf), BF_A(out_vec, PV_VLAN_ID_bf), AND, vlan_id]
+
 skip_vlan#:
+    bitfield_extract__sz1(l3_type, BF_AML(in_nbi_desc, CAT_L3_CLASS_bf)) ; CAT_L3_CLASS_bf
+    br!=byte[l3_type, 0, 4, hdr_parse#], defer[3] // if packet is not IPv4 perform parse
+        alu[BF_A(out_vec, PV_META_TYPES_bf), *$index--, B, 0]
+        // map NBI sequencers to 0, 1, 2, 3
+        alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nbi_desc, CAT_SEQ_NO_bf), OR, 0xff] ; PV_SEQ_NO_bf
+        alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), AND~, 0xfc, <<8] ; PV_SEQ_CTX_bf
+
+    // handle fragments
+    alu[not_frag, 1, AND~, BF_A(in_nbi_desc, CAT_V4_FRAG_bf), >>BF_L(CAT_V4_FRAG_bf)] ; CAT_V4_FRAG_bf
+    alu[not_frag, not_frag, AND~, BF_A(in_nbi_desc, MAC_PARSE_V6_FRAG_bf), >>BF_L(MAC_PARSE_V6_FRAG_bf)] ; MAC_PARSE_V6_FRAG_bf
+    beq[store_l3_off#]
+    alu[l4_type, 0xe, AND, BF_A(in_nbi_desc, CAT_L4_CLASS_bf), >>BF_L(CAT_L4_CLASS_bf)] ; CAT_L4_CLASS_bf
+    br!=byte[l4_type, 0, 2, hdr_parse#] // if packet is not TCP/UDP perform parse
+
+    br_bset[in_tunnel_args, BF_L(INSTR_RX_PARSE_NVGRE_bf), hdr_parse#]
+
+    // check for possibility of UDP tunnels
+    alu[tunnel, in_tunnel_args, AND, ((BF_MASK(INSTR_RX_PARSE_VXLANS_bf) << BF_L(INSTR_RX_PARSE_VXLANS_bf)) | (1 << BF_L(INSTR_RX_PARSE_GENEVE_bf)))]
+    alu[--, 0, -, tunnel]
+    alu[tunnel, tunnel, AND~, BF_A(in_nbi_desc, CAT_L4_CLASS_bf)]
+    br_bset[tunnel, BF_L(CAT_L4_CLASS_bf), hdr_parse#]
+
+    // store L3 offset
+store_l3_off#:
+    bitfield_extract__sz1(l3_offset, BF_AML(in_nbi_desc, CAT_L3_OFFSET_bf)) ; CAT_L3_OFFSET_bf
+    alu[l3_offset, l3_offset, -, MAC_PREPEND_BYTES]
+    alu[BF_A(out_vec, PV_HEADER_STACK_bf), --, B, l3_offset, <<8]
+    alu[BF_A(out_vec, PV_HEADER_STACK_bf), BF_A(out_vec, PV_HEADER_STACK_bf), OR, l3_offset, <<24]
+
+    alu[--, --, B, not_frag]
+    beq[finalize#], defer[3] // skip L4 for fragments
+        alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, not_frag]
+        alu[ip_ver, 0x7c, OR, BF_A(in_nbi_desc, CAT_L3_IP_VER_bf), >>BF_L(CAT_L3_IP_VER_bf)] ; CAT_L3_IP_VER_bf
+        alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, ip_ver, <<1] ; PV_PROTO_bf
+
+    alu[l4_type, 1, AND~, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>(BF_L(MAC_PARSE_STS_bf) + 1)]
+    alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), OR, l4_type]
+    alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, 1, <<2] // L4 is known
+
+    // store L4 offset
+    bitfield_extract__sz1(l4_offset, BF_AML(in_nbi_desc, CAT_L4_OFFSET_bf)) ; CAT_L4_OFFSET_bf
+    alu[l4_offset, l4_offset, -, MAC_PREPEND_BYTES]
+    alu[BF_A(out_vec, PV_HEADER_STACK_bf), BF_A(out_vec, PV_HEADER_STACK_bf), OR, l4_offset]
+    alu[BF_A(out_vec, PV_HEADER_STACK_bf), BF_A(out_vec, PV_HEADER_STACK_bf), OR, l4_offset, <<16]
+
+finalize#:
+    // error checks after metadata is populated (will need for drop)
+    #ifdef PARANOIA // should never happen, Catamaran is buggy if it does
+       br_bset[BF_AL(in_nbi_desc, CAT_VALID_bf), valid#] ; CAT_VALID_bf
+           fatal_error("INVALID CATAMARAN METADATA") // fatal error, can't safely drop without valid sequencer info
+       valid#:
+    #endif
 
     __pv_mtu_check(out_vec, in_mtu, vlan_len, DROP_MTU_LABEL)
 
@@ -1533,6 +1583,254 @@ end#:
 
 #macro pv_invalidate_cache(in_pkt_vec)
     alu[BF_A(in_pkt_vec, PV_SEEK_BASE_bf), BF_A(in_pkt_vec, PV_SEEK_BASE_bf), OR, 0xff, <<BF_L(PV_SEEK_BASE_bf)]
+#endm
+
+
+#macro _pv_hdr_parse(pkt_vec, port_tun_args)
+.begin
+    .reg eth_type
+    .reg proto_test
+    .reg hdr_len
+    .reg hdr_stack
+    .reg label
+    .reg l4_offset
+    .reg mac_dst_type
+    .reg next_hdr
+    .reg n_vxlan
+    .reg pkt_offset
+    .reg udp_dst_port
+    .reg vxlan_idx
+    .reg tmp
+
+    immed[pkt_offset, ETHERNET_SIZE]
+    immed[BF_A(pkt_vec, PV_HEADER_STACK_bf), 0]
+    ld_field[BF_A(pkt_vec, PV_PROTO_bf), 0001, 0]
+
+check_eth_type#:
+    byte_align_be[--, *$index++]
+    byte_align_be[tmp, *$index++]
+    alu[eth_type, --, B, tmp, >>16]
+
+check_ipv6#:
+    immed[proto_test, NET_ETH_TYPE_IPV6]
+    alu[--, eth_type, -, proto_test]
+    bne[check_ipv4#]
+
+parse_ipv6#:
+    ld_field[BF_A(pkt_vec, PV_HEADER_STACK_bf), 0010, pkt_offset, <<8] // IP Offset
+    byte_align_be[--, *$index++]
+    byte_align_be[next_hdr, *$index++]
+    immed[hdr_len, IPV6_HDR_SIZE]
+
+check_ipv6_next_hdr#:
+    br=byte[next_hdr, 3, NET_IP_PROTO_UDP, parse_ipv6_udp#], defer[1]
+        alu[pkt_offset, pkt_offset, +, hdr_len]
+
+check_ipv6_tcp#:
+    br!=byte[next_hdr, 3, NET_IP_PROTO_TCP, check_ipv6_other#]
+    br[done_hdr_stack#], defer[2]
+        ld_field[BF_A(pkt_vec, PV_HEADER_STACK_bf), 0001, pkt_offset] // L4 Offset
+        alu[hdr_stack, --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf)]
+
+check_ipv6_other#:
+    br=byte[next_hdr, 3, NET_IP_PROTO_FRAG, ipv6_frag#]
+
+    br=byte[next_hdr, 3, NET_IP_PROTO_GRE, gre#]
+
+    br=byte[next_hdr, 3, NET_IP_PROTO_HOPOPT, skip_ipv6_ext#]
+    br=byte[next_hdr, 3, NET_IP_PROTO_DSTOPTS, skip_ipv6_ext#]
+    br=byte[next_hdr, 3, NET_IP_PROTO_ROUTING, skip_ipv6_ext#]
+
+    br[done_hdr_stack#], defer[2]
+        alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, PROTO_IPV6_UNKNOWN] // L4 Unknown
+        alu[hdr_stack, --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf)]
+
+ipv6_frag#:
+    br[done_hdr_stack#], defer[2]
+        alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, PROTO_IPV6_FRAGMENT] // IPv6 Frag
+        alu[hdr_stack, --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf)]
+
+skip_ipv6_ext#:
+    pv_seek(pkt_vec, pkt_offset, PV_SEEK_CTM_ONLY)
+
+    byte_align_be[--, *$index++]
+    byte_align_be[next_hdr, *$index++]
+    alu[hdr_len, 0xff, AND, next_hdr, >>16]
+    br[check_ipv6_next_hdr#], defer[2]
+        /* hdr length = "Hdr Ext Len" * 8 + 8 */
+        alu[hdr_len, --, B, hdr_len, <<3]
+        alu[hdr_len, hdr_len, +, 8]
+
+check_ipv4#:
+    immed[proto_test, NET_ETH_TYPE_IPV4]
+    alu[--, eth_type, -, proto_test]
+    bne[check_vlan#]
+
+parse_ipv4#:
+    ld_field[BF_A(pkt_vec, PV_HEADER_STACK_bf), 0010, pkt_offset, <<8] // IP Offset
+
+    // IHL*4 (tmp = 0x0800:4:IHL:xx)
+    alu[l4_offset, (0xf << 2), AND, tmp, >>(8 - 2)]
+    byte_align_be[--, *$index]
+    byte_align_be[tmp, *$index++]
+
+    //fragment test (frag pkt if more frags flag and frag offset is non-zero)
+    alu[tmp, --, B, tmp, >>16]
+    alu[tmp, tmp, AND~, 0x3, <<14]
+    bne[ipv4_frag#], defer[1]
+        alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, PROTO_IPV4] // IPv4
+
+    byte_align_be[next_hdr, *$index++]
+    br=byte[next_hdr, 0, NET_IP_PROTO_UDP, parse_ipv4_udp#], defer[1]
+        alu[pkt_offset, pkt_offset, +, l4_offset]
+
+    br!=byte[next_hdr, 0, NET_IP_PROTO_TCP, check_ipv4_gre#]
+    br[done_hdr_stack#], defer[2]
+        ld_field[BF_A(pkt_vec, PV_HEADER_STACK_bf), 0001, pkt_offset] // L4 Offset
+        alu[hdr_stack, --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf)]
+
+parse_ipv4_udp#:
+    br!=byte[BF_A(pkt_vec, PV_HEADER_STACK_bf), 3, 0, end#], defer[2]
+        ld_field[BF_A(pkt_vec, PV_HEADER_STACK_bf), 0001, pkt_offset] // L4 Offset
+        alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, PROTO_UDP] // UDP
+
+check_tunnel#:
+    pv_seek(pkt_vec, pkt_offset, PV_SEEK_T_INDEX_ONLY)
+
+    // don't need byte_align_be[] after seek because check_tunnel# is only done for outer header
+    alu[udp_dst_port, 0, +16, *$index++]
+
+    bitfield_extract__sz1[vxlan_idx, port_tun_args, BF_ML(INSTR_RX_VXLAN_NN_IDX_bf)) ; INSTR_RX_VXLAN_NN_IDX_bf
+    local_csr_wr[NN_GET, vxlan_idx]
+    bitfield_extract__sz1(n_vxlan, port_tun_args, BF_ML(INSTR_RX_PARSE_VXLANS_bf)) ; INSTR_RX_PARSE_VXLANS_bf
+
+check_nn_vxlan#:
+    alu[n_vxlan, n_vxlan, -, 1]
+    bmi[check_geneve_tun#]
+
+    alu[--, udp_dst_port, -, *n$index++]
+    bne[check_nn_vxlan#]
+    alu[pkt_offset, pkt_offset, +, (UDP_HDR_SIZE + VXLAN_SIZE + ETHERNET_SIZE)]
+
+seek_inner#:
+    alu[tmp, 0xff, AND, BF_A(pkt_vec, PV_PROTO_bf)]
+    ld_field[BF_A(pkt_vec, PV_PROTO_bf), 0001, tmp, <<TUNNEL_SHF]
+    alu[BF_A(pkt_vec, PV_HEADER_STACK_bf), --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf), <<16]
+
+seek_eth_type#:
+    pv_seek(pkt_vec, pkt_offset, (PV_SEEK_CTM_ONLY | PV_SEEK_PAD_INCLUDED), check_eth_type#)
+
+check_geneve_tun#:
+    br_bclr[port_tun_args, BF_L(INSTR_RX_PARSE_GENEVE_bf), done#]
+    immed[proto_test, NET_GENEVE_PORT]
+    alu[--, udp_dst_port, -, proto_test]
+    bne[done#]
+
+    alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, (PROTO_GENEVE >> TUNNEL_SHF)]
+
+    alu[hdr_len, (0x3f << 2), AND, *$index++, >>(24 - 2)]
+
+    br[seek_inner#], defer[2]
+        alu[pkt_offset, pkt_offset, +, hdr_len]
+        alu[pkt_offset, pkt_offset, +, (UDP_HDR_SIZE + GENEVE_SIZE + ETHERNET_SIZE)]
+
+check_ipv4_gre#:
+    br!=byte[next_hdr, 0, NET_IP_PROTO_GRE, unknown_l4#]
+
+gre#:
+    br!=byte[BF_A(pkt_vec, PV_HEADER_STACK_bf), 3, 0, done#]
+    br_bclr[port_tun_args, BF_L(INSTR_RX_PARSE_NVGRE_bf), unknown_l4#]
+    pv_seek(pkt_vec, pkt_offset, PV_SEEK_T_INDEX_ONLY)
+    alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, (PROTO_GRE >> TUNNEL_SHF)]
+    // determine GRE header length - refer to RFC1701
+    alu[tmp, (1 << 3), AND, *$index, >>(28 - 1)] // R implies C
+    alu[tmp, tmp, OR, *$index, >>28]
+    pop_count1[tmp]
+    pop_count2[tmp]
+    pop_count3[tmp, tmp]
+    alu[tmp, --, B, tmp, <<2]
+    br[seek_inner#], defer[2]
+        alu[pkt_offset, pkt_offset, +, tmp]
+        alu[pkt_offset, pkt_offset, +, (NVGRE_SIZE + ETHERNET_SIZE)]
+
+unknown_l4#:
+    br[done_hdr_stack#], defer[2]
+        alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, PROTO_L4_UNKNOWN] //L4 unknown
+        alu[hdr_stack, --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf)]
+
+unknown_proto#:
+    br[done_hdr_stack#], defer[2]
+        ld_field[BF_A(pkt_vec, PV_PROTO_bf), 0001, PROTO_UNKNOWN]
+        alu[hdr_stack, --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf)]
+
+ipv4_frag#:
+    br[done_hdr_stack#], defer[2]
+        alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, PROTO_FRAG] // IPv4 Frag
+        alu[hdr_stack, --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf)]
+
+check_vlan#:
+    immed[proto_test, NET_ETH_TYPE_TPID]
+    alu[--, eth_type, -, proto_test]
+    beq[vlan_tag#]
+    immed[proto_test, NET_ETH_TYPE_SVLAN]
+    alu[--, eth_type, -, proto_test]
+    bne[check_mpls#]
+
+vlan_tag#:
+    br[seek_eth_type#], defer[1]
+        alu[pkt_offset, pkt_offset, +, (ETH_TYPE_SIZE + ETH_VLAN_SIZE)]
+
+check_mpls#:
+    immed[proto_test, NET_ETH_TYPE_MPLS]
+    alu[--, eth_type, -, proto_test]
+    bne[unknown_proto#]
+    alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, PROTO_MPLS] // MPLS
+
+mpls_loop#:
+    /* get low 16 bits of MPLS label into hi 16 bits of tmp */
+    alu[label, --, B, tmp, <<16]
+    byte_align_be[tmp, *$index++]
+
+    /* check Bottom of Stack bit */
+    br_bclr[tmp, 24, mpls_loop#], defer[1]
+        alu[pkt_offset, pkt_offset, +, MPLS_LABEL_SIZE]
+
+    /* check for IPv4 or IPv6 explicit null labels */
+    alu[label, label, OR, tmp, >>16]
+    alu[label, --, B, label, >>12]
+    beq[parse_ipv4#]
+    alu[--, label, -, 2]
+    beq[parse_ipv6#]
+    br[done#]
+
+parse_ipv6_udp#:
+    br=byte[BF_A(pkt_vec, PV_HEADER_STACK_bf), 3, 0, check_tunnel#], defer[2]
+        ld_field[BF_A(pkt_vec, PV_HEADER_STACK_bf), 0001, pkt_offset] // L4 Offset
+        alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, PROTO_UDP] // UDP
+
+done#:
+    alu[hdr_stack, --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf)]
+
+done_hdr_stack#:
+    br!=byte[BF_A(pkt_vec, PV_HEADER_STACK_bf), 3, 0, end#]
+    alu[BF_A(pkt_vec, PV_HEADER_STACK_bf), BF_A(pkt_vec, PV_HEADER_STACK_bf), OR, hdr_stack, <<16]
+
+end#:
+.end
+#endm
+
+
+#macro pv_hdr_parse(pkt_vec, port_tun_args, RETURN_LABEL)
+    br[PV_HDR_PARSE_SUBROUTINE#], defer[1]
+        load_addr[rtn_addr_reg, RETURN_LABEL]
+#endm
+
+
+#macro pv_hdr_parse_subroutine(pkt_vec, port_tun_args)
+.subroutine
+    _pv_hdr_parse(pkt_vec, port_tun_args)
+    rtn[rtn_addr_reg]
+.endsub
 #endm
 
 #endif

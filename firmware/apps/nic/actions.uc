@@ -80,9 +80,11 @@
 #macro __actions_rx_wire(out_pkt_vec, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
 .begin
     .reg mtu
+    .reg tunnel_args
 
     __actions_read(mtu, 0xffff)
-    pkt_io_rx_wire(out_pkt_vec, mtu, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+    __actions_read(tunnel_args)
+    pkt_io_rx_wire(out_pkt_vec, mtu, tunnel_args, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
     __actions_restore_t_idx()
 .end
 #endm
@@ -230,7 +232,7 @@ end#:
     br_bset[BF_AL(in_pkt_vec, PV_QUEUE_SELECTED_bf), queue_selected#]
 
 begin#:
-    bitfield_extract__sz1(l3_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_L3_bf)) ; PV_HEADER_OFFSET_L3_bf
+    bitfield_extract__sz1(l3_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_INNER_IP_bf)) ; PV_HEADER_OFFSET_INNER_IP_bf
     beq[end#] // unknown L3
 
     // seek to IP source address
@@ -267,7 +269,7 @@ check_l4#:
     beq[skip_l4#], defer[1]
         bitfield_extract__sz1(rss_table_addr, BF_AML(args, INSTR_RSS_TABLE_ADDR_bf)) ; INSTR_RSS_TABLE_ADDR_bf
 
-    bitfield_extract__sz1(l4_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_L4_bf)) ; PV_HEADER_OFFSET_L4_bf
+    bitfield_extract__sz1(l4_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_INNER_L4_bf)) ; PV_HEADER_OFFSET_INNER_L4_bf
     beq[end#] // unknown L4
 
     pv_seek(in_pkt_vec, l4_offset, PV_SEEK_T_INDEX_ONLY, process_l4#)

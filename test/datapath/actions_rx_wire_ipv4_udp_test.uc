@@ -1,5 +1,6 @@
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x3ff
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xdeadbeef
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0x0
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xdeadbeef
 
 #include <pkt_io.uc>
 #include <single_ctx_test.uc>
@@ -25,7 +26,7 @@ move(__pkt_io_nfd_pkt_no, 0)
 move($nbi_desc[0], ((0x40<<BF_L(CAT_PKT_LEN_bf)) | 1<<BF_L(CAT_BLS_bf)))
 move($nbi_desc[1], 0)
 move($nbi_desc[2], (0x2<<BF_L(CAT_SEQ_CTX_bf))]
-move($nbi_desc[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf)))
+move($nbi_desc[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf) | 0x2<<BF_L(CAT_L4_TYPE_bf)))
 move($nbi_desc[4], 0)
 move($nbi_desc[5], 0)
 move($nbi_desc[6], 0)
@@ -54,3 +55,10 @@ error_parse#:
 drop_mtu#:
 drop_proto#:
 test_fail()
+
+#pragma warning(push)
+#pragma warning(disable: 4701)
+#pragma warning(disable: 5116)
+PV_HDR_PARSE_SUBROUTINE#:
+pv_hdr_parse_subroutine(pkt_vec, port_tun_args)
+#pragma warning(pop)

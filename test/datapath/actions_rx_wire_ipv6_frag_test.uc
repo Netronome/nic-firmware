@@ -1,5 +1,22 @@
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x3ff
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xdeadbeef
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0x0
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xdeadbeef
+
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x80   0x00000000 0x00000000 0x001d0994 0x6538685b
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x90   0x35c061b6 0x86dd6002 0x128905b0 0x2c402607
+;TEST_INIT_EXEC nfp-mem i32.ctm:0xa0   0xf01003f9 0x00000000 0x00000000 0x10012607
+;TEST_INIT_EXEC nfp-mem i32.ctm:0xb0   0xf01003f9 0x00000000 0x00000011 0x00001100
+;TEST_INIT_EXEC nfp-mem i32.ctm:0xc0   0x0001f88e 0xb46618db 0x18db150b 0x791606fd
+;TEST_INIT_EXEC nfp-mem i32.ctm:0xd0   0x14ff0729 0x08076578 0x616d706c 0x65080774
+;TEST_INIT_EXEC nfp-mem i32.ctm:0xe0   0x65737441 0x70700801 0x31080774 0x65737441
+;TEST_INIT_EXEC nfp-mem i32.ctm:0xf0   0x70700809 0xfd000001 0x4f2368c7 0x8e140419
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x100  0x02271015 0xfd138868 0x68686868 0x68686868
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x110  0x68686868 0x68686868 0x68686868 0x68686868
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x120  0x68686868 0x68686868 0x68686868 0x68686868
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x130  0x68686868 0x68686868 0x68686868 0x68686868
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x140  0x68686868 0x68686868 0x68686868 0x68686868
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x150  0x68686868 0x68686868 0x68686868 0x68686868
+
 
 #include <pkt_io.uc>
 #include <single_ctx_test.uc>
@@ -11,9 +28,18 @@
 .reg volatile write $nbi_desc[(NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))]
 .xfer_order $nbi_desc
 .reg addr
+.reg pkt_num
 .sig s
 
-move(addr, 0x80)
+#define PKT_NUM_i 0
+#while PKT_NUM_i < 0x100
+    move(pkt_num, PKT_NUM_i)
+    pkt_buf_free_ctm_buffer(--, pkt_num)
+    #define_eval PKT_NUM_i (PKT_NUM_i + 1)
+#endloop
+#undef PKT_NUM_i
+
+move(addr, 0x200)
 
 #define pkt_vec *l$index1
 
@@ -54,3 +80,10 @@ error_parse#:
 drop_mtu#:
 drop_proto#:
 test_fail()
+
+#pragma warning(push)
+#pragma warning(disable: 4701)
+#pragma warning(disable: 5116)
+PV_HDR_PARSE_SUBROUTINE#:
+pv_hdr_parse_subroutine(pkt_vec, port_tun_args)
+#pragma warning(pop)

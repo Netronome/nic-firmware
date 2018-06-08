@@ -15,5 +15,4 @@ move(pkt_vec[0], 0x46)
 move(pkt_vec[2], 0x80)
 move(pkt_vec[3], 1)
 move(pkt_vec[4], 0x3fc0)
-move(pkt_vec[5], ((14 << BF_L(PV_HEADER_OFFSET_L3_bf)) |
-                  ((14 + 40 + 8) << BF_L(PV_HEADER_OFFSET_L4_bf))))
+move(pkt_vec[5], ((14 << 24) | ((14 + 40 + 8) << 16) | (14 << 8) | (14 + 40 + 8)))

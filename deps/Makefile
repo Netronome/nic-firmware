@@ -2,7 +2,7 @@
 # Change these revisions to suit the project
 #
 # FLOWENV_REV - Tip as of Apr 23 2018
-FLOWENV_REV=4765e48
+FLOWENV_REV=a77d5b2
 # NFD_REV - Feb 26 2018
 NFD_REV=f899d4074
 
@@ -72,7 +72,7 @@ GIT_REVS += $(NFD_REV)
 # $2 - revision
 #
 define update_hg_dep_decl
-	
+
 	$(Q)(echo Checking $1; cd $1 ; if [ `hg id -i` != "$2" ] ; then echo "Updating $1 to revision $2"; hg pull ; hg up -r $2; fi)
 endef
 
@@ -81,7 +81,7 @@ endef
 # $2 - revision
 #
 define update_git_dep_decl
-	
+
 	$(Q)(echo Checking $1; cd $1 ; if ! git rev-parse HEAD | grep -q "$2" ; then echo "Updating $1 to revision $2"; git pull; git checkout $2; fi)
 endef
 
@@ -100,4 +100,3 @@ firmware_clean_deps:
 		echo "Removing $$dep"; \
 		rm -rf $$dep; \
 	done
-
