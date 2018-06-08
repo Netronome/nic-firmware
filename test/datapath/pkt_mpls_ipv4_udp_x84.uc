@@ -1,5 +1,5 @@
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0x80   0x00000000 0x22334455 0x66771122 0x33445566
-;TEST_INIT_EXEC nfp-mem i32.ctm:0x90   0x88470006 0x41004500 0x01f20001 0x00004011
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x90   0x88470000 0x01004500 0x01f20001 0x00004011
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xa0   0x64960a00 0x00010a00 0x00640bb8 0x0fa001de
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xb0   0x91500001 0x02030405 0x06070809 0x0a0b0c0d
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xc0   0x0e0f1011 0x12131415 0x16171819 0x1a1b1c1d
@@ -19,9 +19,9 @@
 aggregate_zero(pkt_vec, PV_SIZE_LW)
 move(pkt_vec[0], 0x9c)
 move(pkt_vec[2], 0x84)
-move(pkt_vec[3], 0x6)
+move(pkt_vec[3], 0x43)
 move(pkt_vec[4], 0x3fc0)
-move(pkt_vec[5], ((14 << BF_L(PV_HEADER_OFFSET_L3_bf)) |
-                    ((14 + 4 + 20) << BF_L(PV_HEADER_OFFSET_L4_bf))))
+move(pkt_vec[5], (((14 + 4) << 24) | ((14 + 4 + 20) << 16) | ((14 + 4) << 8) | (14 + 4 + 20)))
 move(pkt_vec[6], 1<<BF_L(PV_QUEUE_IN_TYPE_bf))
 move(pkt_vec[9], 0xfff)
+move(pkt_vec[10], (1 << (BF_L(PV_MPD_bf))))

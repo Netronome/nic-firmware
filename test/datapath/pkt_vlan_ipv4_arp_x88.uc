@@ -12,7 +12,7 @@
 aggregate_zero(pkt_vec, PV_SIZE_LW)
 move(pkt_vec[0], 0x3c)
 move(pkt_vec[2], 0x88)
-move(pkt_vec[3], 0x6)
+move(pkt_vec[3], 0xff)
 move(pkt_vec[4], 0x3fcc)
 move(pkt_vec[6], 1<<BF_L(PV_QUEUE_IN_TYPE_bf))
 move(pkt_vec[9], 0x190)

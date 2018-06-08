@@ -14,12 +14,16 @@
 .reg loop_cntr
 .reg loop_cntr1
 .reg mtu
+.reg tunnel_args
 .reg error_expected_flag
 .reg expected[SIZE_LW]
 .reg volatile read  $nbi_desc_rd[(NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))]
 .reg volatile write $nbi_desc_wr[(NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))]
 .xfer_order $nbi_desc_rd
 .xfer_order $nbi_desc_wr
+
+.reg global rtn_addr_reg
+.set rtn_addr_reg
 
 #define pkt_vec *l$index1
 
@@ -31,6 +35,7 @@ move(loop_cntr, 0)
 
 move(error_expected_flag, 0)
 move(mtu, 0xfff)
+move(tunnel_args, 0)
 
 load_addr[rtn_reg, error_expected_ret#]
 
@@ -82,7 +87,7 @@ move(loop_cntr, 1)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
 
     .if (loop_cntr == 0)
         br[test_fail#] // should always get error for this case, so should never get here
@@ -90,9 +95,9 @@ move(loop_cntr, 1)
 
 error_expected_ret#:
 
-    alu[expected[3], --, B, loop_cntr, <<8]
-    alu[expected[3], expected[3], AND, 3, <<8]
-    alu[expected[3], expected[3], OR, 0xff]
+    //alu[expected[3], --, B, loop_cntr, <<8]
+    //alu[expected[3], expected[3], AND, 3, <<8]
+    //alu[expected[3], expected[3], OR, 0xff]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -105,7 +110,9 @@ error_expected_ret#:
         #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
-        test_assert_equal(value, _PV_INIT_EXPECT)
+        #if (_PV_CHK_LOOP != 0 && _PV_CHK_LOOP != 3)
+            test_assert_equal(value, _PV_INIT_EXPECT)
+        #endif
 
         #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
 
@@ -115,16 +122,17 @@ error_expected_ret#:
 
 .endw
 
+
 /* Test PV Sequence Number field */
 
-move($nbi_desc_wr[0], 64)
+move($nbi_desc_wr[0], ((64<<BF_L(CAT_PKT_LEN_bf)) | 0<<BF_L(CAT_BLS_bf)))
 move($nbi_desc_wr[1], 0)
-move($nbi_desc_wr[2], 0x100)
-move($nbi_desc_wr[3], 0)
+move($nbi_desc_wr[2], (0<<BF_L(CAT_SEQ_CTX_bf))]
+move($nbi_desc_wr[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf) | 2<<BF_L(CAT_L4_TYPE_bf)))
 move($nbi_desc_wr[4], 0)
 move($nbi_desc_wr[5], 0)
 move($nbi_desc_wr[6], 0)
-move($nbi_desc_wr[7], 0)
+move($nbi_desc_wr[7], (3<<BF_L(MAC_PARSE_L3_bf) | 2 << BF_L(MAC_PARSE_STS_bf)))
 
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
@@ -149,10 +157,10 @@ move(loop_cntr, 0)
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
     pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
 
     alu[expected[3], temp, OR, loop_cntr, <<16]
-    alu[expected[3], expected[3], OR, 0xff]
+    alu[expected[3], expected[3], OR, 0x2]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -165,7 +173,9 @@ move(loop_cntr, 0)
         #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
+        #if (_PV_CHK_LOOP != 5)
         test_assert_equal(value, _PV_INIT_EXPECT)
+        #endif
 
         #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
 
@@ -214,7 +224,7 @@ move(loop_cntr, 0)
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
     pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
 
 
     //alu[expected[5], --, B, loop_cntr, <<29]
@@ -274,7 +284,7 @@ move(loop_cntr, 0)
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
     pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
 
 
     move(temp, 0x1)
@@ -302,22 +312,20 @@ move(loop_cntr, 0)
 
 .endw
 
-
 /* Now try Port field in Metadata */
-
-move($nbi_desc_wr[0], 64)
+move($nbi_desc_wr[0], ((64<<BF_L(CAT_PKT_LEN_bf)) | 0<<BF_L(CAT_BLS_bf)))
 move($nbi_desc_wr[1], 0)
-move($nbi_desc_wr[2], 0x100)
-move($nbi_desc_wr[3], 0)
+move($nbi_desc_wr[2], (1<<BF_L(CAT_SEQ_CTX_bf))]
+move($nbi_desc_wr[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf) | 2<<BF_L(CAT_L4_TYPE_bf)))
 move($nbi_desc_wr[4], 0)
 move($nbi_desc_wr[5], 0)
 move($nbi_desc_wr[6], 0)
-move($nbi_desc_wr[7], 0)
+move($nbi_desc_wr[7], (3<<BF_L(MAC_PARSE_L3_bf) | 2 << BF_L(MAC_PARSE_STS_bf)))
 
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x000001ff) // Seq
+move(expected[3], 0x00000102) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -335,7 +343,7 @@ move(loop_cntr, 0)
 
     alu[temp, --, B, loop_cntr, <<6]
     pv_set_ingress_queue__sz1(pkt_vec, temp, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
 
 
     alu[expected[6], expected[6], AND~, 0xff, <<23]
@@ -352,7 +360,9 @@ move(loop_cntr, 0)
         #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
-        test_assert_equal(value, _PV_INIT_EXPECT)
+        #if (_PV_CHK_LOOP != 5)
+            test_assert_equal(value, _PV_INIT_EXPECT)
+        #endif
 
         #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
 
@@ -362,22 +372,20 @@ move(loop_cntr, 0)
 
 .endw
 
-
 /* Now try 7-bit Port field and LSB of MType field in Metadata */
-
-move($nbi_desc_wr[0], 64)
+move($nbi_desc_wr[0], ((64<<BF_L(CAT_PKT_LEN_bf)) | 0<<BF_L(CAT_BLS_bf)))
 move($nbi_desc_wr[1], 0)
-move($nbi_desc_wr[2], 0x100)
-move($nbi_desc_wr[3], 0)
+move($nbi_desc_wr[2], (1<<BF_L(CAT_SEQ_CTX_bf))]
+move($nbi_desc_wr[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf) | 2<<BF_L(CAT_L4_TYPE_bf)))
 move($nbi_desc_wr[4], 0)
 move($nbi_desc_wr[5], 0)
 move($nbi_desc_wr[6], 0)
-move($nbi_desc_wr[7], 0)
+move($nbi_desc_wr[7], (3<<BF_L(MAC_PARSE_L3_bf) | 2 << BF_L(MAC_PARSE_STS_bf)))
 
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x000001ff) // Seq
+move(expected[3], 0x00000102) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x00000000)
@@ -400,7 +408,7 @@ move(loop_cntr, 0)
 
     alu[temp, --, B, loop_cntr, <<6]
     pv_set_ingress_queue__sz1(pkt_vec, temp, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
 
     alu[expected[6], expected[6], AND~, 0xff, <<23]
     alu[expected[6], expected[6], OR, loop_cntr, <<23]
@@ -416,7 +424,9 @@ move(loop_cntr, 0)
         #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
-        test_assert_equal(value, _PV_INIT_EXPECT)
+        #if (_PV_CHK_LOOP != 5)
+            test_assert_equal(value, _PV_INIT_EXPECT)
+        #endif
 
         #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
 
@@ -426,9 +436,7 @@ move(loop_cntr, 0)
 
 .endw
 
-
 /* PV Metadata Type Fields word always set to 0, already tested */
-
 
 
 /* Test all fields in PV are filled in when a "rx_discards_proto#" occurs */
@@ -461,7 +469,7 @@ mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_
 mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
 pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
+pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
 
 br[test_fail#] // should always get error, so should never get here
 
@@ -524,7 +532,7 @@ move(loop_cntr, 1)
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
     pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
 
     br[test_fail#] // should always get error, so should never get here
 
@@ -576,3 +584,10 @@ fail#:
 test_fail#:
 
 test_fail()
+
+#pragma warning(push)
+#pragma warning(disable: 4701)
+#pragma warning(disable: 5116)
+PV_HDR_PARSE_SUBROUTINE#:
+pv_hdr_parse_subroutine(pkt_vec, tunnel_args)
+#pragma warning(pop)

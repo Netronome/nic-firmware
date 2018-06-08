@@ -65,6 +65,11 @@ nfd_out_send_init()
 .reg_addr __pkt_io_quiescent 27 A
 .set __pkt_io_quiescent
 
+.reg global rtn_addr_reg
+.set rtn_addr_reg
+
+.reg global port_tun_args
+.set port_tun_args
 
 #macro pkt_io_drop(in_pkt_vec)
     pv_free_buffers(pkt_vec)
@@ -92,10 +97,10 @@ drop_buf_pci#:
 #endm
 
 
-#macro pkt_io_rx_wire(io_vec, in_mtu, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+#macro pkt_io_rx_wire(io_vec, in_mtu, in_tunnel_args, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
     #pragma warning(push)
     #pragma warning(disable:5009) // rx_wire is only invoked when $__pkt_io_nbi_desc ready
-    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, in_mtu, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, in_mtu, in_tunnel_args, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
     #pragma warning(pop)
 #endm
 

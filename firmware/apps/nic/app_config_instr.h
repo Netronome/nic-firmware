@@ -81,13 +81,14 @@ enum instruction_type {
  * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *       +-----------------------------+-+---+---------------------------+
  *    0  |              1              |P| 0 |           MTU             |
- *       +-----------------------------+-+-+-+---+-+-+-------------------+
- *    1  |  VXLAN1 (N=1) / NN_IDX (N>1)  |E|VXLAN|N|G|         R         |
- *       +-------------------------------+-+-----+-+-+-------------------+
+ *       +-----------------------------+-+---+---+-------------+-----+-+-+
+ *    1  |                Reserved               |VXLAN_NN_IDX |VXLAN|G|N|
+ *       +---------------------------------------+-------------+-----+-+-+
  *
+ *       VXLAN_NN_IDX = NN base of VXLAN port table
+ *       VXLAN = Number of VXLAN ports
  *       G = Parse GENEVE
  *       N = Parse NVGRE
- *       VXLAN = Parse VXLAN for N ports
  *
  * INSTR_MAC_CLASSIFY:
  *       +-----------------------------+-+-------------------------------+
@@ -188,6 +189,21 @@ typedef union {
     };
     uint32_t __raw[3];
 } instr_rss_t;
+
+typedef union {
+    struct {
+	    uint32_t instr: 15;
+	    uint32_t pipeline: 1;
+	    uint32_t zero: 2;
+	    uint32_t mtu: 14;
+	    uint32_t reserved: 20;
+	    uint32_t vxlan_nn_idx: 7;
+	    uint32_t parse_vxlans: 3;
+	    uint32_t parse_geneve: 1;
+	    uint32_t parse_nvgre: 1;
+    };
+    uint32_t __raw[2];
+} instr_rx_wire_t;
 #endif
 
 #define INSTR_PIPELINE_BIT 16
@@ -204,5 +220,9 @@ typedef union {
 #define INSTR_RSS_ROW_SHIFT_bf  1, 4, 0
 #define INSTR_RSS_KEY_bf        2, 31, 0
 
+#define INSTR_RX_VXLAN_NN_IDX_bf 1, 11, 5
+#define INSTR_RX_PARSE_VXLANS_bf 1, 4, 2
+#define INSTR_RX_PARSE_GENEVE_bf 1, 1, 1
+#define INSTR_RX_PARSE_NVGRE_bf  1, 0, 0
 
 #endif /* _APP_CONFIG_INSTR_H_ */
