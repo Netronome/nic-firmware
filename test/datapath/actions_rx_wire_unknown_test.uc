@@ -1,5 +1,17 @@
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x3ff
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xdeadbeef
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0x0
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xdeadbeef
+
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x1188 0xffffffff 0xffffffff
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x1190 0xffffffff 0xffffffff 0xffffffff 0xffffffff
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x11a0 0xffffffff 0xffffffff 0xffffffff 0xffffffff
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x11b0 0xffffffff 0xffffffff 0xffffffff 0xffffffff
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x11c0 0xffffffff 0xffffffff 0xffffffff 0xffffffff
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x11d0 0xffffffff 0xffffffff 0xffffffff 0xffffffff
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x11e0 0xffffffff 0xffffffff 0xffffffff 0xffffffff
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x11f0 0xffffffff 0xffffffff 0xffffffff 0xffffffff
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x11100 0xffffffff 0xffffffff 0xffffffff 0xffffffff
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x11110 0xffffffff 0xffffffff 0xffffffff 0xffffffff
 
 #include <pkt_io.uc>
 #include <single_ctx_test.uc>
@@ -16,12 +28,9 @@
 move(addr, 0x80)
 
 #define pkt_vec *l$index1
-
 pv_init(pkt_vec, 0)
 
 //set up CATAMARAN vector
-move(__pkt_io_nfd_pkt_no, 0)
-
 move($nbi_desc[0], ((0x40<<BF_L(CAT_PKT_LEN_bf)) | 1<<BF_L(CAT_BLS_bf)))
 move($nbi_desc[1], 0)
 move($nbi_desc[2], (0x2<<BF_L(CAT_SEQ_CTX_bf))]
@@ -29,7 +38,7 @@ move($nbi_desc[3], (0<<BF_L(CAT_L3_TYPE_bf)))
 move($nbi_desc[4], 0)
 move($nbi_desc[5], 0)
 move($nbi_desc[6], 0)
-move($nbi_desc[7], (0x0<<BF_L(MAC_PARSE_L3_bf) | 0x0 << BF_L(MAC_PARSE_STS_bf)))
+move($nbi_desc[7], (0x0<<BF_L(MAC_PARSE_L3_bf) | 0x0<<BF_L(MAC_PARSE_STS_bf)))
 
 mem[write32, $nbi_desc[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
@@ -54,3 +63,10 @@ error_parse#:
 drop_mtu#:
 drop_proto#:
 test_fail()
+
+#pragma warning(push)
+#pragma warning(disable: 4701)
+#pragma warning(disable: 5116)
+PV_HDR_PARSE_SUBROUTINE#:
+pv_hdr_parse_subroutine(pkt_vec, port_tun_args)
+#pragma warning(pop)

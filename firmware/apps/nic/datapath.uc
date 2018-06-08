@@ -37,5 +37,12 @@ actions#:
 ebpf_reentry#:
     ebpf_reentry()
 
+#pragma warning(push)
+#pragma warning(disable: 4701)
+#pragma warning(disable: 5116)
+PV_HDR_PARSE_SUBROUTINE#:
+    pv_hdr_parse_subroutine(pkt_vec, port_tun_args)
+#pragma warning(pop)
+
 #pragma warning(disable: 4702)
 fatal_error("MAIN LOOP EXIT")

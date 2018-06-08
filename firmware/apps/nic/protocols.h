@@ -4,6 +4,14 @@
 #define MAC_MULTICAST_bf            0, 8, 8
 #define IP_VERSION_bf               0, 31, 28  // version field in same location for IPv4 and IPv6
 
+#define ETHERNET_SIZE               14
+#define ETH_MAC_SIZE                12
+#define ETH_TYPE_SIZE               2
+#define ETH_VLAN_SIZE               2
+#define NET_ETH_TYPE_SVLAN          0x88A8
+
+#define MPLS_LABEL_SIZE             4
+
 /**
  * IPv4 header (without options)
  * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
@@ -43,6 +51,7 @@
 #define IPV4_LEN_OFFS               2
 #define IPV4_PROTOCOL_BYTE          2
 
+#define IPV4_PROTO_BYTE_OFFS        9
 
 /*
  * IPv6 header (without extension headers)
@@ -87,6 +96,8 @@
 
 #define L4_SOURCE_PORT_bf           0, 31, 16
 #define L4_DESTINATION_PORT_bf      0, 15, 0
+
+#define IPV6_HDR_SIZE               40
 
 /*
  * TCP header format (only displaying up to words used or touched by LSO fixup)
@@ -142,5 +153,13 @@
 #define UDP_CHECKSUM_bf             1, 15, 0
 
 #define UDP_LEN_OFFS                4
+#define UDP_HDR_SIZE                8
+
+/* Tunnel Definitions */
+
+#define VXLAN_SIZE                   8
+#define NVGRE_SIZE                   4
+#define GENEVE_SIZE                  8
+#define NET_GENEVE_PORT              0x17C1
 
 #endif

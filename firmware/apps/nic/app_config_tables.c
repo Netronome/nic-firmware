@@ -127,6 +127,8 @@ __export __emem uint64_t cfg_error_rss_cntr = 0;
 /* RSS table length in words */
 #define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
 
+/* VxLAN table length in words */
+#define  NFP_NET_CFG_VXLAN_SZ_wrd (NFP_NET_CFG_VXLAN_SZ >> 2)
 
 /* Cluster target NN write defines and structures */
 typedef enum CT_ADDR_MODE
@@ -481,6 +483,29 @@ extract_rss_flags(uint32_t rss_ctrl)
     return rss_flags;
 }
 
+#define VXLAN_PORTS_NN_IDX (SLICC_HASH_PAD_NN_IDX + SLICC_HASH_PAD_SIZE_LW)
+
+__intrinsic uint32_t
+upd_vxlan_table(__emem __addr40 uint8_t *bar_base, uint32_t vnic_port)
+{
+    __xread uint32_t xrd_vxlan_data[NFP_NET_CFG_VXLAN_SZ_wrd];
+    __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_VXLAN_SZ_wrd];
+    uint32_t vxlan_data[NFP_NET_CFG_VXLAN_SZ_wrd];
+    uint32_t i;
+    uint32_t n_vxlan = 0;
+
+    mem_read32(xrd_vxlan_data, bar_base + NFP_NET_CFG_VXLAN_PORT, sizeof(xrd_vxlan_data));
+    for (i = 0; i < NFP_NET_CFG_VXLAN_SZ_wrd; i++) {
+        xwr_nn_info[i] = xrd_vxlan_data[i];
+	if ((xrd_vxlan_data[i] & 0xffff) != 0)
+	    n_vxlan++;
+    }
+
+    /* Write at NN register start_offset for all worker MEs */
+    upd_nn_table_instr(xwr_nn_info, VXLAN_PORTS_NN_IDX, NFP_NET_CFG_VXLAN_SZ_wrd);
+    return n_vxlan;
+}
+
 
 #define SET_PIPELINE_BIT(prev, current) \
     ((current) - (prev) == 1) ? 1 : 0;
@@ -497,6 +522,7 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
     __xread uint32_t rx_rings[2];
     instr_rss_t instr_rss;
+    instr_rx_wire_t instr_rx_wire;
     __lmem union instruction_format instr[NIC_MAX_INSTR];
     SIGNAL sig1, sig2;
     uint32_t rss_flags, rss_rings;
@@ -571,8 +597,23 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
     instr[count].instr = INSTR_RX_WIRE;
 #endif
     // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
-    instr[count].param = mtu + NET_ETH_LEN + 1;
+    instr_rx_wire.mtu = mtu + NET_ETH_LEN + 1;
+    if (control & NFP_NET_CFG_UPDATE_VXLAN) {
+        instr_rx_wire.parse_vxlans = upd_vxlan_table(bar_base, vnic);
+    }
+    else {
+	instr_rx_wire.parse_vxlans = 0;
+    }
+    instr_rx_wire.vxlan_nn_idx = VXLAN_PORTS_NN_IDX; 
+
+    instr_rx_wire.parse_nvgre = (control & NFP_NET_CFG_CTRL_NVGRE) ? 1 : 0;
+
+    // disable GENEVE until we have configuration ABI
+    instr_rx_wire.parse_geneve = 0;
+
+    instr[count].param = instr_rx_wire.__raw[0];
     instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_WIRE);
+    instr[count++].value = instr_rx_wire.__raw[1];
     prev_instr = INSTR_RX_WIRE;
 
     /* MAC address */
@@ -732,5 +773,3 @@ app_config_port_down(uint32_t vid)
 
     return;
 }
-
-
