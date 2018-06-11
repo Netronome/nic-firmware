@@ -562,9 +562,8 @@ nbi#:
     #if (is_ct_const(pms_offset))
         immed[prev_alu, ((((pms_offset >> 3) - 1) << 8) | 0xcb)]
     #else
-        alu[prev_alu, --, B, pms_offset, >>3]
-        alu[prev_alu, prev_alu, -, 1]
-        alu[prev_alu, 0xcb, OR, prev_alu, <<8]
+        alu[prev_alu, pms_offset, -, (1 << 3)]
+        alu[prev_alu, 0xcb, OR, prev_alu, <<(8-3)]
     #endif
     alu[queue, in_queue_base, AND~, 0x3f, <<10]
     alu[queue, queue, +8, BF_A(in_vec, PV_QUEUE_OFFSET_bf)]
