@@ -935,12 +935,11 @@ end#:
      * spare the per packet CTM accesses. This decision should be revisited if the need
      * for the absolute address (also part of packet status) ever arises for NBI packets.
      */
-    alu[cbs, BF_A(out_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] // must mask out BLS before add
-    alu[cbs, (PKT_NBI_OFFSET + MAC_PREPEND_BYTES - 1), +16, cbs] ; PV_LENGTH_bf
-    alu[--, --, B, cbs, >>10]
+    alu[cbs, (PKT_NBI_OFFSET + MAC_PREPEND_BYTES - 1), +16, BF_A(out_vec, PV_LENGTH_bf)] ; PV_LENGTH_bf
+    alu[--, 0xf, AND, cbs, >>10]
     bne[max_cbs#], defer[3]
-        alu[BF_A(out_vec, PV_MU_ADDR_bf), BF_A(in_nbi_desc, CAT_MUPTR_bf), AND~, 0x3, <<BF_L(PV_CBS_bf)]
-        alu[shift, (3 << 1), AND, cbs, >>(8 - 1)]
+        alu[BF_A(out_vec, PV_MU_ADDR_bf), BF_A(in_nbi_desc, CAT_MUPTR_bf), AND~, BF_MASK(PV_CBS_bf), <<BF_L(PV_CBS_bf)]
+        alu[shift, (BF_MASK(PV_CBS_bf) << 1), AND, cbs, >>(8 - 1)]
         alu[cbs, shift, B, 3]
     alu[cbs, cbs, AND, ((2 << 6) | (2 << 4) | (1 << 2) | (0 << 0)), >>indirect]
 max_cbs#:

@@ -64,7 +64,7 @@ move(expected[15], 0)
 
 move(loop_cntr, 64)
 
-.while (loop_cntr <= 0x3fff)
+.while (loop_cntr <= 0x2800)
 
     move($nbi_desc_wr[0], loop_cntr)
 

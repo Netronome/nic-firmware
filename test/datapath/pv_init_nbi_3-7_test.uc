@@ -445,7 +445,7 @@ move(error_expected_flag, 1)
 
 load_addr[rtn_reg, error_expected_ret1#]
 
-move($nbi_desc_wr[0], 0x03ffffff)
+move($nbi_desc_wr[0], 0x03ffe800)
 move($nbi_desc_wr[1], 0x9fffffff)
 move($nbi_desc_wr[2], 0xffff0000)
 move($nbi_desc_wr[3], 0x3000)
@@ -454,7 +454,7 @@ move($nbi_desc_wr[5], 0)
 move($nbi_desc_wr[6], 0)
 move($nbi_desc_wr[7], 0xe03fffff)
 
-move(expected[0], 0x3fffff7)
+move(expected[0], 0x3ffe7f8)
 move(expected[1], 0xffffffff)
 move(expected[2], 0x83ff0088)
 move(expected[3], 0xffff00ff)
