@@ -14,18 +14,18 @@
  * Handle port config from PCIe. Configure the config instruction tables
  * for wire and host.
  *
- * @vnic_port   VNIC port
+ * @vid         VNIC ID
  * @control     First word of the BAR data
  * @update      Second word of the BAR data
  */
-void app_config_port(unsigned int vnic_port, unsigned int control,
-                        unsigned int update);
+void app_config_port(unsigned int vid, unsigned int control,
+                     unsigned int update);
 
 /**
  * Handle SRIOV port config from PCIe. Configure the hashmap SRIOV
  * config instruction tables for wire and host.
  *
- * @vid             VNIC
+ * @vid             VNIC ID
  * @action_list     Pointer to action list
  * @control         First word of the BAR data
  * @update          Second word of the BAR data
@@ -37,9 +37,9 @@ void app_config_sriov_port(uint32_t vid, __lmem uint32_t *action_list,
  * Handle port down from PCIe. Configure the config instruction tables
  * for wire and host.
  *
- * @vnic_port    VNIC port
+ * @vid             VNIC ID
  */
-void app_config_port_down(unsigned int vnic_port);
+void app_config_port_down(uint32_t vid);
 
 /**
  * Initialize app ME NN registers
