@@ -126,14 +126,12 @@ enum cfg_msg_err {
 #define NUM_PFS_VFS (NFD_MAX_PFS + NFD_MAX_VFS)
 
 /* Current value of NFP_NET_CFG_CTRL (shared between all contexts) */
-/* TODO does NS_PLATFORM_NUM_PORTS equal NFD_MAX_PFS?
- * If so should NFD_MAX_PFS be used below? */
 __shared __lmem volatile uint32_t nic_control_word[NS_PLATFORM_NUM_PORTS +
                                                    NFD_MAX_CTRL];
 
 
 /* Current state of the link state and the pending interrupts. */
-#define LS_ARRAY_LEN           ((NUM_PFS_VFS + 31) >> 5)
+#define LS_ARRAY_LEN           ((NVNICS + 31) >> 5)
 #define LS_IDX(_vnic)          ((_vnic) >> 5)
 #define LS_SHF(_vnic)          ((_vnic) & 0x1f)
 #define LS_MASK(_vnic)         (0x1 << LS_SHF(_vnic))
@@ -151,6 +149,7 @@ __shared __lmem volatile uint32_t nic_control_word[NS_PLATFORM_NUM_PORTS +
 __shared __lmem uint32_t vs_current[LS_ARRAY_LEN];
 __shared __lmem uint32_t ls_current[LS_ARRAY_LEN];
 __shared __lmem uint32_t pending[LS_ARRAY_LEN];
+__shared __lmem uint32_t vf_lsc_list[NS_PLATFORM_NUM_PORTS][LS_ARRAY_LEN];
 
 #define TMQ_DRAIN_RETRIES      15
 
@@ -320,6 +319,75 @@ ct_reflect_data(unsigned int dst_me, unsigned int dst_ctx,
         ct[reflect_write_sig_remote, *src_xfer, addr, 0, \
            __ct_const_val(count)], indirect_ref;
     };
+}
+
+/*
+ * Update flags to enable notification of link state change on port to
+ * vf vf_vid.
+ *
+ * Also update the current link state for vf_vid and schedule an interrupt
+ */
+static void
+update_vf_lsc_list(unsigned int port, uint32_t vf_vid, unsigned int mode)
+{
+    unsigned int i;
+    unsigned int sts_en;
+    unsigned int sts_dis;
+    __xread uint32_t ctrl_xr;
+    __xwrite uint32_t sts_xw;
+    uint32_t pf_vid = NFD_PF2VID(port);
+    unsigned int idx = LS_IDX(vf_vid);
+    unsigned int orig_link_state = LS_READ(ls_current, vf_vid);
+    unsigned int pf_link_state = LS_READ(ls_current, pf_vid);
+    __mem char *cfg_bar = NFD_CFG_BAR_ISL(NIC_PCI, vf_vid);
+
+    /* Enable notification on selected vf from port */
+    if (mode == NFD_VF_CFG_CTRL_LINK_STATE_AUTO)
+        LS_SET(vf_lsc_list[port], vf_vid);
+    else
+        LS_CLEAR(vf_lsc_list[port], vf_vid);
+
+    /* Disable notification to selected vf from other ports */
+    for (i = 0; i < NS_PLATFORM_NUM_PORTS; i++) {
+        if (i != port)
+            LS_CLEAR(vf_lsc_list[i], vf_vid);
+    }
+
+    /* Update the link status for the VF. Report the link speed for the VF as
+     * that of the PF. */
+    sts_en = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
+              NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
+    sts_dis = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
+               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 0;
+    if (mode == NFD_VF_CFG_CTRL_LINK_STATE_DISABLE) {
+        /* Clear the link status. */
+        LS_CLEAR(ls_current, vf_vid);
+        sts_xw = sts_dis;
+    } else if (mode == NFD_VF_CFG_CTRL_LINK_STATE_ENABLE) {
+        /* Set the link status to always be up. */
+        LS_SET(ls_current, vf_vid);
+        sts_xw = sts_en;
+    } else if (pf_link_state) {
+        /* Set the link status to reflect the PF link is up. */
+        LS_SET(ls_current, vf_vid);
+        sts_xw = sts_en;
+    } else {
+        /* Clear the link status to reflect the PF link is down. */
+        LS_CLEAR(ls_current, vf_vid);
+        sts_xw = sts_dis;
+    }
+
+    mem_write32(&sts_xw, cfg_bar + NFP_NET_CFG_STS, sizeof(sts_xw));
+    /* Make sure the config BAR is updated before we send
+       the notification interrupt */
+    mem_read32(&ctrl_xr, cfg_bar + NFP_NET_CFG_CTRL, sizeof(ctrl_xr));
+
+    /* Schedule notification interrupt to be sent from the
+       link state change context */
+    if ((ctrl_xr & NFP_NET_CFG_CTRL_ENABLE) &&
+        (orig_link_state != LS_READ(ls_current, vf_vid))) {
+        LS_SET(pending, vf_vid);
+    }
 }
 
 /* MAC address building macros */
@@ -529,10 +597,8 @@ handle_sriov_update(uint32_t pf_vid, uint32_t pf_control, uint32_t pf_update)
         vnic_entry.link_state_mode = sriov_cfg_data.ctrl_link_state;
 
         /* Update the list of VFs to be notified of link state changes. */
-        /* TODO
-        update_vf_lsc_list(APP_PVN2PHYS(pf_vid), sriov_mb_data.vf,
+        update_vf_lsc_list(NFD_VID2PF(pf_vid), sriov_mb_data.vf,
                                           vnic_entry.link_state_mode);
-        */
     }
 
     reg_cp(&vnic_entry_wr, &vnic_entry, sizeof(struct nfp_vnic_setup_entry));
@@ -846,9 +912,10 @@ perq_stats_loop(void)
  * - If the interrupt is masked, set the pending flag and try again later.
  */
 
-/* Send an LSC MSI-X. return 0 if done or 1 if pending */
+/* Send an LSC MSI-X. return 0 if done or 1 if pending. vid corresponds to
+   either a pf or a vf */
 __inline static int
-lsc_send(int port)
+lsc_send(int vid)
 {
     __mem char *nic_ctrl_bar;
     unsigned int automask;
@@ -856,10 +923,8 @@ lsc_send(int port)
     __gpr unsigned int entry;
     __xread uint32_t mask_r;
     __xwrite uint32_t mask_w;
-    uint32_t vid;
     int ret = 0;
 
-    vid = NFD_PF2VID(port);
     nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vid);
 
     mem_read32_le(&tmp, nic_ctrl_bar + NFP_NET_CFG_LSC, sizeof(tmp));
@@ -890,19 +955,66 @@ out:
     return ret;
 }
 
+/* Check for VFs that should receive an interrupt for a link state change,
+   update the link status, and try to generate an interrupt */
+__inline static void
+lsc_check_vf(int port, enum link_state ls)
+{
+    __mem char *vf_ctrl_bar;
+    unsigned int vf_vid;
+    unsigned int sts_en;
+    unsigned int sts_dis;
+    __xwrite uint32_t sts;
+    __xread uint32_t ctrl;
+
+    sts_en = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
+              NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
+    sts_dis = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
+               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 0;
+    for (vf_vid = 0; vf_vid < NVNICS; vf_vid++) {
+        /* Check if the VF should be receiving an interrupt. */
+        if (NFD_VID_IS_VF(vf_vid) && LS_READ(vf_lsc_list[port], vf_vid)) {
+            /* Update the link state status. Report the link speed for the
+               VF as that of the PF. */
+            if (ls == LINK_UP) {
+                LS_SET(ls_current, vf_vid);
+                sts = sts_en;
+            } else {
+                LS_CLEAR(ls_current, vf_vid);
+                sts = sts_dis;
+            }
+
+            vf_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vf_vid);
+            mem_write32(&sts, vf_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
+            /* Make sure the config BAR is updated before we send
+               the notification interrupt */
+            mem_read32(&ctrl, vf_ctrl_bar + NFP_NET_CFG_CTRL, sizeof(ctrl));
+
+            /* Send the interrupt. */
+            if (lsc_send(vf_vid))
+                LS_SET(pending, vf_vid);
+            else
+                LS_CLEAR(pending, vf_vid);
+        }
+    }
+}
+
 /* Check the Link state and try to generate an interrupt if it changed. */
-__inline static void lsc_check(int port)
+__inline static
+void lsc_check(int port)
 {
     __mem char *nic_ctrl_bar;
     __gpr enum link_state ls;
     __gpr enum link_state vs;
     __gpr int changed = 0;
     __xwrite uint32_t sts;
+    __xread uint32_t ctrl;
     __gpr int ret = 0;
-    uint32_t vid;
+    uint32_t pf_vid;
 
-    vid = NFD_PF2VID(port);
-    nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vid);
+    /* Update pf corresponding to port */
+    pf_vid = NFD_PF2VID(port);
+    nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, pf_vid);
 
     /* link state according to MAC */
     ls = mac_eth_port_link_state(NS_PLATFORM_MAC(port),
@@ -910,25 +1022,25 @@ __inline static void lsc_check(int port)
                                  (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1);
 
     /* link state according to VNIC */
-    vs = nic_control_word[vid] & NFP_NET_CFG_CTRL_ENABLE;
+    vs = nic_control_word[pf_vid] & NFP_NET_CFG_CTRL_ENABLE;
 
-    if (ls != LS_READ(ls_current, port)) {
+    if (ls != LS_READ(ls_current, pf_vid)) {
         changed = 1;
         if (ls)
-            LS_SET(ls_current, port);
+            LS_SET(ls_current, pf_vid);
         else
-            LS_CLEAR(ls_current, port);
+            LS_CLEAR(ls_current, pf_vid);
     }
 
-    if (vs != LS_READ(vs_current, port)) {
-	changed = 1;
-	if (vs)
-	    LS_SET(vs_current, port);
-	else {
+    if (vs != LS_READ(vs_current, pf_vid)) {
+        changed = 1;
+        if (vs)
+            LS_SET(vs_current, pf_vid);
+        else {
             /* a disabled VNIC overrides MAC link state */
             ls = LINK_DOWN;
-	    LS_CLEAR(vs_current, port);
-	}
+            LS_CLEAR(vs_current, pf_vid);
+        }
     }
 
     if (changed) {
@@ -955,24 +1067,32 @@ __inline static void lsc_check(int port)
                NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
     }
     mem_write32(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
+    /* Make sure the config BAR is updated before we send
+       the notification interrupt */
+    mem_read32(&ctrl, nic_ctrl_bar + NFP_NET_CFG_CTRL, sizeof(ctrl));
 
     /* If the link state changed, try to send in interrupt */
-    if (changed || LS_READ(pending, port)) {
-        if (lsc_send(port))
-            LS_SET(pending, port);
+    if (changed || LS_READ(pending, pf_vid)) {
+        if (lsc_send(pf_vid))
+            LS_SET(pending, pf_vid);
         else
-            LS_CLEAR(pending, port);
+            LS_CLEAR(pending, pf_vid);
+
+        /* Now, notify the VFs that follow the port's link state. */
+        if (changed)
+           lsc_check_vf(port, ls);
     }
 }
 
 static void
 lsc_loop(void)
 {
+    __gpr int vid;
     __gpr int port;
     __gpr int lsc_count = 0;
 
     /* Set the initial port state. */
-    for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+    for (port = 0; port < NS_PLATFORM_NUM_PORTS; port++) {
         lsc_check(port);
     }
 
@@ -982,20 +1102,20 @@ lsc_loop(void)
      * determine when to also check for linkstate. */
     for (;;) {
         sleep(LSC_POLL_PERIOD);
-        ++lsc_count;
+        lsc_count++;
 
-        for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
-            if (LS_READ(pending, port)) {
-                if (lsc_send(port))
-                    LS_SET(pending, port);
+        for (vid = 0; vid < NVNICS; vid++) {
+            if (LS_READ(pending, vid)) {
+                if (lsc_send(vid))
+                    LS_SET(pending, vid);
                 else
-                    LS_CLEAR(pending, port);
+                    LS_CLEAR(pending, vid);
             }
         }
 
         if (lsc_count > 19) {
             lsc_count = 0;
-            for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+            for (port = 0; port < NS_PLATFORM_NUM_PORTS; port++) {
                 lsc_check(port);
             }
         }
