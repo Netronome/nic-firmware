@@ -690,7 +690,7 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
 
     /* write TX instr to local table and to other islands too */
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-    upd_rx_host_instr(xwr_instr, byte_off<<2, count, NUM_PCIE_Q_PER_PORT);
+    upd_rx_host_instr(xwr_instr, byte_off<<2, count, NFD_VNIC_MAXQS(type, vnic));
 
     /*
      * RX WIRE --> TX HOST
@@ -892,7 +892,7 @@ app_config_port_down(uint32_t vid)
 #endif
     reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
     byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-    upd_rx_host_instr(xwr_instr, byte_off << 2, count, NUM_PCIE_Q_PER_PORT);
+    upd_rx_host_instr(xwr_instr, byte_off << 2, count, NFD_VNIC_MAXQS(type, vnic));
 
     /*
      * RX_WIRE --> DROP
