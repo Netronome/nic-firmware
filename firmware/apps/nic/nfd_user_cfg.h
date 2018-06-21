@@ -191,7 +191,7 @@
 /* enable cmsg */
 #define NFD_USE_CTRL
 
-/* # of PFs + ctrl vnic */
+/* # of PFs + # VFs + # CTRLs */
 #define NVNICS (NFD_MAX_PFS + NFD_MAX_VFS + NFD_MAX_CTRL)
 
 #define NFD_OUT_FL_BUFS_PER_QUEUE      1024
