@@ -25,8 +25,8 @@ __declspec(shared export emem0 aligned(NFD_VF_CFG_SZ)) \
 
 #define CMSG_DESC_LW 3
 
-#define VEB_KEY_MAC_HI_FROM_BAR(_hi)         (((_hi) >> 16) & 0xffff)
-#define VEB_KEY_MAC_LO_FROM_BAR(_hi, _lo)    ((((_hi) << 16) & 0xffff0000) | (_lo))
+#define VEB_KEY_MAC_HI_FROM_BAR(_hi)      (((_hi) >> 16) & 0xffff)
+#define VEB_KEY_MAC_LO_FROM_BAR(_hi, _lo) ((((_hi) << 16) & 0xffff0000) | (_lo))
 
 #define NET_ETH_LEN 14
 
@@ -65,6 +65,7 @@ void main() {
     uint32_t pf_vid = 1;
     uint32_t pf_control = 1;
     uint32_t pf_update = 1;
+    uint32_t vlan_id = 4090;
     int i,j,pass;
     __gpr struct sriov_mb sriov_mb_data;
     __xwrite struct sriov_mb sriov_mb_data_xfr;
@@ -88,7 +89,7 @@ void main() {
     __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, pf_vid);
     __xread union instruction_format actions_xfr[NIC_MAX_INSTR];
     __lmem union instruction_format actions_exp[NIC_MAX_INSTR];
-    __xread uint64_t vlan_members_xfr;
+
 
     single_ctx_test();
 
@@ -109,7 +110,7 @@ void main() {
     /* init vnic setup entry */
     reg_zero(&entry, sizeof(entry));
     entry.src_mac = 0;
-    entry.vlan = NIC_NO_VLAN_ID;
+    entry.vlan = vlan_id;
     entry.spoof_chk = 0;
     entry.link_state_mode = NFD_VF_CFG_CTRL_LINK_STATE_AUTO;
     entry_xfr = entry;
@@ -156,89 +157,99 @@ void main() {
         handle_sriov_update(pf_vid, pf_control, pf_update);
 
 
-        /* check format of ctrl msg request in nfd workq */
+        /* check format of ctrl msg request in nfd workq for
+           pass 0 and 1. For pass 2, the mac address isn't
+           changed so there should be no table updates */
 
-        /* for pass 1 only, there are two requests. the 1st is
-           to add a new mac entry, and the 2nd is to delete
-           the old entry */
+        if ( pass < 2 ) {
 
-        for ( j = 0; j < 2; j++ ) {
+            /* for pass 1, there are two requests. the 1st is
+               to add a new mac entry, and the 2nd is to delete
+               the old entry */
 
-            /* check workq */
+            for ( j = 0; j < 2; j++ ) {
 
-            q_idx = _link_sym(MAP_CMSG_Q_IDX);
-            q_base = (_link_sym(MAP_CMSG_Q_BASE) >> 8) & 0xff000000;
-            mem_workq_add_thread(q_idx, q_base, &workq_data, sizeof(workq_data));
+                /* check workq */
 
-            ctm_pnum = workq_data[0] >> 16;
-            exp = ((__ISLAND<<26) | (ctm_pnum<<16));
-            test_assert_equal(workq_data[0], exp);
+                q_idx = _link_sym(MAP_CMSG_Q_IDX);
+                q_base = (_link_sym(MAP_CMSG_Q_BASE) >> 8) & 0xff000000;
+                mem_workq_add_thread(q_idx, q_base, &workq_data,
+                                     sizeof(workq_data));
 
-            emem_dst = workq_data[1];
-            exp = emem_dst; /* (useless test) */
-            test_assert_equal(workq_data[1], exp);
+                ctm_pnum = workq_data[0] >> 16;
+                exp = ((__ISLAND<<26) | (ctm_pnum<<16));
+                test_assert_equal(workq_data[0], exp);
 
-            exp = SRIOV_QUEUE<<16;
-            test_assert_equal(workq_data[2], exp);
+                emem_dst = workq_data[1];
+                exp = emem_dst; /* (useless test) */
+                test_assert_equal(workq_data[1], exp);
+
+                exp = SRIOV_QUEUE<<16;
+                test_assert_equal(workq_data[2], exp);
 
 
-            /* check format of ctrl mssg in emem */
+                /* check format of ctrl mssg in emem */
 
-            emem_ptr = (__mem uint8_t *)((uint64_t)emem_dst << 11) +
-                                                    NFD_IN_DATA_OFFSET;
-            mem_read32_swap(&cmsg_data, emem_ptr, sizeof(cmsg_data));
+                emem_ptr = (__mem uint8_t *)((uint64_t)emem_dst << 11) +
+                    NFD_IN_DATA_OFFSET;
+                mem_read32_swap(&cmsg_data, emem_ptr, sizeof(cmsg_data));
 
-            if ( j == 1 )
-                test_assert_equal(cmsg_data.word0, CMSG_TYPE_MAP_DELETE |
-                                  (CMSG_MAP_VERSION<<8));
-            else
-                test_assert_equal(cmsg_data.word0, CMSG_TYPE_MAP_ADD |
-                                  (CMSG_MAP_VERSION<<8));
+                if ( j == 1 )
+                    test_assert_equal(cmsg_data.word0, CMSG_TYPE_MAP_DELETE |
+                                      (CMSG_MAP_VERSION<<8));
+                else
+                    test_assert_equal(cmsg_data.word0, CMSG_TYPE_MAP_ADD |
+                                      (CMSG_MAP_VERSION<<8));
 
-            test_assert_equal(cmsg_data.tid, SRIOV_TID<<24);
-            test_assert_equal(cmsg_data.count, 0);
-            test_assert_equal(cmsg_data.flags, 0);
+                test_assert_equal(cmsg_data.tid, SRIOV_TID<<24);
+                test_assert_equal(cmsg_data.count, 0);
+                test_assert_equal(cmsg_data.flags, 0);
 
-            vlan_key_exp.__raw[0] = 0;
-            vlan_key_exp.__raw[1] = 0;
-            vlan_key_exp.vlan_id = entry.vlan;
-            if ( j == 1 ) {
-                vlan_key_exp.mac_addr_hi =
-                    VEB_KEY_MAC_HI_FROM_BAR(prev_mac_hi);
-                vlan_key_exp.mac_addr_lo =
-                    VEB_KEY_MAC_LO_FROM_BAR(prev_mac_hi, prev_mac_lo);
-            } else {
-                vlan_key_exp.mac_addr_hi =
-                    VEB_KEY_MAC_HI_FROM_BAR(sriov_cfg_data.mac_hi);
-                vlan_key_exp.mac_addr_lo =
-                    VEB_KEY_MAC_LO_FROM_BAR(sriov_cfg_data.mac_hi,
-                                    sriov_cfg_data.mac_lo);
+                vlan_key_exp.__raw[0] = 0;
+                vlan_key_exp.__raw[1] = 0;
+                vlan_key_exp.vlan_id = entry.vlan;
+                if ( j == 1 ) {
+                    vlan_key_exp.mac_addr_hi =
+                        VEB_KEY_MAC_HI_FROM_BAR(prev_mac_hi);
+                    vlan_key_exp.mac_addr_lo =
+                        VEB_KEY_MAC_LO_FROM_BAR(prev_mac_hi, prev_mac_lo);
+                } else {
+                    vlan_key_exp.mac_addr_hi =
+                        VEB_KEY_MAC_HI_FROM_BAR(sriov_cfg_data.mac_hi);
+                    vlan_key_exp.mac_addr_lo =
+                        VEB_KEY_MAC_LO_FROM_BAR(sriov_cfg_data.mac_hi,
+                                                sriov_cfg_data.mac_lo);
+                }
+                test_assert_equal(cmsg_data.key.__raw[0], vlan_key_exp.__raw[0]);
+                test_assert_equal(cmsg_data.key.__raw[1], vlan_key_exp.__raw[1]);
+
+
+                /* check the action list in emem */
+
+                emem_ptr = (__mem uint8_t *)((uint64_t)emem_dst << 11) +
+                    NFD_IN_DATA_OFFSET + 80;
+                mem_read32(&actions_xfr, emem_ptr, sizeof(actions_xfr));
+
+                reg_zero(actions_exp, sizeof(actions_exp));
+                actions_exp[0].instr = INSTR_RX_VEB;
+                actions_exp[0].param = mtu + NET_ETH_LEN + 1;
+                actions_exp[1].instr = INSTR_STRIP_VLAN;
+                actions_exp[1].pipeline = 0;
+                actions_exp[2].instr = INSTR_TX_HOST;
+                actions_exp[2].param = NFD_VID2QID(pf_vid, 0);
+                actions_exp[2].pipeline =
+                    SET_PIPELINE_BIT(INSTR_STRIP_VLAN, INSTR_TX_HOST);
+                actions_exp[3].value = 0;
+
+                for (i = 0; i < sizeof(actions_exp) / sizeof(uint32_t); i++)
+                    test_assert_equal(actions_xfr[i].value,
+                                      actions_exp[i].value);
+
+                if ( pass != 1 ) /* only have 2 requests during pass 1 */
+                    break;
             }
-            test_assert_equal(cmsg_data.key.__raw[0], vlan_key_exp.__raw[0]);
-            test_assert_equal(cmsg_data.key.__raw[1], vlan_key_exp.__raw[1]);
 
-
-            /* check the action list in emem */
-
-            emem_ptr = (__mem uint8_t *)((uint64_t)emem_dst << 11) +
-                NFD_IN_DATA_OFFSET + 80;
-            mem_read32(&actions_xfr, emem_ptr, sizeof(actions_xfr));
-
-            reg_zero(actions_exp, sizeof(actions_exp));
-            actions_exp[0].instr = INSTR_RX_VEB;
-            actions_exp[0].param = mtu + NET_ETH_LEN + 1;
-            actions_exp[1].instr = INSTR_TX_HOST;
-            actions_exp[1].param = NFD_VID2QID(pf_vid, 0);
-            actions_exp[1].pipeline = SET_PIPELINE_BIT(INSTR_STRIP_VLAN, INSTR_TX_HOST);
-            actions_exp[2].value = 0;
-            actions_exp[3].value = 0;
-
-            for (i = 0; i < sizeof(actions_exp) / sizeof(uint32_t); i++)
-                test_assert_equal(actions_xfr[i].value, actions_exp[i].value);
-
-            if ( pass != 1 ) /* only have 2 requests during pass 1 */
-                break;
-        }
+        } /* for pass 0,1
 
         /* save mac addr for next pass */
         prev_mac_hi = sriov_cfg_data.mac_hi;
@@ -255,7 +266,7 @@ void main() {
             entry.src_mac = (uint64_t)0xdeadface << 32;
             entry.src_mac = entry.src_mac | (uint64_t)0x0000a5a5;
         }
-        entry.vlan = NIC_NO_VLAN_ID;
+        entry.vlan = vlan_id;
         entry.spoof_chk = 0;
         entry.link_state_mode = NFD_VF_CFG_CTRL_LINK_STATE_AUTO;
 
