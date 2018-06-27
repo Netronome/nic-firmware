@@ -57,15 +57,6 @@
 
 #define NIC_NBI 0
 
-/* use macros to map input VNIC port to index in NIC_CFG_INSTR_TBL table */
-/* NFD_VNIC_TYPE_PF, NFD_VNIC_TYPE_CTRL, NFD_VNIC_TYPE_VF */
-#define NIC_PORT_TO_PCIE_INDEX(pcie, type, vport, queue) \
-        ((pcie << 6) | (NFD_BUILD_QID((type),(vport),(queue))&0x3f))
-
-#define NIC_PORT_TO_NBI_INDEX(nbi, vport) \
-        ((1 << 8) | (nbi << 7) | (vport & 0x7f))
-
-
 /* Build output port with this macro */
 #define BUILD_PORT(_subsys, _queue) \
     (((_subsys) << 10) | (_queue))
@@ -108,7 +99,7 @@ __export __emem __addr40 uint32_t debug_rss_table[100];
 
 Also, it is expected that it matches:
 enum instruction_type {
-    INSTR_TX_DROP = 0,
+    INSTR_DROP = 0,
     INSTR_MTU,
     INSTR_MAC,
     INSTR_RSS,
@@ -645,15 +636,27 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
 
     NFD_VID2VNIC(type, vnic, vid);
     if (type == NFD_VNIC_TYPE_CTRL) {
-		/* CTRL vnic instruction */
+	/* CTRL vnic instruction */
+	/* mtu */
+	mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU), sizeof(mtu));
 #ifdef GEN_INSTRUCTION
-        instr[0].instr = instr_tbl[INSTR_CMSG];
+	instr[count].instr = instr_tbl[INSTR_RX_HOST];
 #else
-        instr[0].instr = INSTR_CMSG;
+	instr[count].instr = INSTR_RX_HOST;
 #endif
-        reg_cp(xwr_instr, (void *)instr, 4);
+	// add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
+        instr[count].param = mtu + NET_ETH_LEN + 1;
+	instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_HOST);
+	prev_instr = INSTR_RX_HOST;
+#ifdef GEN_INSTRUCTION
+        instr[count++].instr = instr_tbl[INSTR_CMSG];
+#else
+        instr[count++].instr = INSTR_CMSG;
+#endif
+        reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
         byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-        upd_rx_host_instr(xwr_instr, byte_off<<2, 1, 1);
+        upd_rx_host_instr(xwr_instr, byte_off<<2, count, 1);
+
         return;
     }
 
@@ -843,42 +846,90 @@ app_config_sriov_port(uint32_t vid, __lmem uint32_t *action_list,
 __intrinsic void
 app_config_port_down(uint32_t vid)
 {
-    __xwrite union instruction_format xwr_instr;
+    __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
     uint32_t i;
     uint32_t byte_off;
     uint32_t type, vnic;
+    uint32_t count;
+    __xread uint32_t mtu;
+    __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
+    uint32_t prev_instr=0;
+    __lmem union instruction_format instr[NIC_MAX_INSTR];
 
     /* TX drop instr
      * Probably should use the instr field in union but cannot do that with
      * xfer, must first do it in GPR and then copy to xfer which is an overkill
      */
+
+    NFD_VID2VNIC(type, vnic, vid);
+    if (type != NFD_VNIC_TYPE_PF)
+        return;
+
+    /* mtu */
+    mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU), sizeof(mtu));
+
+    /*
+     * RX_HOST --> DROP
+     */
+    count = 0;
+    prev_instr = 0;
+    reg_zero(instr, sizeof(instr));
+
 #ifdef GEN_INSTRUCTION
-    xwr_instr.value = (instr_tbl[INSTR_TX_DROP] << INSTR_OPCODE_LSB);
+    instr[count].instr = instr_tbl[INSTR_RX_HOST];
 #else
-    xwr_instr.value = (INSTR_TX_DROP << INSTR_OPCODE_LSB);
+    instr[count].instr = INSTR_RX_HOST;
+#endif
+    // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
+    instr[count].param = mtu + NET_ETH_LEN + 1;
+    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_HOST);
+    prev_instr = INSTR_RX_HOST;
+
+#ifdef GEN_INSTRUCTION
+    instr[count++].instr = instr_tbl[INSTR_DROP];
+#else
+    instr[count++].instr = INSTR_DROP;
+#endif
+    reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
+    byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
+    upd_rx_host_instr(xwr_instr, byte_off << 2, count, NUM_PCIE_Q_PER_PORT);
+
+    /*
+     * RX_WIRE --> DROP
+     */
+    count = 0;
+    prev_instr = 0;
+    reg_zero(instr, sizeof(instr));
+#ifdef GEN_INSTRUCTION
+    instr[count].instr = instr_tbl[INSTR_RX_WIRE];
+#else
+    instr[count].instr = INSTR_RX_WIRE;
+#endif
+    // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
+    instr[count].param = mtu + NET_ETH_LEN + 1;
+    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_WIRE);
+    prev_instr = INSTR_RX_WIRE;
+
+#ifdef GEN_INSTRUCTION
+    instr[count++].instr = instr_tbl[INSTR_DROP];
+#else
+    instr[count++].instr = INSTR_DROP;
 #endif
 
-    /* write drop instr to local host table */
-	/* do nothing for CTRL vNIC */
-    NFD_VID2VNIC(type, vnic, vid);
-    if (type == NFD_VNIC_TYPE_PF) {
-    	byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-    	upd_rx_host_instr(&xwr_instr.value, byte_off << 2, 1, NUM_PCIE_Q_PER_PORT);
-
-    	/* write drop instr to local wire table */
-    	byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic) * NIC_MAX_INSTR;
-    	upd_rx_wire_instr(&xwr_instr.value, byte_off << 2, 1);
+    /* write drop instr to local wire table */
+    reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
+    byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic) * NIC_MAX_INSTR;
+    upd_rx_wire_instr(xwr_instr, byte_off << 2, count);
 
 #ifdef APP_CONFIG_DEBUG
-    	{
-        	union debug_instr_journal data;
-        	data.value = 0x00;
-        	data.event = PORT_DOWN;
-		data.param = vnic;
-        	JDBG(app_debug_jrn, data.value);
-    	}
+		{
+			union debug_instr_journal data;
+			data.value = 0x00;
+			data.event = PORT_DOWN;
+			data.param = vnic;
+			JDBG(app_debug_jrn, data.value);
+		}
 #endif
-    }
 
     return;
 }
