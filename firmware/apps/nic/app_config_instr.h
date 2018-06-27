@@ -26,7 +26,6 @@
 
     .alloc_mem NIC_CFG_INSTR_TBL cls+NIC_CFG_INSTR_TBL_ADDR \
                 island NIC_CFG_INSTR_TBL_SIZE addr40
-    .init NIC_CFG_INSTR_TBL 0 0
 
 #elif defined(__NFP_LANG_MICROC)
 
@@ -34,8 +33,8 @@
     {
         .alloc_mem NIC_CFG_INSTR_TBL cls + NIC_CFG_INSTR_TBL_ADDR \
                     island NIC_CFG_INSTR_TBL_SIZE addr40
-        .init NIC_CFG_INSTR_TBL 0 0
     }
+#endif
 
 /* Instructions in the worker (actions.uc) should follow the exact same order
  * as in enum used by app config below.
@@ -50,8 +49,23 @@
  *      i5#: br[tx_host#]
  *      i6#: br[tx_wire#]
  */
+#if defined(__NFP_LANG_ASM)
+    #define    INSTR_DROP              0
+    #define    INSTR_RX_WIRE           1
+    #define    INSTR_MAC               2
+    #define    INSTR_RSS               3
+    #define    INSTR_CHECKSUM_COMPLETE 4
+    #define    INSTR_TX_HOST           4
+    #define    INSTR_RX_HOST           5
+    #define    INSTR_TX_WIRE           6
+    #define    INSTR_CMSG              7
+    #define    INSTR_EBPF              8
+    #define    INSTR_VX_VEB            9
+    #define    INSTR_STRIP_VLAN        10
+    #define    INSTR_LKUP_VLAN         11
+#elif defined(__NFP_LANG_MICROC)
 enum instruction_type {
-    INSTR_TX_DROP = 0,
+    INSTR_DROP = 0,
     INSTR_RX_WIRE,
     INSTR_MAC,
     INSTR_RSS,
@@ -224,5 +238,37 @@ typedef union {
 #define INSTR_RX_PARSE_VXLANS_bf 1, 4, 2
 #define INSTR_RX_PARSE_GENEVE_bf 1, 1, 1
 #define INSTR_RX_PARSE_NVGRE_bf  1, 0, 0
+
+/* use macros to map input VNIC port to index in NIC_CFG_INSTR_TBL table */
+/* NFD_VNIC_TYPE_PF, NFD_VNIC_TYPE_CTRL, NFD_VNIC_TYPE_VF */
+#define NIC_PORT_TO_PCIE_INDEX(pcie, type, vport, queue) \
+        ((pcie << 6) | (NFD_BUILD_QID((type),(vport),(queue))&0x3f))
+#define NIC_PORT_TO_NBI_INDEX(nbi, vport) ((1 << 8) | (nbi << 7) | (vport & 0x7f))
+
+#if defined(__NFP_LANG_ASM)
+
+	#define __LOOP 0
+	#define __OFFSET 0
+
+	#while (__LOOP <= (NUM_PCIE_Q_PER_PORT * NS_PLATFORM_NUM_PORTS))
+		.init NIC_CFG_INSTR_TBL+__OFFSET  ((INSTR_RX_HOST << INSTR_OPCODE_LSB) | 16383) INSTR_DROP
+                #define_eval __OFFSET (__OFFSET + (4 * NIC_MAX_INSTR))
+		#define_eval __LOOP (__LOOP + 1)
+	#endloop
+
+        #define_eval __LOOP 0
+	#define_eval __OFFSET (NIC_PORT_TO_NBI_INDEX(0, 0) * (NIC_MAX_INSTR * 4))
+
+	#while (__LOOP < NS_PLATFORM_NUM_PORTS)
+		.init NIC_CFG_INSTR_TBL+__OFFSET  ((INSTR_RX_WIRE << INSTR_OPCODE_LSB) | 16383) INSTR_DROP
+                #define_eval __OFFSET (__OFFSET + (4 * NIC_MAX_INSTR))
+		#define_eval __LOOP (__LOOP + 1)
+	#endloop
+
+	#undef __LOOP
+	#undef __OFFSET
+
+
+#endif
 
 #endif /* _APP_CONFIG_INSTR_H_ */
