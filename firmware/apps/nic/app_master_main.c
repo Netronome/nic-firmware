@@ -402,6 +402,8 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, unsigned int mode)
  * Handle VF configuration changes (MAC and VLAN)
  * These changes are communicated via the VF config symbol _pfX_net_vf_cfgY
  *
+ * Does not support changing MAC and VLAN during single config operation
+ *
  * @param   pf_vid      The VNIC vid of the relevant PF
  * @param   pf_control  1st word in nfd mailbox cmd
  * @param   pf_update   2nd word in nfd mailbox cmd
@@ -423,6 +425,7 @@ handle_sriov_update(uint32_t pf_vid, uint32_t pf_control, uint32_t pf_update)
     __shared __lmem uint32_t sriov_act_list[NIC_MAC_VLAN_RESULT_SIZE_LW];
     __xread struct nic_mac_vlan_entry entry_xr;
     __xwrite enum cfg_msg_err err_code = NO_ERROR;
+    uint32_t vlan_id;
 
 
     /*
@@ -452,26 +455,29 @@ handle_sriov_update(uint32_t pf_vid, uint32_t pf_control, uint32_t pf_update)
      * 2. Check what has changed using the NFP_NET_CFG_SRIOV_UPDATE_FLAGS
      *    (or as it called in the doc : NFP_NET_CFG_VF_CHANGE_BMSK).
      *
-     *    We can have one of three changes:
+     *    We can have three types of changes - MAC, VLAN, Control flags
+     *    ( A,B,C below)
      */
     load_vnic_setup_entry(sriov_mb_data.vf, &vnic_entry_rd);
     reg_cp(&vnic_entry, &vnic_entry_rd, sizeof(struct nfp_vnic_setup_entry));
 
-    /*    A. NFP_NET_CFG_SRIOV_UPDATE_MAC (MAC change)
-     *       If MAC was not already set (read the nic_vnic_setup_map_tbl entry)
-     *          Add entry to the ‘MAC+VLAN’ lkp table using MAC from the BAR
-     *          and VLAN from nic_vnic_setup_map_tbl table
-     *       Else (MAC was already set in the past)
-     *          Remove the entry from the ‘MAC+VLAN’ lkp table using old MAC
-     *          and old VLAN (both are in nic_vnic_setup_map_tbl table)
-     *          NOTE : We assume “MAC == 0” indicates VF went down...
-     *          If new MAC != 0
-     *             Add entry to the ‘MAC+VLAN’ lkp table using new MAC from the
-     *             BAR and VLAN from nic_vnic_setup_map_tbl table
+
+    /* Fail if trying to update MAC and VLAN at same time */
+    if ((sriov_mb_data.update_flags &
+         (NFD_VF_CFG_MB_CAP_MAC | NFD_VF_CFG_MB_CAP_VLAN)) ==
+        (NFD_VF_CFG_MB_CAP_MAC | NFD_VF_CFG_MB_CAP_VLAN)) {
+        err_code = EINVAL;
+        goto done;
+    }
+
+
+    /*    A. NFP_NET_CFG_SRIOV_UPDATE_MAC (MAC initialization or change)
      *
-     *       Update the nic_vnic_setup_map_tbl table
+     *       Update the MAC+VLAN lookup table as needed,
+     *       then update the nic_vnic_setup_map_tbl table
      */
     if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_MAC) {
+
         new_mac_addr = MAC_SETUP_FROM_BAR(sriov_cfg_data.mac_hi,
                                           sriov_cfg_data.mac_lo);
 
@@ -484,105 +490,175 @@ handle_sriov_update(uint32_t pf_vid, uint32_t pf_control, uint32_t pf_update)
             goto done;
         }
 
-        /* Add a new entry to the 'MAC+VLAN' lkp table using MAC from the
-         * BAR and VLAN from nic_vnic_setup_map_tbl table
-         */
-        lkp_key.s_not_c = 0;
-        lkp_key.vlan_id = vnic_entry_rd.vlan;
-        lkp_key.mac_addr_hi = VEB_KEY_MAC_HI_FROM_BAR(sriov_cfg_data.mac_hi);
-        lkp_key.mac_addr_lo = VEB_KEY_MAC_LO_FROM_BAR(sriov_cfg_data.mac_hi,
-                                              sriov_cfg_data.mac_lo);
+        /* If the mac has changed, or is being set for the 1st time... */
+        if ( vnic_entry_rd.src_mac != new_mac_addr ) {
 
-        if (nic_mac_vlan_entry_op_cmsg(&lkp_key, sriov_act_list,
-                                CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL) {
-            err_code = MAC_VLAN_ADD_FAIL;
-            goto done;
-        }
-
-
-        /* src_mac == 0 means mac was not yet setup
-         * src_mac == new_mac_addr means there is already an entry set up
-         */
-        if ((vnic_entry_rd.src_mac != 0) &&
-            (vnic_entry_rd.src_mac != new_mac_addr)) {
-
-            /* Remove the entry from the ?MAC+VLAN? lkp table using old MAC
-             * and old VLAN (both are in nic_vnic_setup_map_tbl table)
-             */
+            lkp_key.s_not_c = 0;
             lkp_key.mac_addr_hi =
-                   VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
+                VEB_KEY_MAC_HI_FROM_BAR(sriov_cfg_data.mac_hi);
             lkp_key.mac_addr_lo =
-                   VEB_KEY_MAC_LO_FROM_SETUP(vnic_entry_rd.src_mac);
+                VEB_KEY_MAC_LO_FROM_BAR(sriov_cfg_data.mac_hi,
+                                        sriov_cfg_data.mac_lo);
 
-            if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
-                            CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
-                /* Issue a warning, but continue operation. */
-                err_code = MAC_VLAN_DELETE_WARN;
+            /* If a specific vlan is configured in nic_vnic_setup_map_tbl,
+             * add one entry to the MAC+VLAN lookup table using the MAC
+             * from the BAR and VLAN from the nic_vnic_setup_map_tbl entry.
+             */
+            if ( vnic_entry_rd.vlan != NIC_NO_VLAN_ID ) {
+
+                lkp_key.vlan_id = vnic_entry_rd.vlan;
+                if (nic_mac_vlan_entry_op_cmsg(&lkp_key, sriov_act_list,
+                                               CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL) {
+                    err_code = MAC_VLAN_ADD_FAIL;
+                    goto done;
+                }
+
+                /* If the mac was changed, delete the previous entry in the
+                 * MAC+VLAN lookup table using the original mac value and
+                 * the VLAN tag
+                 */
+                if (vnic_entry_rd.src_mac != 0) {
+                    lkp_key.mac_addr_hi =
+                        VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
+                    lkp_key.mac_addr_lo =
+                        VEB_KEY_MAC_LO_FROM_SETUP(vnic_entry_rd.src_mac);
+                    if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
+                          CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
+                        /* Issue a warning, but continue operation. */
+                        err_code = MAC_VLAN_DELETE_WARN;
+                    }
+                }
             }
-        }
 
-        /* Update the nic_vnic_setup_map_tbl table, at this point we assume
-         * the mac address is NOT broadcast/multicast/0 */
-        vnic_entry.src_mac = new_mac_addr;
+            /* If no vlan is configured in nic_vnic_setup_map_tbl,
+             * add a new entry to the MAC+VLAN lookup table using the MAC
+             * from the BAR and every possible VLAN tag
+             */
+            else if ( vnic_entry_rd.vlan == NIC_NO_VLAN_ID ) {
 
-        /* Write the MAC to the VF BAR so it is ready to use even
-         * without an FLR */
-        reg_cp(&new_mac_addr_wr, &sriov_cfg_data, sizeof(new_mac_addr_wr));
-        mem_write8(&new_mac_addr_wr,
-                   NFD_CFG_BAR_ISL(NIC_PCI, sriov_mb_data.vf) +
-                   NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
+                for (vlan_id = 0; vlan_id <= 0xfff; vlan_id++ ) {
+                    lkp_key.vlan_id = vlan_id;
+                    if (nic_mac_vlan_entry_op_cmsg(&lkp_key, sriov_act_list,
+                              CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL) {
+                        err_code = MAC_VLAN_ADD_FAIL;
+                        goto done;
+                    }
+                }
+
+                /* If the mac was changed, delete the previous entries in the
+                   MAC+VLAN lookup table using the original mac value
+                */
+                if (vnic_entry_rd.src_mac != 0) {
+                    lkp_key.mac_addr_hi =
+                        VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
+                    lkp_key.mac_addr_lo =
+                        VEB_KEY_MAC_LO_FROM_SETUP(vnic_entry_rd.src_mac);
+                    for (vlan_id = 0; vlan_id <= 0xfff; vlan_id++ ) {
+                        lkp_key.vlan_id = vlan_id;
+                        if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
+                             CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
+                            /* Issue a warning, but continue operation. */
+                            err_code = MAC_VLAN_DELETE_WARN;
+                        }
+                    }
+                }
+            }
+
+            /* Update the nic_vnic_setup_map_tbl table */
+            vnic_entry.src_mac = new_mac_addr;
+
+            /* Write the MAC to the VF BAR so it is ready to use even
+             * without an FLR */
+            reg_cp(&new_mac_addr_wr, &sriov_cfg_data, sizeof(new_mac_addr_wr));
+            mem_write8(&new_mac_addr_wr,
+                       NFD_CFG_BAR_ISL(NIC_PCI, sriov_mb_data.vf) +
+                       NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
+
+        } /* mac changed or set for the 1st time */
     }
 
     /*    B. NFP_NET_CFG_SRIOV_UPDATE_VLAN (VLAN change)
-     *       NOTE : Use NIC_NO_VLAN_ID for non VLAN (4095)
-     *       If MAC was already set (read nic_vnic_setup_map_tbl entry)
-     *          Remove old entry from the MAC+VLAN lkp table (Get the “old”
-     *           MAC+VLAN from the nic_vnic_setup_map_tbl table)
-     *          Add a new entry in the MAC+VLAN lkp table using the new VLAN
-     *           (Get the “old” MAC from nic_vnic_setup_map_tbl table)
      *
-     *       Update the nic_vnic_setup_map_tbl table
-     *       Update the VLAN-to-VNICs bitmap(nic_vlan_to_vnics_map_tbl)
-     *           i. Remove the vNIC from the list of vNICs that belong to the
-     *              “old” VLAN
-     *          ii. Add the vNIC to the list of vNICs that belong to the
-     *              “new” VLAN
+     *       Update the MAC+VLAN lookup table as needed,
+     *       then update the nic_vnic_setup_map_tbl table
      */
-    else if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_VLAN) {
-        /* Driver should handle the no-vlan value and set it to
-         * NIC_NO_VLAN_ID (4095) */
-        if (vnic_entry_rd.src_mac != 0) {
-            /* Add a new entry */
-            lkp_key.s_not_c = 0;
-            lkp_key.vlan_id = sriov_cfg_data.vlan_id;
-            lkp_key.mac_addr_hi =
-                VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
-            lkp_key.mac_addr_lo =
-                VEB_KEY_MAC_LO_FROM_SETUP(vnic_entry_rd.src_mac);
+    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_VLAN) {
 
-            if (nic_mac_vlan_entry_op_cmsg(&lkp_key, sriov_act_list,
-				CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL) {
-                err_code = MAC_VLAN_ADD_FAIL;
-                goto done;
-            }
+        /* if vlan has changed... */
+        if ( sriov_cfg_data.vlan_id != vnic_entry_rd.vlan ) {
 
-            /* Remove the old entry if different vlan */
-            if ( sriov_cfg_data.vlan_id != vnic_entry_rd.vlan ) {
-                lkp_key.vlan_id = vnic_entry_rd.vlan;
-                if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
-                      CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
-                /* this would be a FW bug, no point in rolling back
-                 * the recent addition or reporting to the driver
-                 * TODO: log it somewhere? */
+            /* and if mac is already set... */
+            if (vnic_entry_rd.src_mac != 0) {
+
+                lkp_key.s_not_c = 0;
+                lkp_key.mac_addr_hi =
+                    VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
+                lkp_key.mac_addr_lo =
+                    VEB_KEY_MAC_LO_FROM_SETUP(vnic_entry_rd.src_mac);
+
+                /* If a specific vlan is being set, then add one entry
+                 * to the MAC+VLAN lookup table using the MAC from the
+                 * nic_vlan_setup_map_tbl entry and the VLAN from the BAR
+                 */
+                if ( sriov_cfg_data.vlan_id != NIC_NO_VLAN_ID ) {
+                    /* Add a new entry */
+                    lkp_key.vlan_id = sriov_cfg_data.vlan_id;
+                    if (nic_mac_vlan_entry_op_cmsg(&lkp_key, sriov_act_list,
+                                 CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL) {
+                        err_code = MAC_VLAN_ADD_FAIL;
+                        goto done;
+                    }
+
+                /* If no VLAN is being configured (i.e NIC_NO_VLAN_ID), then
+                 * add one entry to the MAC+VLAN lookup table using the MAC
+                 * from the nic_vlan_setup_map_tbl entry and all 4K possible
+                 * VLAN tags
+                 */
+                } else {
+                    for (vlan_id = 0; vlan_id <= 0xfff; vlan_id++ ) {
+                        lkp_key.vlan_id = vlan_id;
+                        if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
+                            CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
+                            /* Issue a warning, but continue operation. */
+                            err_code = MAC_VLAN_DELETE_WARN;
+                        }
+                    }
                 }
-            }
-        } else {
-            /* Can't configure a vlan unless mac is configured */
-            err_code = MAC_VLAN_ADD_FAIL;
-            goto done;
-        }
 
-        vnic_entry.vlan = sriov_cfg_data.vlan_id;
+                /* If a specific vlan was set previously, delete entry */
+                if ( vnic_entry_rd.vlan != NIC_NO_VLAN_ID ) {
+                    lkp_key.vlan_id = vnic_entry_rd.vlan;
+                    if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
+                           CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
+                        /* Return a warning, but continue operation. */
+                        err_code = MAC_VLAN_DELETE_WARN;
+                    }
+
+                /* otherwise, remove all 4K entries that were previously set */
+                } else {
+                    for (vlan_id = 0; vlan_id <= 0xfff; vlan_id++ ) {
+                        if ( vlan_id == sriov_cfg_data.vlan_id )
+                            continue;
+                        lkp_key.vlan_id = vlan_id;
+                        if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
+                             CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
+                            /* Return a warning, but continue operation. */
+                            err_code = MAC_VLAN_DELETE_WARN;
+                        }
+                    }
+                }
+
+            } /* Mac was already set.
+               *
+               * If mac was not already set, can't update the lookup table.
+               * However, still allow the nic_vnic_setup_map_tbl entry to
+               * be updated with the new vlan tag so it will be set when
+               * the mac is set.
+               */
+
+            vnic_entry.vlan = sriov_cfg_data.vlan_id;
+
+        } /* vlan was changed */
     }
 
     /*    C. NFP_NET_CFG_SRIOV_UPDATE_CTRL_FLAGS (control flags change)
@@ -590,10 +666,11 @@ handle_sriov_update(uint32_t pf_vid, uint32_t pf_control, uint32_t pf_update)
      *       Update the nic_vnic_setup_map_tbl entry with the values there
      *       (those are Spoof enable bit and link state modes bits)
      */
-    else if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_SPOOF) {
+    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_SPOOF) {
         vnic_entry.spoof_chk = sriov_cfg_data.ctrl_spoof;
     }
-    else if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_LINK_STATE) {
+
+    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_LINK_STATE) {
         vnic_entry.link_state_mode = sriov_cfg_data.ctrl_link_state;
 
         /* Update the list of VFs to be notified of link state changes. */
