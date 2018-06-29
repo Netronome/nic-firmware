@@ -67,14 +67,14 @@
     #define    INSTR_MAC               2
     #define    INSTR_RSS               3
     #define    INSTR_CHECKSUM_COMPLETE 4
-    #define    INSTR_TX_HOST           4
-    #define    INSTR_RX_HOST           5
-    #define    INSTR_TX_WIRE           6
-    #define    INSTR_CMSG              7
-    #define    INSTR_EBPF              8
-    #define    INSTR_VX_VEB            9
-    #define    INSTR_STRIP_VLAN        10
-    #define    INSTR_LKUP_VLAN         11
+    #define    INSTR_TX_HOST           5
+    #define    INSTR_RX_HOST           6
+    #define    INSTR_TX_WIRE           7
+    #define    INSTR_CMSG              8
+    #define    INSTR_EBPF              9
+    #define    INSTR_VX_VEB            10
+    #define    INSTR_STRIP_VLAN        11
+    #define    INSTR_LKUP_VLAN         12
 #elif defined(__NFP_LANG_MICROC)
 enum instruction_type {
     INSTR_DROP = 0,
