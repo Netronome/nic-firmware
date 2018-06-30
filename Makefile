@@ -20,7 +20,7 @@ NFP_COMMON    := $(abspath $(CURDIR))
 NETRONOME ?= /opt/netronome
 
 REQ_SDK_VER   = = 6.x-devel
-REQ_SDK_BUILD = -ge 3546
+REQ_SDK_BUILD = -ge 3621
 
 DEPS_DIR      = $(NFP_COMMON)/deps
 FIRMWARE_DIR  = $(NFP_COMMON)/firmware
