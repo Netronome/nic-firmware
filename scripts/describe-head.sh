@@ -23,7 +23,7 @@ else
 fi
 
 if [ "$1" = "--fw_id" ] ; then
-  if [ -z $TAG ] ; then
+  if [ -z "${TAG}" ] ; then
     TRUNC_NAME=`echo ${NAME} | sed 's/^wip[-|_]/@/' | cut -c1-6`
     TRUNC_HASH=`echo ${HASH} | cut -c1-6`
     echo ${TRUNC_NAME}-${TRUNC_HASH}${CHANGES}
@@ -31,13 +31,29 @@ if [ "$1" = "--fw_id" ] ; then
     echo ${TAG}${CHANGES} | sed 's/%/~/g'
   fi
 elif [ "$1" = "--pkg_ver" ] ; then
-  if [ -z $TAG ] ; then
+  if [ -z "${TAG}" ] ; then
     echo ${VERSION}.${HASH}${CHANGES}
   else
     echo ${VERSION}${CHANGES}
   fi
 elif [ "$1" = "--pkg_name" ] ; then
   echo ${NAME}
+elif [ "$1" = "--nfld_args" ] ; then
+  NFLD_VER=`echo ${VERSION} | sed 's/\([[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*\).*/\1/'`
+  NFLD_BUILD=`echo ${VERSION} | sed 's/[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*.//'`
+  NFLD_ARGS=""
+  if [ -z ${CHANGES} ] ; then
+    if [ ! -z "${NAME}" ] ; then
+      NFLD_ARGS="${NFLD_ARGS} -fw_name ${NAME}"
+    fi
+    if [ ! -z "${NFLD_VER}" ] ; then
+      NFLD_ARGS="${NFLD_ARGS} -fw_version ${NFLD_VER}"
+    fi
+    if [ ! -z "${NFLD_BUILD}" ] ; then
+      NFLD_ARGS="${NFLD_ARGS} -fw_buildnum ${NFLD_BUILD}"
+    fi
+  fi
+  echo ${NFLD_ARGS}
 else
   echo ${NAME}-${VERSION}-${HASH}${CHANGES}
 fi
