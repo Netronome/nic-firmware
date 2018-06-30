@@ -61,7 +61,7 @@ NFCC_BASE_CLIBS = $(NETRONOME)/components/standardlibrary/microc/src/rtl.c
 PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp6000
 
 NFLD = $(NETRONOME)/bin/nfld
-NFLD_BASE_FLAGS =
+NFLD_BASE_FLAGS = $(shell ${SCRIPT_DIR}/describe-head.sh --nfld_args)
 
 NFFW2CA = $(NETRONOME)/bin/nfp-nffw2ca
 
