@@ -1728,7 +1728,8 @@ check_geneve_tun#:
 
     alu[BF_A(pkt_vec, PV_PROTO_bf), BF_A(pkt_vec, PV_PROTO_bf), OR, (PROTO_GENEVE >> TUNNEL_SHF)]
 
-    alu[hdr_len, (0x3f << 2), AND, *$index++, >>(24 - 2)]
+    alu[--, --, B, *$index++] // skip over UDP Length:Checksum
+    alu[hdr_len, (0x3f << 2), AND, *$index++, >>(24 - 2)] // Opt Len
 
     br[seek_inner#], defer[2]
         alu[pkt_offset, pkt_offset, +, hdr_len]
