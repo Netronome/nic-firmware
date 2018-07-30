@@ -58,6 +58,7 @@ $(DEPS_DIR)/ng-nfd.git:
 	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_abi3.patch && cd -
 	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_tlv.patch && cd -
 	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_tlv_stats.patch && cd -
+	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_ctm_buf.patch && cd -
 
 
 GIT_DEPS += $(NFD_DIR)
