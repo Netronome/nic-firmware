@@ -18,11 +18,11 @@
 
 /* Global mandetory parameters */
 #ifndef GRO_NUM_BLOCKS
-    #define GRO_NUM_BLOCKS          6
+    #define GRO_NUM_BLOCKS          4
 #endif
 
 #ifndef GRO_CTX_PER_BLOCK
-    #define GRO_CTX_PER_BLOCK       1
+    #define GRO_CTX_PER_BLOCK       2
 #endif
 
 #if 0
@@ -61,9 +61,13 @@
 
         gro_declare_ctx(BLOCKNUM, CALLER, 3, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 4, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 4, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 4096, 2048)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 5, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 5, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 4096, 2048)
+
+        gro_declare_ctx(BLOCKNUM, CALLER, 6, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 4096, 2048)
+
+        gro_declare_ctx(BLOCKNUM, CALLER, 7, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 4096, 2048)
 
 
     /* Netdev wire does not send to NBI, so no NBI dest         */
