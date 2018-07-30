@@ -1,0 +1,75 @@
+diff --git a/me/blocks/gro/_uc/gro_out.uc b/me/blocks/gro/_uc/gro_out.uc
+index 26a9a20..05ee9e5 100644
+--- a/me/blocks/gro/_uc/gro_out.uc
++++ b/me/blocks/gro/_uc/gro_out.uc
+@@ -882,6 +882,50 @@ wait_mem_ring1_input#:
+ #endm
+ 
+ 
++#macro gro_iface_xmit_multicast(in_meta, out_xfer, OUTSIG, CUR_BUF, ONE_REQ_LABEL, TWO_REQ_LABEL)
++.begin
++    .reg addr_hi
++
++    #if (!streq('TWO_REQ_LABEL', '--'))
++        #define_eval _GRO_H_NINST 12
++        alu[g_sigmask, --, B, CUR_BUF[LM_XBUF_SIGMASK_wrd]]
++    #else
++        #define_eval _GRO_H_NINST 10
++        local_csr_wr[SAME_ME_SIGNAL, g_sig_next_worker]
++    #endif
++
++    /* XXX XXX XXX  Assumes one cycle lost unrecoverably due to jump[] */
++
++    alu[addr_hi, --, B, in_meta[GRO_META_NBI_ADDRHI_wrd]]
++    local_csr_wr[CMD_INDIRECT_REF_0, LM_DEST_NBI_CSR0]
++    alu[--, --, B, in_meta[GRO_META_NBI_PALU_wrd]]
++
++    nbi[packet_ready_multicast_dont_free, $, addr_hi, <<8, in_meta[GRO_META_NBI_ADDRLO_wrd]], indirect_ref
++
++    #if (!streq('TWO_REQ_LABEL', '--'))
++        br_bset[CUR_BUF[LM_XBUF_FLAGS_wrd], XBUF_FLAG_TWOPKTS_bit, TWO_REQ_LABEL], defer[2]
++        alu[LM_DEST_NBI_CSR0, LM_DEST_NBI_CSR0, +, g_nbi_seq_incr]
++        alu[LM_DEST_NBI_CSR0, LM_DEST_NBI_CSR0, AND, g_nbi_seq_mask]
++
++        local_csr_wr[SAME_ME_SIGNAL, g_sig_next_worker]
++        ctx_arb[--], br[ONE_REQ_LABEL], defer[2]
++        alu[CUR_BUF[LM_XBUF_FLAGS_wrd], --, B, XBUF_FLAG_READY]
++        local_csr_wr[ACTIVE_CTX_WAKEUP_EVENTS, g_sigmask]
++    #else
++        alu[LM_DEST_NBI_CSR0, LM_DEST_NBI_CSR0, +, g_nbi_seq_incr]
++        alu[LM_DEST_NBI_CSR0, LM_DEST_NBI_CSR0, AND, g_nbi_seq_mask]
++        ctx_arb[--], br[ONE_REQ_LABEL], defer[2]
++        alu[CUR_BUF[LM_XBUF_FLAGS_wrd], --, B, XBUF_FLAG_READY]
++        local_csr_wr[ACTIVE_CTX_WAKEUP_EVENTS, g_sigmask]
++    #endif
++
++    _pad_macro_len(_GRO_H_NINST, GRO_OUT_HANDLER_ILEN)
++    #undef _GRO_H_NINST
++
++.end
++#endm
++
++
+ #ifndef NFD_USE_MOCKUP
+ 
+ 
+@@ -1187,7 +1231,7 @@ wait_mem_ring1_input#:
+     alu[off, g_handler_mask, AND, in_meta[GRO_META_TYPE_wrd], <<GRO_OUT_HANDLER_shf]
+     jump[off, xmit_drop_seq#], defer[3],
+         targets[xmit_drop_seq#, xmit_iface#, xmit_nfd#, xmit_workq#, xmit_mem_ring#,
+-                xmit_drop_ctm_buf#, xmit_drop_mu_buf#]
++                xmit_drop_ctm_buf#, xmit_drop_mu_buf#, xmit_iface_multicast#]
+     alu[lm_dest_addr, (GRO_META_DEST_msk << LM_DEST_shf), AND, in_meta[GRO_META_DEST_wrd]]
+     alu[lm_dest_addr, lm_dest_addr, +, g_lm_dest_base]
+     local_csr_wr[LM_DEST_CSR, lm_dest_addr]
+@@ -1221,6 +1265,10 @@ xmit_drop_mu_buf#:
+     ; VERIFY: icount gro_drop_mu_buf 64
+     gro_drop_mu_buf(in_meta, out_xfer, OUTSIG, CUR_BUF, ONE_REQ_LABEL, TWO_REQ_LABEL)
+ 
++xmit_iface_multicast#:
++    ; VERIFY: icount drop_ifrace_xmit_multicast 64
++    gro_iface_xmit_multicast(in_meta, out_xfer, OUTSIG, CUR_BUF, ONE_REQ_LABEL, TWO_REQ_LABEL)
++
+ .end
+ #endm
+ 
