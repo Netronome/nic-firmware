@@ -47,19 +47,19 @@ END{
     j = 4 + 4 + VNIC_COUNT * (1 + 32)
     if (VNIC_COUNT % 4 != 0)
 	j += 4 - VNIC_COUNT % 4
-    printf("#define NIC_STATS_VNIC_BASE (NFD_CFG_TLV_BLOCK + 0x%x)\n", j)
+    printf("#define NIC_STATS_VNIC_BASE (NFD_CFG_TLV_BLOCK_OFF + 0x%x)\n", j)
     for (i = 0; i < QUEUE_COUNT; ++i) {
 	if (and(MASK[i], 4)) {
-	    printf("#define NIC_STATS_VNIC_%s (NFD_CFG_TLV_BLOCK + 0x%x)\n", toupper(DATA[i]), j)
+	    printf("#define NIC_STATS_VNIC_%s (NFD_CFG_TLV_BLOCK_OFF + 0x%x)\n", toupper(DATA[i]), j)
 	    j += 8
 	}
 	else {
 	    if (and(MASK[i], 1)) {
-	        printf("#define NIC_STATS_VNIC_%s_PKTS (NFD_CFG_TLV_BLOCK + 0x%x)\n", toupper(DATA[i]), j)
+	        printf("#define NIC_STATS_VNIC_%s_PKTS (NFD_CFG_TLV_BLOCK_OFF + 0x%x)\n", toupper(DATA[i]), j)
 	        j += 8
 	    }
 	    if (and(MASK[i], 2)) {
-	        printf("#define NIC_STATS_VNIC_%s_BYTES (NFD_CFG_TLV_BLOCK + 0x%x)\n", toupper(DATA[i]), j)
+	        printf("#define NIC_STATS_VNIC_%s_BYTES (NFD_CFG_TLV_BLOCK_OFF + 0x%x)\n", toupper(DATA[i]), j)
 	        j += 8
 	    }
 	}
