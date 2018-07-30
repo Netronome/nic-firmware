@@ -33,6 +33,7 @@ $(DEPS_DIR)/flowenv.git:
 	git clone -q --no-checkout \
 		git://source.netronome.com/flowenv.git $(FLOWENV_DIR)
 	cd $(FLOWENV_DIR) && git checkout $(FLOWENV_REV)
+	cd $(DEPS_DIR)/flowenv.git && patch -p1 < ../gro_multicast.patch && cd -
 
 GIT_DEPS += $(FLOWENV_DIR)
 GIT_REVS += $(FLOWENV_REV)
