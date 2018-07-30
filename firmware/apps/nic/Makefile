@@ -74,10 +74,18 @@ $(eval $(call fwdep.add_flowenv,$(PROJECT)))
 $(eval $(call fwdep.add_flowenv_nfp_init_flag,$(PROJECT),-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add GRO MEs
-$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei2.me11 mei3.me11 mei4.me11 mei0.me10,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei2.me11 mei3.me11,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add 1 BLM ME
 $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+
+# Add Multicast Buffer Reaper
+$(eval $(call microcode.assemble,$(PROJECT),mcr,apps/nic,mc_reaper.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.add_include,$(PROJECT),mcr,firmware/lib))
+$(eval $(call microcode.add_include,$(PROJECT),mcr,firmware/apps/nic/lib))
+$(eval $(call microcode.add_include,$(PROJECT),mcr,deps/ng-nfd.hg))
+$(eval $(call microcode.add_include,$(PROJECT),mcr,$(BLM_DIR)))
+$(eval $(call nffw.add_obj,$(PROJECT),mcr,mei0.me10))
 
 # Add microcode datapath
 $(eval $(call dep.gen_awk,$(PROJECT),datapath,firmware/lib/nic_basic/nic_stats_gen.h,firmware/lib/nic_basic/nic_stats.def,scripts/nic_stats.awk))
