@@ -101,105 +101,29 @@
 #endm
 
 
-/* VEB lookup key:
- * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
- *       +-------------------------------+-------+-----------------------+
- *    0  |         MAC ADDR HI           |   0   |       VLAN ID         |
- *       +-------------------------------+-------+-----------------------+
- *    1  |                           MAC ADDR LO                         |
- *       +---------+-------------------------------------------+---------+
- */
-
-#macro __actions_mac_classify(in_pkt_vec, DROP_LABEL)
+#macro __actions_mac_match(in_pkt_vec, DROP_LABEL)
 .begin
-    .reg act_broadcast
-    .reg ins_addr[2]
-    .reg key_addr
     .reg mac_hi
     .reg mac_lo
     .reg port_mac[2]
-    .reg promisc
-    .reg tid
-    .reg tmp
-    .reg vlan_id
 
     .sig sig_read
 
     __actions_read(port_mac[0], 0xffff)
     __actions_read(port_mac[1])
 
-    br_bset[BF_AL(in_pkt_vec, PV_MAC_DST_MC_bf), multicast#]
-    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY, mac_match_check#)
+    br_bset[BF_AL(in_pkt_vec, PV_MAC_DST_MC_bf), end#]
+    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
 
-multicast#:
-    br[end#], defer[2]
-        alu[act_broadcast, --, B, 1, <<BF_L(PV_BROADCAST_ACTIVE_bf)]
-        alu[BF_A(in_pkt_vec, PV_BROADCAST_ACTIVE_bf), BF_A(in_pkt_vec, PV_BROADCAST_ACTIVE_bf), OR, act_broadcast]
-
-veb_error#:
-    pv_stats_update(in_pkt_vec, RX_ERROR_VEB, DROP_LABEL)
-
-veb_miss#:
-    br_bclr[BF_AL(in_pkt_vec, PV_QUEUE_IN_TYPE_bf), end#] // continue processing actions for packets from VF
-    br_bset[promisc, BF_L(PV_BROADCAST_PROMISC_bf), end#] // continue processing actions in promisc mode
-    pv_stats_update(in_pkt_vec, RX_DISCARD_ADDR, DROP_LABEL)
-
-veb_lookup#:
-    immed[key_addr, __actions_sriov_keys]
-    alu[key_addr, key_addr, OR, t_idx_ctx, >>5]
-    local_csr_wr[ACTIVE_LM_ADDR_0, key_addr]
-
-        passert(BF_L(PV_BROADCAST_PROMISC_bf), "EQ", 16)
-        alu[promisc, port_mac[1], +, 1]
-        alu[promisc, port_mac[0], +carry, 0]
-        alu[tid, --, B, SRIOV_TID]
-
-    alu[tmp, --, B, *$index++, <<16]
-    alu[*l$index0++, tmp, +16, BF_A(in_pkt_vec, PV_VLAN_ID_bf)]
-    alu[*l$index0, --, B, *$index]
-
-    #define HASHMAP_RXFR_COUNT 4
-    #define MAP_RDXR $__pv_pkt_data
-    // hashmap_ops will overwrite the packet cache, we MUST invalidate
-    pv_invalidate_cache(in_pkt_vec)
-    hashmap_ops(tid,
-                key_addr,
-                --,
-                HASHMAP_OP_LOOKUP,
-                veb_error#, // invalid map - should never happen
-                veb_miss#, // sriov miss
-                HASHMAP_RTN_ADDR,
-                --,
-                --,
-                ins_addr,
-                swap)
-    #undef MAP_RDXR
-    #undef HASHMAP_RXFR_COUNT
-
-veb_hit#:
-    //Load a new set of instructions as pointed by the returned address.
-    //Note that from this point on the original instructions list is overwritten and
-    //we no longer process instructions from current list.
-    ov_start(OV_LENGTH)
-    ov_set_use(OV_LENGTH, 16, OVF_SUBTRACT_ONE)
-    ov_clean()
-    mem[read32, $__actions[0], ins_addr[0], <<8, ins_addr[1], max_16], indirect_ref, sig_done[sig_read]
-
-    .reg_addr __actions_t_idx 28 B
-    alu[__actions_t_idx, t_idx_ctx, OR, &$__actions[0], <<2]
-
-    ctx_arb[sig_read], br[end#], defer[2]
-        alu[promisc, promisc, AND, 1, <<BF_L(PV_BROADCAST_PROMISC_bf)]
-        alu[BF_A(in_pkt_vec, PV_BROADCAST_PROMISC_bf), BF_A(in_pkt_vec, PV_BROADCAST_PROMISC_bf), OR, promisc]
-
-mac_match_check#:
     alu[mac_hi, port_mac[0], XOR, *$index++]
-    alu[mac_lo, port_mac[1], XOR, *$index--]
+    alu[mac_lo, port_mac[1], XOR, *$index++]
+
+    __actions_restore_t_idx()
+
     alu[--, mac_lo, OR, mac_hi, <<16]
-    bne[veb_lookup#]
+    bne[DROP_LABEL]
 
 end#:
-    __actions_restore_t_idx()
 .end
 #endm
 
@@ -448,7 +372,7 @@ next#:
 
     ins_0#: br[drop_act#]
     ins_1#: br[rx_wire#]
-    ins_2#: br[mac#]
+    ins_2#: br[mac_match#]
     ins_3#: br[rss#]
     ins_4#: br[checksum_complete#]
     ins_5#: br[tx_host#]
@@ -471,6 +395,9 @@ error_pci#:
 error_mtu#:
     pv_stats_update(io_pkt_vec, TX_ERROR_MTU, drop#)
 
+drop_mismatch#:
+    pv_stats_update(io_pkt_vec, RX_DISCARD_ADDR, drop#)
+
 drop_mtu#:
     pv_stats_update(io_pkt_vec, RX_DISCARD_MTU, drop#)
 
@@ -481,8 +408,8 @@ rx_wire#:
     __actions_rx_wire(io_pkt_vec, drop_mtu#, drop_proto#, error_parse#)
     __actions_next()
 
-mac#:
-    __actions_mac_classify(io_pkt_vec, drop#)
+mac_match#:
+    __actions_mac_match(io_pkt_vec, drop_mismatch#)
     __actions_next()
 
 rss#:
