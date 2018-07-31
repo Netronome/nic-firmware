@@ -1,6 +1,5 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x3ff
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0x12b51c00
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xdeadbeef
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x12b51c00
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xdeadbeef
 
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0x80  0x00000000 0x00000000 0x00154d0e 0x04a50800
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0x90  0x273d254e 0x81000065 0x81000258 0x08004500
@@ -8,6 +7,9 @@
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xb0  0x01020800 0x2b5c0200 0x20006162 0x63646566
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xc0  0x6768696a 0x6b6c6d6e 0x6f707172 0x73747576
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xd0  0x77616263 0x64656667 0x68690000
+
+#define NFD_CFG_CLASS_VERSION   0
+#define NFD_CFG_CLASS_DEFAULT 0
 
 #include <pkt_io.uc>
 #include <single_ctx_test.uc>
@@ -18,6 +20,7 @@
 #include <global.uc>
 #include <pv.uc>
 #include <stdmac.uc>
+
 
 .reg protocol
 .reg volatile write $nbi_desc[(NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))]
@@ -53,7 +56,6 @@ move(expected_o_l4_offset,0)
 move(expected_proto, 6)
 
 #define pkt_vec *l$index1
-pv_init(pkt_vec, 0)
 
 move(pkt_vec[4], 0x3fc0)
 
@@ -76,7 +78,7 @@ immed[__actions_t_idx, (32 * 4)]
 nop
 nop
 
-__actions_rx_wire(pkt_vec, drop_mtu#, drop_proto#, error_parse#)
+__actions_rx_wire(pkt_vec, drop_proto#, error_parse#)
 
 test_assert_equal(*$index, 0xdeadbeef)
 
@@ -97,7 +99,6 @@ test_pass()
 
 error#:
 error_parse#:
-drop_mtu#:
 drop_proto#:
 test_fail()
 

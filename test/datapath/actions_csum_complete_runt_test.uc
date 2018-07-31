@@ -8,7 +8,6 @@
 #include <single_ctx_test.uc>
 #include <global.uc>
 
-.reg read $csum
 .reg write $zero
 .sig sig_csum
 .reg csum_offset
@@ -17,6 +16,7 @@ immed[csum_offset, -4]
 mem[write32, $zero, BF_A(pkt_vec, PV_CTM_ADDR_bf), csum_offset, 1], ctx_swap[sig_csum]
 
 .reg csum
+.reg pv_csum
 .reg length
 immed[length, 0]
 .while (length < 15)
@@ -24,15 +24,16 @@ immed[length, 0]
     immed[__actions_t_idx, (32 * 4)]
 
     immed[BF_A(pkt_vec, PV_META_TYPES_bf), 0]
-    immed[BF_A(pkt_vec, PV_META_LENGTH_bf), 0]
     alu[BF_A(pkt_vec, PV_LENGTH_bf), --, B, length]
 
     __actions_checksum_complete(pkt_vec)
 
     test_assert_equal(*$index, 0xdeadbeef)
 
-    mem[read32, $csum, BF_A(pkt_vec, PV_CTM_ADDR_bf), csum_offset, 1], ctx_swap[sig_csum]
-    test_assert_equal($csum, 0)
+    alu[--, --, B, *l$index2--]
+    alu[pv_csum, --, B, *l$index2--]
+
+    test_assert_equal(pv_csum, 0)
 
     test_assert_equal(BF_A(pkt_vec, PV_META_TYPES_bf), 0)
 
@@ -40,4 +41,3 @@ immed[length, 0]
 .endw
 
 test_pass()
-

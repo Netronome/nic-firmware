@@ -4,7 +4,7 @@
 #include <pv.uc>
 #include <stdmac.uc>
 
-#define SIZE_LW 16
+#define SIZE_LW 8
 
 .sig s
 .reg addr
@@ -39,8 +39,6 @@ move(tunnel_args, 0)
 
 load_addr[rtn_reg, error_expected_ret#]
 
-pv_init(pkt_vec, 0)
-
 move(addr, 0x80)
 
 /* Test PV Seq Ctx field */
@@ -60,16 +58,8 @@ move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x20000)
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
-move(expected[8], 0)
-move(expected[9], 0xfff)
-move(expected[10], 0)
-move(expected[11], 0)
-move(expected[12], 0)
-move(expected[13], 0)
-move(expected[14], 0)
-move(expected[15], 0)
 
 move(loop_cntr, 1)
 
@@ -87,7 +77,8 @@ move(loop_cntr, 1)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
+
 
     .if (loop_cntr == 0)
         br[test_fail#] // should always get error for this case, so should never get here
@@ -140,10 +131,8 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0)
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
-move(expected[8], 0)
-move(expected[9], 0xfff)
 
 move(loop_cntr, 0)
 
@@ -156,8 +145,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
 
     alu[expected[3], temp, OR, loop_cntr, <<16]
     alu[expected[3], expected[3], OR, 0x2]
@@ -205,7 +193,7 @@ move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -223,8 +211,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
 
 
     //alu[expected[5], --, B, loop_cntr, <<29]
@@ -269,7 +256,7 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -283,8 +270,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
 
 
     move(temp, 0x1)
@@ -328,7 +314,7 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000102) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -342,12 +328,12 @@ move(loop_cntr, 0)
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
     alu[temp, --, B, loop_cntr, <<6]
-    pv_set_ingress_queue__sz1(pkt_vec, temp, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
+
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
 
 
-    alu[expected[6], expected[6], AND~, 0xff, <<23]
-    alu[expected[6], expected[6], OR, loop_cntr, <<23]
+    //alu[expected[6], expected[6], AND~, 0xff, <<23]
+    //alu[expected[6], expected[6], OR, loop_cntr, <<23]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -388,7 +374,7 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000102) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -407,11 +393,10 @@ move(loop_cntr, 0)
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
     alu[temp, --, B, loop_cntr, <<6]
-    pv_set_ingress_queue__sz1(pkt_vec, temp, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
 
-    alu[expected[6], expected[6], AND~, 0xff, <<23]
-    alu[expected[6], expected[6], OR, loop_cntr, <<23]
+    //alu[expected[6], expected[6], AND~, 0xff, <<23]
+    //alu[expected[6], expected[6], OR, loop_cntr, <<23]
 
     #define_eval _PV_CHK_LOOP 0
 
@@ -460,7 +445,7 @@ move(expected[2], 0x83ff0088)
 move(expected[3], 0xffff00ff)
 move(expected[4], 0x00000000)
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 
 
@@ -468,8 +453,7 @@ mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_
 
 mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
+pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
 
 br[test_fail#] // should always get error, so should never get here
 
@@ -517,7 +501,7 @@ move(expected[2], 0x83ff0088)
 move(expected[3], 0xffff01ff)
 move(expected[4], 0x00000000)
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 
 
@@ -531,8 +515,7 @@ move(loop_cntr, 1)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, fail#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
 
     br[test_fail#] // should always get error, so should never get here
 
@@ -540,7 +523,7 @@ error_expected_ret2#:
 
     #define_eval _PV_CHK_LOOP 0
 
-    #while (_PV_CHK_LOOP < PV_SIZE_LW)
+    #while (_PV_CHK_LOOP < 8)
 
         move(value, pkt_vec++)
         // derived from packge

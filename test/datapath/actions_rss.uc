@@ -75,12 +75,12 @@ move(nn_idx, 0)
     local_csr_wr[T_INDEX, (32 * 4)]
     immed[__actions_t_idx, (32 * 4)]
     pv_invalidate_cache(in_pkt_vec)
-    immed[BF_A(in_pkt_vec, PV_META_LENGTH_bf), 0]
     immed[BF_A(in_pkt_vec, PV_QUEUE_OFFSET_bf), 0]
     immed[BF_A(in_pkt_vec, PV_META_TYPES_bf), 0]
 #endm
 
 .reg prev_hash
+.reg hash
 
 #macro rss_validate(in_pkt_vec, TARGET_HASH_TYPE, CHECK, expected)
 .begin
@@ -99,11 +99,15 @@ move(nn_idx, 0)
 
     move(hash_offset, -4)
     mem[read32, $hash, BF_A(pkt_vec, PV_CTM_ADDR_bf), hash_offset, 1], ctx_swap[sig_read]
-    CHECK($hash, expected)
-    move(prev_hash, $hash)
+
+    alu[--, --, B, *l$index2--]
+    alu[hash, --, B, *l$index2--]
+
+    CHECK(hash, expected)
+    move(prev_hash, hash)
 
     alu[tested_queue, 0xff, AND, BF_A(pkt_vec, PV_QUEUE_OFFSET_bf)]
-    alu[expected_queue, $hash, +, 1]
+    alu[expected_queue, hash, +, 1]
     alu[expected_queue, expected_queue, AND, 0x7f]
     .if (==0)
         immed[expected_queue, 0x80]

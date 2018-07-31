@@ -12,6 +12,7 @@
 #include <timestamp.uc>
 
 #include <nfd_user_cfg.h>
+#include <nfd_cfg.uc>
 
 #include <nfd_in.uc>
 nfd_in_recv_init()
@@ -72,8 +73,7 @@ nfd_out_send_init()
 .set port_tun_args
 
 #macro pkt_io_drop(in_pkt_vec)
-    pv_free_buffers(pkt_vec)
-    pv_get_gro_drop_desc($__pkt_io_gro_meta, pkt_vec)
+    pv_free($__pkt_io_gro_meta, pkt_vec)
 #endm
 
 
@@ -85,35 +85,176 @@ nfd_out_send_init()
 #endm
 
 
-#macro pkt_io_tx_host(in_pkt_vec, egress_q_base, IN_LABEL)
+#macro pkt_io_tx_host(io_pkt_vec, in_tx_args, IN_LABEL)
 .begin
-    pv_acquire_nfd_credit(in_pkt_vec, egress_q_base, drop_buf_pci#)
-    pv_get_gro_host_desc($__pkt_io_gro_meta, in_pkt_vec, egress_q_base)
-    pv_stats_tx_host(in_pkt_vec, egress_q_base, IN_LABEL)
+    .reg bls
+    .reg buf_sz
+    .reg addr_hi
+    .reg addr_lo
+    .reg meta_len
+    .reg min_rxb
+    .reg mu_addr
+    .reg multicast
+    .reg pci_isl
+    .reg pci_q
+    .reg read $rxb
+    .reg read $nfd_credits
+    .reg write $nfd_desc[4]
+    .xfer_order $nfd_desc
+    .sig sig_nfd
+    .sig sig_rd
+
+    #ifdef PV_MULTI_PCI
+        alu[pci_isl, 3, AND, in_tx_args, >>6]
+    #endif
+    alu[pci_q, in_tx_args, +8, BF_A(io_pkt_vec, PV_QUEUE_OFFSET_bf)]
+    alu[pci_q, pci_q, AND, 0x3f]
+
+    bitfield_extract__sz1(bls, BF_AML(io_pkt_vec, PV_BLS_bf))
+    alu[multicast, in_tx_args, AND, BF_A(io_pkt_vec, PV_MAC_DST_MC_bf), <<(BF_L(INSTR_TX_MULTICAST_bf) - BF_L(PV_MAC_DST_MC_bf))]
+    alu[multicast, in_tx_args, OR, multicast, <<(BF_L(INSTR_TX_CONTINUE_bf) - BF_L(INSTR_TX_MULTICAST_bf))]
+    br_bset[multicast, BF_L(INSTR_TX_CONTINUE_bf), multicast#]
+
+check_mru#:
+    pv_meta_write(meta_len, io_pkt_vec)
+    pv_get_required_host_buf_sz(buf_sz, io_pkt_vec, meta_len)
+    alu[min_rxb, in_tx_args, AND, BF_MASK(INSTR_TX_HOST_MIN_RXB_bf), <<BF_L(INSTR_TX_HOST_MIN_RXB_bf)]
+    alu[--, min_rxb, -, buf_sz]
+    bmi[buf_sz_check#]
+
+check_credits#:
+    #ifdef PV_MULTI_PCI
+        alu[addr_hi, (__NFD_DIRECT_ACCESS | NFD_PCIE_ISL_BASE), OR, pci_isl]
+        alu[addr_hi, --, B, addr_hi, <<24]
+    #else
+        alu[addr_hi, --, B, (__NFD_DIRECT_ACCESS | NFD_PCIE_ISL_BASE), <<24]
+    #endif
+    alu[addr_lo, --, B, pci_q, <<(log2(NFD_OUT_ATOMICS_SZ))]
+    ov_single(OV_IMMED8, 1)
+    mem[test_subsat_imm, $nfd_credits, addr_hi, <<8, addr_lo, 1], indirect_ref, ctx_swap[sig_nfd]
+
+    alu[--, --, B, $nfd_credits]
+    beq[drop_buf_pci#]
+
+    br=byte[bls, 0, 3, tx_nfd#]
+
+    pv_get_gro_host_desc($__pkt_io_gro_meta, io_pkt_vec, buf_sz, meta_len, pci_isl, pci_q)
+
+tx_stats_update#:
+    pv_stats_tx_host(io_pkt_vec, pci_isl, pci_q, multicast, IN_LABEL, end#)
+
+multicast#:
+    pv_multicast_init(io_pkt_vec, bls, check_mru#)
+
+tx_nfd#:
+    pv_multicast_resend(io_pkt_vec)
+    immed[addr_lo, nfd_out_ring_info]
+    #ifdef PV_MULTI_PCI
+        alu[addr_lo, addr_lo, OR, pci_isl]
+    #endif
+
+    local_csr_wr[ACTIVE_LM_ADDR_0, addr_lo]
+
+    pv_get_nfd_host_desc($nfd_desc, io_pkt_vec, buf_sz, meta_len, pci_q)
+
+    alu[addr_hi, *l$index0, AND, 0xff, <<24]
+    ld_field_w_clr[addr_lo, 0011, *l$index0]
+    mem[qadd_work, $nfd_desc[0], addr_hi, <<8, addr_lo, 4], sig_done[sig_nfd]
+    ctx_arb[sig_nfd], br[tx_stats_update#]
+
+buf_sz_check#:
+    move(addr_hi, (_fl_buf_sz_cache >> 8))
+    alu[addr_lo, --, B, pci_q, <<2]
+#ifdef PV_MULTI_PCI
+    alu[addr_lo, addr_lo, OR, pci_isl, <<(6 + 2)]
+#endif
+    mem[read32, $rxb, addr_hi, <<8, addr_lo, 1], ctx_swap[sig_rd]
+    alu[--, $rxb, -, buf_sz]
+    bge[check_credits#]
+
+#ifdef PV_MULTI_PCI
+    alu[pci_q, pci_q, OR, pci_isl, <<6]
+#endif
+    pv_stats_update(io_pkt_vec, RX_DISCARD_MRU, pci_q, --)
+
+    br_bclr[multicast, BF_L(INSTR_TX_CONTINUE_bf), drop#]
+    br[drop_later#]
 
 drop_buf_pci#:
-    pv_stats_update(pkt_vec, RX_DISCARD_PCI, drop#)
+#ifdef PV_MULTI_PCI
+    alu[pci_q, pci_q, OR, pci_isl, <<6]
+#endif
+    pv_stats_update(io_pkt_vec, RX_DISCARD_PCI, pci_q, --)
+
+    br_bclr[multicast, BF_L(INSTR_TX_CONTINUE_bf), drop#]
+
+drop_later#:
+    pv_get_gro_mu_free_desc($__pkt_io_gro_meta, io_pkt_vec)
+
+end#:
 .end
 #endm
 
 
-#macro pkt_io_rx_wire(io_vec, in_mtu, in_tunnel_args, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+#macro pkt_io_rx_wire(io_vec, in_tunnel_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
     #pragma warning(push)
     #pragma warning(disable:5009) // rx_wire is only invoked when $__pkt_io_nbi_desc ready
-    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, in_mtu, in_tunnel_args, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, in_tunnel_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
     #pragma warning(pop)
 #endm
 
-#macro pkt_io_tx_wire(in_pkt_vec, egress_q_base, IN_LABEL)
+
+#macro pkt_io_tx_wire(in_pkt_vec, in_tx_args, IN_LABEL)
 .begin
+    .reg addr_hi
+    .reg addr_lo
+    .reg bls
+    .reg multicast
+    .reg nbi
+    .reg tm_q
     .reg pms_offset
+    .reg resend_desc[4]
+
+    // CTM buffer is required for TX via NBI
+    br_bclr[BF_AL(in_pkt_vec, PV_CTM_ALLOCATED_bf), error_no_ctm#]
 
     pv_write_nbi_meta(pms_offset, in_pkt_vec, error_offset#)
-    pv_get_gro_wire_desc($__pkt_io_gro_meta, in_pkt_vec, egress_q_base, pms_offset)
+
+    #if (NBI_COUNT > 1)
+        bitfield_extract__sz1(nbi, BF_AML(in_tx_args, INSTR_TX_WIRE_NBI_bf)) ; INSTR_TX_WIRE_NBI_bf
+    #endif
+    alu[tm_q, in_tx_args, AND~, (((~BF_MASK(INSTR_TX_WIRE_TMQ_bf)) & 0xffff) >> 8), <<8]
+
+    alu[multicast, in_tx_args, AND, BF_A(in_pkt_vec, PV_MAC_DST_MC_bf), <<(BF_L(INSTR_TX_MULTICAST_bf) - BF_L(PV_MAC_DST_MC_bf))]
+    alu[multicast, in_tx_args, OR, multicast, <<(BF_L(INSTR_TX_CONTINUE_bf) - BF_L(INSTR_TX_MULTICAST_bf))]
+
+    bitfield_extract__sz1(bls, BF_AML(in_pkt_vec, PV_BLS_bf))
+    br=byte[bls, 0, 3, tx_nbi#]
+
+    br_bset[multicast, BF_L(INSTR_TX_CONTINUE_bf), multicast#]
+
+tx_gro#:
+    pv_get_gro_wire_desc($__pkt_io_gro_meta, in_pkt_vec, nbi, tm_q, pms_offset)
     pv_stats_tx_wire(in_pkt_vec, IN_LABEL)
 
 error_offset#:
-    pv_stats_update(pkt_vec, TX_ERROR_OFFSET, drop#)
+    pv_stats_update(in_pkt_vec, TX_ERROR_OFFSET, drop#)
+
+error_no_ctm#:
+    pv_stats_update(in_pkt_vec, TX_ERROR_NO_CTM, drop#)
+
+multicast#:
+    pv_multicast_init(in_pkt_vec, bls, tx_gro#)
+
+tx_nbi#:
+    pv_multicast_resend(in_pkt_vec)
+    pv_setup_packet_ready(addr_hi, addr_lo, in_pkt_vec, nbi, tm_q, pms_offset)
+    nbi[packet_ready_multicast_dont_free, $, addr_hi, <<8, addr_lo], indirect_ref
+    pv_stats_tx_wire(in_pkt_vec)
+
+    br_bclr[multicast, BF_L(INSTR_TX_CONTINUE_bf), IN_LABEL]
+
+end#:
 .end
 #endm
 

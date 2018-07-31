@@ -17,6 +17,4 @@ move(pkt_vec[3], 0x3)
 move(pkt_vec[4], 0x3fcc)
 move(pkt_vec[5], ((14 << BF_L(PV_HEADER_OFFSET_OUTER_IP_bf)) |
                   ((14 + 4 + 20) << BF_L(PV_HEADER_OFFSET_OUTER_L4_bf))))
-move(pkt_vec[6], 1<<BF_L(PV_QUEUE_IN_TYPE_bf))
-move(pkt_vec[9], 0x2a)
-move(pkt_vec[10], (1 << BF_L(PV_VLD_bf)))
+move(pkt_vec[6], (1<<BF_L(PV_QUEUE_IN_TYPE_bf) | 0x2a00))

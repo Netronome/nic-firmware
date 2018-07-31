@@ -1,6 +1,5 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x3ff
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0x12b51c00
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xdeadbeef
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x12b51c00
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xdeadbeef
 
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0x80  0x00000000 0x00000000 0x00163ec4 0x23450000
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0x90  0x0b000200 0x86dd6030 0x00000010 0x8cfffe80
@@ -8,6 +7,9 @@
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xb0  0x55556666 0x66667777 0x77778888 0x88881100
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xc0  0x00000000 0x0000003f 0x003f0008 0x9b680c79
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xd0  0x8ce90000
+
+#define NFD_CFG_CLASS_VERSION   0
+#define NFD_CFG_CLASS_DEFAULT 0
 
 #include <pkt_io.uc>
 #include <single_ctx_test.uc>
@@ -50,7 +52,6 @@ move(expected_o_l4_offset,0)
 move(expected_proto, 4)
 
 #define pkt_vec *l$index1
-pv_init(pkt_vec, 0)
 
 //set up CATAMARAN vector
 move($nbi_desc[0], ((0x52<<BF_L(CAT_PKT_LEN_bf)) | 0<<BF_L(CAT_BLS_bf)))
@@ -71,7 +72,7 @@ immed[__actions_t_idx, (32 * 4)]
 nop
 nop
 
-__actions_rx_wire(pkt_vec, drop_mtu#, drop_proto#, error_parse#)
+__actions_rx_wire(pkt_vec, drop_proto#, error_parse#)
 
 test_assert_equal(*$index, 0xdeadbeef)
 
@@ -90,7 +91,6 @@ test_assert_equal(o_l3_offset, expected_o_l3_offset)
 test_pass()
 
 error_parse#:
-drop_mtu#:
 drop_proto#:
 test_fail()
 

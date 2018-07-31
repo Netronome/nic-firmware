@@ -1,9 +1,11 @@
 /* Test for macro pv_init_nfd. Not testing lso_fixup */
-;TEST_INIT_EXEC nfp-mem i32.ctm:0x000  0x43020344 0x05060708 0xa5320b0c 0x02030401
-;TEST_INIT_EXEC nfp-mem i32.ctm:0x010  0x43020344 0x05060708 0xa5320b0c 0x02030401
-;TEST_INIT_EXEC nfp-mem i32.ctm:0x020  0x23020304 0x85060708 0x090a0b0c 0x02000f10
-;TEST_INIT_EXEC nfp-mem i32.ctm:0x030  0x33020304 0x05060708 0x090a0b0c 0x020e0f10
-;TEST_INIT_EXEC nfp-mem i32.ctm:0x040  0x03faaa37 0x0401abc0 0x00000b0c 0x01112222
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x000  0x43020344 0x05060708 0x01320b0c 0x02030401
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x010  0x43020344 0x05060708 0x01320b0c 0x02030401
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x020  0x23020304 0x85060708 0x090a0b0c 0x02000402
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x030  0x33020304 0x05060708 0x090a0b0c 0x020e0402
+;TEST_INIT_EXEC nfp-mem i32.ctm:0x040  0x03faaa37 0x0401abc0 0x00000b0c 0x01110222
+
+#define NULL_VLAN 0xfff
 
 #include <single_ctx_test.uc>
 #include <global.uc>
@@ -25,22 +27,32 @@
 .reg volatile read $nfd_desc[NFD_IN_META_SIZE_LW]
 .xfer_order $nfd_desc
 
- move(mtu, 6000)
- move(daddr, 0x00)
- move(i,0)
+.reg volatile read $__actions[NIC_MAX_INSTR]
+.addr $__actions[0] 32
+.xfer_order $__actions
+.reg volatile __actions_t_idx
+
+#define pkt_vec *l$index1
+
+.reg pkt_vec_addr
+.reg_addr __actions_t_idx 28 B
+alu[__actions_t_idx, --, B, 0]
+alu[pkt_vec_addr, (PV_META_BASE_wrd * 4), OR, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
+
+move(mtu, 6000)
+move(daddr, 0x00)
+move(i,0)
+
+pv_reset(pkt_vec_addr, 0, __actions_t_idx, 64)
+
 
 .while (i < NUM_TEST_ITERATIONS)
-
-    #define pkt_vec *l$index1
-
-    pv_init(pkt_vec, 0)
 
     move(pkt_no, i)
 
 
     // read in nfd descriptor for this iteration
     mem[read32, $nfd_desc[0], 0, <<8, daddr, NFD_IN_META_SIZE_LW], ctx_swap[s]
-
 
     // set up expected data
 
@@ -49,6 +61,7 @@
 
     // lword 0
     ld_field_w_clr[exp[0], 1100, pkt_no, <<16] // pkt num
+    alu[exp[0], exp[0], OR, 32,<<BF_L(PV_CTM_ISL_bf)]
     ld_field_w_clr[tmp1, 0011, $nfd_desc[3], >>16] // pkt len
     ld_field_w_clr[tmp2, 0001, $nfd_desc[0], >>24]
     alu[tmp2, tmp2, AND, 0x7f]
@@ -101,20 +114,11 @@
     .endif
 
     // lword 6
-    .if (! drop_flag)
-        alu[tmp1, 0x7f, AND, $nfd_desc[0], >>24] // meta
-        alu[exp[6], --, B, tmp1, <<16]
-    .else
-        move(exp[6], 0)
-    .endif
-    alu[tmp1, $nfd_desc[0], AND, 0x7f] // qid
-    alu[exp[6], exp[6], OR, tmp1, <<23]
-    alu[tmp1, --, B, tmp1, <<6] //(NIC_MAX_INSTR * 4)
-    pv_set_ingress_queue__sz1(pkt_vec, tmp1, 64)
+    alu[exp[6], --, B, 0]
 
     // lword 7
     move(exp[7], 0)
-
+    move(pkt_vec[6], 0)
     pv_init_nfd(pkt_vec, pkt_no, $nfd_desc, mtu, error#, error#)
 
     .if ( drop_flag )

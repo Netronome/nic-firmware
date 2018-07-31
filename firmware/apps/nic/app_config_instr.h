@@ -39,12 +39,21 @@
     .alloc_mem NIC_CFG_INSTR_TBL cls+NIC_CFG_INSTR_TBL_ADDR \
                 island NIC_CFG_INSTR_TBL_SIZE addr40
 
+    /* PCIe Queue RX BUF SZ table*/
+    .alloc_mem _fl_buf_sz_cache imem global (64*4*4) 256
+
 #elif defined(__NFP_LANG_MICROC)
 
     __asm
     {
         .alloc_mem NIC_CFG_INSTR_TBL cls + NIC_CFG_INSTR_TBL_ADDR \
-                    island NIC_CFG_INSTR_TBL_SIZE addr40
+            island NIC_CFG_INSTR_TBL_SIZE addr40
+    }
+
+    /* PCIe Queue RX BUF SZ table*/
+    __asm
+    {
+        .alloc_mem _fl_buf_sz_cache imem global (64*4*4) 256
     }
 #endif
 
@@ -256,6 +265,13 @@ typedef union {
 #define NIC_PORT_TO_PCIE_INDEX(pcie, type, vport, queue) \
         ((pcie << 6) | (NFD_BUILD_QID((type),(vport),(queue))&0x3f))
 #define NIC_PORT_TO_NBI_INDEX(nbi, vport) ((1 << 8) | (nbi << 7) | (vport & 0x7f))
+#define INSTR_TX_CONTINUE_bf     0, 15, 15
+#define INSTR_TX_MULTICAST_bf    0, 14, 14
+
+#define INSTR_TX_HOST_MIN_RXB_bf 0, 13, 8
+
+#define INSTR_TX_WIRE_NBI_bf     0, 10, 10
+#define INSTR_TX_WIRE_TMQ_bf     0, 9, 0
 
 #if defined(__NFP_LANG_ASM)
 

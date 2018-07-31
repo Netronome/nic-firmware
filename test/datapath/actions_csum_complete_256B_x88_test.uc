@@ -45,8 +45,6 @@ finalize#:
 .end
 #endm
 
-.reg read $csum
-.sig sig_csum
 .reg csum_offset
 immed[csum_offset, -4]
 
@@ -55,6 +53,7 @@ pv_get_length(pkt_len, pkt_vec)
 test_assert(pkt_len < 256)
 
 .reg csum
+.reg pv_csum
 .reg length
 immed[length, 15]
 .while (length <= pkt_len)
@@ -62,7 +61,6 @@ immed[length, 15]
     immed[__actions_t_idx, (32 * 4)]
 
     immed[BF_A(pkt_vec, PV_META_TYPES_bf), 0]
-    immed[BF_A(pkt_vec, PV_META_LENGTH_bf), 0]
     alu[BF_A(pkt_vec, PV_LENGTH_bf), --, B, length]
 
     __actions_checksum_complete(pkt_vec)
@@ -70,8 +68,11 @@ immed[length, 15]
     test_assert_equal(*$index, 0xdeadbeef)
 
     checksum_pattern(csum, length)
-    mem[read32, $csum, BF_A(pkt_vec, PV_CTM_ADDR_bf), csum_offset, 1], ctx_swap[sig_csum]
-    test_assert_equal($csum, csum)
+
+    alu[--, --, B, *l$index2--]
+    alu[pv_csum, --, B, *l$index2--]
+
+    test_assert_equal(pv_csum, csum)
 
     test_assert_equal(BF_A(pkt_vec, PV_META_TYPES_bf), NFP_NET_META_CSUM)
 
@@ -79,4 +80,3 @@ immed[length, 15]
 .endw
 
 test_pass()
-

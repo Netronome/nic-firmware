@@ -5,10 +5,11 @@
 #include <global.uc>
 #include <pv.uc>
 
-#include "pkt_ipv4_udp_x88.uc"
-
 #include <bitfields.uc>
 #include <timestamp.uc>
+#include <aggregate.uc>
+
+#define pkt_vec *l$index1
 
 timestamp_enable();
 
@@ -43,7 +44,15 @@ test_assert_equal(NIC_STATS_QUEUE_TX_BC, (NIC_STATS_QUEUE_TX_MC + 8))
 #endm
 
 move(addr[0], (_nic_stats_queue >> 8))
-move(BF_A(pkt_vec, PV_ORIG_LENGTH_bf), 84)
+.reg pkt_vec_orig_len_addr
+alu[pkt_vec_orig_len_addr, --, B, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
+local_csr_wr[ACTIVE_LM_ADDR_2, pkt_vec_orig_len_addr]
+nop
+nop
+nop
+alu[--, --, B, *l$index2--]
+alu[*l$index2, --, B, 84]
+
 move(queue, 0)
 
 /* check that PCIe queues correctly count packets and ORIG_LENGTH */
@@ -91,4 +100,3 @@ done2#:
 .endw
 
 test_pass()
-

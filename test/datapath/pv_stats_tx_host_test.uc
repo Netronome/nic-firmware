@@ -1,5 +1,7 @@
 ;TEST_INIT_EXEC cat firmware/lib/nic_basic/nic_stats.def | awk -f scripts/nic_stats.awk > firmware/lib/nic_basic/nic_stats_gen.h
 
+#define PV_MULTI_PCI
+
 #include <single_ctx_test.uc>
 
 #include <global.uc>
@@ -13,12 +15,14 @@
 timestamp_enable();
 
 .reg bytes
+.reg continue
 .reg expected
 .reg pkts
 .reg dst_queue
 .reg src_queue
+.reg pci_isl
+.reg pci_q
 .reg stat
-.reg offset
 .reg src_addr
 .reg dst_addr
 .reg addr
@@ -61,7 +65,9 @@ test_assert_equal(NIC_STATS_QUEUE_TX_BC, (NIC_STATS_QUEUE_TX_MC + 8))
 .end
 #endm
 
-move(BF_A(pkt_vec, PV_ORIG_LENGTH_bf), 84)
+alu[--, pkt_vec--, OR, 0]
+move(pkt_vec++, 84)
+move(continue, 0)
 move(src_queue, 0)
 move(dst_queue, 0)
 move(dst_addr, 0)
@@ -74,48 +80,44 @@ move(dst_addr, 0)
         alu[src_addr, src_addr, +, NIC_STATS_QUEUE_TX]
         alu[BF_A(pkt_vec, PV_QUEUE_IN_bf), --, B, src_queue, <<BF_L(PV_QUEUE_IN_bf)]
 
-        move(offset, 0)
-        .while (offset < 8)
-            bitfield_insert__sz2(BF_AML(pkt_vec, PV_QUEUE_OFFSET_bf), offset)
-
-            move(stat, 0)
-            .while (stat < 4)
-                bitfield_insert__sz2(BF_AML(pkt_vec, PV_MAC_DST_TYPE_bf), stat)
-                pv_stats_tx_host(pkt_vec, dst_queue, done#)
-                #pragma warning(disable: 4702)
-                test_fail()
-                #pragma warning(pop)
-            done#:
-                /* check source queue stats */
-                .if (src_queue < 256)
-                    get_counters(pkts, bytes, src_addr, stat)
-                    alu[expected, offset, +, 1]
-                    test_assert_equal(pkts, expected)
-                    multiply32(expected, expected, 84, OP_SIZE_8X24)
-                    test_assert_equal(bytes, expected)
-                .else
-                    get_counters(pkts, bytes, src_addr, stat)
-                    test_assert_equal(pkts, 0)
-                    test_assert_equal(bytes, 0)
-                .endif
-                /* check dest queue stats */
-                get_counters(pkts, bytes, dst_addr, stat)
-                immed[expected, 512]
-                multiply32(expected, expected, dst_queue, OP_SIZE_8X24)
-                alu[expected, expected, +, src_queue]
-                alu[expected, expected, +, 1]
+        move(stat, 0)
+        .while (stat < 4)
+            bitfield_insert__sz2(BF_AML(pkt_vec, PV_MAC_DST_TYPE_bf), stat)
+            alu[pci_isl, 0x3, AND, dst_queue, >>6]
+            alu[pci_q, dst_queue, AND, 0x3f]
+            pv_stats_tx_host(pkt_vec, pci_isl, pci_q, continue, done#, done#)
+            #pragma warning(disable: 4702)
+            test_fail()
+            #pragma warning(pop)
+        done#:
+            /* check source queue stats */
+            .if (src_queue < 256)
+                get_counters(pkts, bytes, src_addr, stat)
+                alu[expected, dst_queue, +, 1]
                 test_assert_equal(pkts, expected)
-                multiply32(expected, expected, 60, OP_SIZE_8X24)
+                multiply32(expected, expected, 84, OP_SIZE_8X24)
                 test_assert_equal(bytes, expected)
-                alu[stat, stat, +, 1]
-            .endw
-            alu[offset, offset, +, 1]
-            immed[tmp, NIC_STATS_QUEUE_SIZE]
-            alu[dst_addr, dst_addr, +, tmp]
+            .else
+                get_counters(pkts, bytes, src_addr, stat)
+                test_assert_equal(pkts, 0)
+                test_assert_equal(bytes, 0)
+            .endif
+            /* check dest queue stats */
+            get_counters(pkts, bytes, dst_addr, stat)
+            immed[expected, 512]
+            multiply32(expected, expected, dst_queue, OP_SIZE_8X24)
+            alu[expected, expected, +, src_queue]
+            alu[expected, expected, +, 1]
+            test_assert_equal(pkts, expected)
+            multiply32(expected, expected, 60, OP_SIZE_8X24)
+            test_assert_equal(bytes, expected)
+            alu[stat, stat, +, 1]
         .endw
+        immed[tmp, NIC_STATS_QUEUE_SIZE]
+        alu[dst_addr, dst_addr, +, tmp]
         alu[src_queue, src_queue, +, 1]
     .endw
-    alu[dst_queue, dst_queue, +, 8]
+    alu[dst_queue, dst_queue, +, 1]
 .endw
 
 test_pass()

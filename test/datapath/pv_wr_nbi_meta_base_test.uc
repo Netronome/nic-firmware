@@ -12,6 +12,15 @@
 .reg read $nbi_meta[2]
 .xfer_order $nbi_meta
 .sig sig_read
+.reg pkt_num
+
+#define PKT_NUM_i 0
+#while PKT_NUM_i < 0x100
+    move(pkt_num, PKT_NUM_i)
+    pkt_buf_free_ctm_buffer(--, pkt_num)
+    #define_eval PKT_NUM_i (PKT_NUM_i + 1)
+#endloop
+#undef PKT_NUM_i
 
 move(BF_A(pkt_vec, PV_NUMBER_bf), 0x38a4965)
 move(BF_A(pkt_vec, PV_MU_ADDR_bf), 0xfb7ae13c)
@@ -23,7 +32,7 @@ pv_write_nbi_meta(pms_offset, pkt_vec, fail#]
 move(ctm_base, 0)
 mem[read32, $nbi_meta[0], ctm_base, 0, 2], ctx_swap[sig_read]
 
-test_assert_equal($nbi_meta[0], (__ISLAND << 26 | 0x38a4965))
+test_assert_equal($nbi_meta[0], 0x38a4965)
 test_assert_equal($nbi_meta[1], 0x9b7ae13c)
 
 test_pass()

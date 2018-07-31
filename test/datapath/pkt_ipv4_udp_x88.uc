@@ -9,12 +9,16 @@
 
 #include <pv.uc>
 
-.reg pkt_vec[PV_SIZE_LW]
+#define pkt_vec *l$index1
+local_csr_wr[ACTIVE_LM_ADDR_1, 32]
+nop
+nop
+nop
+
 aggregate_zero(pkt_vec, PV_SIZE_LW)
 move(pkt_vec[0], 0x3c)
 move(pkt_vec[2], 0x88)
 move(pkt_vec[3], 0x3)
 move(pkt_vec[4], 0x3fc0)
 move(pkt_vec[5], ((14 << 24) | ((14 + 20) << 16) | (14 << 8) | (14 + 20)))
-move(pkt_vec[6], 1<<BF_L(PV_QUEUE_IN_TYPE_bf))
-move(pkt_vec[9], 0xfff)
+move(pkt_vec[6], (1<<BF_L(PV_QUEUE_IN_TYPE_bf) | 0xfff00))
