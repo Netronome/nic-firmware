@@ -30,8 +30,6 @@ move(loop_cntr, 0)
     alu[loop_cntr, loop_cntr, +, 1]
 .endw
 
-pv_init(pkt_vec, 0)
-
 move(mtu, 0x3fff)
 move(addr, 0x80)
 move(tunnel_args, 0)
@@ -51,10 +49,10 @@ move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
 move(expected[3], 0x00000102) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 move(expected[8], 0)
-move(expected[9], 0xfff)
+move(expected[9], 0)
 move(expected[10], 0)
 move(expected[11], 0)
 move(expected[12], 0)
@@ -72,8 +70,7 @@ move(loop_cntr, 64)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
 
     alu[expected[0], loop_cntr, -, MAC_PREPEND_BYTES]
 
@@ -113,7 +110,6 @@ move(loop_cntr, 64)
 
 .endw
 
-
 /* Test PV BLS field */
 
 alu[$nbi_desc_wr[0], --, B, 0]
@@ -130,10 +126,10 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 move(expected[8], 0)
-move(expected[9], 0xfff)
+move(expected[9], 0)
 
 move(loop_cntr, 0)
 
@@ -145,8 +141,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
 
 
     alu[expected[0], (64 - MAC_PREPEND_BYTES), OR, loop_cntr, <<14]
@@ -189,7 +184,7 @@ move(expected[1], 0)
 move(expected[3], 0x00000102) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -197,24 +192,22 @@ move(loop_cntr, 0)
 // Go past size of Packet Number field to test CTM Number doesn't leak into PV Packet Number
 .while (loop_cntr <= 0x400)
 
-    alu[temp, 64, OR, loop_cntr, <<16]
+    alu[temp, --, B, loop_cntr, <<16]
     .if (loop_cntr == 0x400)
-        alu[temp, temp, OR, 0x3f, <<26] // Set all CTM Number bits
+        alu[temp, temp, OR, 0xfc, <<BF_L(PV_CTM_ISL_bf)] // Set all CTM Number bits
     .endif
-    move($nbi_desc_wr[0], temp)
+    alu[$nbi_desc_wr[0], 64, OR, temp]
+    alu[expected[0], (64 - MAC_PREPEND_BYTES), OR, temp]
 
     mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
 
 
     move(temp, 0x3ff)
     alu[temp, temp, AND, loop_cntr] // mask off CTM Number bits
-
-    alu[expected[0], (64 - MAC_PREPEND_BYTES), OR, temp, <<16]
     move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
     alu[expected[2], expected[2], OR, temp, <<16]
 
@@ -261,7 +254,7 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -279,8 +272,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
 
 
     .if (loop_cntr == 0x20000000)
@@ -333,7 +325,7 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 
 move(loop_cntr, 1)
@@ -346,8 +338,7 @@ move(loop_cntr, 1)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
 
 
     #define_eval _PV_CHK_LOOP 0
@@ -389,7 +380,7 @@ move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
 move(expected[3], 0x000001ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
-move(expected[6], 0x00000000)
+move(expected[6], 0x000fff00)
 move(expected[7], 0)
 
 move(loop_cntr, 0)
@@ -402,8 +393,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_set_ingress_queue__sz1(pkt_vec, 0, 64)
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, mtu, tunnel_args, drop#, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
 
 
     alu[expected[1], --, B, loop_cntr, <<31]

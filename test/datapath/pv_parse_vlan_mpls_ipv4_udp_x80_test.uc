@@ -30,7 +30,6 @@ bitfield_extract__sz1(expected_proto, BF_AML(pkt_vec, PV_PROTO_bf))
 
 move(BF_A(pkt_vec, PV_HEADER_STACK_bf), 0)
 move(BF_A(pkt_vec, PV_PROTO_bf), 0)
-move(BF_A(pkt_vec, PV_VLD_bf), 0)
 move(BF_A(pkt_vec, PV_VLAN_ID_bf), 0)
 
 pv_seek(pkt_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY))
