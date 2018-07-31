@@ -9,6 +9,7 @@
 #include <global.uc>
 #include <bitfields.uc>
 
+
 #macro checksum_pattern(csum, len)
 .begin
     .reg count
@@ -63,8 +64,10 @@ done#:
 .end
 #endm
 
-.reg read $csum
-.sig sig_csum
+#macro fail_alloc_macro
+    br[fail#]
+#endm
+
 .reg csum_offset
 immed[csum_offset, -4]
 
@@ -72,14 +75,32 @@ immed[csum_offset, -4]
 pv_get_length(pkt_len, pkt_vec)
 
 .reg csum
+.reg pv_csum
 .reg length
+
+.reg pkt_num
+
+#define PKT_NUM_i 0
+#while PKT_NUM_i < 0x100
+    move(pkt_num, PKT_NUM_i)
+    pkt_buf_free_ctm_buffer(--, pkt_num)
+    #define_eval PKT_NUM_i (PKT_NUM_i + 1)
+#endloop
+#undef PKT_NUM_i
+
+pkt_buf_alloc_ctm(pkt_num, 3, fail#, fail_alloc_macro)
+
+test_assert_equal(pkt_num, 0)
+
+move(pkt_vec[2], 0x80000088)
+
+
 immed[length, 15]
 .while (length <= pkt_len)
     local_csr_wr[T_INDEX, (32 * 4)]
     immed[__actions_t_idx, (32 * 4)]
 
     immed[BF_A(pkt_vec, PV_META_TYPES_bf), 0]
-    immed[BF_A(pkt_vec, PV_META_LENGTH_bf), 0]
     alu[BF_A(pkt_vec, PV_LENGTH_bf), --, B, length]
 
     __actions_checksum_complete(pkt_vec)
@@ -87,8 +108,10 @@ immed[length, 15]
     test_assert_equal(*$index, 0xdeadbeef)
 
     checksum_pattern(csum, length)
-    mem[read32, $csum, BF_A(pkt_vec, PV_CTM_ADDR_bf), csum_offset, 1], ctx_swap[sig_csum]
-    test_assert_equal($csum, csum)
+    alu[--, --, B, *l$index2--]
+    alu[pv_csum, --, B, *l$index2--]
+
+    test_assert_equal(pv_csum, csum)
 
     test_assert_equal(BF_A(pkt_vec, PV_META_TYPES_bf), NFP_NET_META_CSUM)
 
@@ -97,3 +120,5 @@ immed[length, 15]
 
 test_pass()
 
+fail#:
+test_fail()

@@ -140,6 +140,8 @@ ebpf_init_cap_finalize()
     .set ebpf_rc
     .reg rc
 
+    pv_restore_meta_lm_ptr(_ebpf_pkt_vec)
+
     alu[rc, --, B, ebpf_rc] // would have preferred ebpf_rc in bank B
 
     alu[stat, EBPF_RET_STATS_MASK, AND, rc, >>EBPF_RET_STATS_PASS]
@@ -168,6 +170,7 @@ ebpf_init_cap_finalize()
     .reg jump_offset
     .reg stack_addr
 
+    pv_save_meta_lm_ptr(_ebpf_pkt_vec)
     load_addr[jump_offset, ebpf_start#]
     alu[jump_offset, in_ustore_addr, -, jump_offset]
     jump[jump_offset, ebpf_start#], targets[dummy0#, dummy1#], defer[3]

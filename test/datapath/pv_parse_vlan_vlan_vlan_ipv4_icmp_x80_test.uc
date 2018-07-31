@@ -8,13 +8,11 @@
 .reg o_l3_offset
 .reg i_l4_offset
 .reg i_l3_offset
-.reg vld_mpd
 .reg proto
 .reg expected_o_l3_offset
 .reg expected_o_l4_offset
 .reg expected_i_l3_offset
 .reg expected_i_l4_offset
-.reg expected_vld_mpd
 .reg expected_proto
 .reg pkt_len
 .reg in_args
@@ -29,11 +27,9 @@ bitfield_extract__sz1(expected_i_l3_offset, BF_AML(pkt_vec, PV_HEADER_OFFSET_INN
 bitfield_extract__sz1(expected_o_l4_offset, BF_AML(pkt_vec, PV_HEADER_OFFSET_OUTER_L4_bf))
 bitfield_extract__sz1(expected_o_l3_offset, BF_AML(pkt_vec, PV_HEADER_OFFSET_OUTER_IP_bf))
 bitfield_extract__sz1(expected_proto, BF_AML(pkt_vec, PV_PROTO_bf))
-alu[expected_vld_mpd, --, B, BF_A(pkt_vec, PV_VLD_bf)]
 
 move(BF_A(pkt_vec, PV_HEADER_STACK_bf), 0)
 move(BF_A(pkt_vec, PV_PROTO_bf), 0)
-move(BF_A(pkt_vec, PV_VLD_bf), 0)
 move(BF_A(pkt_vec, PV_VLAN_ID_bf), 0)
 
 pv_seek(pkt_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY))
@@ -51,7 +47,6 @@ bitfield_extract__sz1(i_l3_offset, BF_AML(pkt_vec, PV_HEADER_OFFSET_INNER_IP_bf)
 bitfield_extract__sz1(o_l4_offset, BF_AML(pkt_vec, PV_HEADER_OFFSET_OUTER_L4_bf))
 bitfield_extract__sz1(o_l3_offset, BF_AML(pkt_vec, PV_HEADER_OFFSET_OUTER_IP_bf))
 bitfield_extract__sz1(proto, BF_AML(pkt_vec, PV_PROTO_bf))
-alu[vld_mpd, --, B, BF_A(pkt_vec, PV_VLD_bf)]
 alu[vlan_id, --, B, BF_A(pkt_vec, PV_VLAN_ID_bf)]
 
 test_assert_equal(i_l3_offset, expected_i_l3_offset)

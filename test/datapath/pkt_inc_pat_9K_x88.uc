@@ -587,5 +587,3 @@ move(pkt_vec[0], 0x23fc)
 move(pkt_vec[1], 0xf3000000)
 move(pkt_vec[2], 0x88)
 move(pkt_vec[4], 0x3fc0)
-
-

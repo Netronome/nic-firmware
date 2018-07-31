@@ -390,11 +390,12 @@ ret#:
     alu[out_desc[2], desc, OR, buf_list, <<NFD_OUT_BLS_shf]
 
     // Word 3 -- NFD_OUT_QID_wrd+1
-    alu[desc, pkt_len, OR, BF_A(in_vec, PV_META_LENGTH_bf), <<NFD_OUT_METALEN_shf]
     #ifndef GRO_EVEN_NFD_OFFSETS_ONLY
-       alu[desc, desc, OR, BF_A(in_vec, PV_OFFSET_bf), <<31]
+        alu[desc, pkt_len, OR, BF_A(in_vec, PV_OFFSET_bf), <<31]
+        alu[out_desc[3], desc, OR, BF_A(in_vec, PV_QUEUE_IN_bf), <<NFD_OUT_QID_shf]
+    #else
+        alu[out_desc[3], pkt_len, OR, BF_A(in_vec, PV_QUEUE_IN_bf), <<NFD_OUT_QID_shf]
     #endif
-    alu[out_desc[3], desc, OR, BF_A(in_vec, PV_QUEUE_IN_bf), <<NFD_OUT_QID_shf]
 
 .end
 	#undef __NUM_WORKQ_DESC__

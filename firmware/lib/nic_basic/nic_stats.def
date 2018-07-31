@@ -11,7 +11,7 @@ tx_bc
 rx_discards
 rx_discard_act
 rx_discard_addr
-rx_discard_mtu
+rx_discard_mru
 rx_discard_pci
 rx_discard_proto
 
@@ -26,6 +26,7 @@ tx_errors
 tx_error_offset
 tx_error_mtu
 tx_error_pci
+tx_error_no_ctm
 
 rx_discard_mac_pkts
 rx_error_mac_pkts

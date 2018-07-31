@@ -181,6 +181,22 @@ void ct_nn_write(
     }
 }
 
+__intrinsic __emem __addr40 uint8_t*
+cfg_act_bar_ptr(uint32_t pcie, uint32_t vid)
+{
+
+    __emem __addr40 uint8_t* bar_base = 0;
+
+    switch (pcie) {
+        case 0: bar_base = NFD_CFG_BAR_ISL(0, vid); break;
+        case 1: bar_base = NFD_CFG_BAR_ISL(1, vid); break;
+        case 2: bar_base = NFD_CFG_BAR_ISL(2, vid); break;
+        case 3: bar_base = NFD_CFG_BAR_ISL(3, vid); break;
+    }
+
+    return bar_base;
+}
+
 /*
  * Config change management.
  *
@@ -499,6 +515,20 @@ upd_vxlan_table(__emem __addr40 uint8_t *bar_base, uint32_t vnic_port)
 }
 
 
+__intrinsic void
+cfg_act_cache_fl_buf_sz(uint32_t pcie, uint32_t vid)
+{
+    __xread uint32_t rxb_r;
+    __xwrite uint32_t rxb_w;
+    __imem uint32_t *fl_buf_sz_cache = (__imem uint32_t *)
+                                        __link_sym("_fl_buf_sz_cache");
+
+    mem_read32(&rxb_r, (__mem void*) (cfg_act_bar_ptr(pcie, vid) + NFP_NET_CFG_FLBUFSZ), sizeof(rxb_r));
+    rxb_w = rxb_r;
+    mem_write32(&rxb_w, &fl_buf_sz_cache[pcie * 64 + vid], sizeof(rxb_w));
+}
+
+
 #define SET_PIPELINE_BIT(prev, current) \
     ((current) - (prev) == 1) ? 1 : 0;
 
@@ -659,6 +689,8 @@ app_config_port(uint32_t vid, uint32_t control, uint32_t update)
 
         return;
     }
+
+    cfg_act_cache_fl_buf_sz(NIC_PCI, vid);
 
     /*
      * RX HOST --> TX WIRE

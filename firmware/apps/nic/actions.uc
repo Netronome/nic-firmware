@@ -77,14 +77,12 @@
 #endm
 
 
-#macro __actions_rx_wire(out_pkt_vec, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+#macro __actions_rx_wire(out_pkt_vec, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
 .begin
-    .reg mtu
     .reg tunnel_args
 
-    __actions_read(mtu, 0xffff)
-    __actions_read(tunnel_args)
-    pkt_io_rx_wire(out_pkt_vec, mtu, tunnel_args, DROP_MTU_LABEL, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+    __actions_read(tunnel_args, 0xffff)
+    pkt_io_rx_wire(out_pkt_vec, tunnel_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
     __actions_restore_t_idx()
 .end
 #endm
@@ -226,25 +224,20 @@ skip_l4#:
     pv_meta_push_type__sz1(in_pkt_vec, NFP_NET_META_HASH)
 
 skip_meta_type#:
-    // index into RSS table rows
     bitfield_extract__sz1(row_msk, BF_AML(args, INSTR_RSS_ROW_MASK_bf)) ; INSTR_RSS_ROW_MASK_bf
-    alu[--, BF_A(args, INSTR_RSS_ROW_SHIFT_bf), OR, 0]
+    alu[*l$index2++, BF_A(args, INSTR_RSS_COL_SHIFT_bf), B, hash]
+    alu[queue_shf, BF_A(args, INSTR_RSS_ROW_SHIFT_bf), B, hash, <<indirect]
     alu[rss_table_idx, row_msk, AND, hash, >>indirect]
     alu[rss_table_addr, rss_table_addr, +, rss_table_idx]
     local_csr_wr[NN_GET, rss_table_addr]
 
-    // index into RSS table column
-    bitfield_extract__sz1(col_msk, BF_AML(args, INSTR_RSS_COL_MASK_bf)) ; INSTR_RSS_COL_MASK_bf
-    alu[$metadata, BF_A(args, INSTR_RSS_COL_SHIFT_bf), B, hash]
-    alu[queue_shf, col_msk, AND, hash, <<indirect]
+    bits_set__sz1(BF_AL(in_pkt_vec, PV_TX_HOST_RX_RSS_bf), 1)
+    __actions_restore_t_idx()
     passert(BF_M(INSTR_RSS_QUEUE_MASK_bf), "EQ", 31)
     alu[queue_msk, queue_shf, B, BF_A(args, INSTR_RSS_QUEUE_MASK_bf), >>BF_L(INSTR_RSS_QUEUE_MASK_bf)]
     alu[queue, queue_msk, AND, *n$index, >>indirect]
     pv_set_queue_offset__sz1(in_pkt_vec, queue)
 
-    pv_meta_prepend(in_pkt_vec, $metadata, 4)
-
-    __actions_restore_t_idx()
 end#:
 .end
 #endm
@@ -266,7 +259,6 @@ end#:
     .reg remaining_words
     .reg shift
     .reg zero_padded
-    .reg write $metadata
 
     .sig sig_read
 
@@ -329,9 +321,7 @@ last_bits#:
 
 finalize#:
     alu[checksum, checksum, +carry, carries]
-    alu[$metadata, checksum, +carry, 0] // adding carries might cause another carry
-
-    pv_meta_prepend(in_pkt_vec, $metadata, 4)
+    alu[*l$index2++, checksum, +carry, 0] // adding carries might cause another carry
 
     __actions_restore_t_idx()
 
@@ -340,22 +330,21 @@ skip_checksum#:
 #endm
 
 
-#macro actions_load(io_pkt_vec, in_addr)
+#macro actions_load(in_act_addr)
 .begin
+    .reg pkt_vec_addr
     .sig sig_actions
 
     ov_start(OV_LENGTH)
     ov_set_use(OV_LENGTH, 16, OVF_SUBTRACT_ONE)
     ov_clean()
-    cls[read, $__actions[0], 0, in_addr, max_16], indirect_ref, defer[2], ctx_swap[sig_actions]
+    cls[read, $__actions[0], 0, in_act_addr, max_16], indirect_ref, defer[2], ctx_swap[sig_actions]
         .reg_addr __actions_t_idx 28 B
         alu[__actions_t_idx, t_idx_ctx, OR, &$__actions[0], <<2]
-        pv_set_ingress_queue__sz1(io_pkt_vec, in_addr, (NIC_MAX_INSTR * 4))
+        alu[pkt_vec_addr, (PV_META_BASE_wrd * 4), OR, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
 
-    local_csr_wr[T_INDEX, __actions_t_idx]
-    nop
-    nop
-    nop
+    pv_reset(pkt_vec_addr, in_act_addr, __actions_t_idx, (NIC_MAX_INSTR *4))
+
 .end
 #endm
 
@@ -364,7 +353,7 @@ skip_checksum#:
 .begin
     .reg ebpf_addr
     .reg jump_idx
-    .reg egress_q_base
+    .reg tx_args
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
@@ -398,14 +387,11 @@ error_mtu#:
 drop_mismatch#:
     pv_stats_update(io_pkt_vec, RX_DISCARD_ADDR, drop#)
 
-drop_mtu#:
-    pv_stats_update(io_pkt_vec, RX_DISCARD_MTU, drop#)
-
 drop_act#:
     pv_stats_update(io_pkt_vec, RX_DISCARD_ACT, drop#)
 
 rx_wire#:
-    __actions_rx_wire(io_pkt_vec, drop_mtu#, drop_proto#, error_parse#)
+    __actions_rx_wire(io_pkt_vec, drop_proto#, error_parse#)
     __actions_next()
 
 mac_match#:
@@ -421,16 +407,20 @@ checksum_complete#:
     __actions_next()
 
 tx_host#:
-    __actions_read(egress_q_base, 0xffff)
-    pkt_io_tx_host(io_pkt_vec, egress_q_base, EGRESS_LABEL)
+    __actions_read(tx_args, 0xffff)
+    pkt_io_tx_host(io_pkt_vec, tx_args, EGRESS_LABEL)
+    __actions_restore_t_idx()
+    __actions_next()
 
 rx_host#:
     __actions_rx_host(io_pkt_vec, error_mtu#, error_pci#)
     __actions_next()
 
 tx_wire#:
-    __actions_read(egress_q_base, 0xffff)
-    pkt_io_tx_wire(io_pkt_vec, egress_q_base, EGRESS_LABEL)
+    __actions_read(tx_args, 0xffff)
+    pkt_io_tx_wire(io_pkt_vec, tx_args, EGRESS_LABEL)
+    __actions_restore_t_idx()
+    __actions_next()
 
 cmsg#:
     cmsg_desc_workq($__pkt_io_gro_meta, io_pkt_vec, EGRESS_LABEL)

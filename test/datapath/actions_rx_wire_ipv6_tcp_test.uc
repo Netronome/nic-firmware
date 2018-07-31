@@ -1,6 +1,5 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x3ff
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0x0
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xdeadbeef
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x0
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xdeadbeef
 
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0x80  0x00000000 0x00000000 0x00154d12 0x2cc60000
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0x90  0x0b000300 0x86dd6030 0x00000014 0x06fffe80
@@ -8,6 +7,9 @@
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xb0  0x55556666 0x66667777 0x77778888 0x88880000
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xc0  0x00000000 0x00000000 0x00005000 0x00004aed
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0xd0  0x00006acf 0x14990000
+
+#define NFD_CFG_CLASS_VERSION   0
+#define NFD_CFG_CLASS_DEFAULT 0
 
 #include <pkt_io.uc>
 #include <single_ctx_test.uc>
@@ -34,10 +36,8 @@ move(addr, 0x200)
 
 #define pkt_vec *l$index1
 
-pv_init(pkt_vec, 0)
 
 //set up CATAMARAN vector
-move(__pkt_io_nfd_pkt_no, 0)
 
 move($nbi_desc[0], ((0x40<<BF_L(CAT_PKT_LEN_bf)) | 1<<BF_L(CAT_BLS_bf)))
 move($nbi_desc[1], 0)
@@ -57,7 +57,7 @@ immed[__actions_t_idx, (32 * 4)]
 nop
 nop
 
-__actions_rx_wire(pkt_vec, drop_mtu#, drop_proto#, error_parse#)
+__actions_rx_wire(pkt_vec, drop_proto#, error_parse#)
 
 bitfield_extract__sz1(protocol, BF_AML(pkt_vec, PV_PROTO_bf))
 
@@ -68,7 +68,6 @@ test_assert_equal(*$index, 0xdeadbeef)
 test_pass()
 
 error_parse#:
-drop_mtu#:
 drop_proto#:
 test_fail()
 
