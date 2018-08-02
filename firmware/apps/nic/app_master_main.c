@@ -50,21 +50,6 @@
 #include "app_mac_vlan_config_cmsg.h"
 #include "maps/cmsg_map_types.h"
 #include "nic_tables.h"
-
-/* from linux errno-base.h */
-#define	ENOSPC	28
-#define	EINVAL	22
-
-enum cfg_msg_err {
-    NO_ERROR = 0,
-
-    /* Note: Negative values are errors. */
-    MAC_VLAN_ADD_FAIL = ENOSPC,
-    MAC_VLAN_WRONG_VF = -2,
-
-    /* Note: Positive values are warnings. */
-    MAC_VLAN_DELETE_WARN = 1,
-};
 #include "trng.h"
 
 /*
@@ -115,8 +100,7 @@ enum cfg_msg_err {
 #define NUM_PFS_VFS (NFD_MAX_PFS + NFD_MAX_VFS)
 
 /* Current value of NFP_NET_CFG_CTRL (shared between all contexts) */
-__shared __lmem volatile uint32_t nic_control_word[NS_PLATFORM_NUM_PORTS +
-                                                   NFD_MAX_CTRL];
+__shared __lmem volatile uint32_t nic_control_word[NVNICS];
 
 
 /* Current state of the link state and the pending interrupts. */
@@ -156,6 +140,7 @@ __shared __lmem uint32_t vf_lsc_list[NS_PLATFORM_NUM_PORTS][LS_ARRAY_LEN];
 
 __visible SIGNAL nfd_cfg_sig_app_master0;
 NFD_CFG_BASE_DECLARE(0);
+NFD_VF_CFG_DECLARE(NIC_PCI)
 NFD_FLR_DECLARE;
 MSIX_DECLARE;
 
@@ -317,7 +302,7 @@ ct_reflect_data(unsigned int dst_me, unsigned int dst_ctx,
  * Also update the current link state for vf_vid and schedule an interrupt
  */
 static void
-update_vf_lsc_list(unsigned int port, uint32_t vf_vid, unsigned int mode)
+update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigned int mode)
 {
     unsigned int i;
     unsigned int sts_en;
@@ -329,6 +314,11 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, unsigned int mode)
     unsigned int orig_link_state = LS_READ(ls_current, vf_vid);
     unsigned int pf_link_state = LS_READ(ls_current, pf_vid);
     __mem char *cfg_bar = NFD_CFG_BAR_ISL(NIC_PCI, vf_vid);
+
+    if (control & NFP_NET_CFG_CTRL_ENABLE)
+        LS_SET(vs_current, vf_vid);
+    else
+	LS_CLEAR(vs_current, vf_vid);
 
     /* Enable notification on selected vf from port */
     if (mode == NFD_VF_CFG_CTRL_LINK_STATE_AUTO)
@@ -379,301 +369,8 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, unsigned int mode)
     }
 }
 
-/* MAC address building macros */
-#define VEB_KEY_MAC_HI_FROM_BAR(_hi)      (((_hi) >> 16) & 0xffff)
-#define VEB_KEY_MAC_LO_FROM_BAR(_hi, _lo) ((((_hi) << 16) & 0xffff0000) | (_lo))
-#define VEB_KEY_MAC_HI_FROM_SETUP(_mac64) (((_mac64) >> 48) & 0xffff)
-#define VEB_KEY_MAC_LO_FROM_SETUP(_mac64) ((((_mac64) >> 16) & 0xffff0000) |\
-                                             (_mac64 & 0xffff))
-#define MAC_SETUP_FROM_BAR(_hi, _lo)   (((uint64_t)_hi << 32) | ((_lo) & 0xffff))
 
-/**
- * Handle VF configuration changes (MAC and VLAN)
- * These changes are communicated via the VF config symbol _pfX_net_vf_cfgY
- *
- * Does not support changing MAC and VLAN during single config operation
- *
- * @param   pf_vid      The VNIC vid of the relevant PF
- * @param   pf_control  1st word in nfd mailbox cmd
- * @param   pf_update   2nd word in nfd mailbox cmd
- *
- * @return  Returns an error code for whether the operation was successful
- */
-void
-handle_sriov_update(uint32_t pf_vid, uint32_t pf_control, uint32_t pf_update)
-{
-    __xread struct sriov_mb sriov_mb_data;
-    __xread struct sriov_cfg sriov_cfg_data;
-    uint64_t new_mac_addr;
-    __xwrite uint64_t new_mac_addr_wr[NFD_VF_CFG_MAC_SZ];
-    __gpr struct nfp_vnic_setup_entry vnic_entry;
-    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
-    __xwrite struct nfp_vnic_setup_entry vnic_entry_wr;
-    __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
-    __shared __lmem struct nic_mac_vlan_key lkp_key;
-    __shared __lmem uint32_t sriov_act_list[NIC_MAC_VLAN_RESULT_SIZE_LW];
-    __xread struct nic_mac_vlan_entry entry_xr;
-    __xwrite enum cfg_msg_err err_code = NO_ERROR;
-    uint32_t vlan_id;
-
-
-    /*
-     * 1. Load the VF update info from the config mailbox and entry
-     */
-    mem_read32(&sriov_mb_data, vf_cfg_base, sizeof(struct sriov_mb));
-
-    mem_read32(&sriov_cfg_data, NFD_VF_CFG_ADDR(vf_cfg_base, sriov_mb_data.vf),
-               sizeof(struct sriov_cfg));
-
-    reg_zero(&lkp_key, sizeof(struct nic_mac_vlan_key));
-    reg_zero(sriov_act_list, sizeof(sriov_act_list));
-
-    /* input check: make sure the driver is not passing a bad
-     * request */
-    if (!NFD_VID_IS_VF(sriov_mb_data.vf)) {
-        err_code = EINVAL;
-        goto done;
-    }
-
-    /* Build SRIOV action list*/
-    app_config_sriov_port(NFD_VNIC2VID(NFD_VNIC_TYPE_VF,sriov_mb_data.vf),
-                          sriov_act_list, pf_control, pf_update);
-
-
-    /*
-     * 2. Check what has changed using the NFP_NET_CFG_SRIOV_UPDATE_FLAGS
-     *    (or as it called in the doc : NFP_NET_CFG_VF_CHANGE_BMSK).
-     *
-     *    We can have three types of changes - MAC, VLAN, Control flags
-     *    ( A,B,C below)
-     */
-    load_vnic_setup_entry(sriov_mb_data.vf, &vnic_entry_rd);
-    reg_cp(&vnic_entry, &vnic_entry_rd, sizeof(struct nfp_vnic_setup_entry));
-
-
-    /* Fail if trying to update MAC and VLAN at same time */
-    if ((sriov_mb_data.update_flags &
-         (NFD_VF_CFG_MB_CAP_MAC | NFD_VF_CFG_MB_CAP_VLAN)) ==
-        (NFD_VF_CFG_MB_CAP_MAC | NFD_VF_CFG_MB_CAP_VLAN)) {
-        err_code = EINVAL;
-        goto done;
-    }
-
-
-    /*    A. NFP_NET_CFG_SRIOV_UPDATE_MAC (MAC initialization or change)
-     *
-     *       Update the MAC+VLAN lookup table as needed,
-     *       then update the nic_vnic_setup_map_tbl table
-     */
-    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_MAC) {
-
-        new_mac_addr = MAC_SETUP_FROM_BAR(sriov_cfg_data.mac_hi,
-                                          sriov_cfg_data.mac_lo);
-
-        /* Fail if mac is 0, broadcast, or multicast */
-        if ((!sriov_cfg_data.mac_hi && !sriov_cfg_data.mac_lo) ||
-            (sriov_cfg_data.mac_hi == 0xffffffff &&
-             sriov_cfg_data.mac_lo == 0xffff ) ||
-            sriov_cfg_data.mac_hi & 0x01000000) {
-            err_code = MAC_VLAN_ADD_FAIL;
-            goto done;
-        }
-
-        /* If the mac has changed, or is being set for the 1st time... */
-        if ( vnic_entry_rd.src_mac != new_mac_addr ) {
-
-            lkp_key.mac_addr_hi =
-                VEB_KEY_MAC_HI_FROM_BAR(sriov_cfg_data.mac_hi);
-            lkp_key.mac_addr_lo =
-                VEB_KEY_MAC_LO_FROM_BAR(sriov_cfg_data.mac_hi,
-                                        sriov_cfg_data.mac_lo);
-
-            /* If a specific vlan is configured in nic_vnic_setup_map_tbl,
-             * add one entry to the MAC+VLAN lookup table using the MAC
-             * from the BAR and VLAN from the nic_vnic_setup_map_tbl entry.
-             */
-            if ( vnic_entry_rd.vlan != NIC_NO_VLAN_ID ) {
-
-                lkp_key.vlan_id = vnic_entry_rd.vlan;
-                if (nic_mac_vlan_entry_op_cmsg(&lkp_key, sriov_act_list,
-                                               CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL) {
-                    err_code = MAC_VLAN_ADD_FAIL;
-                    goto done;
-                }
-
-                /* If the mac was changed, delete the previous entry in the
-                 * MAC+VLAN lookup table using the original mac value and
-                 * the VLAN tag
-                 */
-                if (vnic_entry_rd.src_mac != 0) {
-                    lkp_key.mac_addr_hi =
-                        VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
-                    lkp_key.mac_addr_lo =
-                        VEB_KEY_MAC_LO_FROM_SETUP(vnic_entry_rd.src_mac);
-                    if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
-                          CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
-                        /* Issue a warning, but continue operation. */
-                        err_code = MAC_VLAN_DELETE_WARN;
-                    }
-                }
-            }
-
-            /* If no vlan is configured in nic_vnic_setup_map_tbl,
-             * add a new entry to the MAC+VLAN lookup table using the MAC
-             * from the BAR and every possible VLAN tag
-             */
-            else if ( vnic_entry_rd.vlan == NIC_NO_VLAN_ID ) {
-
-                for (vlan_id = 0; vlan_id <= 0xfff; vlan_id++ ) {
-                    lkp_key.vlan_id = vlan_id;
-                    if (nic_mac_vlan_entry_op_cmsg(&lkp_key, sriov_act_list,
-                              CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL) {
-                        err_code = MAC_VLAN_ADD_FAIL;
-                        goto done;
-                    }
-                }
-
-                /* If the mac was changed, delete the previous entries in the
-                   MAC+VLAN lookup table using the original mac value
-                */
-                if (vnic_entry_rd.src_mac != 0) {
-                    lkp_key.mac_addr_hi =
-                        VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
-                    lkp_key.mac_addr_lo =
-                        VEB_KEY_MAC_LO_FROM_SETUP(vnic_entry_rd.src_mac);
-                    for (vlan_id = 0; vlan_id <= 0xfff; vlan_id++ ) {
-                        lkp_key.vlan_id = vlan_id;
-                        if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
-                             CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
-                            /* Issue a warning, but continue operation. */
-                            err_code = MAC_VLAN_DELETE_WARN;
-                        }
-                    }
-                }
-            }
-
-            /* Update the nic_vnic_setup_map_tbl table */
-            vnic_entry.src_mac = new_mac_addr;
-
-            /* Write the MAC to the VF BAR so it is ready to use even
-             * without an FLR */
-            reg_cp(&new_mac_addr_wr, &sriov_cfg_data, sizeof(new_mac_addr_wr));
-            mem_write8(&new_mac_addr_wr,
-                       NFD_CFG_BAR_ISL(NIC_PCI, sriov_mb_data.vf) +
-                       NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
-
-        } /* mac changed or set for the 1st time */
-    }
-
-    /*    B. NFP_NET_CFG_SRIOV_UPDATE_VLAN (VLAN change)
-     *
-     *       Update the MAC+VLAN lookup table as needed,
-     *       then update the nic_vnic_setup_map_tbl table
-     */
-    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_VLAN) {
-
-        /* if vlan has changed... */
-        if ( sriov_cfg_data.vlan_id != vnic_entry_rd.vlan ) {
-
-            /* and if mac is already set... */
-            if (vnic_entry_rd.src_mac != 0) {
-
-                lkp_key.mac_addr_hi =
-                    VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
-                lkp_key.mac_addr_lo =
-                    VEB_KEY_MAC_LO_FROM_SETUP(vnic_entry_rd.src_mac);
-
-                /* If a specific vlan is being set, then add one entry
-                 * to the MAC+VLAN lookup table using the MAC from the
-                 * nic_vlan_setup_map_tbl entry and the VLAN from the BAR
-                 */
-                if ( sriov_cfg_data.vlan_id != NIC_NO_VLAN_ID ) {
-                    /* Add a new entry */
-                    lkp_key.vlan_id = sriov_cfg_data.vlan_id;
-                    if (nic_mac_vlan_entry_op_cmsg(&lkp_key, sriov_act_list,
-                                 CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL) {
-                        err_code = MAC_VLAN_ADD_FAIL;
-                        goto done;
-                    }
-
-                /* If no VLAN is being configured (i.e NIC_NO_VLAN_ID), then
-                 * add one entry to the MAC+VLAN lookup table using the MAC
-                 * from the nic_vlan_setup_map_tbl entry and all 4K possible
-                 * VLAN tags
-                 */
-                } else {
-                    for (vlan_id = 0; vlan_id <= 0xfff; vlan_id++ ) {
-                        lkp_key.vlan_id = vlan_id;
-                        if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
-                            CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
-                            /* Issue a warning, but continue operation. */
-                            err_code = MAC_VLAN_DELETE_WARN;
-                        }
-                    }
-                }
-
-                /* If a specific vlan was set previously, delete entry */
-                if ( vnic_entry_rd.vlan != NIC_NO_VLAN_ID ) {
-                    lkp_key.vlan_id = vnic_entry_rd.vlan;
-                    if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
-                           CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
-                        /* Return a warning, but continue operation. */
-                        err_code = MAC_VLAN_DELETE_WARN;
-                    }
-
-                /* otherwise, remove all 4K entries that were previously set */
-                } else {
-                    for (vlan_id = 0; vlan_id <= 0xfff; vlan_id++ ) {
-                        if ( vlan_id == sriov_cfg_data.vlan_id )
-                            continue;
-                        lkp_key.vlan_id = vlan_id;
-                        if (nic_mac_vlan_entry_op_cmsg(&lkp_key, 0,
-                             CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL) {
-                            /* Return a warning, but continue operation. */
-                            err_code = MAC_VLAN_DELETE_WARN;
-                        }
-                    }
-                }
-
-            } /* Mac was already set.
-               *
-               * If mac was not already set, can't update the lookup table.
-               * However, still allow the nic_vnic_setup_map_tbl entry to
-               * be updated with the new vlan tag so it will be set when
-               * the mac is set.
-               */
-
-            vnic_entry.vlan = sriov_cfg_data.vlan_id;
-
-        } /* vlan was changed */
-    }
-
-    /*    C. NFP_NET_CFG_SRIOV_UPDATE_CTRL_FLAGS (control flags change)
-     *       Read the NFP_NET_CFG_SRIOV_CTRL_FLAGS byte from the BAR
-     *       Update the nic_vnic_setup_map_tbl entry with the values there
-     *       (those are Spoof enable bit and link state modes bits)
-     */
-    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_SPOOF) {
-        vnic_entry.spoof_chk = sriov_cfg_data.ctrl_spoof;
-    }
-
-    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_LINK_STATE) {
-        vnic_entry.link_state_mode = sriov_cfg_data.ctrl_link_state;
-
-        /* Update the list of VFs to be notified of link state changes. */
-        update_vf_lsc_list(NFD_VID2PF(pf_vid), sriov_mb_data.vf,
-                                          vnic_entry.link_state_mode);
-    }
-
-    reg_cp(&vnic_entry_wr, &vnic_entry, sizeof(struct nfp_vnic_setup_entry));
-    write_vnic_setup_entry(sriov_mb_data.vf, &vnic_entry_wr);
-
-
-done:
-    mem_write8_le(&err_code,
-                  (__mem void*)(vf_cfg_base + NFD_VF_CFG_MB_RET_ofs),
-                  2);
-}
+__cls __align(4) struct ctm_pkt_credits pkt_buf_ctm_credits;
 
 
 __inline static void
@@ -784,6 +481,58 @@ mac_port_disable_tx_flush(unsigned int mac, unsigned int mac_core,
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
 
+__intrinsic uint32_t veb_up_check()
+{
+    uint32_t vid;
+
+    for (vid = 0; vid < NVNICS; vid++) {
+        if (NFD_VID_IS_VF(vid) && (nic_control_word[vid] & NFP_NET_CFG_CTRL_ENABLE))
+            return 1;
+    }
+    return 0;
+}
+
+__intrinsic void
+handle_sriov_update()
+{
+    __xread struct sriov_mb sriov_mb_data;
+    __xread struct sriov_cfg sriov_cfg_data;
+    __gpr struct nfp_vnic_setup_entry vnic_entry;
+    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
+    __xwrite struct nfp_vnic_setup_entry vnic_entry_wr;
+    __xwrite uint64_t new_mac_addr_wr;
+    __xwrite int err_code = 0;
+    __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
+
+    mem_read32(&sriov_mb_data, vf_cfg_base, sizeof(struct sriov_mb));
+
+    mem_read32(&sriov_cfg_data, NFD_VF_CFG_ADDR(vf_cfg_base, sriov_mb_data.vf),
+               sizeof(struct sriov_cfg));
+
+    reg_cp(&new_mac_addr_wr, &sriov_cfg_data, sizeof(new_mac_addr_wr));
+    mem_write8(&new_mac_addr_wr, NFD_CFG_BAR_ISL(NIC_PCI, sriov_mb_data.vf) +
+               NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
+
+    load_vnic_setup_entry(NFD_VF2VID(sriov_mb_data.vf), &vnic_entry_rd);
+    reg_cp(&vnic_entry, &vnic_entry_rd, sizeof(struct nfp_vnic_setup_entry));
+    vnic_entry.src_mac = MAC64_FROM_SRIOV_CFG(sriov_cfg_data);
+    add_vlan_member(vnic_entry.vlan, NFD_VF2VID(sriov_mb_data.vf));
+
+    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_SPOOF) {
+        vnic_entry.spoof_chk = sriov_cfg_data.ctrl_spoof;
+    }
+
+    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_LINK_STATE) {
+        vnic_entry.link_state_mode = sriov_cfg_data.ctrl_link_state;
+    }
+
+    reg_cp(&vnic_entry_wr, &vnic_entry, sizeof(struct nfp_vnic_setup_entry));
+    write_vnic_setup_entry(NFD_VF2VID(sriov_mb_data.vf), &vnic_entry_wr);
+
+    mem_write8_le(&err_code,
+		  (__mem void*) (vf_cfg_base + NFD_VF_CFG_MB_RET_ofs), 2);
+}
+
 
 static void
 cfg_changes_loop(void)
@@ -795,8 +544,13 @@ cfg_changes_loop(void)
     uint32_t vid, type, vnic, port;
     uint32_t update;
     uint32_t control;
+    unsigned int ls_mode;
     __gpr uint32_t ctx_mode = 1;
     __emem __addr40 uint8_t *bar_base;
+    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
+    __xwrite unsigned int link_state;
+    action_list_t acts;
+    uint32_t veb_up;
 
     /* Initialisation */
     MSIX_INIT_ISL(NIC_PCI);
@@ -815,11 +569,12 @@ cfg_changes_loop(void)
     upd_slicc_hash_table();
 
     for (;;) {
+	cfg_msg.error = 0;
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
 
-        if (cfg_msg.msg_valid) {
-
+        if (cfg_msg.msg_valid && !cfg_msg.error) {
             vid = cfg_msg.vid;
+            veb_up = veb_up_check();
             /* read in the first 64bit of the Control BAR */
             mem_read64(cfg_bar_data, NFD_CFG_BAR_ISL(NIC_PCI, vid),
                        sizeof cfg_bar_data);
@@ -830,11 +585,8 @@ cfg_changes_loop(void)
             NFD_VID2VNIC(type, vnic, vid);
 
             if (type == NFD_VNIC_TYPE_CTRL) {
-                /* For now just set the link on. */
-                /* TODO figure out what else is required */
-                __xwrite unsigned int link_state;
-
-                nic_control_word[vid] = control;
+		cfg_act_build_ctrl(&acts, NIC_PCI, vid);
+                cfg_act_write_host(NIC_PCI, vid, &acts);
 
                 /* Set link state */
                 if (!cfg_msg.error &&
@@ -843,9 +595,6 @@ cfg_changes_loop(void)
                 } else {
                     link_state = 0;
                 }
-	        app_config_port(vid, control, update);	/* write cmsg instr */
-    		upd_slicc_hash_table();
-
                 mem_write32(&link_state,
                             (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg.vid) +
                              NFP_NET_CFG_STS),
@@ -858,70 +607,106 @@ cfg_changes_loop(void)
                 }
 
                 if (control & NFP_NET_CFG_CTRL_ENABLE) {
-                    app_config_port(vid, control, update);
+		    if (cfg_act_pf_up(NIC_PCI, vid, veb_up, control, update)) {
+		        cfg_msg.error = 1;
+			goto error;
+		    }
                     nic_local_epoch();
                 }
 
                 /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
                 if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
                     if (control & NFP_NET_CFG_CTRL_ENABLE) {
-			mac_port_enable_tx(port);
+                        mac_port_enable_tx(port);
 
                         /* Wait for config to stabilize */
                         sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
 
                         mac_port_enable_rx(port);
-                    } else {
-			__xread struct nfp_nbi_tm_queue_status tmq_status;
-			int i, queue, occupied = 1;
 
-			/* stop receiving packets */
+		        for (i = 0; i < NVNICS; i++) {
+                            if (NFD_VID_IS_VF(i) &&
+			        (nic_control_word[i] & NFP_NET_CFG_CTRL_ENABLE))
+				cfg_act_vf_up(NIC_PCI, i, control,
+			  		      nic_control_word[i], 0);
+                        }
+                    } else {
+                        __xread struct nfp_nbi_tm_queue_status tmq_status;
+                        int i, queue, occupied = 1;
+
+                        /* stop receiving packets */
                         mac_port_disable_rx(port);
 
-			/* allow workers to drain RX queue */
-			sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
+                        /* allow workers to drain RX queue */
+                        sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
 
-			/* stop processing packets: drop action */
-                        app_config_port_down(vid);
+                        /* stop processing packets: drop action */
+			cfg_act_pf_down(NIC_PCI, vid);
+
                         nic_local_epoch();
 
-			/* wait for TM queues to drain */
-			for (i = 0; occupied && i < TMQ_DRAIN_RETRIES; ++i) {
-				occupied = 0;
-				for (queue = NS_PLATFORM_NBI_TM_QID_LO(port);
-				     queue <= NS_PLATFORM_NBI_TM_QID_HI(port);
-				     queue++) {
-					tmq_status_read(&tmq_status,
-							NS_PLATFORM_MAC(port),
-							queue, 1);
-					if (tmq_status.queuelevel) {
-						occupied = 1;
-						break;
-					}
-				}
-				sleep(NS_PLATFORM_TCLK * 1000); // 1ms
-			}
+                        /* wait for TM queues to drain */
+                        for (i = 0; occupied && i < TMQ_DRAIN_RETRIES; ++i) {
+                            occupied = 0;
+                            for (queue = NS_PLATFORM_NBI_TM_QID_LO(port);
+                                queue <= NS_PLATFORM_NBI_TM_QID_HI(port);
+                                queue++) {
+                                tmq_status_read(&tmq_status,
+                                    NS_PLATFORM_MAC(port),
+                                    queue, 1);
+                                if (tmq_status.queuelevel) {
+                                    occupied = 1;
+                                    break;
+                                }
+                            }
+                            sleep(NS_PLATFORM_TCLK * 1000); // 1ms
+                        }
 
-			mac_port_disable_tx(port);
+                        mac_port_disable_tx(port);
 
-			/* give Arbitrator ME time to react */
-			sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
+                        /* give Arbitrator ME time to react */
+                        sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
                     }
                 }
 
-                /* Save the control word */
-                nic_control_word[vid] = control;
-            } else {
-                    /* This is an error, VFs aren't supported yet */
+                /* Handle SR-IOV setup changes */
+                if (update & NFP_NET_CFG_UPDATE_VF) {
+	            handle_sriov_update();
+                }
+            } else if (type == NFD_VNIC_TYPE_VF) {
+                /* Set the link state handling control */
+                if (control & NFP_NET_CFG_CTRL_ENABLE) {
+                    /* Retrieve the link state mode for the VF. */
+                    load_vnic_setup_entry(vid, &vnic_entry_rd);
+                    ls_mode = vnic_entry_rd.link_state_mode;
+                } else {
+                    /* Disable the link when interface is disabled. */
+                    ls_mode = NFD_VF_CFG_CTRL_LINK_STATE_DISABLE;
+                }
+                update_vf_lsc_list(0, vid, control, ls_mode);
+
+
+                if ((nic_control_word[NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE) &&
+		    (control & NFP_NET_CFG_CTRL_ENABLE)) {
+
+		    if (cfg_act_vf_up(NIC_PCI, vid, nic_control_word[NFD_PF2VID(0)],
+				      control, update)) {
+		        cfg_msg.error = 1;
+			goto error;
+		    }
+                } else if ((control & NFP_NET_CFG_CTRL_ENABLE) == 0)
+		    cfg_act_vf_down(NIC_PCI, vid);
+
             }
 
-            /* Complete the message */
-            cfg_msg.msg_valid = 0;
-            nfd_cfg_app_complete_cfg_msg(NIC_PCI, &cfg_msg,
+            nic_control_word[cfg_msg.vid] = control;
+error:
+	    /* Complete the message */
+	    cfg_msg.msg_valid = 0;
+	    nfd_cfg_app_complete_cfg_msg(NIC_PCI, &cfg_msg,
                                          NFD_CFG_BASE_LINK(NIC_PCI),
                                          &nfd_cfg_sig_app_master0);
-        }
-
+	}
         ctx_swap();
     }
     /* NOTREACHED */

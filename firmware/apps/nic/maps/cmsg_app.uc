@@ -19,6 +19,7 @@
 #define CMSG_MAP_PROC 1
 #include "hashmap.uc"
 #include "cmsg_map.uc"
+#include "app_mac_vlan_config_cmsg.h"
 hashmap_init()
 cmsg_init()
 
@@ -52,6 +53,10 @@ cmsg_init()
     local_csr_rd[ACTIVE_CTX_STS]
     immed[my_act_ctx, 0]
     alu[my_act_ctx, my_act_ctx, and, 7]
+
+    .if (ctx() == 0)
+	        hashmap_alloc_fd(SRIOV_TID, 8, 32, NIC_MAC_VLAN_TABLE__NUM_ENTRIES, --, swap, BPF_MAP_TYPE_HASH)
+    .endif
 
 main_loop#:
 	ctx_sig_next()

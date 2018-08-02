@@ -1,4 +1,5 @@
 #include <nfd_tlv.uc>
+#include <nfd_user_cfg.h>
 
 #define _PCI 0
 
