@@ -558,7 +558,7 @@ skip_checksum#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#, ins_12#]
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#, ins_12#, ins_13#, ins_14#]
 
     ins_0#: br[drop_act#]
     ins_1#: br[rx_wire#]
@@ -573,6 +573,8 @@ next#:
     ins_10#: br[pop_vlan#]
     ins_11#: br[push_vlan#]
     ins_12#: br[veb_lookup#]
+    ins_13#: br[pkt_pop#]
+    ins_14#: br[pkt_push#]
 
 drop_proto#:
     // invalid protocols have no sequencer, must not go to reorder
@@ -587,6 +589,9 @@ error_pci#:
 
 error_mtu#:
     pv_stats_update(io_pkt_vec, TX_ERROR_MTU, drop#)
+
+error_pkt_stack#:
+    pv_stats_update(io_pkt_vec, ERROR_PKT_STACK, drop#)
 
 drop_mismatch#:
     pv_stats_update(io_pkt_vec, RX_DISCARD_ADDR, drop#)
@@ -636,6 +641,17 @@ push_vlan#:
 
 veb_lookup#:
     __actions_veb_lookup(io_pkt_vec, drop#)
+    __actions_next()
+
+pkt_pop#:
+    __actions_read()
+    pv_pop(io_pkt_vec, error_pkt_stack#)
+    __actions_next()
+
+pkt_push#:
+    __actions_read()
+    pv_push(io_pkt_vec, error_pkt_stack#)
+    __actions_restore_t_idx()
     __actions_next()
 
 cmsg#:

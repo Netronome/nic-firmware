@@ -285,4 +285,59 @@ retry_dma#:
 .end
 #endm
 
+/** pkt_buf_copy_ctm_to_mu_head
+ *
+ * Copy packet head from CTM to MU
+ *
+ * @param in_pkt_num       Packet number for source CTM buffer
+ * @param in_dst_mu_addr   29 bit MU pointer (the >>11 of a 2K aligned 40-bit address)
+ *                         (the most significant 3 bits are ignored by this macro, garbage is permitted)
+ * @param in_offset        11 bit offset within packet buffer to copy from
+ *                         (garbage is permitted above the 11th bit, this macro will mask the bits it needs)
+ */
+#macro pkt_buf_copy_ctm_to_mu_head(in_pkt_num, in_dst_mu_addr, in_offset)
+.begin
+    .reg mu_addr_hi
+    .reg mu_addr_lo
+    .reg offset
+
+    .sig sig_dma
+
+#if (WORKERS_PER_ISLAND > 4)
+retry_dma#:
+    alu[@dma_semaphore, @dma_semaphore, -, 1]
+    bmi[yield_retry_dma#]
+#endif
+
+    alu[offset, 0xff, AND, in_offset, >>3]
+    alu[mu_addr_hi, 0x1f, AND, in_dst_mu_addr, >>24]
+    alu[mu_addr_lo, offset, OR, in_dst_mu_addr, <<8]
+
+    ov_start((OV_BYTE_MASK | OV_IMMED16 | OV_LENGTH))
+    ov_set(OV_BYTE_MASK, offset)
+    ov_set(OV_LENGTH, mu_addr_hi)
+    ov_set_use(OV_IMMED16, in_pkt_num)
+    ov_clean()
+
+#if (WORKERS_PER_ISLAND > 4)
+    mem[pe_dma_to_memory_packet, --, mu_addr_lo, 0, <<8, 1], indirect_ref, sig_done[sig_dma]
+    ctx_arb[sig_dma], br[release_semaphore#]
+
+yield_retry_dma#:
+    ctx_arb[voluntary], br[retry_dma#], defer[2]
+        alu[@dma_semaphore, @dma_semaphore, +, 1]
+        nop
+#else
+    mem[pe_dma_to_memory_packet, --, mu_addr_lo, 0, <<8, 1], indirect_ref, ctx_swap[sig_dma]
+#endif
+
+#if (WORKERS_PER_ISLAND > 4)
+release_semaphore#:
+    alu[@dma_semaphore, @dma_semaphore, +, 1]
+#endif
+
+.end
+#endm
+
+
 #endif
