@@ -1,4 +1,4 @@
-Package: agilio-__FW_NAME__-firmware
+Package: __FW_NAME__
 Version: __VERSION__
 Architecture: all
 Maintainer: Edwin Peer <edwin.peer@netronome.com>
