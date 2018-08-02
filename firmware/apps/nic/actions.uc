@@ -558,7 +558,7 @@ skip_checksum#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#, ins_12#, ins_13#, ins_14#]
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#, ins_12#, ins_13#, ins_14#, ins_15#]
 
     ins_0#: br[drop_act#]
     ins_1#: br[rx_wire#]
@@ -575,6 +575,7 @@ next#:
     ins_12#: br[veb_lookup#]
     ins_13#: br[pkt_pop#]
     ins_14#: br[pkt_push#]
+    ins_15#: br[tx_vlan#]
 
 drop_proto#:
     // invalid protocols have no sequencer, must not go to reorder
@@ -653,6 +654,10 @@ pkt_push#:
     pv_push(io_pkt_vec, error_pkt_stack#)
     __actions_restore_t_idx()
     __actions_next()
+
+tx_vlan#:
+    __actions_read()
+    pkt_io_tx_vlan(io_pkt_vec, EGRESS_LABEL)
 
 cmsg#:
     cmsg_desc_workq($__pkt_io_gro_meta, io_pkt_vec, EGRESS_LABEL)

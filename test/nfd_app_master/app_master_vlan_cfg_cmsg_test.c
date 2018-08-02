@@ -85,7 +85,6 @@ void main() {
             oper = CMSG_TYPE_MAP_DELETE;
 
         reg_zero(&lkp_key, sizeof(struct nic_mac_vlan_key));
-        lkp_key.s_not_c = 0;
         lkp_key.vlan_id = vlan;
         lkp_key.mac_addr_hi = mac_hi;
         lkp_key.mac_addr_lo = mac_lo;

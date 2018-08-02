@@ -45,9 +45,8 @@
     struct nic_mac_vlan_key {
         union {
             struct {
-                unsigned int __unused : 3;
-                unsigned int s_not_c  : 1;  /**< VLAN tag is S-VLAN */
                 unsigned int vlan_id  : 12; /**< VLAN ID */
+                unsigned int __unused : 4;
                 uint16_t mac_addr_hi;       /**< Upper 2 bytes of MAC address */
                 uint32_t mac_addr_lo;       /**< Lower 4 bytes of MAC address */
             };
