@@ -330,6 +330,113 @@ skip_checksum#:
 #endm
 
 
+#macro __actions_pop_vlan(io_pkt_vec)
+.begin
+    .reg msk
+    .reg addr_hi
+    .reg addr_lo
+    .reg offsets
+    .reg stack
+    .reg write $mac[3]
+    .xfer_order $mac
+    .sig sig_write
+    .sig sig_read
+
+    __actions_read()
+
+    pv_get_base_addr(addr_hi, addr_lo, io_pkt_vec)
+    mem[read32, $__pv_pkt_data[0], addr_hi, <<8, addr_lo, 3], ctx_swap[sig_read], defer[2]
+        alu[addr_lo, addr_lo, +, 4]
+	    pv_invalidate_cache(io_pkt_vec)
+
+    alu[$mac[0], --, B, $__pv_pkt_data[0]]
+    alu[$mac[1], --, B, $__pv_pkt_data[1]]
+    alu[$mac[2], --, B, $__pv_pkt_data[2]]
+
+    mem[write32, $mac[0], addr_hi, <<8, addr_lo, 3], ctx_swap[sig_write], defer[2]
+        alu[BF_A(io_pkt_vec, PV_LENGTH_bf), BF_A(io_pkt_vec, PV_LENGTH_bf), -, 4]
+        alu[BF_A(io_pkt_vec, PV_OFFSET_bf), BF_A(io_pkt_vec, PV_OFFSET_bf), +, 4]
+
+    __actions_restore_t_idx()
+
+    // subtract 4 from each non-zero offset
+    alu[msk, --, B, 0xff, <<24]
+    alu[--, BF_A(io_pkt_vec, PV_HEADER_STACK_bf), +, msk]
+    alu[stack, BF_A(io_pkt_vec, PV_HEADER_STACK_bf), AND~, msk], no_cc
+    alu[msk, --, B, msk, >>8], no_cc
+    alu[stack, stack, +, msk], no_cc
+    alu[stack, stack, AND~, msk], no_cc
+    alu[msk, --, B, msk, >>8], no_cc
+    alu[stack, stack, +, msk], no_cc
+    alu[stack, stack, AND~, msk], no_cc
+    alu[stack, stack, +, 0xff], no_cc
+    alu[stack, stack, AND~, 0xff], no_cc
+    alu[stack, stack, +carry, 0]
+    alu[stack, --, B, stack, >>rot6]
+    alu[BF_A(io_pkt_vec, PV_HEADER_STACK_bf), BF_A(io_pkt_vec, PV_HEADER_STACK_bf), -, stack]
+
+    immed[msk, NULL_VLAN]
+    bits_set__sz1(BF_AL(io_pkt_vec, PV_VLAN_ID_bf), msk) ; PV_VLAN_ID_bf
+
+.end
+#endm
+
+
+#macro __actions_push_vlan(io_pkt_vec)
+.begin
+    .reg msk
+    .reg addr_hi
+    .reg addr_lo
+    .reg offsets
+    .reg stack
+    .reg vlan_id
+    .reg write $mac[4]
+    .xfer_order $mac
+    .sig sig_write
+    .sig sig_read
+
+    __actions_read(vlan_id, 0xffff)
+
+    pv_get_base_addr(addr_hi, addr_lo, io_pkt_vec)
+    mem[read32, $__pv_pkt_data[0], addr_hi, <<8, addr_lo, 3], ctx_swap[sig_read], defer[2]
+        alu[addr_lo, addr_lo, -, 4]
+	    pv_invalidate_cache(io_pkt_vec)
+
+    alu[$mac[0], --, B, $__pv_pkt_data[0]]
+    alu[$mac[1], --, B, $__pv_pkt_data[1]]
+    alu[$mac[2], --, B, $__pv_pkt_data[2]]
+    alu[$mac[3], vlan_id, or, 0x81, <<24]
+
+    mem[write32, $mac[0], addr_hi, <<8, addr_lo, 4], ctx_swap[sig_write], defer[2]
+        alu[BF_A(io_pkt_vec, PV_LENGTH_bf), BF_A(io_pkt_vec, PV_LENGTH_bf), +, 4]
+        alu[BF_A(io_pkt_vec, PV_OFFSET_bf), BF_A(io_pkt_vec, PV_OFFSET_bf), -, 4]
+
+    __actions_restore_t_idx()
+
+    // Add 4 to each non-zero offset
+    alu[msk, --, B, 0xff, <<24]
+    alu[--, BF_A(io_pkt_vec, PV_HEADER_STACK_bf), +, msk]
+    alu[stack, BF_A(io_pkt_vec, PV_HEADER_STACK_bf), AND~, msk], no_cc
+    alu[msk, --, B, msk, >>8], no_cc
+    alu[stack, stack, +, msk], no_cc
+    alu[stack, stack, AND~, msk], no_cc
+    alu[msk, --, B, msk, >>8], no_cc
+    alu[stack, stack, +, msk], no_cc
+    alu[stack, stack, AND~, msk], no_cc
+    alu[stack, stack, +, 0xff], no_cc
+    alu[stack, stack, AND~, 0xff], no_cc
+    alu[stack, stack, +carry, 0]
+    alu[stack, --, B, stack, >>rot6]
+    alu[BF_A(io_pkt_vec, PV_HEADER_STACK_bf), BF_A(io_pkt_vec, PV_HEADER_STACK_bf), +, stack]
+
+    immed[msk, NULL_VLAN]
+    bits_clr__sz1(BF_AL(io_pkt_vec, PV_VLAN_ID_bf), msk) ; PV_VLAN_ID_bf
+    bits_set__sz1(BF_AL(io_pkt_vec, PV_VLAN_ID_bf), vlan_id) ; PV_VLAN_ID_bf
+
+.end
+#endm
+
+
 #macro actions_load(in_act_addr)
 .begin
     .reg pkt_vec_addr
@@ -357,7 +464,7 @@ skip_checksum#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#]
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#]
 
     ins_0#: br[drop_act#]
     ins_1#: br[rx_wire#]
@@ -369,6 +476,8 @@ next#:
     ins_7#: br[tx_wire#]
     ins_8#: br[cmsg#]
     ins_9#: br[ebpf#]
+    ins_10#: br[pop_vlan#]
+    ins_11#: br[push_vlan#]
 
 drop_proto#:
     // invalid protocols have no sequencer, must not go to reorder
@@ -420,6 +529,14 @@ tx_wire#:
     __actions_read(tx_args, 0xffff)
     pkt_io_tx_wire(io_pkt_vec, tx_args, EGRESS_LABEL)
     __actions_restore_t_idx()
+    __actions_next()
+
+pop_vlan#:
+    __actions_pop_vlan(io_pkt_vec)
+    __actions_next()
+
+push_vlan#:
+    __actions_push_vlan(io_pkt_vec)
     __actions_next()
 
 cmsg#:
