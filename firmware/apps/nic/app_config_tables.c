@@ -816,26 +816,18 @@ app_config_sriov_port(uint32_t vid, __lmem uint32_t *action_list,
 
     if (NFD_VID_IS_VF(vid)){
         /* DestVNIC is a VF
-        *      RX_VEB
         *      Strip VLAN (No RSS)
         *      CSUM
         *      Translate (DestVNIC, RSS_Q=0) to NFD Natural Q number (use NATQ)
         *      TX HOST
         */
 
-	/* rx veb */
-	instr[count].instr = INSTR_RX_VEB;
-        /*  add eth hdrlen + 1 to cause borrow on subtract of MTU from pktlen */
-        instr[count].param = mtu + NET_ETH_LEN + 1;
-        instr[count++].pipeline = 0;
-        prev_instr = INSTR_RX_VEB;
-
         /* strip VLAN */
         if ( (load_vnic_setup_entry(vid, &entry) == 0 )
              && (entry.vlan != NIC_NO_VLAN_ID )) {
-            instr[count].instr = INSTR_STRIP_VLAN;
+            instr[count].instr = INSTR_POP_VLAN;
             instr[count].pipeline = 0;
-            prev_instr = INSTR_STRIP_VLAN;
+            prev_instr = INSTR_POP_VLAN;
             count++;
         }
 
@@ -853,19 +845,11 @@ app_config_sriov_port(uint32_t vid, __lmem uint32_t *action_list,
 
     } else {
         /* Dest VNIC is a PF
-         *      RX_VEB
          *      BPF
          *      RSS
          *      CSUM
          *      TX HOST
          */
-
-	/* rx veb */
-	instr[count].instr = INSTR_RX_VEB;
-        /*  add eth hdrlen + 1 to cause borrow on subtract of MTU from pktlen */
-        instr[count].param = mtu + NET_ETH_LEN + 1;
-        instr[count++].pipeline = 0;
-        prev_instr = INSTR_RX_VEB;
 
 	/* BPF, RSS, CSUM Complete, TX Host */
         app_config_pf_common(vid, instr, &count, control, update);

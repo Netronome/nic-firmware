@@ -231,15 +231,13 @@ void main() {
                 mem_read32(&actions_xfr, emem_ptr, sizeof(actions_xfr));
 
                 reg_zero(actions_exp, sizeof(actions_exp));
-                actions_exp[0].instr = INSTR_RX_VEB;
-                actions_exp[0].param = mtu + NET_ETH_LEN + 1;
-                actions_exp[1].instr = INSTR_STRIP_VLAN;
-                actions_exp[1].pipeline = 0;
-                actions_exp[2].instr = INSTR_TX_HOST;
-                actions_exp[2].param = NFD_VID2QID(pf_vid, 0);
-                actions_exp[2].pipeline =
-                    SET_PIPELINE_BIT(INSTR_STRIP_VLAN, INSTR_TX_HOST);
-                actions_exp[3].value = 0;
+                actions_exp[0].instr = INSTR_POP_VLAN;
+                actions_exp[0].pipeline = 0;
+                actions_exp[1].instr = INSTR_TX_HOST;
+                actions_exp[1].param = NFD_VID2QID(pf_vid, 0);
+                actions_exp[1].pipeline =
+                    SET_PIPELINE_BIT(INSTR_POP_VLAN, INSTR_TX_HOST);
+                actions_exp[2].value = 0;
 
                 for (i = 0; i < sizeof(actions_exp) / sizeof(uint32_t); i++)
                     test_assert_equal(actions_xfr[i].value,
