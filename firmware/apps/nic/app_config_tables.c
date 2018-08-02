@@ -35,6 +35,81 @@
 #include "ebpf.h"
 #include "nic_tables.h"
 
+
+/*
+    RXB tables (in CTM)
+
+    Per host queue, FL_BUF_SZ from config BAR
+
+    VLAN Member Tables (in CTM)
+
+    58 bit bitmask of (up/enabled) host queue members per VLAN + 6 bit MIN RXB over members
+    TX_VLAN strips VLAN
+
+
+    ** ACTION LISTS **
+    No VFs
+
+    Wire -> PF
+    RX_WIRE -> MAC_MATCH -> CHECKSUM(C) -> BPF -> RSS -> TX_HOST(PF)
+
+    Wire -> PF (promisc)
+    RX_WIRE -> CHECKSUM(C) -> BPF -> RSS -> TX_HOST(PF)
+
+    Host -> Wire
+    RX_HOST -> CHECKSUM(I) -> TX_WIRE
+
+    Wire -> Host (SR-IOV)
+
+    Wire->PF
+    RX_WIRE -> VEB_LOOKUP -miss-> CHECKSUM(O,I,C) -> BPF -> RSS -> TX_HOST(PF,M=1) -multicast-> PUSH_PKT -> TX_VLAN
+
+    Wire->VF (VLAN=0xfff)
+    RX_WIRE -> VEB_LOOKUP -hit-> [CHECKSUM(O,I,C) -> TX_HOST(VF)]
+
+    Wire->VF (VLAN=0x5)
+    RX_WIRE -> VEB_LOOKUP -hit-> [CHECKSUM(O,I,C) -> DELETE(12,4) -> TX_HOST(VF)]
+
+    Wire->VF (Promisc/VLAN=0xfff)
+    RX_WIRE -> VEB_LOOKUP -hit-> [CHECKSUM(O,I,C) -> TX_HOST(VF,C=1) -> BPF -> RSS -> TX_HOST(PF)]
+
+    Wire->VF (Promisc/VLAN=0x5)
+    RX_WIRE -> VEB_LOOKUP -hit-> [CHECKSUM(O,I,C) -> PUSH_PKT -> DELETE(12,4) -> TX_HOST(VF,C=1) -> POP_PKT -> BPF -> RSS -> TX_HOST(PF)]
+
+
+    Host -> Wire/Host (SR-IOV)
+
+    VF->Wire (VLAN=0xfff)
+    RX_HOST -> VEB_LOOKUP -miss-> CHECKSUM(I) -> TX_WIRE(M=1) -multicast-> CHECKSUM(O) -> TX_HOST(PF,C=1) -> PUSH_PKT -> TX_VLAN
+
+    VF->Wire (VLAN=0xfff, Promisc)
+    RX_HOST -> VEB_LOOKUP -miss-> CHECKSUM(O,I) -> TX_WIRE(C=1) -> TX_HOST(PF, M=1) -multicast-> PUSH_PKT -> TX_VLAN
+
+    VF->Wire (Vlan=0x5)
+    RX_HOST -> INSERT(12,4,0x81000005) -> VEB_LOOKUP -miss-> CHECKSUM(I) -> TX_WIRE(M=1) -multicast-> CHECKSUM(O) -> TX_HOST(PF,C=1) -> PUSH_PKT -> TX_VLAN
+,
+    VF->Wire (Vlan=0x5, Promisc)
+    RX_HOST -> INSERT(12,4,0x81000005) -> VEB_LOOKUP -miss-> CHECKSUM(O,I) -> TX_WIRE(C=1) -> TX_HOST(PF,M=1) -multicast-> PUSH_PKT -> TX_VLAN
+
+    PF->Wire (VLAN=0xfff)
+    PF->Wire (VLAN=0x5)
+    RX_HOST -> VEB_LOOKUP -miss-> CHECKSUM(I) -> TX_WIRE(M=1) -multicast-> CHECKSUM{O) -> PUSH_PKT -> TX_VLAN
+
+    PF->VF
+    RX_HOST -> VEB_LOOKUP -hit-> (same as Wire->VF)
+
+    VF->VF
+    RX_HOST -> VEB_LOOKUP -hit-> (same as Wire->VF)
+
+    VF->PF
+    RX_HOST -> VEB_LOOKUP -hit-> [CHECKSUM(O,I,C) -> BPF -> RSS -> TX_HOST(PF)]
+*/
+
+uint32_t cfg_act_map[] = {
+    0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15,
+    16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+};
+
 /*
  * Global declarations for configuration change management
  */
@@ -59,14 +134,6 @@
 
 
 #define NIC_NBI 0
-
-/* Build output port with this macro */
-#define BUILD_PORT(_subsys, _queue) \
-    (((_subsys) << 10) | (_queue))
-
-#define BUILD_HOST_PORT(_pcie, _vf, _q) \
-  BUILD_PORT(_pcie, NFD_BUILD_QID((_vf), (_q)))
-
 
   /*
    * Debug
@@ -93,31 +160,7 @@ MEM_RING_INIT_MU(app_debug_jrn,8192,emem0);
 __export __emem __addr40 uint32_t debug_rss_table[100];
 #endif
 
-// #define GEN_INSTRUCTION
-#ifdef GEN_INSTRUCTION
-/*
- * By running py script, and generating array: instr_tbl from actions:
- * targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#] ;actions_jump
-./parse_list.py --label_prefix=ins_ --jump_table_tag=instr_tbl datapath.list
-
-Also, it is expected that it matches:
-enum instruction_type {
-    INSTR_DROP = 0,
-    INSTR_MTU,
-    INSTR_MAC,
-    INSTR_RSS,
-    INSTR_CHECKSUM_COMPLETE,
-    INSTR_TX_HOST,
-    INSTR_TX_WIRE,
-    INSTR_CMSG,
-    INSTR_EBPF
-};
-*/
-unsigned int instr_tbl[] = {0, 0x40, 0x50, 0x20, 0x30, 0x80, 0x60, 0x90};
-#endif
-
 __export __emem uint64_t cfg_error_rss_cntr = 0;
-
 
 /* RSS table length in words */
 #define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
@@ -297,17 +340,6 @@ upd_rx_wire_instr(__xwrite uint32_t *xwr_instr,
     uint32_t isl;
     struct nfp_mecsr_prev_alu ind;
 
-    /* write to local CLS table */
-    ind.__raw = 0;
-    ind.ov_len = 1;
-    ind.length = count - 1;
-    __asm {
-        alu[--, --, B, ind.__raw]
-        cls[write, *xwr_instr, nic_cfg_instr_tbl, start_offset, \
-                __ct_const_val(count)], ctx_swap[sig], indirect_ref
-    }
-
-    /* Propagate to all worker CLS islands */
     for (isl= 0; isl< sizeof(app_isl_ids)/sizeof(uint32_t); isl++) {
         addr_lo = (uint32_t)nic_cfg_instr_tbl + start_offset;
         addr_hi = app_isl_ids[isl] >> 4; /* only use island, mask out ME */
@@ -339,22 +371,6 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
     uint32_t isl;
     uint32_t i;
 
-    /* Write multiple entries (one for each host queue) to local CLS.
-     * All writes without a signal except last. */
-    for (i = 0; i < (num_pcie_q - 1); i++)
-    {
-        __asm cls[write, *xwr_instr, nic_cfg_instr_tbl, byte_off, \
-                    __ct_const_val(count)]
-        byte_off += (NIC_MAX_INSTR<<2);
-    }
-
-    /* last write to local CLS */
-    __asm cls[write, *xwr_instr, nic_cfg_instr_tbl, byte_off, \
-                __ct_const_val(count)], sig_done[last_sig]
-
-    wait_for_all(&last_sig);
-
-    /* Propagate to all worker (remote) CLS islands */
     for (isl = 0; isl < sizeof(app_isl_ids) / sizeof(uint32_t); isl++) {
         addr_lo = (uint32_t) nic_cfg_instr_tbl + start_offset;
         addr_hi = app_isl_ids[isl] >> 4; /* only use island, mask out ME */
@@ -375,7 +391,6 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
     return;
 }
 
-__lmem __shared uint32_t rss_tmp[32];
 /* Copy VLAN members table to all CTMs */
 __intrinsic void
 upd_ctm_vlan_members()
@@ -423,6 +438,7 @@ __intrinsic void upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *b
     __xread uint32_t rss_rd[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
     __xwrite uint32_t rss_wr[32];
     uint32_t i, j, tmp, data, shf, rows, cols;
+    uint32_t rss_tmp[32];
 
     if (((start_offset + (RSS_TBL_SIZE_LW / NS_PLATFORM_NUM_PORTS)) > SLICC_HASH_PAD_NN_IDX) || (vnic_port > NS_PLATFORM_NUM_PORTS)) {
 	cfg_error_rss_cntr++;
@@ -432,7 +448,6 @@ __intrinsic void upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *b
     mem_read32(rss_rd, bar_base + NFP_NET_CFG_RSS_ITBL, sizeof(rss_rd));
 
     #if (NFD_MAX_PF_QUEUES <= 4)
-        #define ACTION_RSS_COL_MASK  0x1e
         #define ACTION_RSS_ROW_MASK  0x7
         #define ACTION_RSS_COL_SHIFT 0x1
         #define ACTION_RSS_ROW_SHIFT 0x4
@@ -440,7 +455,6 @@ __intrinsic void upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *b
         rows = 8;
         cols = 16;
     #elif (NFD_MAX_PF_QUEUES <= 16)
-        #define ACTION_RSS_COL_MASK  0x1c
         #define ACTION_RSS_ROW_MASK  0xf
         #define ACTION_RSS_COL_SHIFT 0x2
         #define ACTION_RSS_ROW_SHIFT 0x3
@@ -448,7 +462,6 @@ __intrinsic void upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *b
 	rows = 16;
 	cols = 8;
     #else
-        #define ACTION_RSS_COL_MASK  0x18
         #define ACTION_RSS_ROW_MASK  0x1f
         #define ACTION_RSS_COL_SHIFT 0x3
         #define ACTION_RSS_ROW_SHIFT 0x2
@@ -472,7 +485,7 @@ __intrinsic void upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *b
 
     // separate loop for rss_wr[i] to avoid T_INDEX bug, see THSDK-4040
     for (i = 0; i < rows; ++i) {
-	rss_wr[i] = rss_tmp[i];
+        rss_wr[i] = rss_tmp[i];
     }
 
     upd_nn_table_instr(rss_wr, start_offset, rows);
@@ -505,38 +518,10 @@ upd_slicc_hash_table(void)
     return;
 }
 
-#define ACTION_RSS_IPV6_TCP_BIT 0
-#define ACTION_RSS_IPV6_UDP_BIT 1
-#define ACTION_RSS_IPV4_TCP_BIT 2
-#define ACTION_RSS_IPV4_UDP_BIT 3
-
-/* Set RSS flags by matching what is used in the workers */
-__intrinsic uint32_t
-extract_rss_flags(uint32_t rss_ctrl)
-{
-    uint32_t rss_flags = 0;
-
-    // Driver does L3 unconditionally, so we only care about L4 combinations
-
-    if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_TCP)
-        rss_flags |= (1 << ACTION_RSS_IPV4_TCP_BIT);
-
-    if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_UDP)
-        rss_flags |= (1 << ACTION_RSS_IPV4_UDP_BIT);
-
-    if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_TCP)
-        rss_flags |= (1 << ACTION_RSS_IPV6_TCP_BIT);
-
-    if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_UDP)
-        rss_flags |= (1 << ACTION_RSS_IPV6_UDP_BIT);
-
-    return rss_flags;
-}
-
 #define VXLAN_PORTS_NN_IDX (SLICC_HASH_PAD_NN_IDX + SLICC_HASH_PAD_SIZE_LW)
 
 __intrinsic uint32_t
-upd_vxlan_table(__emem __addr40 uint8_t *bar_base, uint32_t vnic_port)
+cfg_act_upd_vxlan_table(uint32_t pcie, uint32_t vid)
 {
     __xread uint32_t xrd_vxlan_data[NFP_NET_CFG_VXLAN_SZ_wrd];
     __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_VXLAN_SZ_wrd];
@@ -544,7 +529,8 @@ upd_vxlan_table(__emem __addr40 uint8_t *bar_base, uint32_t vnic_port)
     uint32_t i;
     uint32_t n_vxlan = 0;
 
-    mem_read32(xrd_vxlan_data, bar_base + NFP_NET_CFG_VXLAN_PORT, sizeof(xrd_vxlan_data));
+    mem_read32(xrd_vxlan_data, cfg_act_bar_ptr(pcie, vid) +
+	       NFP_NET_CFG_VXLAN_PORT, sizeof(xrd_vxlan_data));
     for (i = 0; i < NFP_NET_CFG_VXLAN_SZ_wrd; i++) {
         xwr_nn_info[i] = xrd_vxlan_data[i];
 	if ((xrd_vxlan_data[i] & 0xffff) != 0)
@@ -554,6 +540,555 @@ upd_vxlan_table(__emem __addr40 uint8_t *bar_base, uint32_t vnic_port)
     /* Write at NN register start_offset for all worker MEs */
     upd_nn_table_instr(xwr_nn_info, VXLAN_PORTS_NN_IDX, NFP_NET_CFG_VXLAN_SZ_wrd);
     return n_vxlan;
+}
+
+
+__intrinsic void
+
+cfg_act_init(action_list_t *acts)
+{
+    reg_zero(acts->instr, NIC_MAX_INSTR);
+    acts->count = 0;
+    acts->prev = 0;
+}
+
+
+__intrinsic void
+cfg_act_write_queue(uint32_t qid, action_list_t *acts)
+{
+    SIGNAL sig;
+    uint32_t addr_hi;
+    uint32_t addr_lo;
+    uint32_t isl;
+    uint32_t count;
+    struct nfp_mecsr_prev_alu ind;
+    __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
+    __cls __addr32 void *nic_cfg_instr_tbl = (__cls __addr32 void*)
+                                              __link_sym("NIC_CFG_INSTR_TBL");
+
+    reg_cp(xwr_instr, (void *) acts->instr, NIC_MAX_INSTR << 2);
+    count = acts->count;
+
+    for (isl = 0; isl < sizeof(app_isl_ids) / sizeof(uint32_t); isl++) {
+	addr_lo = (uint32_t) nic_cfg_instr_tbl + qid * NIC_MAX_INSTR * 4;
+        addr_hi = app_isl_ids[isl] >> 4; /* only use island, mask out ME */
+        addr_hi = (addr_hi << (34 - 8)); /* address shifted by 8 in instr */
+
+        ind.__raw = 0;
+        ind.ov_len = 1;
+        ind.length = count - 1;
+        __asm {
+            alu[--, --, B, ind.__raw]
+            cls[write, *xwr_instr, addr_hi, <<8, addr_lo, \
+                __ct_const_val(count)], ctx_swap[sig], indirect_ref
+        }
+    }
+}
+
+
+__intrinsic void
+cfg_act_write_host(uint32_t pcie, uint32_t vid, action_list_t *acts)
+{
+    uint32_t i;
+
+    for (i = 0; i < NFD_VID_MAXQS(vid); ++i)
+        cfg_act_write_queue((pcie << 6) | NFD_VID2QID(vid, i), acts);
+}
+
+
+__intrinsic void
+cfg_act_write_wire(uint32_t port, action_list_t *acts)
+{
+    cfg_act_write_queue((1 << 8) | port, acts);
+}
+
+
+__intrinsic void
+cfg_act_append(action_list_t *acts, uint16_t op, uint16_t args)
+{
+    uint32_t precursor_act = 2 * cfg_act_map[op] - cfg_act_map[op + 1];
+
+    acts->instr[acts->count].pipeline =
+        (acts->count && acts->prev == precursor_act) ? 1 : 0;
+
+    acts->instr[acts->count].op = cfg_act_map[op];
+    acts->prev = cfg_act_map[op];
+
+    acts->instr[acts->count++].args = args;
+}
+
+__intrinsic void
+cfg_act_append_drop(action_list_t *acts)
+{
+    cfg_act_append(acts, INSTR_DROP, 0);
+}
+
+
+__intrinsic void
+cfg_act_append_rx_host(action_list_t *acts, uint32_t pcie, uint32_t vid)
+{
+    __xread uint32_t mtu;
+
+    mem_read32(&mtu, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
+				    NFP_NET_CFG_MTU), sizeof(mtu));
+    cfg_act_append(acts, INSTR_RX_HOST, mtu + NET_ETH_LEN + 1);
+}
+
+__intrinsic void
+cfg_act_append_veb_lookup(action_list_t *acts, uint32_t pcie, uint32_t vid,
+			  uint32_t promisc, uint32_t mac_match)
+{
+    __xread uint32_t bar_mac[2];
+    uint32_t mac[2];
+
+    if (promisc) {
+        cfg_act_append(acts, INSTR_VEB_LOOKUP, 0);
+        acts->instr[acts->count++].value = 0;
+    } else {
+        if (mac_match) {
+            mem_read64(bar_mac, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
+				NFP_NET_CFG_MACADDR), sizeof(mac));
+            mac[0] = bar_mac[0];
+            mac[1] = bar_mac[1];
+        } else {
+            mac[0] = 0;
+            mac[1] = 0;
+        }
+	cfg_act_append(acts, INSTR_VEB_LOOKUP, mac[0] >> 16);
+	acts->instr[acts->count++].value = (mac[0] << 16) | (mac[1] >> 16);
+    }
+}
+
+__intrinsic void
+cfg_act_append_mac_match(action_list_t *acts, uint32_t pcie, uint32_t vid)
+{
+    __xread uint32_t mac[2];
+
+    mem_read64(mac, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
+				   NFP_NET_CFG_MACADDR), sizeof(mac));
+    cfg_act_append(acts, INSTR_MAC_MATCH, mac[0] >> 16);
+    acts->instr[acts->count++].value = (mac[0] << 16) | (mac[1] >> 16);
+}
+
+#define ACTION_RSS_IPV6_TCP_BIT 0
+#define ACTION_RSS_IPV6_UDP_BIT 1
+#define ACTION_RSS_IPV4_TCP_BIT 2
+#define ACTION_RSS_IPV4_UDP_BIT 3
+
+__intrinsic void
+cfg_act_append_rss(action_list_t *acts, uint32_t pcie, uint32_t vid, int update_map, int v1_meta)
+{
+    __emem __addr40 uint8_t *bar_base;
+    SIGNAL sig1, sig2, sig3;
+    __xread uint32_t rss_ctrl;
+    __xread uint32_t rx_rings[2];
+    __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
+    uint32_t rss_tbl_nnidx;
+    uint32_t type, vnic;
+    instr_rss_t instr_rss;
+
+    bar_base = cfg_act_bar_ptr(pcie, vid);
+
+    /* RSS remapping table with NN register index as start offset */
+    NFD_VID2VNIC(type, vnic, vid);
+    rss_tbl_nnidx = vnic * (RSS_TBL_SIZE_LW / NS_PLATFORM_NUM_PORTS);
+    if (update_map)
+        upd_rss_table(rss_tbl_nnidx, bar_base, vnic);
+
+    /* Read RSS configuration from BAR */
+    __mem_read32(&rss_ctrl, (__mem void*) (bar_base + NFP_NET_CFG_RSS_CTRL),
+                 sizeof(rss_ctrl), sizeof(rss_ctrl), sig_done, &sig1);
+    __mem_read64(&rss_key, (__mem void*) (bar_base + NFP_NET_CFG_RSS_KEY),
+                NFP_NET_CFG_RSS_KEY_SZ, NFP_NET_CFG_RSS_KEY_SZ, sig_done, &sig2);
+    __mem_read64(&rx_rings, (__mem void*) (bar_base + NFP_NET_CFG_RXRS_ENABLE),
+                 sizeof(uint64_t), sizeof(uint64_t), sig_done, &sig3);
+    wait_for_all(&sig1, &sig2, &sig3);
+    instr_rss.key = rss_key[0];
+
+    // Driver does L3 unconditionally, so we only care about L4 combinations
+    instr_rss.cfg_proto = 0;
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_TCP)
+        instr_rss.cfg_proto |= (1 << ACTION_RSS_IPV4_TCP_BIT);
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV4_UDP)
+        instr_rss.cfg_proto |= (1 << ACTION_RSS_IPV4_UDP_BIT);
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_TCP)
+        instr_rss.cfg_proto |= (1 << ACTION_RSS_IPV6_TCP_BIT);
+    if (rss_ctrl & NFP_NET_CFG_RSS_IPV6_UDP)
+        instr_rss.cfg_proto |= (1 << ACTION_RSS_IPV6_UDP_BIT);
+
+    instr_rss.max_queue = ((~rx_rings[0]) ? ffs(~rx_rings[0]) : 32 + ffs(~rx_rings[1]) - 1);
+
+    instr_rss.v1_meta = v1_meta;
+    instr_rss.col_shf = ACTION_RSS_COL_SHIFT;
+    instr_rss.queue_mask = ACTION_RSS_Q_MASK;
+    instr_rss.row_mask = ACTION_RSS_ROW_MASK;
+    instr_rss.table_addr = rss_tbl_nnidx;
+    instr_rss.row_shf = ACTION_RSS_ROW_SHIFT;
+
+    cfg_act_append(acts, INSTR_RSS, instr_rss.__raw[0]);
+    acts->instr[acts->count++].value = instr_rss.__raw[1];
+    acts->instr[acts->count++].value = instr_rss.__raw[2];
+}
+
+
+__intrinsic void
+cfg_act_append_push_pkt(action_list_t *acts)
+{
+    cfg_act_append(acts, INSTR_PUSH_PKT, 0);
+}
+
+
+__intrinsic void
+cfg_act_append_pop_pkt(action_list_t *acts)
+{
+    cfg_act_append(acts, INSTR_POP_PKT, 0);
+}
+
+
+__intrinsic void
+cfg_act_append_checksum(action_list_t *acts,
+            int outer, int inner, int complete)
+{
+    instr_checksum_t instr_csum;
+
+    instr_csum.outer = outer;
+    instr_csum.inner = inner;
+    instr_csum.complete = complete;
+
+    cfg_act_append(acts, INSTR_CHECKSUM, instr_csum.__raw[0]);
+}
+
+
+__intrinsic void
+cfg_act_append_rx_wire(action_list_t *acts, uint32_t pcie, uint32_t vid,
+		       uint32_t vxlan, uint32_t nvgre)
+{
+    instr_rx_wire_t instr_rx_wire;
+
+    instr_rx_wire.__raw[0] = 0;
+
+    if (vxlan) {
+        instr_rx_wire.parse_vxlans = cfg_act_upd_vxlan_table(pcie, vid);
+        instr_rx_wire.vxlan_nn_idx = VXLAN_PORTS_NN_IDX;
+    }
+    else {
+        instr_rx_wire.parse_vxlans = 0;
+        instr_rx_wire.vxlan_nn_idx = 0;
+    }
+
+    instr_rx_wire.parse_nvgre = nvgre;
+
+    // disable GENEVE until we have configuration ABI
+    instr_rx_wire.parse_geneve = 0;
+
+    cfg_act_append(acts, INSTR_RX_WIRE, instr_rx_wire.__raw[0]);
+}
+
+__intrinsic void
+cfg_act_append_strip_vlan(action_list_t *acts)
+{
+    cfg_act_append(acts, INSTR_POP_VLAN, 0);
+}
+
+__intrinsic void
+cfg_act_append_push_vlan(action_list_t *acts, uint32_t vlan_id)
+{
+    cfg_act_append(acts, INSTR_PUSH_VLAN, vlan_id);
+}
+
+__intrinsic void
+cfg_act_append_tx_wire(action_list_t *acts, uint32_t tmq,
+                       uint32_t cont, uint32_t multicast)
+{
+
+    instr_tx_wire_t instr_tx_wire;
+    uint32_t type, vnic;
+
+    instr_tx_wire.tm_queue = tmq;
+    instr_tx_wire.cont = cont;
+    instr_tx_wire.multicast = multicast;
+
+    cfg_act_append(acts, INSTR_TX_WIRE, instr_tx_wire.__raw[0]);
+}
+
+__intrinsic void
+cfg_act_append_tx_host(action_list_t *acts, uint32_t pcie, uint32_t vid,
+                       uint32_t cont, uint32_t multicast)
+{
+
+    __imem uint32_t *fl_buf_sz_cache = (__imem uint32_t *)
+                                        __link_sym("_fl_buf_sz_cache");
+    uint32_t min_rxb = 0;
+    instr_tx_host_t instr_tx_host;
+    __xread uint64_t members;
+    __xread uint32_t flbuf_sz;
+
+    instr_tx_host.pcie = pcie;
+    instr_tx_host.queue = NFD_VID2QID(vid, 0); //to PF!
+    instr_tx_host.cont = cont;
+    instr_tx_host.multicast = multicast;
+
+    mem_read32(&flbuf_sz, &fl_buf_sz_cache[pcie * 64 + vid], sizeof(flbuf_sz));
+    min_rxb = flbuf_sz >> 8;
+    instr_tx_host.min_rxb = (min_rxb > 63) ? 63 : min_rxb;
+
+    cfg_act_append(acts, INSTR_TX_HOST, instr_tx_host.__raw[0]);
+}
+
+__intrinsic void
+cfg_act_append_tx_vlan(action_list_t *acts)
+{
+    cfg_act_append(acts, INSTR_TX_VLAN, 0);
+}
+
+__intrinsic void
+cfg_act_append_bpf(action_list_t *acts, uint32_t vnic)
+{
+
+    uint32_t bpf_offset;
+
+    bpf_offset = NFD_BPF_START_OFF + vnic * NFD_BPF_MAX_LEN;
+    cfg_act_append(acts, INSTR_EBPF, bpf_offset);
+}
+
+
+__intrinsic void
+cfg_act_append_cmsg(action_list_t *acts)
+{
+    cfg_act_append(acts, INSTR_CMSG, 0);
+}
+
+
+__intrinsic void
+cfg_act_build_ctrl(action_list_t *acts, uint32_t pcie, uint32_t vid)
+{
+    uint32_t type, vnic;
+
+    cfg_act_init(acts);
+
+    NFD_VID2VNIC(type, vnic, vid);
+
+    if (type != NFD_VNIC_TYPE_CTRL)
+        return;
+
+    cfg_act_append_rx_host(acts, pcie, vid);
+    cfg_act_append_cmsg(acts);
+}
+
+
+__intrinsic void
+cfg_act_build_pf(action_list_t *acts, uint32_t pcie, uint32_t vid,
+		 uint32_t veb_up, uint32_t control, uint32_t update)
+{
+    uint32_t type, vnic;
+    uint32_t csum_i, csum_o;
+    uint32_t tmq;
+
+    cfg_act_init(acts);
+
+    NFD_VID2VNIC(type, vnic, vid);
+
+    if (type != NFD_VNIC_TYPE_PF)
+        return;
+
+    csum_o = (control & NFP_NET_CFG_CTRL_TXCSUM) ? 1 : 0;
+    csum_i = (csum_o && (control & NFP_NET_CFG_CTRL_VXLAN)) ? 1 : 0;
+    tmq = NS_PLATFORM_NBI_TM_QID_LO(vnic);
+
+    cfg_act_append_rx_host(acts, pcie, vid);
+
+    if (! veb_up)
+        cfg_act_append_tx_wire(acts, tmq, 0, 0);
+    else {
+	cfg_act_append_veb_lookup(acts, pcie, vid, 0, 0);
+
+        if (csum_i)
+	    cfg_act_append_checksum(acts, 0, 1, 0); // I
+
+        cfg_act_append_tx_wire(acts, tmq, 0, 1); // M
+
+        if (csum_o)
+            cfg_act_append_checksum(acts, csum_o, 0, 0);
+
+        cfg_act_append_push_pkt(acts);
+        cfg_act_append_tx_vlan(acts);
+    }
+}
+
+__intrinsic void
+cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
+		 uint32_t pf_control, uint32_t vf_control)
+{
+    __xread struct nfp_vnic_setup_entry entry;
+    uint32_t type, vnic;
+    uint32_t csum_o, csum_i;
+    uint32_t promisc;
+
+    cfg_act_init(acts);
+
+    NFD_VID2VNIC(type, vnic, vid);
+    if (type != NFD_VNIC_TYPE_VF)
+        return;
+
+    csum_o = (vf_control & NFP_NET_CFG_CTRL_TXCSUM) ? 1 : 0;
+    csum_i = (csum_o && (vf_control & NFP_NET_CFG_CTRL_VXLAN)) ? 1 : 0;
+    promisc = (pf_control & NFP_NET_CFG_CTRL_PROMISC) ? 1 : 0;
+
+    cfg_act_append_rx_host(acts, pcie, vid);
+
+    if ((load_vnic_setup_entry(vid, &entry) == 0) &&
+	    (entry.vlan != NIC_NO_VLAN_ID))
+        cfg_act_append_push_vlan(acts, entry.vlan);
+
+    cfg_act_append_checksum(acts, csum_o, csum_i, 0);
+
+    cfg_act_append_veb_lookup(acts, pcie, vid, 0, 0);
+
+    cfg_act_append_tx_wire(acts, NS_PLATFORM_NBI_TM_QID_LO(0) /* vnic 0 */,
+			   promisc, 1);
+
+    if (promisc)
+	cfg_act_append_tx_host(acts, pcie, NFD_PF2VID(0), 0, 1); // M
+
+    cfg_act_append_push_pkt(acts);
+    cfg_act_append_tx_vlan(acts);
+}
+
+__intrinsic void
+cfg_act_build_pcie_down(action_list_t *acts, uint32_t pcie, uint32_t vid)
+{
+    cfg_act_init(acts);
+    cfg_act_append_rx_host(acts, pcie, vid);
+    cfg_act_append_drop(acts);
+}
+
+__intrinsic void
+cfg_act_build_nbi(action_list_t *acts, uint32_t pcie, uint32_t vid,
+		  uint32_t veb_up, uint32_t control, uint32_t update)
+{
+    uint32_t type, vnic;
+    uint32_t vxlan = (control & NFP_NET_CFG_CTRL_VXLAN) ? 1 : 0;
+    uint32_t nvgre = (control & NFP_NET_CFG_CTRL_NVGRE) ? 1 : 0;
+    uint32_t promisc = (control & NFP_NET_CFG_CTRL_PROMISC) ? 1 : 0;
+    uint32_t csum_compl = (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) ? 1 : 0;
+    uint32_t update_rss = (update & NFP_NET_CFG_UPDATE_RSS ||
+			   update & NFP_NET_CFG_CTRL_BPF);
+    uint32_t rss_v1 = (NFD_CFG_MAJOR_PF < 4 &&
+                       !(control & NFP_NET_CFG_CTRL_CHAIN_META));
+
+    cfg_act_init(acts);
+
+    NFD_VID2VNIC(type, vnic, vid);
+    if (type != NFD_VNIC_TYPE_PF)
+        return;
+
+    cfg_act_append_rx_wire(acts, pcie, vid, vxlan, nvgre);
+
+    if (veb_up)
+	   cfg_act_append_veb_lookup(acts, pcie, vid, promisc, 1);
+    else if (! promisc)
+	   cfg_act_append_mac_match(acts, pcie, vid);
+
+    if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE)
+        cfg_act_append_checksum(acts, 0, 0, 1); // C
+
+    if (control & NFP_NET_CFG_CTRL_BPF)
+        cfg_act_append_bpf(acts, vnic);
+
+    if (control & NFP_NET_CFG_CTRL_RSS_ANY || control & NFP_NET_CFG_CTRL_BPF)
+	cfg_act_append_rss(acts, pcie, vid, update_rss, rss_v1);
+
+    cfg_act_append_tx_host(acts, pcie, vid, 0, veb_up);
+
+    if (veb_up) {
+        cfg_act_append_push_pkt(acts);
+        cfg_act_append_tx_vlan(acts);
+    }
+
+}
+
+
+__intrinsic void
+cfg_act_build_nbi_down(action_list_t *acts, uint32_t pcie, uint32_t vid)
+{
+    cfg_act_init(acts);
+    cfg_act_append_rx_wire(acts, pcie, vid, 0, 0);
+    cfg_act_append_drop(acts);
+}
+
+
+__intrinsic void
+cfg_act_build_veb_pf(action_list_t *acts, uint32_t pcie, uint32_t vid,
+		     uint32_t control, uint32_t update)
+{
+    uint32_t type, vnic;
+    uint32_t update_rss = (update & NFP_NET_CFG_UPDATE_RSS ||
+			   update & NFP_NET_CFG_CTRL_BPF);
+    uint32_t rss_v1 = (NFD_CFG_MAJOR_PF < 4 &&
+                       !(control & NFP_NET_CFG_CTRL_CHAIN_META));
+    uint32_t csum_c = (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) ? 1 : 0;
+
+    cfg_act_init(acts);
+
+    NFD_VID2VNIC(type, vnic, vid);
+    if (type != NFD_VNIC_TYPE_PF)
+        return;
+
+    cfg_act_append_checksum(acts, 1, 1, csum_c); // O, I, C?
+
+    if (control & NFP_NET_CFG_CTRL_BPF)
+        cfg_act_append_bpf(acts, vnic);
+
+    if (control & NFP_NET_CFG_CTRL_RSS_ANY || control & NFP_NET_CFG_CTRL_BPF)
+	cfg_act_append_rss(acts, pcie, vid, update_rss, rss_v1);
+
+    cfg_act_append_tx_host(acts, pcie, vid, 0, 0);
+}
+
+
+__intrinsic void
+cfg_act_build_veb_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
+                     uint32_t pf_control, uint32_t vf_control, uint32_t update)
+{
+    __xread struct nfp_vnic_setup_entry entry;
+    uint32_t type, vnic;
+    uint32_t csum_c = (vf_control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) ? 1 : 0;
+    uint32_t promisc = (pf_control & NFP_NET_CFG_CTRL_PROMISC) ? 1 : 0;
+    uint32_t rss_v1 = (NFD_CFG_MAJOR_PF < 4 &&
+                       !(pf_control & NFP_NET_CFG_CTRL_CHAIN_META));
+
+    cfg_act_init(acts);
+
+    NFD_VID2VNIC(type, vnic, vid);
+    if (type != NFD_VNIC_TYPE_VF)
+        return;
+
+    if (load_vnic_setup_entry(vid, &entry) == 0 &&
+	    entry.vlan != NIC_NO_VLAN_ID) {
+        if (promisc) {
+            cfg_act_append_push_pkt(acts);
+        }
+
+        cfg_act_append_strip_vlan(acts);
+    }
+
+    cfg_act_append_checksum(acts, 1, 1, csum_c); // O, I, C?
+
+    cfg_act_append_tx_host(acts, pcie, vid, promisc, 0);
+
+    if (promisc) {
+	cfg_act_append_pop_pkt(acts);
+
+        cfg_act_append_checksum(acts, 0, 0, 1); // C
+
+	if (pf_control & NFP_NET_CFG_CTRL_BPF)
+	    cfg_act_append_bpf(acts, vnic);
+
+        if (pf_control & NFP_NET_CFG_CTRL_RSS_ANY || pf_control & NFP_NET_CFG_CTRL_BPF)
+            cfg_act_append_rss(acts, pcie, vid, 0, rss_v1);
+
+            cfg_act_append_tx_host(acts, pcie, NFD_PF2VID(0), 0, 0);
+    }
 }
 
 
@@ -571,423 +1106,189 @@ cfg_act_cache_fl_buf_sz(uint32_t pcie, uint32_t vid)
 }
 
 
-#define SET_PIPELINE_BIT(prev, current) \
-    ((current) - (prev) == 1) ? 1 : 0;
-
-/* vnic_port == vid */
-
-
-/*
-    common routine to configure BPF, RSS, CSUM, and TX HOST instructions
-    for pf destination port
-*/
-__intrinsic void
-app_config_pf_common(uint32_t vid,
-                     __lmem union instruction_format instr[NIC_MAX_INSTR],
-                     uint32_t *_count,
-                     uint32_t control, uint32_t update)
+enum cfg_msg_err
+cfg_act_write_veb(uint32_t vid, __lmem struct nic_mac_vlan_key *veb_key,
+		  action_list_t *acts)
 {
-    __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
-    uint32_t type, vnic;
-    SIGNAL sig1, sig2;
-    uint32_t rss_flags, rss_rings;
-    __xread uint32_t rss_ctrl[2];
-    __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
-    uint32_t rss_tbl_nnidx;
-    __xread uint32_t rx_rings[2];
-    instr_rss_t instr_rss;
-    uint32_t count = *_count;
-    uint32_t prev_instr = 0;
+    __gpr struct nfp_vnic_setup_entry vnic_entry;
+    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
+    __xwrite struct nfp_vnic_setup_entry vnic_entry_wr;
+    __lmem struct nic_mac_vlan_key del_key;
+    uint32_t new_vlan_id, vlan_id;
+    uint64_t old_mac_addr;
+    uint64_t new_mac_addr = MAC64_FROM_VEB_KEY(*veb_key);
+    enum cfg_msg_err err_code = NO_ERROR;
 
-    NFD_VID2VNIC(type, vnic, vid);
+    /* Fail if mac is 0, broadcast, or multicast */
+    if (new_mac_addr == 0 || new_mac_addr == 0xffffffffffffl ||
+	    ((new_mac_addr >> 40) & 0x01))
+        return MAC_VLAN_ADD_FAIL;
 
-    /* BPF */
-    if (control & NFP_NET_CFG_CTRL_BPF) {
-        instr[count].param = NFD_BPF_START_OFF + vnic * NFD_BPF_MAX_LEN;
-#ifdef GEN_INSTRUCTION
-        instr[count++].instr = instr_tbl[INSTR_EBPF];
-#else
-        instr[count++].instr = INSTR_EBPF;
-#endif
-        prev_instr = INSTR_EBPF;
-    }
-
-    /* RSS */
-    if (control & NFP_NET_CFG_CTRL_RSS_ANY || control & NFP_NET_CFG_CTRL_BPF) {
-
-        /* RSS remapping table with NN register index as start offset */
-        rss_tbl_nnidx = vnic * (RSS_TBL_SIZE_LW / NS_PLATFORM_NUM_PORTS);
-
-        /* Update the RSS NN table but only if RSS has changed
-        * If vnic_port x write at x*32 NN register */
-        if (update & NFP_NET_CFG_UPDATE_RSS || update & NFP_NET_CFG_CTRL_BPF) {
-            upd_rss_table(rss_tbl_nnidx, bar_base, vnic);
-        }
-
-        /* RSS flags: read rss_ctrl but only first word is used */
-        __mem_read64(rss_ctrl, bar_base + NFP_NET_CFG_RSS_CTRL,
-                sizeof(rss_ctrl), sizeof(rss_ctrl), sig_done, &sig1);
-        __mem_read64(rss_key, bar_base + NFP_NET_CFG_RSS_KEY,
-                NFP_NET_CFG_RSS_KEY_SZ, NFP_NET_CFG_RSS_KEY_SZ,
-                sig_done, &sig2);
-        wait_for_all(&sig1, &sig2);
-
-        mem_read64(rx_rings, (__mem void*)(bar_base + NFP_NET_CFG_RXRS_ENABLE), sizeof(uint64_t));
-        rss_rings = (~rx_rings[0]) ? ffs(~rx_rings[0]) : 32 + ffs(~rx_rings[1]);
-        rss_flags = extract_rss_flags(rss_ctrl[0]);
-
-#ifdef GEN_INSTRUCTION
-        instr[count].instr = instr_tbl[INSTR_RSS];
-#else
-        instr[count].instr = INSTR_RSS;
-#endif
-        if ((NFD_CFG_MAJOR_PF < 4) && !(control & NFP_NET_CFG_CTRL_CHAIN_META)) {
-		instr_rss.v1_meta = 1;
-        }
-        instr_rss.max_queue = rss_rings - 1;
-        instr_rss.cfg_proto = rss_flags;
-        instr_rss.col_shf = ACTION_RSS_COL_SHIFT;
-        instr_rss.queue_mask = ACTION_RSS_Q_MASK;
-        instr_rss.row_mask = ACTION_RSS_ROW_MASK;
-        instr_rss.col_mask = ACTION_RSS_COL_MASK;
-        instr_rss.table_addr = rss_tbl_nnidx;
-        instr_rss.row_shf = ACTION_RSS_ROW_SHIFT;
-        instr_rss.key = rss_key[0];
-        instr[count].param = instr_rss.__raw[0];
-        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RSS);
-        prev_instr = INSTR_RSS;
-        instr[count++].value = instr_rss.__raw[1];
-        instr[count++].value = instr_rss.__raw[2];
-    }
-
-    /* CSUM Complete */
-    if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {
-        /* calculate checksum and drop if mismatch */
-#ifdef GEN_INSTRUCTION
-        instr[count].instr = instr_tbl[INSTR_CHECKSUM_COMPLETE];
-#else
-        instr[count].instr = INSTR_CHECKSUM_COMPLETE;
-#endif
-        instr[count++].pipeline =
-            SET_PIPELINE_BIT(prev_instr, INSTR_CHECKSUM_COMPLETE);
-        prev_instr = INSTR_CHECKSUM_COMPLETE;
-    }
-
-    /* TX Host */
-#ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_TX_HOST];
-#else
-    instr[count].instr = INSTR_TX_HOST;
-#endif
-    instr[count].param = NFD_VID2QID(vid, 0);
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
-    prev_instr = INSTR_TX_HOST;
-
-    *_count = count;
-}
-
-__intrinsic void
-app_config_port(uint32_t vid, uint32_t control, uint32_t update)
-{
-    __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
-    __xread uint32_t mtu;
-    __xread uint32_t nic_mac[2];
-    __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
-    __lmem union instruction_format instr[NIC_MAX_INSTR];
-    instr_rx_wire_t instr_rx_wire;
-    uint32_t byte_off;
-    uint32_t count;
-    uint32_t type, vnic;
-    uint32_t prev_instr = 0;
-    __xwrite uint32_t dbg;
-    __imem struct nic_port_stats_extra *nic_stats_extra =
-        (__imem struct nic_port_stats_extra *) __link_sym("_nic_stats_extra");
-
-    reg_zero(instr, sizeof(instr));
-    count = 0;
-
-    NFD_VID2VNIC(type, vnic, vid);
-    if (type == NFD_VNIC_TYPE_CTRL) {
-	/* CTRL vnic instruction */
-	/* mtu */
-	mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU), sizeof(mtu));
-#ifdef GEN_INSTRUCTION
-	instr[count].instr = instr_tbl[INSTR_RX_HOST];
-#else
-	instr[count].instr = INSTR_RX_HOST;
-#endif
-	// add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
-        instr[count].param = mtu + NET_ETH_LEN + 1;
-	instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_HOST);
-	prev_instr = INSTR_RX_HOST;
-#ifdef GEN_INSTRUCTION
-        instr[count++].instr = instr_tbl[INSTR_CMSG];
-#else
-        instr[count++].instr = INSTR_CMSG;
-#endif
-        reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
-        byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-        upd_rx_host_instr(xwr_instr, byte_off<<2, count, 1);
-
-        return;
-    }
-
-    cfg_act_cache_fl_buf_sz(NIC_PCI, vid);
-
-    /*
-     * RX HOST --> TX WIRE
-     */
-
-    /* mtu */
-    mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU), sizeof(mtu));
-#ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_RX_HOST];
-#else
-    instr[count].instr = INSTR_RX_HOST;
-#endif
-    // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
-    instr[count].param = mtu + NET_ETH_LEN + 1;
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_HOST);
-    prev_instr = INSTR_RX_HOST;
-
-    /* tx wire */
-#ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_TX_WIRE];
-#else
-    instr[count].instr = INSTR_TX_WIRE;
-#endif
-    instr[count].param = NS_PLATFORM_NBI_TM_QID_LO(vnic);
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_WIRE);
-    prev_instr = INSTR_TX_WIRE;
-
-    reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
-
-    /* write TX instr to local table and to other islands too */
-    byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-    upd_rx_host_instr(xwr_instr, byte_off<<2, count, NFD_VNIC_MAXQS(type, vnic));
-
-    /*
-     * RX WIRE --> TX HOST
-     */
-    count = 0;
-    prev_instr = 0;
-    reg_zero(instr, sizeof(instr));
-
-#ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_RX_WIRE];
-#else
-    instr[count].instr = INSTR_RX_WIRE;
-#endif
-    // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
-    instr_rx_wire.mtu = mtu + NET_ETH_LEN + 1;
-    if (control & NFP_NET_CFG_UPDATE_VXLAN) {
-        instr_rx_wire.parse_vxlans = upd_vxlan_table(bar_base, vnic);
-    }
-    else {
-	instr_rx_wire.parse_vxlans = 0;
-    }
-    instr_rx_wire.vxlan_nn_idx = VXLAN_PORTS_NN_IDX;
-
-    instr_rx_wire.parse_nvgre = (control & NFP_NET_CFG_CTRL_NVGRE) ? 1 : 0;
-
-    // disable GENEVE until we have configuration ABI
-    instr_rx_wire.parse_geneve = 0;
-
-    instr[count].param = instr_rx_wire.__raw[0];
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_WIRE);
-    instr[count++].value = instr_rx_wire.__raw[1];
-    prev_instr = INSTR_RX_WIRE;
-
-    /* MAC address */
-    mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
-                    sizeof(nic_mac));
-#ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_MAC];
-#else
-    instr[count].instr = INSTR_MAC;
-#endif
-    instr[count].param = (control & NFP_NET_CFG_CTRL_PROMISC) ? 0xffff :
-                         (nic_mac[0] >> 16);
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_MAC);
-    prev_instr = INSTR_MAC;
-    instr[count++].value = (control & NFP_NET_CFG_CTRL_PROMISC) ? 0xffffffff :
-                           ((nic_mac[0] << 16) | (nic_mac[1] >> 16));
-
-    /* BPF, RSS, CSUM Complete, TX Host */
-    app_config_pf_common(vid, instr, &count, control, update);
-
-    reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
-
-    /* map vnic_port to NBI index in the instruction table */
-    byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic) * NIC_MAX_INSTR;
-
-    /* write TX instr to local table and to other islands too */
-    upd_rx_wire_instr(xwr_instr, byte_off<<2, count);
-
-#ifdef APP_CONFIG_DEBUG
-    {
-        union debug_instr_journal data;
-        data.value = 0x00;
-        data.event = PORT_CFG;
-        data.param = vid;
-        JDBG(app_debug_jrn, data.value);
-    }
-#endif
-
-    return;
-}
-
-void
-app_config_sriov_port(uint32_t vid, __lmem uint32_t *action_list,
-                      uint32_t control, uint32_t update)
-{
-    __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
-     uint32_t type, vnic;
-    __xread uint32_t mtu;
-    __lmem union instruction_format instr[NIC_MAX_INSTR];
-    uint32_t count = 0;
-    uint32_t prev_instr = 0;
-    __xread struct nfp_vnic_setup_entry entry;
-
-    reg_zero(instr, sizeof(instr));
-
-    NFD_VID2VNIC(type, vnic, vid);
-
-    mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
-	       sizeof(mtu));
-
-    if (NFD_VID_IS_VF(vid)){
-        /* DestVNIC is a VF
-        *      Strip VLAN (No RSS)
-        *      CSUM
-        *      Translate (DestVNIC, RSS_Q=0) to NFD Natural Q number (use NATQ)
-        *      TX HOST
-        */
-
-        /* strip VLAN */
-        if ( (load_vnic_setup_entry(vid, &entry) == 0 )
-             && (entry.vlan != NIC_NO_VLAN_ID )) {
-            instr[count].instr = INSTR_POP_VLAN;
-            instr[count].pipeline = 0;
-            prev_instr = INSTR_POP_VLAN;
-            count++;
-        }
-
-        if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) {
-            /* calculate checksum and drop if mismatch */
-            instr[count].instr = INSTR_CHECKSUM_COMPLETE;
-            instr[count++].pipeline = 0;
-            prev_instr = INSTR_CHECKSUM_COMPLETE;
-        }
-
-        /* tx host */
-        instr[count].instr = INSTR_TX_HOST;
-        instr[count].param = NFD_VID2QID(vid, 0);
-        instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_TX_HOST);
-
+    if (acts == 0) {
+	new_mac_addr = 0;
+	new_vlan_id = 0;
+	veb_key->vlan_id = 0;
     } else {
-        /* Dest VNIC is a PF
-         *      BPF
-         *      RSS
-         *      CSUM
-         *      TX HOST
-         */
-
-	/* BPF, RSS, CSUM Complete, TX Host */
-        app_config_pf_common(vid, instr, &count, control, update);
+        new_vlan_id = veb_key->vlan_id;
+        /* Add or overwrite VEB table entries */
+        for (vlan_id = 0; vlan_id <= new_vlan_id; vlan_id++) {
+            if (new_vlan_id == NIC_NO_VLAN_ID || vlan_id == new_vlan_id) {
+      	        veb_key->vlan_id = vlan_id;
+                if (nic_mac_vlan_entry_op_cmsg(veb_key,
+		        (__lmem uint32_t *) acts->instr,
+                        CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL)
+                    return MAC_VLAN_ADD_FAIL;
+            }
+        }
     }
 
-    reg_cp(action_list, instr, sizeof(instr));
-    return;
+    load_vnic_setup_entry(vid, &vnic_entry_rd);
+    reg_cp(&vnic_entry, &vnic_entry_rd, sizeof(struct nfp_vnic_setup_entry));
+    old_mac_addr = vnic_entry.src_mac;
+
+    if (acts != 0) {
+        vnic_entry.src_mac = new_mac_addr;
+        vnic_entry.vlan = veb_key->vlan_id;
+        reg_cp(&vnic_entry_wr, &vnic_entry, sizeof(struct nfp_vnic_setup_entry));
+        write_vnic_setup_entry(vid, &vnic_entry_wr);
+    }
+
+    /* Delete previously existing entries if the lookup key differs */
+    VEB_KEY_FROM_MAC64(del_key, old_mac_addr);
+    for (vlan_id = 0; vlan_id <= NIC_NO_VLAN_ID; vlan_id++) {
+	if (new_mac_addr != old_mac_addr ||
+	    (new_vlan_id != NIC_NO_VLAN_ID && vlan_id != new_vlan_id)) {
+            del_key.vlan_id = vlan_id;
+            if (nic_mac_vlan_entry_op_cmsg(&del_key, 0,
+                    CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL)
+                err_code = MAC_VLAN_DELETE_WARN;
+	}
+    }
+
+    return err_code;
 }
 
-__intrinsic void
-app_config_port_down(uint32_t vid)
-{
-    __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
-    uint32_t i;
-    uint32_t byte_off;
-    uint32_t type, vnic;
-    uint32_t count;
-    __xread uint32_t mtu;
-    __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(NIC_PCI, vid);
-    uint32_t prev_instr=0;
-    __lmem union instruction_format instr[NIC_MAX_INSTR];
 
-    /* TX drop instr
-     * Probably should use the instr field in union but cannot do that with
-     * xfer, must first do it in GPR and then copy to xfer which is an overkill
-     */
+int
+cfg_act_vf_up(uint32_t pcie, uint32_t vid,
+	      uint32_t pf_control, uint32_t vf_control, uint32_t update)
+{
+    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
+    __shared __lmem struct nic_mac_vlan_key veb_key;
+    action_list_t acts;
+
+    cfg_act_build_veb_vf(&acts, pcie, vid, pf_control, vf_control, update);
+
+    load_vnic_setup_entry(vid, &vnic_entry_rd);
+    veb_key.__raw[0] = 0;
+    veb_key.mac_addr_hi = (vnic_entry_rd.src_mac >> 32);
+    veb_key.mac_addr_lo = vnic_entry_rd.src_mac;
+    veb_key.vlan_id = vnic_entry_rd.vlan;
+
+    if (cfg_act_write_veb(vid, &veb_key, &acts) != NO_ERROR)
+        return 1;
+
+    cfg_act_cache_fl_buf_sz(pcie, vid);
+    add_vlan_member(vnic_entry_rd.vlan, vid);
+    upd_ctm_vlan_members();
+
+    cfg_act_build_vf(&acts, pcie, vid, pf_control, vf_control);
+    cfg_act_write_host(pcie, vid, &acts);
+
+    cfg_act_build_nbi(&acts, pcie, NFD_PF2VID(0), 1, pf_control, 0);
+    cfg_act_write_wire(0, &acts);
+    cfg_act_build_pf(&acts, pcie, NFD_PF2VID(0), 1, pf_control, 0);
+    cfg_act_write_host(pcie, NFD_PF2VID(0), &acts);
+
+    return 0;
+}
+
+int
+cfg_act_vf_down(uint32_t pcie, uint32_t vid)
+{
+    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
+    __shared __lmem struct nic_mac_vlan_key veb_key;
+    action_list_t acts;
+
+    cfg_act_build_pcie_down(&acts, pcie, vid);
+    cfg_act_write_host(pcie, vid, &acts);
+
+    load_vnic_setup_entry(vid, &vnic_entry_rd);
+    veb_key.__raw[0] = 0;
+    veb_key.mac_addr_hi = (vnic_entry_rd.src_mac >> 32);
+    veb_key.mac_addr_lo = vnic_entry_rd.src_mac;
+    veb_key.vlan_id = vnic_entry_rd.vlan;
+
+    cfg_act_write_veb(vid, &veb_key, 0);
+
+    remove_vlan_member(vnic_entry_rd.vlan, vid);
+    upd_ctm_vlan_members();
+
+    return 0;
+}
+
+
+int
+cfg_act_pf_up(uint32_t pcie, uint32_t vid, uint32_t veb_up,
+	      uint32_t control, uint32_t update)
+{
+    __xread uint32_t mac[2];
+    uint32_t type, vnic;
+    __shared __lmem struct nic_mac_vlan_key veb_key;
+    action_list_t acts;
+
+    cfg_act_cache_fl_buf_sz(pcie, vid);
+
+    cfg_act_build_nbi(&acts, pcie, vid, veb_up, control, update);
+    NFD_VID2VNIC(type, vnic, vid);
+    cfg_act_write_wire(vnic, &acts);
+
+    cfg_act_build_pf(&acts, pcie, vid, veb_up, control, update);
+    cfg_act_write_host(pcie, vid, &acts);
+
+    if (vnic == 0) { // VFs are only associated with the first PF VNIC (for now)
+        cfg_act_build_veb_pf(&acts, pcie, vid, control, update);
+
+        mem_read64(mac, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
+				       NFP_NET_CFG_MACADDR), sizeof(mac));
+        veb_key.__raw[0] = 0;
+        veb_key.mac_addr_hi = (mac[0] >> 16);
+        veb_key.mac_addr_lo = (mac[0] << 16) | (mac[1] >> 16);
+	veb_key.vlan_id = NIC_NO_VLAN_ID;
+
+	if (cfg_act_write_veb(vid, &veb_key, &acts) != NO_ERROR)
+	    return 1;
+    }
+
+    return 0;
+}
+
+int cfg_act_pf_down(uint32_t pcie, uint32_t vid)
+{
+    __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(pcie, vid);
+    __xread uint32_t mac[2];
+    uint32_t type, vnic;
+    __shared __lmem struct nic_mac_vlan_key veb_key;
+    action_list_t acts;
 
     NFD_VID2VNIC(type, vnic, vid);
     if (type != NFD_VNIC_TYPE_PF)
-        return;
+	return 1;
 
-    /* mtu */
-    mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU), sizeof(mtu));
+    cfg_act_build_nbi_down(&acts, pcie, vid);
+    cfg_act_write_wire(vnic, &acts);
+    cfg_act_build_pcie_down(&acts, pcie, vid);
+    cfg_act_write_host(pcie, vid, &acts);
 
-    /*
-     * RX_HOST --> DROP
-     */
-    count = 0;
-    prev_instr = 0;
-    reg_zero(instr, sizeof(instr));
+    if (vnic == 0) {
+	mem_read64(mac, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
+	    		               NFP_NET_CFG_MACADDR), sizeof(mac));
+        veb_key.__raw[0] = 0;
+        veb_key.mac_addr_hi = (mac[0] >> 16);
+        veb_key.mac_addr_lo = (mac[0] << 16) | (mac[1] >> 16);
 
-#ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_RX_HOST];
-#else
-    instr[count].instr = INSTR_RX_HOST;
-#endif
-    // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
-    instr[count].param = mtu + NET_ETH_LEN + 1;
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_HOST);
-    prev_instr = INSTR_RX_HOST;
+        cfg_act_write_veb(vid, &veb_key, 0);
+    }
 
-#ifdef GEN_INSTRUCTION
-    instr[count++].instr = instr_tbl[INSTR_DROP];
-#else
-    instr[count++].instr = INSTR_DROP;
-#endif
-    reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
-    byte_off = NIC_PORT_TO_PCIE_INDEX(NIC_PCI, type, vnic, 0) * NIC_MAX_INSTR;
-    upd_rx_host_instr(xwr_instr, byte_off << 2, count, NFD_VNIC_MAXQS(type, vnic));
-
-    /*
-     * RX_WIRE --> DROP
-     */
-    count = 0;
-    prev_instr = 0;
-    reg_zero(instr, sizeof(instr));
-#ifdef GEN_INSTRUCTION
-    instr[count].instr = instr_tbl[INSTR_RX_WIRE];
-#else
-    instr[count].instr = INSTR_RX_WIRE;
-#endif
-    // add eth hdrlen, plus one to cause borrow on subtract of MTU from pktlen
-    instr[count].param = mtu + NET_ETH_LEN + 1;
-    instr[count++].pipeline = SET_PIPELINE_BIT(prev_instr, INSTR_RX_WIRE);
-    prev_instr = INSTR_RX_WIRE;
-
-#ifdef GEN_INSTRUCTION
-    instr[count++].instr = instr_tbl[INSTR_DROP];
-#else
-    instr[count++].instr = INSTR_DROP;
-#endif
-
-    /* write drop instr to local wire table */
-    reg_cp(xwr_instr, (void *)instr, NIC_MAX_INSTR<<2);
-    byte_off = NIC_PORT_TO_NBI_INDEX(NIC_NBI, vnic) * NIC_MAX_INSTR;
-    upd_rx_wire_instr(xwr_instr, byte_off << 2, count);
-
-#ifdef APP_CONFIG_DEBUG
-		{
-			union debug_instr_journal data;
-			data.value = 0x00;
-			data.event = PORT_DOWN;
-			data.param = vnic;
-			JDBG(app_debug_jrn, data.value);
-		}
-#endif
-
-    return;
+    return 0;
 }

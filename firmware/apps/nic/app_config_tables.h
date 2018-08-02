@@ -20,39 +20,78 @@
 #ifndef _APP_CONFIG_TABLES_H_
 #define _APP_CONFIG_TABLES_H_
 
+#include <app_config_instr.h>
 
+/* from linux errno-base.h */
+#define	ENOSPC	28
+#define	EINVAL	22
 
-/**
- * Handle port config from PCIe. Configure the config instruction tables
- * for wire and host.
- *
- * @vid         VNIC ID
- * @control     First word of the BAR data
- * @update      Second word of the BAR data
- */
-void app_config_port(unsigned int vid, unsigned int control,
-                     unsigned int update);
+enum cfg_msg_err {
+    NO_ERROR = 0,
 
-/**
- * Handle SRIOV port config from PCIe. Configure the hashmap SRIOV
- * config instruction tables for wire and host.
- *
- * @vid             VNIC ID
- * @action_list     Pointer to action list
- * @control         First word of the BAR data
- * @update          Second word of the BAR data
- */
-void app_config_sriov_port(uint32_t vid, __lmem uint32_t *action_list,
-			   uint32_t control, uint32_t update);
+    /* Note: Negative values are errors. */
+    MAC_VLAN_ADD_FAIL = ENOSPC,
+    MAC_VLAN_WRONG_VF = -2,
 
-/**
- * Handle port down from PCIe. Configure the config instruction tables
- * for wire and host.
- *
- * @vid             VNIC ID
- */
-void app_config_port_down(uint32_t vid);
+    /* Note: Positive values are warnings. */
+    MAC_VLAN_DELETE_WARN = 1,
+};
 
+/* MAC address building macros */
+#define MAC64_FROM_SRIOV_CFG(cfg)     (((uint64_t) (cfg).mac_hi << 16) | (cfg).mac_lo)
+#define MAC64_FROM_VEB_KEY(key)       (((uint64_t) (key).mac_addr_hi << 32) | (key).mac_addr_lo)
+#define VEB_KEY_FROM_MAC64(key, mac)  do { \
+    key.__raw[0] = 0; \
+    key.mac_addr_hi = mac >> 32; \
+    key.mac_addr_lo = mac; \
+} while (0);
+
+typedef struct {
+    union instruction_format instr[NIC_MAX_INSTR];
+    uint32_t count;
+    uint32_t prev;
+} __lmem __shared action_list_t;
+
+void cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
+                    uint32_t pf_control, uint32_t vf_control);
+
+void cfg_act_build_pf(action_list_t *acts, uint32_t pcie, uint32_t vid,
+		      uint32_t veb_up, uint32_t control, uint32_t update);
+
+void cfg_act_build_ctrl(action_list_t *acts, uint32_t pcie, uint32_t vid);
+
+void cfg_act_build_veb_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
+                    uint32_t pf_control, uint32_t vf_control, uint32_t update);
+
+void cfg_act_build_veb_pf(action_list_t *acts, uint32_t pcie, uint32_t vid,
+                    uint32_t control, uint32_t update);
+
+void cfg_act_write_host(uint32_t pcie, uint32_t vid, action_list_t *acts);
+
+void cfg_act_build_nbi(action_list_t *acts, uint32_t pcie, uint32_t vid,
+		       uint32_t veb_up, uint32_t control, uint32_t update);
+
+void cfg_act_write_wire(uint32_t port, action_list_t *acts);
+
+void cfg_act_write_host(uint32_t pcie, uint32_t vid, action_list_t *acts);
+
+void cfg_act_build_nbi_down(action_list_t *acts, uint32_t pcie, uint32_t vid);
+
+void cfg_act_build_pcie_down(action_list_t *acts, uint32_t pcie, uint32_t vid);
+
+enum cfg_msg_error cfg_act_write_veb(uint32_t vid,
+				     __lmem struct nic_mac_vlan_key *veb_key,
+		                     action_list_t *acts);
+
+int cfg_act_vf_up(uint32_t pcie, uint32_t vid, uint32_t pf_control,
+		  uint32_t vf_control, uint32_t update);
+
+int cfg_act_vf_down(uint32_t pcie, uint32_t vid);
+
+int cfg_act_pf_up(uint32_t pcie, uint32_t vid, uint32_t veb_up,
+		  uint32_t control, uint32_t update);
+
+int cfg_act_pf_down(uint32_t pcie, uint32_t vid);
 /**
  * Initialize app ME NN registers
  */

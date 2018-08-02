@@ -82,9 +82,9 @@
 #if defined(__NFP_LANG_ASM)
     #define    INSTR_DROP              0
     #define    INSTR_RX_WIRE           1
-    #define    INSTR_MAC               2
+    #define    INSTR_MAC_MATCH         2
     #define    INSTR_RSS               3
-    #define    INSTR_CHECKSUM_COMPLETE 4
+    #define    INSTR_CHECKSUM          4
     #define    INSTR_TX_HOST           5
     #define    INSTR_RX_HOST           6
     #define    INSTR_TX_WIRE           7
@@ -92,13 +92,17 @@
     #define    INSTR_EBPF              9
     #define    INSTR_POP_VLAN          10
     #define    INSTR_PUSH_VLAN         11
+    #define    INSTR_VEB_LOOKUP        12
+    #define    INSTR_POP_PKT           13
+    #define    INSTR_PUSH_PKT          14
+    #define    INSTR_TX_VLAN           15
 #elif defined(__NFP_LANG_MICROC)
-enum instruction_type {
+enum instruction_ops {
     INSTR_DROP = 0,
     INSTR_RX_WIRE,
-    INSTR_MAC,
+    INSTR_MAC_MATCH,
     INSTR_RSS,
-    INSTR_CHECKSUM_COMPLETE,
+    INSTR_CHECKSUM,
     INSTR_TX_HOST,
     INSTR_RX_HOST,
     INSTR_TX_WIRE,
@@ -109,12 +113,23 @@ enum instruction_type {
     INSTR_VEB_LOOKUP,
     INSTR_POP_PKT,
     INSTR_PUSH_PKT,
+    INSTR_TX_VLAN
 };
+
+/* this maping will eventually be replaced at build time with actual offsets
+ *
+ * - required to be in monotonically increasing order of relative action
+ *   addresses as they appear in ME code store
+ * - additional entry at end denotes length of the last action (as if another
+ *   action follows)
+ */
 
 /* Instruction format of NIC_CFG_INSTR_TBL table.
  *
  *
  * INSTR_DROP:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *       +-----------------------------+-+-------------------------------+
  *    0  |              0              |P|           Reserved            |
  *       +-----------------------------+-+-------------------------------+
@@ -124,32 +139,45 @@ enum instruction_type {
  * INSTR_RX_WIRE:
  * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
- *       +-----------------------------+-+---+---------------------------+
- *    0  |              1              |P| 0 |           MTU             |
- *       +-----------------------------+-+---+---+-------------+-----+-+-+
- *    1  |                Reserved               |VXLAN_NN_IDX |VXLAN|G|N|
- *       +---------------------------------------+-------------+-----+-+-+
+ *       +-----------------------------+-+-------+-------------+-----+-+-+
+ *    0  |              1              |P|   0   |VXLAN_NN_IDX |VXLAN|G|N|
+ *       +-----------------------------+-+-------+-------------+-----+-+-+
  *
  *       VXLAN_NN_IDX = NN base of VXLAN port table
  *       VXLAN = Number of VXLAN ports
  *       G = Parse GENEVE
  *       N = Parse NVGRE
  *
- * INSTR_MAC_CLASSIFY:
+ * INSTR_VEB_LOOKUP:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *       +-----------------------------+-+-------------------------------+
  *    0  |              2              |P|            MAC HI             |
  *       +-----------------------------+-+-------------------------------+
  *    1  |                            MAC LO                             |
  *       +---------------------------------------------------------------+
  *
- * Passing MAC = 0xffffff enabled promiscuous mode
+ * MAC: pass on match (skip lookup / shortcut to PF)
+ * MAC = 0: pass on VEB miss (promiscuous mode)
+ *
+ * INSTR_MAC_MATCH:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+-------------------------------+
+ *    0  |              3              |P|            MAC HI             |
+ *       +-----------------------------+-+-------------------------------+
+ *    1  |                            MAC LO                             |
+ *       +---------------------------------------------------------------+
+ *
+ * MAC: drop on mismatch
  *
  * INSTR_RSS:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *       +-----------------------------+-+-+-----------+-+-+-+-+---------+
- *    0  |              3              |P|1| MAX Queue |u|t|U|T| C Shift |
+ *    0  |              4              |P|1| MAX Queue |u|t|U|T| C Shift |
  *       +---------------+-------------+-+-+-----+-----+-+-+-+-+---------+
- *    1  |  Queue Mask   |  Row Mask   | Col Msk | Table Addr  | R Shift |
+ *    1  |  Queue Mask   |  Row Mask   |    -    | Table Addr  | R Shift |
  *       +---------------+-------------+---------+-------------+---------+
  *    2  |                            RSS Key                            |
  *       +---------------------------------------------------------------+
@@ -160,66 +188,112 @@ enum instruction_type {
  *       T - Enable IPV6_TCP
  *       1 - RSSv1
  *
- * INSTR_CHECKSUM_COMPLETE:
- *       +-----------------------------+-+-------------------------------+
- *    0  |              4              |P|           Reserved            |
- *       +-----------------------------+-+-------------------------------+
+ * INSTR_CHECKSUM:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+-------------------------+-+-+-+
+ *    0  |              5              |P|     Reserved            |O|I|C|
+ *       +-----------------------------+-+-------------------------+-+-+-+
+ *
+ *       C - Calculate and prepend CHECKSUM_COMPLETE metadata
+ *       O - Update outer checksums in packet (L3 and L4, if from host)
+ *       I - Update inner checksums in packet (L3 and L4, if from host)
  *
  * INSTR_TX_HOST:
- *       +-----------------------------+-+---------------+---+-----------+
- *    0  |              5              |P|       0       |PCI|Base Queue |
- *       +-----------------------------+-+---------------+---------------+
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+-+-+-----------+---+-----------+
+ *    0  |              6              |P|C|M|  MIN RXB  |PCI|Base Queue |
+ *       +-----------------------------+-+-+-+-----------+---+-----------+
+ *
+ * C - Continue action processing after TX (non-terminal)
+ * M - continue only if packet MAC DST is Multicast/Broadcast
+ *
+ *
+ * INSTR_TX_VLAN:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+-------------------------------+
+ *    0  |              7              |P|           Reserved            |
+ *       +-----------------------------+-+-------------------------------+
  *
  * INSTR_RX_HOST:
- *       +-----------------------------+-+---------------+---------------+
- *    0  |              6              |P| 0 |           MTU             |
- *       +-------------------------------+---+---------------------------+
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+---+-----------+---------------+
+ *    0  |              8              |P| 0 |           MTU             |
+ *       +-----------------------------+-+---+---------------------------+
  *
  * INSTR_TX_WIRE:
- *       +-----------------------------+-+---------+-+-------------------+
- *    0  |              7              |P|    0    |N|     TM Queue      |
- *       +-----------------------------+-+---------+-+-------------------+
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+-+-+-----+-+-------------------+
+ *    0  |              9              |P|C|M|  0  |N|     TM Queue      |
+ *       +-----------------------------+-+-+-+-----+-+-------------------+
+ *
+ * C - Continue (non-terminal action)
+ * M - continue if Multicast
+ * N - NBI
  *
  * INSTR_RX_CMSG:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *       +-----------------------------+-+-------------------------------+
- *    0  |              8              |P|           Reserved            |
+ *    0  |             10              |P|           Reserved            |
  *       +-----------------------------+-+-------------------------------+
  *
  * INSTR_EXEC_EBPF:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *       +-----------------------------+-+-------------------------------+
- *    0  |              9              |P|            UC Addr            |
- *       +-----------------------------+-+-------------------------------+
- *
- * INSTR_RX_VEB
- *       +-----------------------------+-+-------------------------------+
- *    0  |             10              |P|              MTU              |
+ *    0  |             11              |P|            UC Addr            |
  *       +-----------------------------+-+-------------------------------+
  *
- * INSTR_STRIP_VLAN:
+ * INSTR_POP_VLAN:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+-+-------------+---------------+
+ *    0  |             12              |P|                               |
+ *       +-----------------------------+-+-+-------------+---------------+
+ *
+ * INSTR_PUSH_VLAN:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+-+-------------+---------------+
+ *    0  |             13              |P|           VLAN ID             |
+ *       +-----------------------------+-+-+-------------+---------------+
+ *
+ * INSTR_PUSH_PKT:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *       +-----------------------------+-+-------------------------------+
- *    0  |             11              |P|           Reserved            |
+ *    0  |             14              |P|                               |
  *       +-----------------------------+-+-------------------------------+
  *
- * INSTR_LKUP_VLAN:
+ * INSTR_POP_PKT:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *       +-----------------------------+-+-------------------------------+
- *    0  |             12              |P|           Reserved            |
+ *    0  |             15              |P|                               |
  *       +-----------------------------+-+-------------------------------+
+ *
+ *
  */
 
 /* Instruction format of NIC_CFG_INSTR_TBL table. Some 32-bit words will
  * be parameter only i.e. MAC which is 48 bits. */
 union instruction_format {
     struct {
-        uint32_t instr : 15;
+        uint32_t op : 15;
         uint32_t pipeline: 1;
-        uint32_t param: 16;
+        uint32_t args: 16;
     };
     uint32_t value;
 };
 
 typedef union {
     struct {
-        uint32_t instr : 15;
+        uint32_t op : 15;
         uint32_t pipeline : 1;
         uint32_t v1_meta : 1;
         uint32_t max_queue : 6;
@@ -227,7 +301,7 @@ typedef union {
         uint32_t col_shf : 5;
         uint32_t queue_mask : 8;
         uint32_t row_mask : 7;
-        uint32_t col_mask : 5;
+        uint32_t reserved : 5;
         uint32_t table_addr : 7;
         uint32_t row_shf : 5;
 	uint32_t key;
@@ -237,22 +311,68 @@ typedef union {
 
 typedef union {
     struct {
-	    uint32_t instr: 15;
+	    uint32_t op: 15;
 	    uint32_t pipeline: 1;
-	    uint32_t zero: 2;
-	    uint32_t mtu: 14;
-	    uint32_t reserved: 20;
+	    uint32_t reserved: 4;
 	    uint32_t vxlan_nn_idx: 7;
 	    uint32_t parse_vxlans: 3;
 	    uint32_t parse_geneve: 1;
 	    uint32_t parse_nvgre: 1;
     };
-    uint32_t __raw[2];
+    uint32_t __raw[1];
 } instr_rx_wire_t;
+
+typedef union {
+    struct {
+        uint32_t op: 15;
+        uint32_t pipeline: 1;
+        uint32_t cont: 1;
+        uint32_t multicast: 1;
+        uint32_t min_rxb: 6;
+        uint32_t pcie: 2;
+        uint32_t queue: 6;
+    };
+    uint32_t __raw[1];
+} instr_tx_host_t;
+
+typedef union {
+    struct {
+        uint32_t op: 15;
+        uint32_t pipeline: 1;
+        uint32_t reserved: 16;
+    };
+    uint32_t __raw[2];
+} instr_tx_vlan_t;
+
+typedef union {
+    struct {
+        uint32_t op: 15;
+        uint32_t pipeline: 1;
+        uint32_t cont: 1;
+        uint32_t multicast: 1;
+        uint32_t reserved: 3;
+        //uint32_t nbi: 1;
+        uint32_t tm_queue: 11;
+    };
+    uint32_t __raw[1];
+} instr_tx_wire_t;
+
+typedef union {
+    struct {
+        uint32_t op: 15;
+        uint32_t pipeline: 1;
+        uint32_t reserved: 13;
+        uint32_t outer : 1;
+        uint32_t inner : 1;
+        uint32_t complete : 1;
+    };
+    uint32_t __raw[1];
+} instr_checksum_t;
 #endif
 
 #define INSTR_PIPELINE_BIT 16
 #define INSTR_OPCODE_LSB   17
+
 
 #define INSTR_RSS_V1_META_bf    0, 15, 15
 #define INSTR_RSS_MAX_QUEUE_bf  0, 14, 9
@@ -270,11 +390,6 @@ typedef union {
 #define INSTR_RX_PARSE_GENEVE_bf 1, 1, 1
 #define INSTR_RX_PARSE_NVGRE_bf  1, 0, 0
 
-/* use macros to map input VNIC port to index in NIC_CFG_INSTR_TBL table */
-/* NFD_VNIC_TYPE_PF, NFD_VNIC_TYPE_CTRL, NFD_VNIC_TYPE_VF */
-#define NIC_PORT_TO_PCIE_INDEX(pcie, type, vport, queue) \
-        ((pcie << 6) | (NFD_BUILD_QID((type),(vport),(queue))&0x3f))
-#define NIC_PORT_TO_NBI_INDEX(nbi, vport) ((1 << 8) | (nbi << 7) | (vport & 0x7f))
 #define INSTR_TX_CONTINUE_bf     0, 15, 15
 #define INSTR_TX_MULTICAST_bf    0, 14, 14
 
@@ -283,28 +398,31 @@ typedef union {
 #define INSTR_TX_WIRE_NBI_bf     0, 10, 10
 #define INSTR_TX_WIRE_TMQ_bf     0, 9, 0
 
+#define INSTR_DEL_OFFSET_bf      0, 14, 8
+#define INSTR_DEL_LENGTH_bf      0, 7, 0
+
 #if defined(__NFP_LANG_ASM)
 
-	#define __LOOP 0
-	#define __OFFSET 0
+    #define __LOOP 0
+    #define __OFFSET 0
 
-	#while (__LOOP <= (NUM_PCIE_Q_PER_PORT * NS_PLATFORM_NUM_PORTS))
-		.init NIC_CFG_INSTR_TBL+__OFFSET  ((INSTR_RX_HOST << INSTR_OPCODE_LSB) | 16383) INSTR_DROP
-                #define_eval __OFFSET (__OFFSET + (4 * NIC_MAX_INSTR))
-		#define_eval __LOOP (__LOOP + 1)
+    #while (__LOOP <= (NUM_PCIE_Q_PER_PORT * NS_PLATFORM_NUM_PORTS))
+        .init NIC_CFG_INSTR_TBL+__OFFSET  ((INSTR_RX_HOST << INSTR_OPCODE_LSB) | 16383) INSTR_DROP
+        #define_eval __OFFSET (__OFFSET + (4 * NIC_MAX_INSTR))
+        #define_eval __LOOP (__LOOP + 1)
+    #endloop
+
+    #define_eval __LOOP 0
+    #define_eval __OFFSET ((1 << 8) * (NIC_MAX_INSTR * 4))
+
+    #while (__LOOP < NS_PLATFORM_NUM_PORTS)
+        .init NIC_CFG_INSTR_TBL+__OFFSET  ((INSTR_RX_WIRE << INSTR_OPCODE_LSB) | 16383) INSTR_DROP
+        #define_eval __OFFSET (__OFFSET + (4 * NIC_MAX_INSTR))
+        #define_eval __LOOP (__LOOP + 1)
 	#endloop
 
-        #define_eval __LOOP 0
-	#define_eval __OFFSET (NIC_PORT_TO_NBI_INDEX(0, 0) * (NIC_MAX_INSTR * 4))
-
-	#while (__LOOP < NS_PLATFORM_NUM_PORTS)
-		.init NIC_CFG_INSTR_TBL+__OFFSET  ((INSTR_RX_WIRE << INSTR_OPCODE_LSB) | 16383) INSTR_DROP
-                #define_eval __OFFSET (__OFFSET + (4 * NIC_MAX_INSTR))
-		#define_eval __LOOP (__LOOP + 1)
-	#endloop
-
-	#undef __LOOP
-	#undef __OFFSET
+    #undef __LOOP
+    #undef __OFFSET
 
 
 #endif

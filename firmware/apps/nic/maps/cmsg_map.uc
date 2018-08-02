@@ -347,6 +347,7 @@ ret#:
     .reg ctm_buf_sz
     .reg ctm_only
     .reg desc
+    .reg meta_len
     .reg offset
     .reg pkt_len
     .reg pkt_num
@@ -448,6 +449,7 @@ ret#:
 	.reg reply_pktlen
 	.reg nfd_meta_len
 	.reg c_offset
+    .reg rx_queue
 	.reg read $cmsg_data[6]
 	.xfer_order $cmsg_data
 	.reg cmsg_hdr_w0
@@ -473,6 +475,8 @@ ret#:
 	// extract buffer address.
 	cmsg_get_mem_addr(mem_location, $nfd_data)
 
+    bitfield_extract(rx_queue, BF_AML($nfd_data, NFD_OUT_QID_fld))
+
     .sig read_sig
 	move(c_offset, NFD_IN_DATA_OFFSET)
 	mem[read32, $cmsg_data[0], c_offset, mem_location, <<8, 6], ctx_swap[read_sig]
@@ -480,17 +484,18 @@ ret#:
 
 	cmsg_validate(cmsg_type, cmsg_tag, cmsg_hdr_w0, cmsg_error#)
 
-    cmsg_proc(mem_location, reply_pktlen, cmsg_type, cmsg_tag, $cmsg_data, cmsg_exit_free#)
+    cmsg_proc(mem_location, reply_pktlen, cmsg_type, cmsg_tag, rx_queue, $cmsg_data, cmsg_exit_free_error#, cmsg_exit_free#)
 	cmsg_reply(nfd_pkt_meta, reply_pktlen, cmsg_no_credit#)
 	br[cmsg_exit#]
 
 cmsg_error#:
 	pkt_counter_incr(cmsg_err)
-cmsg_exit_free#:
 cmsg_no_credit#:
+cmsg_exit_free_error#:
 	pkt_counter_incr(cmsg_err_no_credits)
 cmsg_pkt_error#:
-	// free MU buffers
+	// free CTM + MU buffers
+cmsg_exit_free#:
 	cmsg_free_mem_buffer(nfd_pkt_meta)
 	br[cmsg_exit#]
 cmsg_exit_no_free#:
@@ -537,7 +542,7 @@ cmsg_exit#:
 #endm
 
 
-#macro cmsg_proc(in_addr_hi, out_pktlen, in_cmsg_type, in_cmsg_tag, HDR_DATA, ERROR_LABEL)
+ #macro cmsg_proc(in_addr_hi, out_pktlen, in_cmsg_type, in_cmsg_tag, in_rx_queue, HDR_DATA, ERROR_LABEL, FREE_LABEL)
 .begin
     .reg read $pkt_data[CMSG_TXFR_COUNT]
     .xfer_order $pkt_data
@@ -689,7 +694,9 @@ do_op#:
 			swap(le_key, cur_key, NO_LOAD_CC)
 
 			_cmsg_hashmap_op(l_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, key_offset, value_offset, flags, rc, swap, le_key, cur_key)
-
+    /* check if reply required */
+            alu[--, in_fd, -, SRIOV_TID]
+            beq[FREE_LABEL]
 			alu[key_offset, value_offset, +, 64]
 			alu[out_pktlen, out_pktlen, +, (64*2)]
 			alu[save_rc, save_rc, or, rc]
@@ -725,7 +732,6 @@ done#:
     		mem[write32, $reply[0], in_addr_hi, <<8, addr_lo, 3], sig_done[sig_reply_map_ops]
     		alu[out_pktlen, out_pktlen, +, (4*4)]
 			ctx_arb[sig_reply_map_ops]
-
 
 		.end
 

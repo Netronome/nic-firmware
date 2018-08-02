@@ -90,11 +90,9 @@ void main() {
         lkp_key.mac_addr_lo = mac_lo;
 
         reg_zero(actions, sizeof(actions));
-        actions[0].instr = INSTR_POP_VLAN;
-        actions[1].instr = INSTR_TX_HOST;
-        actions[1].param = NFD_VID2QID(pass, 0);
-        actions[1].pipeline = SET_PIPELINE_BIT(INSTR_POP_VLAN, INSTR_TX_HOST);
-        actions[2].value = 0;
+        actions[0].op = INSTR_TX_HOST;
+        actions[0].args = NFD_VID2QID(pass, 0);
+        actions[1].value = 0;
 
         /* invoke the routine being tested */
 
@@ -145,11 +143,9 @@ void main() {
         mem_read32(&actions_xfr, emem_ptr, sizeof(actions_xfr));
 
         reg_zero(actions_exp, sizeof(actions_exp));
-        actions_exp[0].instr = INSTR_POP_VLAN;
-        actions_exp[1].instr = INSTR_TX_HOST;
-        actions_exp[1].param = NFD_VID2QID(pass, 0);
-        actions_exp[1].pipeline = SET_PIPELINE_BIT(INSTR_POP_VLAN, INSTR_TX_HOST);
-        actions_exp[2].value = 0;
+        actions_exp[0].op = INSTR_TX_HOST;
+        actions_exp[0].args = NFD_VID2QID(pass, 0);
+        actions_exp[1].value = 0;
 
         for (i = 0; i < sizeof(actions_exp) / sizeof(uint32_t); i++)
             test_assert_equal(actions_xfr[i].value, actions_exp[i].value);
