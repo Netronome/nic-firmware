@@ -184,13 +184,13 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 4, 8), \
         $(call NIC_ISL_ME_DEST, 4, 9)"
 
-# Add cmsg map handler 
+# Add cmsg map handler
 $(eval $(call microcode.assemble,$(PROJECT),mapcmsg,apps/nic/maps,cmsg_app.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/lib))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/apps/nic/lib))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,firmware/apps/nic/maps))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,deps/ng-nfd.hg))
-$(eval $(call microcode.add_includes,$(PROJECT),mapcmsg,$(DEPS_DIR)/flowenv.git/me/blocks/blm))
+$(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(DEPS_DIR)/flowenv.git/me/blocks/blm))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(BLM_DIR)))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(GRO_DIR)))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,WORKERS_PER_ISLAND=4))
