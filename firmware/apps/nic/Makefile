@@ -5,6 +5,12 @@ ifndef PLATFORM
     $(error PLATFORM is not set)
 endif
 
+ifeq ($(FLAVOR), nic)
+    NS_FLAVOR_TYPE = 1
+else ifeq ($(FLAVOR), sriov)
+    NS_FLAVOR_TYPE = 2
+endif
+
 CHIP = nfp-4xxx-B0
 ifeq ($(PLATFORM),Hydrogen)
     NS_PLATFORM_TYPE = 1
@@ -58,7 +64,7 @@ else ifeq ($(PLATFORM),Starfighter_2x40_passive)
     AMDA = AMDA0058-0012
     CHIP = AMDA0058-0012:0
 endif
-PROJECT = nic_$(AMDA)_$(MEDIA)
+PROJECT = $(FLAVOR)/nic_$(AMDA)_$(MEDIA)
 
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
 $(eval $(call nffw.set_amda,$(PROJECT),$(AMDA)))
@@ -74,7 +80,7 @@ $(eval $(call fwdep.add_flowenv,$(PROJECT)))
 $(eval $(call fwdep.add_flowenv_nfp_init_flag,$(PROJECT),-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add GRO MEs
-$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei2.me11 mei3.me11,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei2.me11 mei3.me11,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE) -DNS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 
 # Add 1 BLM ME
 $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
@@ -85,6 +91,7 @@ $(eval $(call microcode.add_include,$(PROJECT),mcr,firmware/lib))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,firmware/apps/nic/lib))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,deps/ng-nfd.hg))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,$(BLM_DIR)))
+$(eval $(call microcode.add_define,$(PROJECT),mcr,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call nffw.add_obj,$(PROJECT),mcr,mei0.me10))
 
 # Add microcode datapath
@@ -107,6 +114,7 @@ $(eval $(call microcode.add_define,$(PROJECT),datapath,SS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=10))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 #$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
 $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
         mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5 mei0.me6 mei0.me7 mei0.me8 mei0.me9 \
@@ -195,11 +203,13 @@ $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(BLM_DIR)))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(GRO_DIR)))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,WORKERS_PER_ISLAND=4))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,GLOBAL_INIT=1))
+$(eval $(call microcode.add_define,$(PROJECT),mapcmsg,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,mei1.me10))
 
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_svc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_svc,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,app_config_tables))
 $(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,mei2.me10,mei4.me10))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,nic_basic))
@@ -218,17 +228,25 @@ $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Ob0))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_WORKER_ISLAND_LIST=$(NIC_APP_ISLANDS)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,CFG_NIC_LIB_DBG_JOURNAL=1))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call micro_c.add_tests,$(PROJECT),nfd_app_master))
 
 # Add NFD for PCIE0
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_issue0,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue1,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_issue1,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_gather,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_gather,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_notify,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_notify,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call fwdep.add_nfd_in,$(PROJECT),0,mei3.me10)) # specify Notify ME
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_cache,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_cache,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_sb,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.add_define,$(PROJECT),nfd_pcie0_sb,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_pd,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.add_define,$(PROJECT),nfd_pcie0_pd,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call fwdep.add_nfd_out,$(PROJECT),0,ila0.me1,ila0.me2 ila0.me3)) # Stage batch, then packet DMA MEs
 
 # Add TM PM initialization (codeless)
@@ -242,10 +260,12 @@ $(eval $(call nffw.add_obj_codeless,$(PROJECT),dump_spec))
 
 # Add NFD config BAR TLVs
 $(eval $(call microcode.assemble.codeless,$(PROJECT),nfd_tlv_init,apps/nic,init_tlv.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.add_define,$(PROJECT),nfd_tlv_init,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),nfd_tlv_init))
 
 # Link stage
 # Write the FW ID to the MIP
-$(eval $(call nffw.add_rtsyms,$(PROJECT),$(FW_ID)))
+$(eval $(call nffw.add_rtsyms,$(PROJECT),$(shell $(SCRIPT_DIR)/describe-head.sh --fw_id $(FLAVOR))))
+$(eval $(call nffw.add_link_flag,$(PROJECT),$(shell $(SCRIPT_DIR)/describe-head.sh --nfld_args $(FLAVOR))))
 # TODO get link_w_analysis to work without adding a warning
 $(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx,datapath))

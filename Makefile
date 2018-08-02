@@ -33,7 +33,6 @@ Q ?= @
 #Q ?=
 
 HG_USERNAME ?= $(shell whoami)
-FW_ID = $(shell ${SCRIPT_DIR}/describe-head.sh --fw_id)
 
 ALL: firmware_all
 
