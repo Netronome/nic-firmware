@@ -482,7 +482,6 @@ handle_sriov_update(uint32_t pf_vid, uint32_t pf_control, uint32_t pf_update)
         /* If the mac has changed, or is being set for the 1st time... */
         if ( vnic_entry_rd.src_mac != new_mac_addr ) {
 
-            lkp_key.s_not_c = 0;
             lkp_key.mac_addr_hi =
                 VEB_KEY_MAC_HI_FROM_BAR(sriov_cfg_data.mac_hi);
             lkp_key.mac_addr_lo =
@@ -579,7 +578,6 @@ handle_sriov_update(uint32_t pf_vid, uint32_t pf_control, uint32_t pf_update)
             /* and if mac is already set... */
             if (vnic_entry_rd.src_mac != 0) {
 
-                lkp_key.s_not_c = 0;
                 lkp_key.mac_addr_hi =
                     VEB_KEY_MAC_HI_FROM_SETUP(vnic_entry_rd.src_mac);
                 lkp_key.mac_addr_lo =

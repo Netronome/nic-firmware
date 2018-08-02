@@ -114,8 +114,8 @@ retry:;
     /* build queue descriptor */
     reg_zero(&workq_data, sizeof(workq_data));
 
-    workq_data[0] =((__ISLAND<<26) | (ctm_pnum<<16));
-    workq_data[1] = (uint32_t)(((uint64_t) emem_dst)>>11);
+    workq_data[0] = ((__ISLAND<<26) | (ctm_pnum<<16));
+    workq_data[1] = (uint32_t) ((((uint64_t) emem_dst)>>11) | (NFD_IN_BLM_REG_BLS << 29));
     workq_data[2] = (SRIOV_QUEUE<<16);
     /* place message on nfd work queue. */
     mem_workq_add_work(q_idx, q_base,
@@ -123,6 +123,6 @@ retry:;
 
     proc_res = CMESG_DISPATCH_OK;
 
-skip:;
+skip:
     return proc_res;
 }

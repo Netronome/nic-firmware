@@ -259,6 +259,143 @@ end#:
 #endm
 
 
+#macro pkt_io_tx_vlan(io_pkt_vec, IN_LABEL)
+.begin
+    .reg addr_hi
+    .reg addr_lo
+    .reg map_base
+    .reg meta_len
+    .reg min_rxb
+    .reg pci_q
+    .reg buf_sz
+    .reg src_q
+    .reg vlan_id
+    .reg vlan_ports[2] // top six bits of vlan_ports[0] used to store base queue when processing flips to 2nd word
+    .reg null_vlan_id
+    .reg read $vf_rxb
+    .reg read $nfd_credits
+    .reg write $nfd_desc[4]
+    .xfer_order $nfd_desc
+    .reg read $vlan_ports[2]
+    .xfer_order $vlan_ports
+    .reg $mac[3]
+    .xfer_order $mac
+    .sig sig_nfd
+    .sig sig_rd
+    .sig sig_wr
+
+    immed[map_base, (_vf_vlan_cache >> 16), <<(16 - 8)]
+
+    bitfield_extract(vlan_id, BF_AML(io_pkt_vec, PV_VLAN_ID_bf))
+    alu[addr_lo, --, B, vlan_id, <<3]
+
+    mem[read32, $vlan_ports[0], map_base, <<8, addr_lo, 2], ctx_swap[sig_rd], defer[2]
+        immed[null_vlan_id, NULL_VLAN]
+        immed[addr_lo, nfd_out_ring_info] // note, TX_VLAN does not support multi-PCIe
+
+    local_csr_wr[ACTIVE_LM_ADDR_0, addr_lo]
+
+    bitfield_extract__sz1(src_q, BF_AML(io_pkt_vec, PV_QUEUE_IN_bf)) ; PV_QUEUE_IN_bf
+    pv_get_base_addr(addr_hi, addr_lo, io_pkt_vec)
+
+    alu[--, vlan_id, -, null_vlan_id]
+    beq[null_vlan#], defer[3]
+        alu[min_rxb, 0xff, ~AND, $vlan_ports[0], >>(26-8)]
+        alu[vlan_ports[0], $vlan_ports[0], AND~, 0x3f, <<26]
+        alu[vlan_ports[1], --, B, $vlan_ports[1]]
+
+strip_vlan#:
+    mem[read32, $mac[0], addr_hi, <<8, addr_lo, 3], ctx_swap[sig_rd], defer[2]
+        alu[addr_lo, addr_lo, +, 4]
+        alu[BF_A(io_pkt_vec, PV_OFFSET_bf), BF_A(io_pkt_vec, PV_OFFSET_bf), +, 4]
+    alu[$mac[0], --, B, $mac[0]]
+    alu[$mac[1], --, B, $mac[1]]
+    #pragma warning(disable:5009)
+    #pragma warning(disable:4700)
+    mem[write32, $mac[0], addr_hi, <<8, addr_lo, 3], ctx_swap[sig_wr], defer[2]
+    #pragma warning(default:4700)
+        alu[$mac[2], --, B, $mac[2]]
+    #pragma warning(default:5009)
+        alu[BF_A(io_pkt_vec, PV_LENGTH_bf), BF_A(io_pkt_vec, PV_LENGTH_bf), -, 4]
+
+null_vlan#:
+    pv_meta_write(meta_len, io_pkt_vec, addr_hi, addr_lo)
+    pv_get_nfd_host_desc($nfd_desc, io_pkt_vec, meta_len)
+    pv_get_required_host_buf_sz(buf_sz, io_pkt_vec, meta_len)
+
+tx_vlan_loop#:
+    alu[--, --, B, vlan_ports[1]]
+    beq[check_done#]
+
+    ffs[pci_q, vlan_ports[1]]
+    alu[pci_q, pci_q, OR, vlan_ports[0], >>26]
+    alu[vlan_ports[1], vlan_ports[1], AND~, 1, <<indirect]
+
+    alu[--, src_q, -, pci_q]
+    beq[tx_vlan_loop#]
+
+    alu[--, min_rxb, -, buf_sz]
+    bmi[vf_buf_sz_check#]
+
+packet_fits#:
+    alu[addr_hi, --, B, (__NFD_DIRECT_ACCESS | NFD_PCIE_ISL_BASE), <<24]
+    alu[addr_lo, --, B, pci_q, <<(log2(NFD_OUT_ATOMICS_SZ))]
+    ov_single(OV_IMMED8, 1)
+    mem[test_subsat_imm, $nfd_credits, addr_hi, <<8, addr_lo, 1], indirect_ref, ctx_swap[sig_nfd]
+
+    alu[--, --, B, $nfd_credits]
+    beq[no_tx_continue#]
+
+    pv_multicast_resend(io_pkt_vec)
+
+    pv_update_nfd_desc_queue($nfd_desc, io_pkt_vec, buf_sz, meta_len, pci_q)
+
+    alu[addr_hi, *l$index0, AND, 0xff, <<24]
+    ld_field_w_clr[addr_lo, 0011, *l$index0]
+    mem[qadd_work, $nfd_desc[0], addr_hi, <<8, addr_lo, 4], ctx_swap[sig_nfd]
+
+    pv_stats_tx_host(io_pkt_vec, 0, pci_q, --, tx_vlan_loop#, --)
+
+vf_buf_sz_check#:
+    move(addr_hi, (_fl_buf_sz_cache >> 8))
+    alu[addr_lo, --, B, pci_q, <<2]
+    mem[read32, $vf_rxb, addr_hi, <<8, addr_lo, 1], ctx_swap[sig_rd]
+    alu[--, $vf_rxb, -, buf_sz]
+    bge[packet_fits#]
+
+    pv_stats_update(io_pkt_vec, RX_DISCARD_MRU, pci_q, tx_vlan_loop#)
+
+no_tx_continue#:
+    pv_stats_update(io_pkt_vec, RX_DISCARD_PCI, pci_q, tx_vlan_loop#)
+
+pop_error#:
+    pv_stats_update(io_pkt_vec, ERROR_PKT_STACK, IN_LABEL)
+
+check_done#:
+    alu[vlan_ports[1], vlan_ports[0], AND~, 0x3f, <<26]
+    bne[tx_vlan_loop#], defer[1]
+        alu[vlan_ports[0], --, B, 32, <<26]
+
+    alu[--, vlan_id, -, null_vlan_id]
+    beq[IN_LABEL]
+
+    pv_pop(io_pkt_vec, pop_error#)
+
+    immed[vlan_id, NULL_VLAN]
+    alu[addr_lo, --, B, vlan_id, <<3]
+    mem[read32, $vlan_ports[0], map_base, <<8, addr_lo, 2], ctx_swap[sig_rd]
+
+    pv_get_base_addr(addr_hi, addr_lo, io_pkt_vec)
+
+    alu[vlan_ports[1], --, B, $vlan_ports[1]]
+    br[null_vlan#], defer[2]
+        alu[min_rxb, 0xff, ~AND, $vlan_ports[0], >>(26-8)]
+        alu[vlan_ports[0], $vlan_ports[0], AND~, 0x3f, <<26]
+
+.end
+#endm
+
+
 #macro __pkt_io_dispatch_nbi()
 .begin
     .reg addr
