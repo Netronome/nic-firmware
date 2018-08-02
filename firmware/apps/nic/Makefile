@@ -213,6 +213,8 @@ $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(DEPS_DIR)/
 $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(DEPS_DIR)/flowenv.git/me/lib/pkt,libpkt))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnn_mode=1))
+$(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qip_no_inlining))
+$(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Ob0))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_WORKER_ISLAND_LIST=$(NIC_APP_ISLANDS)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,CFG_NIC_LIB_DBG_JOURNAL=1))

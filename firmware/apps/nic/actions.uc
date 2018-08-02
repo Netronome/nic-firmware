@@ -199,8 +199,6 @@ end#:
     .reg mac_lo
     .reg port_mac[2]
 
-    .sig sig_read
-
     __actions_read(port_mac[0], 0xffff)
     __actions_read(port_mac[1])
 
@@ -564,7 +562,7 @@ next#:
     ins_1#: br[rx_wire#]
     ins_2#: br[mac_match#]
     ins_3#: br[rss#]
-    ins_4#: br[checksum_complete#]
+    ins_4#: br[checksum#]
     ins_5#: br[tx_host#]
     ins_6#: br[rx_host#]
     ins_7#: br[tx_wire#]
@@ -612,7 +610,7 @@ rss#:
     __actions_rss(io_pkt_vec)
     __actions_next()
 
-checksum_complete#:
+checksum#:
     __actions_checksum_complete(io_pkt_vec)
     __actions_next()
 
