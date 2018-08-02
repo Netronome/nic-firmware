@@ -60,13 +60,11 @@ void main() {
             entry.vlan = 32;
             entry.spoof_chk = 0;
             entry.link_state_mode = 2;
-            exp[0].instr = INSTR_RX_VEB;
-            exp[0].param = mtu + NET_ETH_LEN + 1;
-            exp[1].instr = INSTR_STRIP_VLAN;
-            exp[2].instr = INSTR_CHECKSUM_COMPLETE;
-            exp[3].instr = INSTR_TX_HOST;
-            exp[3].param = NFD_VID2QID(vid, 0);
-            exp[3].pipeline =
+            exp[0].instr = INSTR_POP_VLAN;
+            exp[1].instr = INSTR_CHECKSUM_COMPLETE;
+            exp[2].instr = INSTR_TX_HOST;
+            exp[2].param = NFD_VID2QID(vid, 0);
+            exp[2].pipeline =
                 SET_PIPELINE_BIT(INSTR_CHECKSUM_COMPLETE, INSTR_TX_HOST);
             break;
 
@@ -76,14 +74,12 @@ void main() {
             entry.vlan = 32;
             entry.spoof_chk = 0;
             entry.link_state_mode = 2;
-            exp[0].instr = INSTR_RX_VEB;
-            exp[0].param = mtu + NET_ETH_LEN + 1;
-            exp[1].instr = INSTR_STRIP_VLAN;
-            exp[2].instr = INSTR_TX_HOST;
-            exp[2].param = NFD_VID2QID(vid, 0);
-            exp[2].pipeline =
-                SET_PIPELINE_BIT(INSTR_STRIP_VLAN, INSTR_TX_HOST);
-            exp[3].value = 0;
+            exp[0].instr = INSTR_POP_VLAN;
+            exp[1].instr = INSTR_TX_HOST;
+            exp[1].param = NFD_VID2QID(vid, 0);
+            exp[1].pipeline =
+                SET_PIPELINE_BIT(INSTR_POP_VLAN, INSTR_TX_HOST);
+            exp[2].value = 0;
             break;
 
         /* csum complete, no vlan configured */
@@ -92,14 +88,12 @@ void main() {
             entry.vlan = NIC_NO_VLAN_ID;
             entry.spoof_chk = 0;
             entry.link_state_mode = 2;
-            exp[0].instr = INSTR_RX_VEB;
-            exp[0].param = mtu + NET_ETH_LEN + 1;
-            exp[1].instr = INSTR_CHECKSUM_COMPLETE;
-            exp[2].instr = INSTR_TX_HOST;
-            exp[2].param = NFD_VID2QID(vid, 0);
-            exp[2].pipeline =
+            exp[0].instr = INSTR_CHECKSUM_COMPLETE;
+            exp[1].instr = INSTR_TX_HOST;
+            exp[1].param = NFD_VID2QID(vid, 0);
+            exp[1].pipeline =
                 SET_PIPELINE_BIT(INSTR_CHECKSUM_COMPLETE, INSTR_TX_HOST);
-            exp[3].value = 0;
+            exp[2].value = 0;
             break;
 
         /* no csum complete, no vlan configured */
@@ -108,14 +102,12 @@ void main() {
             entry.vlan = NIC_NO_VLAN_ID;
             entry.spoof_chk = 0;
             entry.link_state_mode = 2;
-            exp[0].instr = INSTR_RX_VEB;
-            exp[0].param = mtu + NET_ETH_LEN + 1;
-            exp[1].instr = INSTR_TX_HOST;
-            exp[1].param = NFD_VID2QID(vid, 0);
-            exp[1].pipeline =
-                SET_PIPELINE_BIT(INSTR_STRIP_VLAN, INSTR_TX_HOST);
+            exp[0].instr = INSTR_TX_HOST;
+            exp[0].param = NFD_VID2QID(vid, 0);
+            exp[0].pipeline =
+                SET_PIPELINE_BIT(INSTR_POP_VLAN, INSTR_TX_HOST);
+            exp[1].value = 0;
             exp[2].value = 0;
-            exp[3].value = 0;
             break;
 
         default:

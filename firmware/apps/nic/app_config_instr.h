@@ -69,9 +69,8 @@
     #define    INSTR_TX_WIRE           7
     #define    INSTR_CMSG              8
     #define    INSTR_EBPF              9
-    #define    INSTR_VX_VEB            10
-    #define    INSTR_STRIP_VLAN        11
-    #define    INSTR_LKUP_VLAN         12
+    #define    INSTR_POP_VLAN          10
+    #define    INSTR_PUSH_VLAN         11
 #elif defined(__NFP_LANG_MICROC)
 enum instruction_type {
     INSTR_DROP = 0,
@@ -84,9 +83,8 @@ enum instruction_type {
     INSTR_TX_WIRE,
     INSTR_CMSG,
     INSTR_EBPF,
-    INSTR_RX_VEB,
-    INSTR_STRIP_VLAN,
-    INSTR_LKUP_VLAN
+    INSTR_POP_VLAN,
+    INSTR_PUSH_VLAN,
 };
 
 /* Instruction format of NIC_CFG_INSTR_TBL table.
