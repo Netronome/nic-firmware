@@ -97,6 +97,7 @@ enum instruction_type {
     INSTR_EBPF,
     INSTR_POP_VLAN,
     INSTR_PUSH_VLAN,
+    INSTR_VEB_LOOKUP,
 };
 
 /* Instruction format of NIC_CFG_INSTR_TBL table.

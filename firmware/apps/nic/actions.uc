@@ -99,6 +99,100 @@
 #endm
 
 
+/* VEB lookup key:
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------+-------+-------------------------------+
+ *    0  |       VLAN ID         |   0   |         MAC ADDR HI           |
+ *       +-----------------------+-------+-------------------------------+
+ *    1  |                           MAC ADDR LO                         |
+ *       +---------+-------------------------------------------+---------+
+ */
+
+#macro __actions_veb_lookup(in_pkt_vec, DROP_LABEL)
+.begin
+    .reg ins_addr[2]
+    .reg key_addr
+    .reg mac_hi
+    .reg mac_lo
+    .reg port_mac[2]
+    .reg tid
+    .reg tmp
+    .reg vlan_id
+
+    .sig sig_read
+
+    __actions_read(port_mac[0], 0xffff)
+    __actions_read(port_mac[1])
+
+    br_bset[BF_AL(in_pkt_vec, PV_MAC_DST_MC_bf), end#]
+    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY, mac_match_check#)
+
+veb_error#:
+    pv_stats_update(in_pkt_vec, RX_ERROR_VEB, DROP_LABEL)
+
+veb_miss#:
+    alu[--, port_mac[0], OR, port_mac[1]]
+    beq[done#]
+    pv_stats_update(in_pkt_vec, RX_DISCARD_ADDR, DROP_LABEL)
+
+veb_lookup#:
+    immed[key_addr, __actions_sriov_keys]
+    alu[key_addr, key_addr, OR, t_idx_ctx, >>5]
+    local_csr_wr[ACTIVE_LM_ADDR_0, key_addr]
+
+    alu[tid, --, B, SRIOV_TID]
+    bitfield_extract(vlan_id, BF_AML(in_pkt_vec, PV_VLAN_ID_bf))
+    alu[vlan_id, --, B, vlan_id, <<20]
+
+    alu[*l$index0++, vlan_id, +16, *$index++]
+    alu[*l$index0, --, B, *$index]
+
+    #define HASHMAP_RXFR_COUNT 4
+    #define MAP_RDXR $__pv_pkt_data
+    // hashmap_ops will overwrite the packet cache, we MUST invalidate
+    pv_invalidate_cache(in_pkt_vec)
+    hashmap_ops(tid,
+                key_addr,
+                --,
+                HASHMAP_OP_LOOKUP,
+                veb_error#, // invalid map - should never happen
+                veb_miss#, // sriov miss
+                HASHMAP_RTN_ADDR,
+                --,
+                --,
+                ins_addr,
+                swap)
+    #undef MAP_RDXR
+    #undef HASHMAP_RXFR_COUNT
+
+veb_hit#:
+    //Load a new set of instructions as pointed by the returned address.
+    //Note that from this point on the original instructions list is overwritten and
+    //we no longer process instructions from current list.
+    ov_start(OV_LENGTH)
+    ov_set_use(OV_LENGTH, 16, OVF_SUBTRACT_ONE)
+    ov_clean()
+    mem[read32, $__actions[0], ins_addr[0], <<8, ins_addr[1], max_16], indirect_ref, sig_done[sig_read]
+
+    ctx_arb[sig_read], defer[2], br[done#]
+        .reg_addr __actions_t_idx 28 B
+        alu[__actions_t_idx, t_idx_ctx, OR, &$__actions[0], <<2]
+        nop
+
+mac_match_check#:
+    alu[mac_hi, port_mac[0], XOR, *$index++]
+    alu[mac_lo, port_mac[1], XOR, *$index--]
+    alu[--, mac_lo, OR, mac_hi, <<16]
+    bne[veb_lookup#]
+
+done#:
+    __actions_restore_t_idx()
+
+end#:
+.end
+#endm
+
+
 #macro __actions_mac_match(in_pkt_vec, DROP_LABEL)
 .begin
     .reg mac_hi
@@ -464,7 +558,7 @@ skip_checksum#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#]
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#, ins_12#]
 
     ins_0#: br[drop_act#]
     ins_1#: br[rx_wire#]
@@ -478,6 +572,7 @@ next#:
     ins_9#: br[ebpf#]
     ins_10#: br[pop_vlan#]
     ins_11#: br[push_vlan#]
+    ins_12#: br[veb_lookup#]
 
 drop_proto#:
     // invalid protocols have no sequencer, must not go to reorder
@@ -537,6 +632,10 @@ pop_vlan#:
 
 push_vlan#:
     __actions_push_vlan(io_pkt_vec)
+    __actions_next()
+
+veb_lookup#:
+    __actions_veb_lookup(io_pkt_vec, drop#)
     __actions_next()
 
 cmsg#:
