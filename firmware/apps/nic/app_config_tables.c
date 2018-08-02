@@ -24,9 +24,12 @@
 #include <vnic/pci_in.h>
 #include <vnic/pci_out.h>
 #include <vnic/nfd_common.h>
+#include <vnic/shared/nfd_vf_cfg_iface.h>
 #include <shared/nfp_net_ctrl.h>
 #include <nic_basic/nic_basic.h>
 #include <nic_basic/nic_stats.h>
+#include "app_mac_vlan_config_cmsg.h"
+#include "maps/cmsg_map_types.h"
 #include "app_config_tables.h"
 #include "app_config_instr.h"
 #include "ebpf.h"
@@ -373,6 +376,45 @@ upd_rx_host_instr (__xwrite uint32_t *xwr_instr,
 }
 
 __lmem __shared uint32_t rss_tmp[32];
+/* Copy VLAN members table to all CTMs */
+__intrinsic void
+upd_ctm_vlan_members()
+{
+    __ctm __addr40 void *vlan_vnic_members_tbl = (__ctm __addr40 void*)
+                                        __link_sym("_vf_vlan_cache");
+
+    SIGNAL sig_read;
+    SIGNAL sig_write;
+    uint32_t addr_hi;
+    uint32_t addr_lo;
+    uint32_t start_offset;
+    uint32_t isl;
+    struct nfp_mecsr_prev_alu ind;
+    __xwrite uint32_t wr_data[16];
+    __xread uint32_t rd_data[16];
+
+    ind.__raw = 0;
+    ind.ov_len = 1;
+    ind.length = 15;
+
+    /* Propagate to all worker CTM islands */
+    for(start_offset = 0; start_offset < (4096*64)/8; start_offset+=64){
+        mem_read32(&rd_data, &nic_vlan_to_vnics_map_tbl[(start_offset/8)], (16*4));
+        reg_cp(wr_data, rd_data, sizeof(rd_data));
+        for (isl= 32; isl< 37; isl++) {
+            addr_lo = (uint32_t)vlan_vnic_members_tbl + start_offset;
+            addr_hi = ((isl) << (32 - 8));
+            addr_hi = (addr_hi | (1<<(39-8)));
+            __asm {
+                alu[--, --, B, ind.__raw]
+                mem[write32, wr_data, addr_hi, << 8, addr_lo, \
+                       max_16], ctx_swap[sig_write], indirect_ref
+            }
+        }
+    }
+    return;
+}
+
 
 //for each port there must be call to this.
 //for each port size of table must be known and configured accordingly

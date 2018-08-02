@@ -18,6 +18,8 @@
 
 #define RSS_TBL_SIZE_LW     64
 
+#define VLAN_TO_VNICS_MAP_TBL_SIZE ((1<<12) * 8)
+
 /* For host ports,
  *   use 0 to NIC_HOST_MAX_ENTRIES-1
  * For wire ports,
@@ -26,6 +28,8 @@
 
     .alloc_mem NIC_CFG_INSTR_TBL cls+NIC_CFG_INSTR_TBL_ADDR \
                 island NIC_CFG_INSTR_TBL_SIZE addr40
+
+    .alloc_mem _vf_vlan_cache ctm island VLAN_TO_VNICS_MAP_TBL_SIZE 65536
 
     /* PCIe Queue RX BUF SZ table*/
     .alloc_mem _fl_buf_sz_cache imem global (64*4*4) 256
@@ -38,13 +42,18 @@
             island NIC_CFG_INSTR_TBL_SIZE addr40
     }
 
+    __asm
+    {
+        .alloc_mem _vf_vlan_cache ctm island VLAN_TO_VNICS_MAP_TBL_SIZE 65536
+    }
+
     /* PCIe Queue RX BUF SZ table*/
     __asm
     {
         .alloc_mem _fl_buf_sz_cache imem global (64*4*4) 256
     }
-#endif
 
+#endif
 /* Instructions in the worker (actions.uc) should follow the exact same order
  * as in enum used by app config below.
  * The pipeline bit in the instruction_format is set when previous and

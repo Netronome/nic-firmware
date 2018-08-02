@@ -10,6 +10,7 @@
 
 #include <net/eth.h>
 #include "nfd_user_cfg.h"
+#include <vnic/shared/nfd_cfg.h>
 
 struct vlan_filter_cfg {
     union {
@@ -57,6 +58,14 @@ struct nfp_vnic_setup_entry {
     };
 };
 
+/* vid to <SrcMAC, VLAN, flags> mapping table */
+__export __shared __imem_n(0) __addr40 __align16
+                        struct nfp_vnic_setup_entry nic_vnic_setup_map_tbl[NVNICS];
+
+/* VLAN to vid mapping table */
+__export __shared __mem uint64_t nic_vlan_to_vnics_map_tbl[NIC_NUM_VLANS];
+
+
 /**
  * Init nic tables
  */
@@ -70,7 +79,7 @@ __intrinsic void nic_tables_init();
  *
  * @return 0 on success, -1 on failure
  */
-__intrinsic int load_vnic_setup_entry(uint16_t vid,
+__intrinsic int load_vnic_setup_entry(uint32_t vid,
                                __xread struct nfp_vnic_setup_entry *entry);
 
 /**
@@ -81,7 +90,7 @@ __intrinsic int load_vnic_setup_entry(uint16_t vid,
  *
  * @return 0 on success, -1 on failure
  */
-__intrinsic int write_vnic_setup_entry(uint16_t vid,
+__intrinsic int write_vnic_setup_entry(uint32_t vid,
                                __xwrite struct nfp_vnic_setup_entry *entry);
 
 /**
