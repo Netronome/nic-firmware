@@ -812,6 +812,7 @@ $1__MAP  = $(FW_BUILD)/$1.map
 
 $$($1__NFFW): $$($1__LINK_DEPENDENCIES)
 	@echo Linking $$($1__NFFW) ...
+	$(Q)mkdir -p `dirname $$@`
 	$(Q)$(NFLD) $(NFLD_BASE_FLAGS) -chip $$($1__CHIP) $$($1__LINK_FLAGS) \
 		-o $$@ -map $$($1__MAP) $$($1__ME_LOADS)  $$($1__PPC_LOADS)
 

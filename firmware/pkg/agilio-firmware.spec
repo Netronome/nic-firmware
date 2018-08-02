@@ -1,4 +1,4 @@
-Name: agilio-__FW_NAME__-firmware
+Name: __FW_NAME__
 Summary: Firmware for Netronome Agilio SmartNICs
 License: Netronome
 Version: __VERSION__
@@ -8,7 +8,7 @@ Release: 1
 BuildArch: noarch
 Vendor: Netronome Systems, Inc.
 URL: http://netronome.com
-Source: agilio-__FW_NAME__-firmware-__VERSION__.tgz
+Source: __FW_NAME__-__VERSION__.tgz
 Packager: Edwin Peer <edwin.peer@netronome.com>
 
 %description
@@ -18,10 +18,10 @@ Firmware for Netronome Agilio SmartNICs
 %setup -q
 
 %install
-mkdir -p $RPM_BUILD_ROOT/opt/netronome/firmware/agilio-__FW_NAME__
-cp * $RPM_BUILD_ROOT/opt/netronome/firmware/agilio-__FW_NAME__
+mkdir -p $RPM_BUILD_ROOT/opt/netronome/__FW_NAME__
+cp * $RPM_BUILD_ROOT/opt/netronome/__FW_NAME__
 
 %files
 %define _binaries_in_noarch_packages_terminate_build 0
 %defattr(-,root, root)
-/opt/netronome/firmware/agilio-__FW_NAME__
+/opt/netronome/__FW_NAME__
