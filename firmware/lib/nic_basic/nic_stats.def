@@ -33,6 +33,8 @@ rx_error_mac_pkts
 tx_discard_mac_pkts
 tx_error_mac_pkts
 
+error_pkt_stack
+
 bpf_pass
 bpf_discard
 bpf_tx
