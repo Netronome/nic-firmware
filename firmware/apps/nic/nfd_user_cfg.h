@@ -13,70 +13,104 @@
 #endif
 
 #include <platform.h>
+#include <flavors.h>
 
 #define NFD_USE_OVERSUBSCRIPTION
 
 /* The absolute max number of VNICs we can support */
 #define NVNICS_ABSOLUTE_MAX 64
 
-#if NS_PLATFORM_NUM_PORTS > 1
 #if NS_PLATFORM_NUM_PORTS > 8  /* NS_PLATFORM_NUM_PORTS > 8 */
 
-#ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       4
-#endif
+    #if (NS_FLAVOR_TYPE == NS_FLAVOR_SRIOV)
+        #ifndef NFD_MAX_VFS
+        #define NFD_MAX_VFS             40
+        #endif
+        #ifndef NFD_MAX_PF_QUEUES
+        #define NFD_MAX_PF_QUEUES       2
+        #endif
+    #else
+        #ifndef NFD_MAX_PF_QUEUES
+        #define NFD_MAX_PF_QUEUES       4
+        #endif
+    #endif
 
 #elif NS_PLATFORM_NUM_PORTS > 4  /* 4 < NS_PLATFORM_NUM_PORTS <= 8 */
 
-#ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       8
-#endif
+    #if (NS_FLAVOR_TYPE == NS_FLAVOR_SRIOV)
+        #ifndef NFD_MAX_VFS
+        #define NFD_MAX_VFS             48
+        #endif
+        #ifndef NFD_MAX_PF_QUEUES
+        #define NFD_MAX_PF_QUEUES       2
+        #endif
+    #else
+        #ifndef NFD_MAX_PF_QUEUES
+        #define NFD_MAX_PF_QUEUES       8
+        #endif
+    #endif
 
 #elif NS_PLATFORM_NUM_PORTS > 2  /* 2 < NS_PLATFORM_NUM_PORTS <= 4 */
 
-#ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       16
-#endif
+    #if (NS_FLAVOR_TYPE == NS_FLAVOR_SRIOV)
+        #ifndef NFD_MAX_VFS
+        #define NFD_MAX_VFS             48
+        #endif
+        #ifndef NFD_MAX_PF_QUEUES
+        #define NFD_MAX_PF_QUEUES       4
+        #endif
+    #else
+        #ifndef NFD_MAX_PF_QUEUES
+        #define NFD_MAX_PF_QUEUES       16
+        #endif
+    #endif
 
-#else /* NS_PLATFORM_NUM_PORTS = 2 */
+#elif NS_PLATFORM_NUM_PORTS > 1 /* NS_PLATFORM_NUM_PORTS = 2 */
 
-#ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       32
-#endif
+    #if (NS_FLAVOR_TYPE == NS_FLAVOR_SRIOV)
+        #ifndef NFD_MAX_VFS
+        #define NFD_MAX_VFS             48
+        #endif
+        #ifndef NFD_MAX_PF_QUEUES
+        #define NFD_MAX_PF_QUEUES       8
+        #endif
+    #else
+        #ifndef NFD_MAX_PF_QUEUES
+        #define NFD_MAX_PF_QUEUES       32
+        #endif
+    #endif
 
-#endif
+#else
 
-#ifndef NFD_MAX_VF_QUEUES
-#define NFD_MAX_VF_QUEUES       0
+    #if (NS_FLAVOR_TYPE == NS_FLAVOR_SRIOV)
+        #ifndef NFD_MAX_VFS
+        #define NFD_MAX_VFS             56
+        #endif
+        #ifndef NFD_MAX_PF_QUEUES
+        #define NFD_MAX_PF_QUEUES       8
+        #endif
+    #else
+        #ifndef NFD_MAX_PF_QUEUES
+        #define NFD_MAX_PF_QUEUES       64
+        #endif
+    #endif
+
 #endif
 
 #ifndef NFD_MAX_VFS
 #define NFD_MAX_VFS             0
+#endif
+
+#ifndef NFD_MAX_VF_QUEUES
+    #if (NFD_MAX_VFS != 0)
+        #define NFD_MAX_VF_QUEUES   1
+    #else
+        #define NFD_MAX_VF_QUEUES   0
+    #endif
 #endif
 
 #ifndef NFD_MAX_PFS
 #define NFD_MAX_PFS             NS_PLATFORM_NUM_PORTS
-#endif
-
-#else /* NS_PLATFORM_NUM_PORTS <= 1 */
-
-#ifndef NFD_MAX_VF_QUEUES
-#define NFD_MAX_VF_QUEUES       1
-#endif
-
-#ifndef NFD_MAX_PF_QUEUES
-#define NFD_MAX_PF_QUEUES       64
-#endif
-
-#ifndef NFD_MAX_PFS
-#define NFD_MAX_PFS             1
-#endif
-
-/* No VFs needed */
-#ifndef NFD_MAX_VFS
-#define NFD_MAX_VFS             0
-#endif
-
 #endif
 
 /* Configure VF expansion BARs to access the NFP, this seems to be required
