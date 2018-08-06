@@ -111,8 +111,10 @@ nfd_out_send_init()
     alu[pci_q, pci_q, AND, 0x3f]
 
     bitfield_extract__sz1(bls, BF_AML(io_pkt_vec, PV_BLS_bf))
-    alu[multicast, in_tx_args, AND, BF_A(io_pkt_vec, PV_MAC_DST_MC_bf), <<(BF_L(INSTR_TX_MULTICAST_bf) - BF_L(PV_MAC_DST_MC_bf))]
-    alu[multicast, in_tx_args, OR, multicast, <<(BF_L(INSTR_TX_CONTINUE_bf) - BF_L(INSTR_TX_MULTICAST_bf))]
+    passert(BF_L(PV_MAC_DST_MC_bf), "EQ", BF_L(INSTR_TX_CONTINUE_bf))
+    passert(BF_L(PV_MAC_DST_MC_bf), "EQ", (BF_L(INSTR_TX_MULTICAST_bf) + 1))
+    alu[multicast, BF_A(io_pkt_vec, PV_MAC_DST_MC_bf), AND, in_tx_args, <<1]
+    alu[multicast, multicast, OR, in_tx_args]
     br_bset[multicast, BF_L(INSTR_TX_CONTINUE_bf), multicast#]
 
 check_mru#:
@@ -225,8 +227,10 @@ end#:
     #endif
     alu[tm_q, in_tx_args, AND~, (((~BF_MASK(INSTR_TX_WIRE_TMQ_bf)) & 0xffff) >> 8), <<8]
 
-    alu[multicast, in_tx_args, AND, BF_A(in_pkt_vec, PV_MAC_DST_MC_bf), <<(BF_L(INSTR_TX_MULTICAST_bf) - BF_L(PV_MAC_DST_MC_bf))]
-    alu[multicast, in_tx_args, OR, multicast, <<(BF_L(INSTR_TX_CONTINUE_bf) - BF_L(INSTR_TX_MULTICAST_bf))]
+    passert(BF_L(PV_MAC_DST_MC_bf), "EQ", BF_L(INSTR_TX_CONTINUE_bf))
+    passert(BF_L(PV_MAC_DST_MC_bf), "EQ", (BF_L(INSTR_TX_MULTICAST_bf) + 1))
+    alu[multicast, BF_A(in_pkt_vec, PV_MAC_DST_MC_bf), AND, in_tx_args, <<1]
+    alu[multicast, multicast, OR, in_tx_args]
 
     bitfield_extract__sz1(bls, BF_AML(in_pkt_vec, PV_BLS_bf))
     br=byte[bls, 0, 3, tx_nbi#]

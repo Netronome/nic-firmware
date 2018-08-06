@@ -157,7 +157,7 @@ move(loop_cntr, 0)
         move(value, pkt_vec++)
         // derived from packge
         #if (_PV_CHK_LOOP == 4)
-            alu[value, value, AND~, 0xc]
+            alu[value, value, AND~, 0xc0, <<8]
         #endif
 
         #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
