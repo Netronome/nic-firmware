@@ -71,7 +71,7 @@ passert(PV_MAX_CLONES, "EQ", 2)
  *       +-+---------+-------------------+-----+---------+---------------+
  *    11 |        Sequence Number        | --- | Seq Ctx |   Protocol    | 3
  *       +-------------------------------+-+-+-+---------+---+-+-+-+-+-+-+
- *    12 |         TX Host Flags         |I|i|Seek (64B algn)|-|Q|M|B|C|c| 4
+ *    12 |         TX Host Flags         |M|B|Seek (64B algn)|-|Q|I|i|C|c| 4
  *       +-------------------------------+-+-+---------------+-+-+-+-+-+-+
  *    13 |       8B Header Offsets (stacked outermost to innermost)      | 5
  *       +-----------------+-----+-----------------------+---------------+
@@ -90,10 +90,10 @@ passert(PV_MAX_CLONES, "EQ", 2)
  * V     - One or more VLANs present
  * M     - dest MAC is multicast
  * B     - dest MAC is broadcast
- * C     - Enable MAC offload of L3 checksum
- * c     - Enable MAC offload of L4 checksum
  * I     - Enable offload of inner L3 checksum
  * i     - Enable offload of inner L4 checksum
+ * C     - Enable offload of outer L3 checksum
+ * c     - Enable offload of outer L4 checksum
  * LMP   - LM Metadata Pointer
  *
  * Protocol - Parsed Packet Type (see defines below)
@@ -167,14 +167,16 @@ passert(PV_MAX_CLONES, "EQ", 2)
 #define PV_TX_HOST_CSUM_TCP_OK_bf       PV_FLAGS_wrd, 19, 19
 #define PV_TX_HOST_UDP_bf               PV_FLAGS_wrd, 18, 18
 #define PV_TX_HOST_CSUM_UDP_OK_bf       PV_FLAGS_wrd, 17, 17
+#define PV_MAC_DST_TYPE_bf              PV_FLAGS_wrd, 15, 14
+#define PV_MAC_DST_MC_bf                PV_FLAGS_wrd, 15, 15
+#define PV_MAC_DST_BC_bf                PV_FLAGS_wrd, 14, 14
 #define PV_SEEK_BASE_bf                 PV_FLAGS_wrd, 13, 6
 #define PV_QUEUE_SELECTED_bf            PV_FLAGS_wrd, 4, 4
-#define PV_MAC_DST_TYPE_bf              PV_FLAGS_wrd, 3, 2
-#define PV_MAC_DST_MC_bf                PV_FLAGS_wrd, 3, 3
-#define PV_MAC_DST_BC_bf                PV_FLAGS_wrd, 2, 2
-#define PV_CSUM_OFFLOAD_bf              PV_FLAGS_wrd, 1, 0
-#define PV_CSUM_OFFLOAD_L3_bf           PV_FLAGS_wrd, 1, 1
-#define PV_CSUM_OFFLOAD_L4_bf           PV_FLAGS_wrd, 0, 0
+#define PV_CSUM_OFFLOAD_bf              PV_FLAGS_wrd, 3, 0
+#define PV_CSUM_OFFLOAD_IL3_bf          PV_FLAGS_wrd, 3, 3
+#define PV_CSUM_OFFLOAD_IL4_bf          PV_FLAGS_wrd, 2, 2
+#define PV_CSUM_OFFLOAD_OL3_bf          PV_FLAGS_wrd, 1, 1
+#define PV_CSUM_OFFLOAD_OL4_bf          PV_FLAGS_wrd, 0, 0
 
 #define PV_HEADER_STACK_wrd             5
 #define PV_HEADER_STACK_bf              PV_HEADER_STACK_wrd, 31, 0
@@ -1631,11 +1633,13 @@ skip_lso#:
     __pv_get_mac_dst_type(mac_dst_type, out_vec) // advances *$index by 2 words
     alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
 
-    br_bset[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), lso_fixup#], defer[3]
-        alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_MASK(PV_CSUM_OFFLOAD_bf), AND, \
-            BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld), >>BF_L(NFD_IN_FLAGS_TX_TCP_CSUM_fld)]
-        bitfield_extract__sz1(udp_csum, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
-        alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_A(out_vec, PV_CSUM_OFFLOAD_bf), OR, udp_csum] ; PV_CSUM_OFFLOAD_bf
+    alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), 3, AND, \
+        BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld), >>BF_L(NFD_IN_FLAGS_TX_TCP_CSUM_fld)]
+    bitfield_extract__sz1(udp_csum, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
+    alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_A(out_vec, PV_CSUM_OFFLOAD_bf), OR, udp_csum] ; PV_CSUM_OFFLOAD_bf
+
+    br_bset[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), lso_fixup#]
+
 
 end#:
 .end
