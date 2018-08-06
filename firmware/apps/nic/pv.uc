@@ -1427,7 +1427,7 @@ finalize#:
 #endm
 
 
-#macro __pv_lso_fixup(io_vec, in_nfd_desc)
+#macro __pv_lso_fixup(io_vec, in_nfd_desc, DONE_LABEL)
 .begin
     .reg $ip
     .sig sig_read_ip
@@ -1502,16 +1502,15 @@ ipv4#:
     alu[$ip, ip_len, +16, ip_id]
 
     mem[write32, $ip, BF_A(io_vec, PV_CTM_ADDR_bf), l3_off, 1], sig_done[sig_write_ip]
-    ctx_arb[sig_write_tcp_seq, sig_write_tcp_flags, sig_write_ip], br[end#]
+    ctx_arb[sig_write_tcp_seq, sig_write_tcp_flags, sig_write_ip], br[DONE_LABEL]
 
 ipv6#:
     alu[tmp, --, B, 40, <<16]
     alu[$ip, ip_len, -, tmp]
     alu[l3_off, l3_off, +, IPV6_PAYLOAD_OFFS]
     mem[write8, $ip, BF_A(io_vec, PV_CTM_ADDR_bf), l3_off, 2], sig_done[sig_write_ip]
-    ctx_arb[sig_write_tcp_seq, sig_write_tcp_flags, sig_write_ip]
+    ctx_arb[sig_write_tcp_seq, sig_write_tcp_flags, sig_write_ip], br[DONE_LABEL]
 
-end#:
 .end
 #endm
 
@@ -1626,18 +1625,19 @@ end#:
     pv_seek(out_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY), skip_lso#)
 
 lso_fixup#:
-    __pv_lso_fixup(out_vec, in_nfd_desc)
+    __pv_lso_fixup(out_vec, in_nfd_desc, end#)
 
 skip_lso#:
     __pv_get_mac_dst_type(mac_dst_type, out_vec) // advances *$index by 2 words
     alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
 
-
     br_bset[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), lso_fixup#], defer[3]
-       alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_MASK(PV_CSUM_OFFLOAD_bf), AND, \
-           BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld), >>BF_L(NFD_IN_FLAGS_TX_TCP_CSUM_fld)]
-       bitfield_extract__sz1(udp_csum, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
-       alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_A(out_vec, PV_CSUM_OFFLOAD_bf), OR, udp_csum] ; PV_CSUM_OFFLOAD_bf
+        alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_MASK(PV_CSUM_OFFLOAD_bf), AND, \
+            BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld), >>BF_L(NFD_IN_FLAGS_TX_TCP_CSUM_fld)]
+        bitfield_extract__sz1(udp_csum, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
+        alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_A(out_vec, PV_CSUM_OFFLOAD_bf), OR, udp_csum] ; PV_CSUM_OFFLOAD_bf
+
+end#:
 .end
 #endm
 
