@@ -1622,6 +1622,17 @@ ipv6#:
     immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
     immed[BF_A(out_vec, PV_HEADER_STACK_bf), 0]
 
+    // fake host to host checksum validity
+    .if (BIT(BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_IPV4_CSUM_fld)))
+        bits_set__sz1(BF_AL(out_vec, PV_TX_HOST_CSUM_IP4_OK_bf), 3)
+    .endif
+    .if (BIT(BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld)))
+        bits_set__sz1(BF_AL(out_vec, PV_TX_HOST_CSUM_TCP_OK_bf), 3)
+    .endif
+    .if (BIT(BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)))
+        bits_set__sz1(BF_AL(out_vec, PV_TX_HOST_CSUM_UDP_OK_bf), 3)
+    .endif
+
     pv_seek(out_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY), skip_lso#)
 
 lso_fixup#:
