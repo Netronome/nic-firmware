@@ -1,4 +1,4 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x0
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x100
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xdeadbeef
 
 #include "actions_harness.uc"
@@ -63,7 +63,7 @@ immed[length, 15]
     immed[BF_A(pkt_vec, PV_META_TYPES_bf), 0]
     alu[BF_A(pkt_vec, PV_LENGTH_bf), --, B, length]
 
-    __actions_checksum_complete(pkt_vec)
+    __actions_checksum(pkt_vec)
 
     test_assert_equal(*$index, 0xdeadbeef)
 

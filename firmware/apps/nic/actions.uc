@@ -335,26 +335,62 @@ end#:
 #endm
 
 
-#macro __actions_checksum_complete(in_pkt_vec)
+#macro __actions_checksum(in_pkt_vec)
 .begin
     .reg available_words
+    .reg buf_offset
     .reg carries
+    .reg cbs
     .reg checksum
+    .reg csum_complete
+    .reg csum_offset
+    .reg data
+    .reg data_history
     .reg data_len
+    .reg encap
     .reg idx
+    .reg ihl
     .reg include_mask
+    .reg ip_offset
+    .reg ipv4_delta
     .reg iteration_bytes
     .reg iteration_words
+    .reg l4_len
+    .reg l4_offset
+    .reg l4_proto
     .reg last_bits
+    .reg mem_addr
+    .reg mu_addr
+    .reg msk
+    .reg neg_csum_field
     .reg offset
+    .reg proto_shl
     .reg pkt_len
+    .reg pkt_offset
     .reg remaining_words
     .reg shift
+    .reg split_offset
+    .reg state
+    .reg tmp
+    .reg work
     .reg zero_padded
-
+    .reg write $checksum
     .sig sig_read
+    .sig sig_write
 
-    __actions_read()
+    .set csum_complete
+    .set csum_offset
+    .set ip_offset
+    .set l4_len
+    .set l4_proto
+    .set proto_shl
+
+    __actions_read(state, 0xffff)
+
+    passert(BF_L(PV_CSUM_OFFLOAD_bf), "EQ", 0)
+    alu[msk, BF_A(in_pkt_vec, PV_CSUM_OFFLOAD_bf), OR, 1, <<BF_L(INSTR_CSUM_META_bf)]
+    alu[state, state, AND, msk]
+    beq[end#]
 
     immed[checksum, 0]
     immed[carries, 0]
@@ -367,7 +403,7 @@ end#:
         immed[iteration_words, 0]
         immed[offset, (14 + 2)]
 
-    br[skip_checksum#]
+    br[end#]
 
 #define_eval LOOP_UNROLL (0)
 #while (LOOP_UNROLL < 32)
@@ -400,8 +436,197 @@ consume_available#:
         alu[iteration_bytes, --, B, iteration_words, <<2]
         alu[offset, offset, +, iteration_bytes]
 
+update_l4_csum#:
+    // finalize pending checksum
+    alu[checksum, checksum, +carry, 0]
+
+    // extract work from state
+    alu[work, --, B, state, >>24]
+
+    // seek to L3 source address for pseudo-header
+    pv_seek(in_pkt_vec, ip_offset)
+
+    // calculate tail of L4 checksum (csum_complete -' head checksum)
+    alu[checksum, --, ~B, checksum]
+    alu[checksum, csum_complete, +, checksum]
+
+    // L4 pseudo-header fields
+    alu[checksum, checksum, +carry, l4_len]
+    alu[checksum, checksum, +carry, l4_proto]
+
+    // IPv4 addresses
+    byte_align_be[--, *$index++], no_cc
+    byte_align_be[data, *$index++], no_cc
+    br_bset[proto_shl, 2, write_csum#], defer[3]
+        alu[checksum, checksum, +carry, data]
+        byte_align_be[data, *$index++], no_cc
+        alu[checksum, checksum, +carry, data]
+
+    // IPv6 addresses
+#define_eval LOOP (0)
+#while (LOOP < 5)
+    byte_align_be[data, *$index++], no_cc
+    alu[checksum, checksum, +carry, data]
+#define_eval LOOP (LOOP + 1)
+#endloop
+#undef LOOP
+    br[write_csum#], defer[2]
+        byte_align_be[data, *$index++], no_cc
+        alu[checksum, checksum, +carry, data]
+
+update#:
+    br!=byte[state, 3, 0, update_l4_csum#], defer[1]
+        alu[checksum, checksum, +carry, carries]
+
+    // first entry - save checksum complete for later
+    alu[csum_complete, checksum, +carry, 0]
+
+check_work#:
+    alu[work, state, AND, (1 << BF_L(INSTR_CSUM_IL4_bf))]
+    bne[process_l4#]
+
+    alu[work, state, AND, (1 << BF_L(INSTR_CSUM_IL3_bf))]
+    bne[process_l3#]
+
+    alu[work, state, AND, (1 << BF_L(INSTR_CSUM_OL4_bf))]
+    bne[process_l4#]
+
+    alu[work, state, AND, (1 << BF_L(INSTR_CSUM_OL3_bf))]
+    bne[process_l3#]
+
+    // no more work
+    __actions_restore_t_idx()
+    pv_invalidate_cache(in_pkt_vec)
+    br_bclr[state, BF_L(INSTR_CSUM_META_bf), end#]
+    br[end#], defer[2]
+        alu[*l$index2++, --, B, csum_complete]
+        pv_meta_push_type__sz1(in_pkt_vec, NFP_NET_META_CSUM)
+
+process_l4#:
+    // determine L4 offset (inner / outer)
+    alu[shift, 16, AND~, work, <<(4 - BF_L(INSTR_CSUM_IL4_bf))] // 16 if inner, else 0
+    alu[iteration_words, shift, B, 0]
+    ld_field_w_clr[offset, 0011, BF_A(in_pkt_vec, PV_HEADER_STACK_bf), >>indirect], load_cc
+    beq[invalid_offset#]
+
+    alu[l4_offset, 0xff, AND, offset] // l4_offset
+    alu[l4_len, pkt_len, -, l4_offset]
+    alu[data_len, l4_offset, -, 14]
+    alu[remaining_words, --, B, data_len, >>2]
+
+    // determine presence of outer encap
+    alu[encap, l4_offset, XOR, BF_A(in_pkt_vec, PV_HEADER_STACK_bf)]
+    alu[encap, 0xff, +8, encap] // 8-bit carry if l4_offset != inner offset
+    alu[shift, 4, AND, encap, >>6] // 4 if l4_offset != inner, else 0
+    alu[shift, shift, OR, encap, >>8] // 5 if l4_offset != inner, else 0
+
+    // determine L4 protocol
+    alu[proto_shl, shift, B, BF_A(in_pkt_vec, PV_PROTO_bf), <<1]
+    alu[shift, (1 << 1), AND, proto_shl, >>indirect] // 2 if UDP, else 0
+    alu[l4_proto, shift, B, ((0x11 << 2) | 0x6)]
+    alu[l4_proto, 0x1f, AND, l4_proto, >>indirect]
+
+    // determine offset of L3 IP addresses
+    alu[ip_offset, 0xff, AND, offset, >>8]
+    alu[ipv4_delta, 4, AND, proto_shl]
+    alu[ip_offset, ip_offset, +, 8]
+    alu[ip_offset, ip_offset, +, ipv4_delta]
+
+    // determine offset of checksum field in packet
+    alu[csum_offset, shift, B, (6 << 2)]
+    alu[csum_offset, 0x16, AND, csum_offset, >>indirect] // 6 if UDP, else 16 if TCP
+    alu[csum_offset, csum_offset, +, l4_offset]
+
+    // subtract checksum field in packet from csum_complete
+    pv_seek(in_pkt_vec, csum_offset)
+    byte_align_be[--, *$index++]
+    byte_align_be[data, *$index++]
+    alu[neg_csum_field, --, ~B, data, >>16]
+    alu[csum_complete, csum_complete, +16, neg_csum_field]
+    alu[csum_complete, csum_complete, +carry, 0]
+
+    ld_field[state, 1000, work, <<24]
+    immed[offset, (14 + 2)]
+    br[start#], defer[2]
+        immed[checksum, 0]
+        immed[carries, 0]
+
+process_l3#:
+    // determine IPv4 offset
+    alu[shift, 16, AND~, work, <<(4 - BF_L(INSTR_CSUM_IL3_bf))] // 16 if inner, else 0
+    alu[shift, shift, OR, 8] // 24 if inner, else 8
+    alu[--, shift, OR, 0]
+    alu[ip_offset, 0xff, AND, BF_A(in_pkt_vec, PV_HEADER_STACK_bf), >>indirect]
+    beq[invalid_offset#]
+
+    alu[csum_offset, ip_offset, +, 10]
+
+    pv_seek(in_pkt_vec, ip_offset)
+
+    byte_align_be[--, *$index++]
+    byte_align_be[checksum, *$index++]
+    alu[ihl, 0xf, AND, checksum, >>24]
+
+    byte_align_be[data_history, *$index++]
+    byte_align_be[data, *$index++]
+
+    // subtract checksum field in packet from csum_complete
+    alu[neg_csum_field, --, ~B, data]
+    alu[csum_complete, csum_complete, +16, neg_csum_field]
+    alu[csum_complete, csum_complete, +carry, 0]
+
+    ld_field_w_clr[tmp, 1100, data] // zero checksum field for calc
+    alu[checksum, checksum, +, data_history]
+    alu[checksum, checksum, +carry, tmp]
+
+    byte_align_be[data, *$index++], no_cc
+    alu[checksum, checksum, +carry, data]
+
+options#:
+    br!=byte[ihl, 0, 5, options#], defer[3]
+        byte_align_be[data, *$index++], no_cc
+        alu[checksum, checksum, +carry, data]
+        alu[ihl, ihl, -, 1], no_cc
+
+write_csum#:
+    // finalize pending checksum
+    alu[checksum, checksum, +carry, 0]
+
+    // fold checksum for write
+    alu[tmp, --, B, checksum, >>16]
+    alu[tmp, tmp, +16, checksum] // top half-word is 16-bit carry, bottom is checksum
+    alu[checksum, --, B, tmp, <<16] // move checksum to top half-word
+    alu[checksum, checksum, +, tmp] // add carry to checksum
+    alu[checksum, --, ~B, checksum, >>16]
+
+    br_bclr[BF_AL(in_pkt_vec, PV_CTM_ALLOCATED_bf), write_mu#], defer[3]
+        alu[$checksum, --, B, checksum, <<16]
+        alu[state, state, AND~, work]
+        alu[buf_offset, csum_offset, +16, BF_A(in_pkt_vec, PV_OFFSET_bf)]
+
+    bitfield_extract__sz1(cbs, BF_AML(in_pkt_vec, PV_CBS_bf)) ; PV_CBS_bf
+    alu[split_offset, cbs, B, 1, <<8]
+    alu[split_offset, --, B, split_offset, <<indirect]
+    alu[--, split_offset, -, buf_offset]
+    blo[write_mu#]
+
+    mem[write8, $checksum, BF_A(in_pkt_vec, PV_CTM_ADDR_bf), csum_offset, 2], sig_done[sig_write]
+    ctx_arb[sig_write], defer[2], br[check_work#]
+        alu[csum_complete, csum_complete, +16, checksum]
+        alu[csum_complete, csum_complete, +carry, 0]
+
+write_mu#:
+    alu[mu_addr, --, B, BF_A(in_pkt_vec, PV_MU_ADDR_bf), <<(31 - BF_L(PV_MU_ADDR_bf))]
+    mem[write8, $checksum, mu_addr, <<8, buf_offset, 2], sig_done[sig_write]
+    ctx_arb[sig_write], defer[2], br[check_work#]
+        alu[csum_complete, csum_complete, +16, checksum]
+        alu[csum_complete, csum_complete, +carry, 0]
+
+invalid_offset#:
+    br[check_work#], defer[1]
+        alu[state, state, AND~, work]
+
 last_bits#:
-    pv_meta_push_type__sz1(in_pkt_vec, NFP_NET_META_CSUM)
     alu[last_bits, (3 << 3), AND, data_len, <<3]
     beq[finalize#]
 
@@ -412,12 +637,16 @@ last_bits#:
     alu[checksum, checksum, +, zero_padded]
 
 finalize#:
-    alu[checksum, checksum, +carry, carries]
-    alu[*l$index2++, checksum, +carry, 0] // adding carries might cause another carry
+    br!=byte[state, 0, 0, update#]
 
     __actions_restore_t_idx()
 
-skip_checksum#:
+    br_bclr[state, BF_L(INSTR_CSUM_META_bf), end#]
+    alu[checksum, checksum, +carry, carries]
+    alu[*l$index2++, checksum, +carry, 0] // adding carries might cause another carry
+    pv_meta_push_type__sz1(in_pkt_vec, NFP_NET_META_CSUM)
+
+end#:
 .end
 #endm
 
@@ -611,7 +840,7 @@ rss#:
     __actions_next()
 
 checksum#:
-    __actions_checksum_complete(io_pkt_vec)
+    __actions_checksum(io_pkt_vec)
     __actions_next()
 
 tx_host#:

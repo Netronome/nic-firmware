@@ -747,13 +747,16 @@ cfg_act_append_pop_pkt(action_list_t *acts)
 
 __intrinsic void
 cfg_act_append_checksum(action_list_t *acts,
-            int outer, int inner, int complete)
+			int outer, int inner, int complete)
 {
     instr_checksum_t instr_csum;
 
-    instr_csum.outer = outer;
-    instr_csum.inner = inner;
-    instr_csum.complete = complete;
+    instr_csum.__raw[0] = 0;
+    instr_csum.outer_l3 = outer;
+    instr_csum.outer_l4 = outer;
+    instr_csum.inner_l3 = inner;
+    instr_csum.inner_l4 = inner;
+    instr_csum.complete_meta = complete;
 
     cfg_act_append(acts, INSTR_CHECKSUM, instr_csum.__raw[0]);
 }
@@ -908,7 +911,7 @@ cfg_act_build_pf(action_list_t *acts, uint32_t pcie, uint32_t vid,
         cfg_act_append_tx_wire(acts, tmq, 0, 1); // M
 
         if (csum_o)
-            cfg_act_append_checksum(acts, csum_o, 0, 0);
+	    cfg_act_append_checksum(acts, 1, 0, 0); // O
 
         cfg_act_append_push_pkt(acts);
         cfg_act_append_tx_vlan(acts);
@@ -921,7 +924,7 @@ cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
 {
     __xread struct nfp_vnic_setup_entry entry;
     uint32_t type, vnic;
-    uint32_t csum_o, csum_i;
+    uint32_t csum_i, csum_o;
     uint32_t promisc;
 
     cfg_act_init(acts);
@@ -940,15 +943,20 @@ cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
 	    (entry.vlan != NIC_NO_VLAN_ID))
         cfg_act_append_push_vlan(acts, entry.vlan);
 
-    cfg_act_append_checksum(acts, csum_o, csum_i, 0);
-
     cfg_act_append_veb_lookup(acts, pcie, vid, 0, 0);
+
+    if (csum_i)
+        cfg_act_append_checksum(acts, 0, 1, 0); // I
 
     cfg_act_append_tx_wire(acts, NS_PLATFORM_NBI_TM_QID_LO(0) /* vnic 0 */,
 			   promisc, 1);
 
-    if (promisc)
+    if (promisc) {
+        if (csum_o)
+	    cfg_act_append_checksum(acts, 1, 0, 0); // O
+
 	cfg_act_append_tx_host(acts, pcie, NFD_PF2VID(0), 0, 1); // M
+    }
 
     cfg_act_append_push_pkt(acts);
     cfg_act_append_tx_vlan(acts);
@@ -985,12 +993,12 @@ cfg_act_build_nbi(action_list_t *acts, uint32_t pcie, uint32_t vid,
     cfg_act_append_rx_wire(acts, pcie, vid, vxlan, nvgre);
 
     if (veb_up)
-	   cfg_act_append_veb_lookup(acts, pcie, vid, promisc, 1);
+        cfg_act_append_veb_lookup(acts, pcie, vid, promisc, 1);
     else if (! promisc)
-	   cfg_act_append_mac_match(acts, pcie, vid);
+        cfg_act_append_mac_match(acts, pcie, vid);
 
-    if (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE)
-        cfg_act_append_checksum(acts, 0, 0, 1); // C
+    if (veb_up || csum_compl)
+        cfg_act_append_checksum(acts, veb_up, veb_up, csum_compl); // O, I, C
 
     if (control & NFP_NET_CFG_CTRL_BPF)
         cfg_act_append_bpf(acts, vnic);

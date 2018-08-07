@@ -191,13 +191,15 @@ enum instruction_ops {
  * INSTR_CHECKSUM:
  * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
- *       +-----------------------------+-+-------------------------+-+-+-+
- *    0  |              5              |P|     Reserved            |O|I|C|
- *       +-----------------------------+-+-------------------------+-+-+-+
+ *       +-----------------------------+-+-------------+-+-------+-+-+-+-+
+ *    0  |              5              |P|      0      |M|   0   |I|i|C|c|
+ *       +-----------------------------+-+-------------+-+-------+-+-+-+-+
  *
- *       C - Calculate and prepend CHECKSUM_COMPLETE metadata
- *       O - Update outer checksums in packet (L3 and L4, if from host)
- *       I - Update inner checksums in packet (L3 and L4, if from host)
+ *       M - Update CHECKSUM_COMPLETE metadata
+ *       I - Update inner L3 checksum in packet (if requested by host)
+ *       i - Update inner L4 checksum in packet (if requested by host)
+ *       C - Update outer L3 checksum in packet (if requested by host)
+ *       c - Update outer L4 checksum in packet (if requested by host)
  *
  * INSTR_TX_HOST:
  * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
@@ -361,10 +363,13 @@ typedef union {
     struct {
         uint32_t op: 15;
         uint32_t pipeline: 1;
-        uint32_t reserved: 13;
-        uint32_t outer : 1;
-        uint32_t inner : 1;
-        uint32_t complete : 1;
+        uint32_t reserved: 7;
+        uint32_t complete_meta : 1;
+        uint32_t zero: 4;
+        uint32_t inner_l3 : 1;
+        uint32_t inner_l4 : 1;
+        uint32_t outer_l3 : 1;
+	uint32_t outer_l4 : 1;
     };
     uint32_t __raw[1];
 } instr_checksum_t;
@@ -397,6 +402,12 @@ typedef union {
 
 #define INSTR_TX_WIRE_NBI_bf     0, 10, 10
 #define INSTR_TX_WIRE_TMQ_bf     0, 9, 0
+
+#define INSTR_CSUM_META_bf       0, 8, 8
+#define INSTR_CSUM_IL3_bf        0, 3, 3
+#define INSTR_CSUM_IL4_bf        0, 2, 2
+#define INSTR_CSUM_OL3_bf        0, 1, 1
+#define INSTR_CSUM_OL4_bf        0, 0, 0
 
 #define INSTR_DEL_OFFSET_bf      0, 14, 8
 #define INSTR_DEL_LENGTH_bf      0, 7, 0

@@ -1560,6 +1560,9 @@ ipv6#:
 .begin
     .reg addr_hi
     .reg addr_lo
+    .reg csum_offload
+    .reg csum_ol3
+    .reg csum_udp
     .reg mac_dst_type
     .reg meta_len
     .reg pcie
@@ -1567,8 +1570,8 @@ ipv6#:
     .reg pkt_len
     .reg seq_ctx
     .reg seq_no
+    .reg shift
     .reg split
-    .reg udp_csum
     .reg vlan_id
 
     bitfield_extract__sz1(pkt_len, BF_AML(in_nfd_desc, NFD_IN_DATALEN_fld)) ; NFD_IN_DATALEN_fld
@@ -1622,8 +1625,12 @@ ipv6#:
 
     pkt_buf_copy_mu_head_to_ctm(in_pkt_num, BF_A(out_vec, PV_MU_ADDR_bf), NFD_IN_DATA_OFFSET, 1)
 
-    immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
-    immed[BF_A(out_vec, PV_HEADER_STACK_bf), 0]
+    alu[csum_offload, 0x3, AND, BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld), >>BF_L(NFD_IN_FLAGS_TX_TCP_CSUM_fld)]
+    bitfield_extract__sz1(csum_udp, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
+    alu[csum_offload, csum_offload, OR, csum_udp]
+    alu[shift, (1 << 1), AND, BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_ENCAP_fld), >>(BF_L(NFD_IN_FLAGS_TX_ENCAP_fld) - 1)]
+    alu[csum_ol3, shift, AND, BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_O_IPV4_CSUM_fld), >>(BF_L(NFD_IN_FLAGS_TX_O_IPV4_CSUM_fld) - 1)]
+    alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), csum_ol3, OR, csum_offload, <<indirect]
 
     pv_seek(out_vec, 0, PV_SEEK_INIT, skip_lso#)
 
@@ -1632,15 +1639,11 @@ lso_fixup#:
 
 skip_lso#:
     __pv_get_mac_dst_type(mac_dst_type, out_vec) // advances *$index by 2 words
-    alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
 
-    alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), 3, AND, \
-        BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld), >>BF_L(NFD_IN_FLAGS_TX_TCP_CSUM_fld)]
-    bitfield_extract__sz1(udp_csum, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
-    alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), BF_A(out_vec, PV_CSUM_OFFLOAD_bf), OR, udp_csum] ; PV_CSUM_OFFLOAD_bf
-
-    br_bset[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), lso_fixup#]
-
+    br_bset[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), lso_fixup#], defer[3]
+        alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
+        immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
+        immed[BF_A(out_vec, PV_HEADER_STACK_bf), 0]
 
 end#:
 .end
