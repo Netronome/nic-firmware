@@ -4,6 +4,15 @@
 #include <actions.uc>
 #include <single_ctx_test.uc>
 
+#macro test_action_reset()
+    immed[__actions_t_idx, (32 * 4)]
+    local_csr_wr[T_INDEX, __actions_t_idx]
+    nop
+    nop
+    nop
+#endm
+
+
 .if (0)
     tx_errors_offset#:
     drop#:

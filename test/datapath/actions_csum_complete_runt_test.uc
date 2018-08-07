@@ -26,7 +26,7 @@ immed[length, 0]
     immed[BF_A(pkt_vec, PV_META_TYPES_bf), 0]
     alu[BF_A(pkt_vec, PV_LENGTH_bf), --, B, length]
 
-    __actions_checksum_complete(pkt_vec)
+    __actions_checksum(pkt_vec)
 
     test_assert_equal(*$index, 0xdeadbeef)
 
