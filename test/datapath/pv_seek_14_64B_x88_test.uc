@@ -14,7 +14,7 @@
 move(expected, 0x0f101112)
 
 // 16th byte should be word aligned
-pv_seek(pkt_vec, 14, PV_SEEK_CTM_ONLY)
+pv_seek(pkt_vec, 14)
 move(tested, *$index)
 test_assert_equal(tested, expected)
 
@@ -24,3 +24,6 @@ byte_align_be[tested, *$index]
 test_assert_equal(tested, expected)
 
 test_pass()
+
+PV_SEEK_SUBROUTINE#:
+    pv_seek_subroutine(pkt_vec)

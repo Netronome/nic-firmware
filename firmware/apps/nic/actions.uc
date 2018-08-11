@@ -125,7 +125,7 @@
     __actions_read(port_mac[1])
 
     br_bset[BF_AL(in_pkt_vec, PV_MAC_DST_MC_bf), end#]
-    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY, mac_match_check#)
+    pv_seek(in_pkt_vec, 0, PV_SEEK_DEFAULT, mac_match_check#)
 
 veb_error#:
     pv_stats_update(in_pkt_vec, RX_ERROR_VEB, DROP_LABEL)
@@ -203,7 +203,7 @@ end#:
     __actions_read(port_mac[1])
 
     br_bset[BF_AL(in_pkt_vec, PV_MAC_DST_MC_bf), end#]
-    pv_seek(in_pkt_vec, 0, PV_SEEK_CTM_ONLY)
+    pv_seek(in_pkt_vec, 0)
 
     alu[mac_hi, port_mac[0], XOR, *$index++]
     alu[mac_lo, port_mac[1], XOR, *$index++]
@@ -253,7 +253,7 @@ begin#:
     alu[l3_offset, l3_offset, +, (8 + 2)] // 8 bytes of IP header, 2 bytes seek align
     alu[proto_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PROTO_bf), <<1] // 4 bytes extra for IPv4
     alu[l3_offset, l3_offset, +, proto_delta]
-    pv_seek(in_pkt_vec, l3_offset, (PV_SEEK_CTM_ONLY | PV_SEEK_PAD_INCLUDED))
+    pv_seek(in_pkt_vec, l3_offset, PV_SEEK_PAD_INCLUDED)
 
     local_csr_wr[CRC_REMAINDER, BF_A(args, INSTR_RSS_KEY_bf)]
     immed[hash_type, 1]
@@ -380,7 +380,7 @@ w/**/LOOP_UNROLL#:
     alu[carries, carries, +carry, 0] // accumulate carries that would be lost to looping construct alu[]s
 
 start#:
-    pv_seek(idx, in_pkt_vec, offset, --, PV_SEEK_PAD_INCLUDED, --)
+    pv_seek(idx, in_pkt_vec, offset, PV_SEEK_PAD_INCLUDED, --)
 
     alu[remaining_words, remaining_words, -, iteration_words]
     beq[last_bits#]

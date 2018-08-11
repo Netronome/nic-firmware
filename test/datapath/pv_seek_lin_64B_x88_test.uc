@@ -17,7 +17,7 @@ move(offset, 0)
 move(increment, 0x04040404)
 move(expected, 0x01020304)
 
-pv_seek(pkt_vec, 0, PV_SEEK_CTM_ONLY)
+pv_seek(pkt_vec, 0)
 
 byte_align_be[--, *$index++]
 
@@ -29,3 +29,6 @@ byte_align_be[--, *$index++]
 .endw
 
 test_pass()
+
+PV_SEEK_SUBROUTINE#:
+    pv_seek_subroutine(pkt_vec)
