@@ -80,3 +80,6 @@ immed[length, 15]
 .endw
 
 test_pass()
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)

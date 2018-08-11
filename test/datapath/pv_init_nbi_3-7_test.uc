@@ -574,3 +574,6 @@ test_fail()
 PV_HDR_PARSE_SUBROUTINE#:
 pv_hdr_parse_subroutine(pkt_vec, tunnel_args)
 #pragma warning(pop)
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)

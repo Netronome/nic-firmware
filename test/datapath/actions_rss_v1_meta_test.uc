@@ -11,3 +11,6 @@ __actions_rss(pkt_vec)
 test_assert_equal(BF_A(pkt_vec, PV_META_TYPES_bf), NFP_NET_RSS_IPV4_TCP)
 
 test_pass()
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)

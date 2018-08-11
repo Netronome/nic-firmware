@@ -45,3 +45,6 @@ test_assert(queue_offset > 0)
 test_assert(queue_offset <= 0x80)
 
 test_pass()
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)

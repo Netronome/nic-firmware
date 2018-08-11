@@ -158,3 +158,6 @@ pv_reset(pkt_vec_addr, 0, __actions_t_idx, 64)
 .endw
 
 test_pass()
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)

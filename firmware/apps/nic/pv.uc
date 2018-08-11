@@ -38,6 +38,7 @@ passert(PV_MAX_CLONES, "EQ", 2)
 
 .alloc_mem __pv_reserved_pkt_mem ctm+0 island (96*2048) 0
 
+
 /**
  * Packet vector internal representation
  *
@@ -1349,7 +1350,7 @@ max_cbs#:
 
     immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
 
-    pv_seek(out_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY), skip_hdr_parse#)
+    pv_seek(out_vec, 0, PV_SEEK_INIT, skip_hdr_parse#)
 
 hdr_parse#:
     pv_hdr_parse(out_vec, in_tunnel_args, finalize#)
@@ -1624,7 +1625,7 @@ ipv6#:
     immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
     immed[BF_A(out_vec, PV_HEADER_STACK_bf), 0]
 
-    pv_seek(out_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY), skip_lso#)
+    pv_seek(out_vec, 0, PV_SEEK_INIT, skip_lso#)
 
 lso_fixup#:
     __pv_lso_fixup(out_vec, in_nfd_desc, end#)
@@ -1679,277 +1680,266 @@ skip_ctm_buffer#:
 #endm
 
 
-#define PV_SEEK_ANY          (0)
-#define PV_SEEK_CTM_ONLY     (1 << 0)
-#define PV_SEEK_T_INDEX_ONLY (1 << 1)
-#define PV_SEEK_PAD_INCLUDED (1 << 2)
-#define PV_SEEK_REVERSE      (1 << 3)
-#define PV_SEEK_INIT         (1 << 4)
-
-.reg volatile read $__pv_pkt_data[32]
-.addr $__pv_pkt_data[0] 0
-.xfer_order $__pv_pkt_data
-#macro pv_seek(out_cache_idx, io_vec, in_offset, in_length, in_flags, EXIT_LABEL)
+.reg __pv_seek_offset
+.reg __pv_seek_rtn
+#macro pv_seek_subroutine(io_vec)
+.subroutine
 .begin
-    .reg tibi // T_INDEX_BYTE_INDEX
-    .reg write $reflect
-
-    #if ((in_flags & PV_SEEK_REVERSE) || (in_flags & PV_SEEK_T_INDEX_ONLY))
-        #define _PV_SEEK_TEST_OFFSET_MASK 0x7f
-        #define _PV_SEEK_READ_BASE_MASK 0x3f80
-        #define _PV_SEEK_READ_OFFSET_MASK 0x7f
-    #elif (! streq('in_length', '--'))
-        #define _PV_SEEK_TEST_OFFSET_MASK 0x7f
-        #define _PV_SEEK_READ_BASE_MASK 0x3fc0
-        #define _PV_SEEK_READ_OFFSET_MASK 0x3f
-    #else
-        #define _PV_SEEK_TEST_OFFSET_MASK 0x3f
-        #define _PV_SEEK_READ_BASE_MASK 0x3fc0
-        #define _PV_SEEK_READ_OFFSET_MASK 0x3f
-    #endif
-
-    #if (isnum(in_offset))
-        #define_eval _PV_SEEK_OFFSET in_offset
-        #if (((in_flags & PV_SEEK_PAD_INCLUDED) == 0))
-            #define_eval _PV_SEEK_OFFSET (_PV_SEEK_OFFSET + 2)
-        #endif
-        alu[tibi, t_idx_ctx, OR, (_PV_SEEK_OFFSET & _PV_SEEK_TEST_OFFSET_MASK)]
-        #if (_PV_SEEK_OFFSET >= 256)
-           .reg seek_offset
-           immed[seek_offset, _PV_SEEK_OFFSET]
-           #define_eval _PV_SEEK_OFFSET seek_offset
-        #endif
-    #else
-        #define_eval _PV_SEEK_OFFSET in_offset
-        #if (((in_flags & PV_SEEK_PAD_INCLUDED) == 0))
-            .reg seek_offset
-            alu[seek_offset, in_offset, +, 2]
-            #define_eval _PV_SEEK_OFFSET seek_offset
-        #endif
-        alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_TEST_OFFSET_MASK]
-        alu[tibi, tibi, OR, t_idx_ctx]
-    #endif
-
-#if (((in_flags) & PV_SEEK_T_INDEX_ONLY) != 0)
-    local_csr_wr[T_INDEX_BYTE_INDEX, tibi]
-#if (! streq('EXIT_LABEL', '--'))
-    br[EXIT_LABEL], defer[2]
-#else
-    nop
-#endif
-    #if (! streq('out_cache_idx', '--'))
-        alu[out_cache_idx, 0x1f, AND, tibi, >>2]
-    #else
-        nop
-    #endif
-    nop
-#else
-    .reg outside
     .reg aligned_offset
+    .reg buffer_offset
+    .reg cbs
+    .reg ctm_bytes
+    .reg ctm_words
+    .reg data_ref
+    .reg mu_addr
+    .reg mu_words
     .reg read_offset
+    .reg split_offset
+    .reg straddle_data
+    .reg reflect_addr
+    .reg tibi
+    .reg tmp
+    .reg write $reflect
+    .sig sig_reflect
     .sig sig_ctm
+    .sig sig_mu
 
-    #if (! streq('out_cache_idx', '--'))
-        alu[out_cache_idx, 0x1f, AND, tibi, >>2]
-    #endif
-#if ((in_flags & PV_SEEK_INIT) == 0)
-#if (streq('EXIT_LABEL', '--'))
-    br[check#], defer[2]
-#endif
-        local_csr_wr[T_INDEX_BYTE_INDEX, tibi]
-        alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, _PV_SEEK_OFFSET]
-#endif
+    br_bclr[BF_AL(io_vec, PV_CTM_ALLOCATED_bf), read_mu#], defer[2]
+        alu[aligned_offset, __pv_seek_offset, AND~, 0x3f]
+        alu[read_offset, aligned_offset, -, 2]
 
-#if ((in_flags & PV_SEEK_INIT) == 0 && !streq('EXIT_LABEL', '--'))
-    #if (streq('in_length', '--'))
-        #if (((in_flags & PV_SEEK_REVERSE) == 0))
-            alu[--, BF_MASK(PV_SEEK_BASE_bf), AND, outside, >>BF_L(PV_SEEK_BASE_bf)]
-        #else
-            alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
-        #endif
-        beq[EXIT_LABEL]
-    #else
-        .reg boundary
-        alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
-        bne[read#]
-        #if (((in_flags & PV_SEEK_REVERSE) == 0))
-            alu[boundary, _PV_SEEK_OFFSET, +, in_length]
-        #else
-            alu[boundary, _PV_SEEK_OFFSET, -, in_length]
-        #endif
-        alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, boundary]
-        alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
-        beq[EXIT_LABEL]
-    #endif
-#endif // ((in_flags & PV_SEEK_INIT) == 0 && !streq('EXIT_LABEL', '--'))
+    br_bset[BF_AL(io_vec, PV_SPLIT_bf), split#]
 
-read#:
-    #if (((in_flags) & PV_SEEK_CTM_ONLY) == 0)
-        br_bclr[BF_AL(io_vec, PV_CTM_ALLOCATED_bf), read_mu#], defer[2]
-    #endif
-            #if (isnum(_PV_SEEK_OFFSET))
-                immed[aligned_offset, (_PV_SEEK_OFFSET & _PV_SEEK_READ_BASE_MASK)]
-            #else
-                alu[aligned_offset, _PV_SEEK_OFFSET, AND~, _PV_SEEK_READ_OFFSET_MASK]
-            #endif
-            alu[read_offset, aligned_offset, -, 2]
-    #if (((in_flags) & PV_SEEK_CTM_ONLY) == 0)
-        br_bset[BF_AL(io_vec, PV_SPLIT_bf), split#]
-    #endif
-
-read_ctm#:
     ov_single(OV_LENGTH, 32, OVF_SUBTRACT_ONE)
     mem[read32, $__pv_pkt_data[0], BF_A(io_vec, PV_CTM_ADDR_bf), read_offset, max_32], indirect_ref, defer[2], ctx_swap[sig_ctm]
-        #if (isnum(_PV_SEEK_OFFSET))
-            immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_READ_OFFSET_MASK)]
-        #else
-            alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_READ_OFFSET_MASK]
-        #endif
+        alu[tibi, __pv_seek_offset, AND, 0x3f]
         alu[tibi, tibi, OR, t_idx_ctx]
 
 finalize#:
-    local_csr_wr[T_INDEX_BYTE_INDEX, tibi] // reload T_INDEX after ctx_swap[]
-#if (streq('EXIT_LABEL', '--'))
-    br[end#], defer[2]
-#else
-    br[EXIT_LABEL], defer[2]
-#endif
-        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), AND~, BF_MASK(PV_SEEK_BASE_bf), <<BF_L(PV_SEEK_BASE_bf)]
-        alu[BF_A(io_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), OR, aligned_offset]
+    rtn[__pv_seek_rtn], defer[3]
+        local_csr_wr[T_INDEX_BYTE_INDEX, tibi] // reload T_INDEX after ctx_swap[]
+        alu[BF_A(pkt_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), AND~, BF_MASK(PV_SEEK_BASE_bf), <<BF_L(PV_SEEK_BASE_bf)]
+        alu[BF_A(pkt_vec, PV_SEEK_BASE_bf), BF_A(io_vec, PV_SEEK_BASE_bf), OR, aligned_offset]
 
-    #if (((in_flags) & PV_SEEK_CTM_ONLY) == 0)
-        .reg buffer_offset
-        .reg cbs
-        .reg ctm_bytes
-        .reg ctm_words
-        .reg data_ref
-        .reg mask
-        .reg mu_addr
-        .reg mu_words
-        .reg split_offset
-        .reg straddle_data
-        .reg reflect_addr
-        .reg tmp
-        .sig sig_mu
-        .sig sig_reflect
+split#:
+    // determine the split offset based on CTM buffer size
+    bitfield_extract__sz1(cbs, BF_AML(io_vec, PV_CBS_bf))
+    alu[split_offset, cbs, B, 1, <<8]
+    alu[split_offset, --, B, split_offset, <<indirect]
 
-    split#:
-        // determine the split offset based on CTM buffer size
-        bitfield_extract__sz1(cbs, BF_AML(io_vec, PV_CBS_bf))
-        alu[split_offset, cbs, B, 1, <<8]
-        alu[split_offset, --, B, split_offset, <<indirect]
+    alu[buffer_offset, read_offset, +16, BF_A(io_vec, PV_OFFSET_bf)]
+    alu[ctm_bytes, split_offset, -, buffer_offset]
+    ble[read_mu#]
 
-        alu[buffer_offset, read_offset, +16, BF_A(io_vec, PV_OFFSET_bf)]
-        alu[ctm_bytes, split_offset, -, buffer_offset]
-        ble[read_mu#]
+    alu[--, 128, -, ctm_bytes]
+    bgt[read_straddled#]
 
-        alu[--, 128, -, ctm_bytes]
-        ble[read_ctm#]
+    ov_single(OV_LENGTH, 32, OVF_SUBTRACT_ONE)
+    mem[read32, $__pv_pkt_data[0], BF_A(io_vec, PV_CTM_ADDR_bf), read_offset, max_32], indirect_ref, sig_done[sig_ctm]
+    ctx_arb[sig_ctm], br[finalize#], defer[2]
+        alu[tibi, __pv_seek_offset, AND, 0x3f]
+        alu[tibi, tibi, OR, t_idx_ctx]
 
-    read_straddled#:
-        alu[ctm_words, --, B, ctm_bytes, >>2]
-        ov_single(OV_LENGTH, ctm_words) // read one additional word
-        mem[read32, $__pv_pkt_data[0], BF_A(io_vec, PV_CTM_ADDR_bf), read_offset, max_32], indirect_ref, ctx_swap[sig_ctm], defer[2]
-            alu[read_offset, split_offset, -, 2]
-            alu[data_ref, t_idx_ctx, +, ctm_bytes]
+read_mu#:
+    alu[mu_addr, --, B, BF_A(io_vec, PV_MU_ADDR_bf), <<(31 - BF_M(PV_MU_ADDR_bf))]
+    alu[read_offset, read_offset, +16, BF_A(io_vec, PV_OFFSET_bf)]
+    ov_single(OV_LENGTH, 32, OVF_SUBTRACT_ONE)
+    mem[read32, $__pv_pkt_data[0], mu_addr, <<8, read_offset, max_32], indirect_ref, sig_done[sig_mu]
+    ctx_arb[sig_mu], br[finalize#], defer[2]
+        alu[tibi, __pv_seek_offset, AND, 0x3f]
+        alu[tibi, tibi, OR, t_idx_ctx]
 
-        local_csr_wr[T_INDEX, data_ref]
-        alu[mu_addr, --, B, BF_A(io_vec, PV_MU_ADDR_bf), <<(31 - BF_M(PV_MU_ADDR_bf))]
-        alu[mu_words, (32 - 1), -, ctm_words] // subtract one for OV_LENGTH
+read_straddled#:
+    alu[ctm_words, --, B, ctm_bytes, >>2]
+    ov_single(OV_LENGTH, ctm_words) // read one additional word
+    mem[read32, $__pv_pkt_data[0], BF_A(io_vec, PV_CTM_ADDR_bf), read_offset, max_32], indirect_ref, ctx_swap[sig_ctm], defer[2]
+        alu[read_offset, split_offset, -, 2]
+        alu[data_ref, t_idx_ctx, +, ctm_bytes]
 
-        ov_start((OV_DATA_REF | OV_LENGTH))
-        ov_set(OV_DATA_REF, data_ref)
-        ov_set_use(OV_LENGTH, mu_words)
-        ov_clean()
-        mem[read32, $__pv_pkt_data[0], mu_addr, <<8, read_offset, max_32], indirect_ref, ctx_swap[sig_mu], defer[2]
-            immed[mask, 0xffff]
-            alu[straddle_data, *$index, AND~, mask]
+    local_csr_wr[T_INDEX, data_ref]
+    alu[mu_addr, --, B, BF_A(io_vec, PV_MU_ADDR_bf), <<(31 - BF_M(PV_MU_ADDR_bf))]
+    alu[mu_words, (32 - 1), -, ctm_words] // subtract one for OV_LENGTH
 
-        local_csr_wr[T_INDEX, data_ref]
+    ov_start((OV_DATA_REF | OV_LENGTH))
+    ov_set(OV_DATA_REF, data_ref)
+    ov_set_use(OV_LENGTH, mu_words)
+    ov_clean()
+    mem[read32, $__pv_pkt_data[0], mu_addr, <<8, read_offset, max_32], indirect_ref, ctx_swap[sig_mu], defer[2]
+        ld_field_w_clr[straddle_data, 1100, *$index]
         #if (SCS != 0)
             #error calculation of reflect_addr depends on __MEID
         #endif
         immed[reflect_addr, ((&$reflect << 2) | ((__MEID & 0xf) << 10))]
-        alu[reflect_addr, reflect_addr, OR, __ISLAND, <<24]
-        ov_single(OV_DATA_REF, data_ref)
-        ct[reflect_read_sig_init, $__pv_pkt_data[0], t_idx_ctx, reflect_addr, 1], indirect_ref, ctx_swap[sig_reflect], defer[2]
-            alu[tmp, *$index, AND, mask]
-            alu[$reflect, tmp, OR, straddle_data]
 
-        br[finalize#], defer[2]
-            #if (isnum(_PV_SEEK_OFFSET))
-                immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_READ_OFFSET_MASK)]
+    local_csr_wr[T_INDEX, data_ref]
+    alu[reflect_addr, reflect_addr, OR, __ISLAND, <<24]
+    ov_single(OV_DATA_REF, data_ref)
+    ct[reflect_read_sig_init, $__pv_pkt_data[0], t_idx_ctx, reflect_addr, 1], indirect_ref, ctx_swap[sig_reflect], defer[2]
+        alu[tmp, 0, +16, *$index]
+        alu[$reflect, tmp, OR, straddle_data]
+
+    br[finalize#], defer[2]
+        alu[tibi, __pv_seek_offset, AND, 0x3f]
+        alu[tibi, tibi, OR, t_idx_ctx]
+.end
+.endsub
+#endm
+
+
+#define PV_SEEK_DEFAULT      (0)
+#define PV_SEEK_T_INDEX_ONLY (1 << 1)
+#define PV_SEEK_PAD_INCLUDED (1 << 2)
+#define PV_SEEK_INIT         (1 << 3)
+
+.reg volatile read $__pv_pkt_data[32]
+.addr $__pv_pkt_data[0] 0
+.xfer_order $__pv_pkt_data
+#macro pv_seek(out_cache_idx, io_vec, in_offset, in_flags, EXIT_LABEL)
+.begin
+    .reg outside
+    .reg tibi // T_INDEX_BYTE_INDEX
+
+#if ((in_flags) & PV_SEEK_INIT)
+    br[PV_SEEK_SUBROUTINE#], defer[2]
+        #if (isnum((in_offset)))
+            #if ((in_flags) & PV_SEEK_PAD_INCLUDED)
+                immed[__pv_seek_offset, (in_offset)]
             #else
-                alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_READ_OFFSET_MASK]
+                immed[__pv_seek_offset, ((in_offset) + 2)]
             #endif
-            alu[tibi, tibi, OR, t_idx_ctx]
-
-    read_mu#:
-        alu[mu_addr, --, B, BF_A(io_vec, PV_MU_ADDR_bf), <<(31 - BF_M(PV_MU_ADDR_bf))]
-        alu[read_offset, read_offset, +16, BF_A(io_vec, PV_OFFSET_bf)]
-        ov_single(OV_LENGTH, 32, OVF_SUBTRACT_ONE)
-        mem[read32, $__pv_pkt_data[0], mu_addr, <<8, read_offset, max_32], indirect_ref, sig_done[sig_mu]
-        ctx_arb[sig_mu], br[finalize#], defer[2]
-            #if (isnum(_PV_SEEK_OFFSET))
-                immed[tibi, (_PV_SEEK_OFFSET & _PV_SEEK_READ_OFFSET_MASK)]
-            #else
-                alu[tibi, _PV_SEEK_OFFSET, AND, _PV_SEEK_READ_OFFSET_MASK]
-            #endif
-            alu[tibi, tibi, OR, t_idx_ctx]
-
-    #endif // ((in_flags) & PV_SEEK_CTM_ONLY) == 0
-
-#if ((in_flags & PV_SEEK_INIT) == 0 && streq('EXIT_LABEL', '--'))
-check#:
-    #if (streq('in_length', '--'))
-        #if (((in_flags & PV_SEEK_REVERSE) == 0))
-            alu[--, BF_MASK(PV_SEEK_BASE_bf), AND, outside, >>BF_L(PV_SEEK_BASE_bf)]
         #else
-            alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
+            #if ((in_flags) & PV_SEEK_PAD_INCLUDED)
+                alu[__pv_seek_offset, --, B, in_offset]
+            #else
+                alu[__pv_seek_offset, in_offset, +, 2]
+            #endif
         #endif
-        bne[read#]
+        #if (! streq('EXIT_LABEL', '--'))
+            load_addr[__pv_seek_rtn, EXIT_LABEL]
+        #else
+            load_addr[__pv_seek_rtn, end#]
+        #endif
+#else // PV_SEEK_INIT == 0
+    #if ((in_flags) & PV_SEEK_T_INDEX_ONLY)
+        #define _PV_SEEK_OFFSET_MASK 0x7f
     #else
-        .reg boundary
-        alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
-        bne[read#]
-        #if (((in_flags & PV_SEEK_REVERSE) == 0))
-            alu[boundary, _PV_SEEK_OFFSET, +, in_length]
-        #else
-            alu[boundary, _PV_SEEK_OFFSET, -, in_length]
-        #endif
-        alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, boundary]
-        alu[--, (BF_MASK(PV_SEEK_BASE_bf) >> 1), AND, outside, >>(BF_L(PV_SEEK_BASE_bf) + 1)]
-        bne[read#]
+        #define _PV_SEEK_OFFSET_MASK 0x3f
     #endif
-#endif // ((in_flags & PV_SEEK_INIT) == 0 && streq('EXIT_LABEL', '--'))
 
+    #if (isnum((in_offset)))
+       #if (((in_flags) & PV_SEEK_T_INDEX_ONLY) == 0)
+            #define_eval _PV_SEEK_OFFSET (in_offset)
+            #if (((in_flags) & PV_SEEK_PAD_INCLUDED) == 0)
+                #define_eval _PV_SEEK_OFFSET (_PV_SEEK_OFFSET + 2)
+            #endif
+            alu[tibi, t_idx_ctx, OR, (_PV_SEEK_OFFSET & _PV_SEEK_OFFSET_MASK)]
+            local_csr_wr[T_INDEX_BYTE_INDEX, tibi]
+            #if (_PV_SEEK_OFFSET < 256)
+                alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, _PV_SEEK_OFFSET]
+            #else
+                immed[__pv_seek_offset, _PV_SEEK_OFFSET]
+                alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, __pv_seek_offset]
+                #define _PV_SEEK_OFFSET __pv_seek_offset
+            #endif
+        #endif
+    #else
+        #if (((in_flags) & PV_SEEK_PAD_INCLUDED) == 0)
+            alu[__pv_seek_offset, in_offset, +, 2]
+            alu[tibi, __pv_seek_offset, AND, _PV_SEEK_OFFSET_MASK]
+            #define _PV_SEEK_OFFSET __pv_seek_offset
+        #else
+            alu[tibi, in_offset, AND, _PV_SEEK_OFFSET_MASK]
+            #define_eval _PV_SEEK_OFFSET in_offset
+        #endif
+        alu[tibi, tibi, OR, t_idx_ctx]
+        local_csr_wr[T_INDEX_BYTE_INDEX, tibi]
+        #if (((in_flags) & PV_SEEK_T_INDEX_ONLY) == 0)
+            alu[outside, BF_A(io_vec, PV_SEEK_BASE_bf), XOR, _PV_SEEK_OFFSET]
+        #endif
+    #endif
+
+    #if (((in_flags) & PV_SEEK_T_INDEX_ONLY) == 0)
+        alu[--, BF_MASK(PV_SEEK_BASE_bf), AND, outside, >>BF_L(PV_SEEK_BASE_bf)]
+        #if (! streq('EXIT_LABEL', '--'))
+            #if (! streq('out_cache_idx', '--'))
+                beq[EXIT_LABEL], defer[1]
+                    alu[out_cache_idx, 0x1f, AND, tibi, >>2]
+            #else
+                beq[EXIT_LABEL]
+            #endif
+            #if (isnum(_PV_SEEK_OFFSET))
+                br[PV_SEEK_SUBROUTINE#], defer[2]
+                    immed[__pv_seek_offset, _PV_SEEK_OFFSET]
+            #elif (! streq('_PV_SEEK_OFFSET', '__pv_seek_offset'))
+                br[PV_SEEK_SUBROUTINE#], defer[2]
+                    alu[__pv_seek_offset, --, B, _PV_SEEK_OFFSET]
+            #else
+                br[PV_SEEK_SUBROUTINE#], defer[1]
+            #endif
+            load_addr[__pv_seek_rtn, EXIT_LABEL]
+        #else
+            #if (isnum(_PV_SEEK_OFFSET))
+                #if (! streq('out_cache_idx', '--'))
+                    bne[PV_SEEK_SUBROUTINE#], defer[3]
+                        alu[out_cache_idx, 0x1f, AND, tibi, >>2]
+                #else
+                    bne[PV_SEEK_SUBROUTINE#], defer[2]
+                #endif
+                immed[__pv_seek_offset, _PV_SEEK_OFFSET]
+            #elif (! streq('_PV_SEEK_OFFSET', '__pv_seek_offset'))
+                #if (! streq('out_cache_idx', '--'))
+                    bne[PV_SEEK_SUBROUTINE#], defer[3]
+                       alu[out_cache_idx, 0x1f, AND, tibi, >>2]
+                #else
+                    bne[PV_SEEK_SUBROUTINE#], defer[2]
+                #endif
+                alu[__pv_seek_offset, --, B, _PV_SEEK_OFFSET]
+            #elif (! streq('out_cache_idx', '--'))
+                bne[PV_SEEK_SUBROUTINE#], defer[2]
+                    alu[out_cache_idx, 0x1f, AND, tibi, >>2]
+            #else
+                bne[PV_SEEK_SUBROUTINE#], defer[1]
+            #endif
+            load_addr[__pv_seek_rtn, end#]
+        #endif
+    #else // PV_SEEK_T_INDEX_ONLY
+        #if (! streq('EXIT_LABEL', '--'))
+            #if (! streq('out_cache_idx', '--'))
+                br[EXIT_LABEL], defer[1]
+                    alu[out_cache_idx, 0x1f, AND, tibi, >>2]
+            #else
+                br[EXIT_LABEL]
+            #endif
+        #else
+            #if (! streq('out_cache_idx', '--'))
+                alu[out_cache_idx, 0x1f, AND, tibi, >>2]
+            #else
+                nop
+            #endif
+            nop
+            nop
+        #endif
+    #endif
+    #undef _PV_SEEK_OFFSET
+    #undef _PV_SEEK_OFFSET_MASK
+#endif
 end#:
-#endif // ((in_flags) & PV_SEEK_T_INDEX_ONLY) == 0
-#undef _PV_SEEK_OFFSET
-#undef _PV_SEEK_TEST_OFFSET_MASK
-#undef _PV_SEEK_READ_OFFSET_MASK
-#undef _PV_SEEK_READ_BASE_MASK
 .end
 #endm
 
 
 #macro pv_seek(io_vec, in_offset)
-    pv_seek(--, io_vec, in_offset, --, 0, --)
+    pv_seek(--, io_vec, in_offset, 0, --)
 #endm
 
 
 #macro pv_seek(io_vec, in_offset, in_flags)
-    pv_seek(--, io_vec, in_offset, --, in_flags, --)
+    pv_seek(--, io_vec, in_offset, in_flags, --)
 #endm
 
 
 #macro pv_seek(io_vec, in_offset, in_flags, EXIT_LABEL)
-    pv_seek(--, io_vec, in_offset, --, in_flags, EXIT_LABEL)
-#endm
-
-
-#macro pv_seek(io_vec, in_offset, in_length, in_flags, EXIT_LABEL)
-    pv_seek(--, io_vec, in_offset, in_length, in_flags, EXIT_LABEL)
+    pv_seek(--, io_vec, in_offset, in_flags, EXIT_LABEL)
 #endm
 
 
@@ -2023,7 +2013,7 @@ ipv6_frag#:
         alu[hdr_stack, --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf)]
 
 skip_ipv6_ext#:
-    pv_seek(pkt_vec, pkt_offset, PV_SEEK_CTM_ONLY)
+    pv_seek(pkt_vec, pkt_offset)
 
     byte_align_be[--, *$index++]
     byte_align_be[next_hdr, *$index++]
@@ -2090,7 +2080,7 @@ seek_inner#:
     alu[BF_A(pkt_vec, PV_HEADER_STACK_bf), --, B, BF_A(pkt_vec, PV_HEADER_STACK_bf), <<16]
 
 seek_eth_type#:
-    pv_seek(pkt_vec, pkt_offset, (PV_SEEK_CTM_ONLY | PV_SEEK_PAD_INCLUDED), check_eth_type#)
+    pv_seek(pkt_vec, pkt_offset, PV_SEEK_PAD_INCLUDED, check_eth_type#)
 
 check_geneve_tun#:
     br_bclr[port_tun_args, BF_L(INSTR_RX_PARSE_GENEVE_bf), done#]
@@ -2205,5 +2195,6 @@ end#:
     rtn[rtn_addr_reg]
 .endsub
 #endm
+
 
 #endif

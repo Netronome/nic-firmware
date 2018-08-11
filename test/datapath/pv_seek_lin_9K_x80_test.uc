@@ -55,3 +55,6 @@ test_pass()
 
 fail#:
 test_fail()
+
+PV_SEEK_SUBROUTINE#:
+    pv_seek_subroutine(pkt_vec)
