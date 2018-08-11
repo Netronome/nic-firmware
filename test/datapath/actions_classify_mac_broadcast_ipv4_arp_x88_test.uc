@@ -11,8 +11,6 @@
 .reg expected_pv_broadcast
 .reg pkt_len
 
-//move(expected_pv_broadcast, (NULL_VLAN<<BF_L(PV_VLAN_ID_bf) |\
-//                             1<<BF_L(PV_BROADCAST_ACTIVE_bf)))
 
 pv_get_length(pkt_len, pkt_vec)
 
@@ -33,8 +31,6 @@ nop
 
 __actions_veb_lookup(pkt_vec, discards_filter_mac#)
 
-//test_assert_equal(pkt_vec[PV_VLAN_wrd], expected_pv_broadcast)
-
 test_assert_equal(*$index++, 0xc0ffee)
 test_assert_equal(*$index++, 0xdeadbeef)
 
@@ -42,3 +38,6 @@ test_pass()
 
 discards_filter_mac#:
 test_fail()
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)

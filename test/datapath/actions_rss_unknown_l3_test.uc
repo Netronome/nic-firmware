@@ -16,3 +16,6 @@ test_assert_equal(BF_A(pkt_vec, PV_META_TYPES_bf), 0)
 test_assert_equal(BF_A(pkt_vec, PV_QUEUE_OFFSET_bf), 0)
 
 test_pass()
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)

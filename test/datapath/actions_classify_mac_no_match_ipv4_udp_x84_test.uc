@@ -42,3 +42,6 @@ test_fail()
 discards_filter_mac#:
 
 test_pass()
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)

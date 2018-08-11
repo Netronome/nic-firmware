@@ -77,7 +77,7 @@ move(loop_cntr, 0)
     alu[--, value, OR, 1, <<7]
     mem[write32, $pkt_data_wr[0], 0, <<8, addr, max_19], ctx_swap[s], indirect_ref
 
-    pv_seek(pkt_vec, 0, (PV_SEEK_INIT | PV_SEEK_CTM_ONLY))
+    pv_seek(pkt_vec, 0, (PV_SEEK_INIT | PV_SEEK_DEFAULT))
     alu[--, --, B, *$index++]
     alu[--, --, B, *$index++]
     alu[--, --, B, *$index++]
@@ -101,3 +101,6 @@ test_pass()
 PV_HDR_PARSE_SUBROUTINE#:
 pv_hdr_parse_subroutine(pkt_vec, port_tun_args)
 #pragma warning(pop)
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)

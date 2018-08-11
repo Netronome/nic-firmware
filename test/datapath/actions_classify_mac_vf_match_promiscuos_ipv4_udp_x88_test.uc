@@ -53,3 +53,6 @@ discards_filter_mac#:
 error_map_fd#:
 lookup_not_found#:
 test_fail()
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)

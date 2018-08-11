@@ -18,3 +18,6 @@ rss_validate_range(pkt_vec, NFP_NET_RSS_IPV4_UDP, incl, (14 + 12), (14 + 12 + 8 
 rss_validate_range(pkt_vec, NFP_NET_RSS_IPV4_UDP, excl, (14 + 12 + 8 + 4), pkt_len)
 
 test_pass()
+
+PV_SEEK_SUBROUTINE#:
+   pv_seek_subroutine(pkt_vec)
