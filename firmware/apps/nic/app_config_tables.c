@@ -749,7 +749,6 @@ __intrinsic void
 cfg_act_append_checksum(action_list_t *acts,
             int outer, int inner, int complete)
 {
-#if 0
     instr_checksum_t instr_csum;
 
     instr_csum.outer = outer;
@@ -757,7 +756,6 @@ cfg_act_append_checksum(action_list_t *acts,
     instr_csum.complete = complete;
 
     cfg_act_append(acts, INSTR_CHECKSUM, instr_csum.__raw[0]);
-#endif
 }
 
 
