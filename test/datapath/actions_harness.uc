@@ -2,7 +2,7 @@
 #define _ACTIONS_HARNESS_UC
 
 #include <actions.uc>
-#include <test.uc>
+#include <single_ctx_test.uc>
 
 .if (0)
     tx_errors_offset#:
