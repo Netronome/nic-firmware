@@ -264,8 +264,8 @@ $(eval $(call microcode.add_define,$(PROJECT),nfd_tlv_init,NS_FLAVOR_TYPE=$(NS_F
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),nfd_tlv_init))
 
 # Link stage
-# Write the FW ID to the MIP
-$(eval $(call nffw.add_rtsyms,$(PROJECT),$(shell $(SCRIPT_DIR)/describe-head.sh --fw_id $(FLAVOR))))
+# Write the build info and then the firmware ID to the MIP (one overrides the other in the MIP)
 $(eval $(call nffw.add_link_flag,$(PROJECT),$(shell $(SCRIPT_DIR)/describe-head.sh --nfld_args $(FLAVOR))))
+$(eval $(call nffw.add_rtsyms,$(PROJECT),$(shell $(SCRIPT_DIR)/describe-head.sh --fw_id $(FLAVOR))))
 # TODO get link_w_analysis to work without adding a warning
 $(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx,datapath))
