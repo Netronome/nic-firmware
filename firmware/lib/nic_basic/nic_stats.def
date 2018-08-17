@@ -23,6 +23,7 @@ tx_discards
 tx_discard_act
 
 tx_errors
+tx_error_lso
 tx_error_offset
 tx_error_mtu
 tx_error_pci
