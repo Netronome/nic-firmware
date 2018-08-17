@@ -385,7 +385,7 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigne
 __cls __align(4) struct ctm_pkt_credits pkt_buf_ctm_credits;
 
 
-__inline static void
+static void
 disable_port_tx_datapath(unsigned int nbi, unsigned int start_q,
                          unsigned int end_q)
 {
@@ -398,7 +398,7 @@ disable_port_tx_datapath(unsigned int nbi, unsigned int start_q,
 }
 
 
-__inline static void
+static void
 enable_port_tx_datapath(unsigned int nbi, unsigned int start_q,
                         unsigned int end_q)
 {
@@ -411,7 +411,7 @@ enable_port_tx_datapath(unsigned int nbi, unsigned int start_q,
 }
 
 
-__inline static void
+static void
 mac_port_enable_rx(unsigned int port)
 {
     unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
@@ -426,7 +426,7 @@ mac_port_enable_rx(unsigned int port)
 }
 
 
-__inline static int
+static int
 mac_port_disable_rx(unsigned int port)
 {
     unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
@@ -445,7 +445,7 @@ mac_port_disable_rx(unsigned int port)
 }
 
 
-__inline static void
+static void
 mac_port_enable_tx(unsigned int port)
 {
     unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
@@ -459,7 +459,7 @@ mac_port_enable_tx(unsigned int port)
 }
 
 
-__inline static void
+static void
 mac_port_disable_tx(unsigned int port)
 {
     unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
@@ -473,7 +473,7 @@ mac_port_disable_tx(unsigned int port)
 }
 
 
-__inline static void
+static void
 mac_port_enable_tx_flush(unsigned int mac, unsigned int mac_core,
                          unsigned int mac_core_port)
 {
@@ -485,7 +485,7 @@ mac_port_enable_tx_flush(unsigned int mac, unsigned int mac_core,
 }
 
 
-__inline static void
+static void
 mac_port_disable_tx_flush(unsigned int mac, unsigned int mac_core,
                           unsigned int mac_core_port)
 {
@@ -507,8 +507,8 @@ __intrinsic uint32_t veb_up_check()
     return 0;
 }
 
-__intrinsic void
-handle_sriov_update()
+static void
+handle_sriov_update(uint32_t pf_control)
 {
     __xread struct sriov_mb sriov_mb_data;
     __xread struct sriov_cfg sriov_cfg_data;
@@ -524,14 +524,22 @@ handle_sriov_update()
     mem_read32(&sriov_cfg_data, NFD_VF_CFG_ADDR(vf_cfg_base, sriov_mb_data.vf),
                sizeof(struct sriov_cfg));
 
-    reg_cp(&new_mac_addr_wr, &sriov_cfg_data, sizeof(new_mac_addr_wr));
-    mem_write8(&new_mac_addr_wr, NFD_CFG_BAR_ISL(NIC_PCI, sriov_mb_data.vf) +
-               NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
-
     load_vnic_setup_entry(NFD_VF2VID(sriov_mb_data.vf), &vnic_entry_rd);
     reg_cp(&vnic_entry, &vnic_entry_rd, sizeof(struct nfp_vnic_setup_entry));
-    vnic_entry.src_mac = MAC64_FROM_SRIOV_CFG(sriov_cfg_data);
-    add_vlan_member(vnic_entry.vlan, NFD_VF2VID(sriov_mb_data.vf));
+
+    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_MAC) {
+        reg_cp(&new_mac_addr_wr, &sriov_cfg_data, sizeof(new_mac_addr_wr));
+        mem_write8(&new_mac_addr_wr, NFD_CFG_BAR_ISL(NIC_PCI, sriov_mb_data.vf) +
+                   NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
+        vnic_entry.src_mac = MAC64_FROM_SRIOV_CFG(sriov_cfg_data);
+	add_vlan_member(vnic_entry_rd.vlan, NFD_VF2VID(sriov_mb_data.vf));
+    }
+
+    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_VLAN) {
+        remove_vlan_member(vnic_entry_rd.vlan, NFD_VF2VID(sriov_mb_data.vf));
+        add_vlan_member(sriov_cfg_data.vlan_id, NFD_VF2VID(sriov_mb_data.vf));
+        vnic_entry.vlan = sriov_cfg_data.vlan_id;
+    }
 
     if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_SPOOF) {
         vnic_entry.spoof_chk = sriov_cfg_data.ctrl_spoof;
@@ -539,6 +547,9 @@ handle_sriov_update()
 
     if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_LINK_STATE) {
         vnic_entry.link_state_mode = sriov_cfg_data.ctrl_link_state;
+        /* Update the list of VFs to be notified of link state changes. */
+        update_vf_lsc_list(0, sriov_mb_data.vf, pf_control,
+                           vnic_entry.link_state_mode);
     }
 
     reg_cp(&vnic_entry_wr, &vnic_entry, sizeof(struct nfp_vnic_setup_entry));
@@ -584,7 +595,7 @@ cfg_changes_loop(void)
     upd_slicc_hash_table();
 
     for (;;) {
-	cfg_msg.error = 0;
+        cfg_msg.error = 0;
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
 
         if (cfg_msg.msg_valid && !cfg_msg.error) {
@@ -600,7 +611,7 @@ cfg_changes_loop(void)
             NFD_VID2VNIC(type, vnic, vid);
 
             if (type == NFD_VNIC_TYPE_CTRL) {
-		cfg_act_build_ctrl(&acts, NIC_PCI, vid);
+                cfg_act_build_ctrl(&acts, NIC_PCI, vid);
                 cfg_act_write_host(NIC_PCI, vid, &acts);
 
                 /* Set link state */
@@ -611,21 +622,20 @@ cfg_changes_loop(void)
                     link_state = 0;
                 }
                 mem_write32(&link_state,
-                            (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg.vid) +
-                             NFP_NET_CFG_STS),
-                            sizeof link_state);
+                                (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg.vid) +
+                                NFP_NET_CFG_STS), sizeof link_state);
             } else if (type == NFD_VNIC_TYPE_PF) {
                 port = vnic;
 
                 if (update & NFP_NET_CFG_UPDATE_BPF) {
-	            nic_local_bpf_reconfig(&ctx_mode, vid, vnic);
+                    nic_local_bpf_reconfig(&ctx_mode, vid, vnic);
                 }
 
                 if (control & NFP_NET_CFG_CTRL_ENABLE) {
-		    if (cfg_act_pf_up(NIC_PCI, vid, veb_up, control, update)) {
-		        cfg_msg.error = 1;
-			goto error;
-		    }
+                    if (cfg_act_pf_up(NIC_PCI, vid, veb_up, control, update)) {
+                        cfg_msg.error = 1;
+                        goto error;
+                    }
                     nic_local_epoch();
                 }
 
@@ -639,11 +649,10 @@ cfg_changes_loop(void)
 
                         mac_port_enable_rx(port);
 
-		        for (i = 0; i < NVNICS; i++) {
+                        for (i = 0; i < NVNICS; i++) {
                             if (NFD_VID_IS_VF(i) &&
-			        (nic_control_word[i] & NFP_NET_CFG_CTRL_ENABLE))
-				cfg_act_vf_up(NIC_PCI, i, control,
-			  		      nic_control_word[i], 0);
+                                        (nic_control_word[i] & NFP_NET_CFG_CTRL_ENABLE))
+                                cfg_act_vf_up(NIC_PCI, i, control, nic_control_word[i], 0);
                         }
                     } else {
                         __xread struct nfp_nbi_tm_queue_status tmq_status;
@@ -659,7 +668,7 @@ cfg_changes_loop(void)
                         sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
 
                         /* stop processing packets: drop action */
-			cfg_act_pf_down(NIC_PCI, vid);
+                        cfg_act_pf_down(NIC_PCI, vid);
 
                         nic_local_epoch();
 
@@ -667,11 +676,10 @@ cfg_changes_loop(void)
                         for (i = 0; occupied && i < TMQ_DRAIN_RETRIES; ++i) {
                             occupied = 0;
                             for (queue = NS_PLATFORM_NBI_TM_QID_LO(port);
-                                queue <= NS_PLATFORM_NBI_TM_QID_HI(port);
-                                queue++) {
+                                        queue <= NS_PLATFORM_NBI_TM_QID_HI(port);
+                                        queue++) {
                                 tmq_status_read(&tmq_status,
-                                    NS_PLATFORM_MAC(port),
-                                    queue, 1);
+                                        NS_PLATFORM_MAC(port), queue, 1);
                                 if (tmq_status.queuelevel) {
                                     occupied = 1;
                                     break;
@@ -689,7 +697,13 @@ cfg_changes_loop(void)
 
                 /* Handle SR-IOV setup changes */
                 if (update & NFP_NET_CFG_UPDATE_VF) {
-	            handle_sriov_update();
+                    handle_sriov_update(control);
+                    //after a vf change via PF mailbox - rebuild all VF action lists
+                    for (i = 0; i < NVNICS; i++) {
+                        if (NFD_VID_IS_VF(i) &&
+                                    (nic_control_word[i] & NFP_NET_CFG_CTRL_ENABLE))
+                            cfg_act_vf_up(NIC_PCI, i, control, nic_control_word[i], 0);
+                    }
                 }
             } else if (type == NFD_VNIC_TYPE_VF) {
                 /* Set the link state handling control */
@@ -703,28 +717,32 @@ cfg_changes_loop(void)
                 }
                 update_vf_lsc_list(0, vid, control, ls_mode);
 
-
                 if ((nic_control_word[NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE) &&
-		    (control & NFP_NET_CFG_CTRL_ENABLE)) {
+                                    (control & NFP_NET_CFG_CTRL_ENABLE)) {
 
-		    if (cfg_act_vf_up(NIC_PCI, vid, nic_control_word[NFD_PF2VID(0)],
-				      control, update)) {
-		        cfg_msg.error = 1;
-			goto error;
-		    }
+                    if (cfg_act_vf_up(NIC_PCI, vid, nic_control_word[NFD_PF2VID(0)],
+                                    control, update)) {
+                        cfg_msg.error = 1;
+                        goto error;
+                    }
+		    // rebuild PF action list because veb_up state may have changed
+		    if (cfg_act_pf_up(NIC_PCI, NFD_PF2VID(0), 1,
+				      nic_control_word[NFD_PF2VID(0)], 0)) {
+                        cfg_msg.error = 1;
+                        goto error;
+                    }
                 } else if ((control & NFP_NET_CFG_CTRL_ENABLE) == 0)
-		    cfg_act_vf_down(NIC_PCI, vid);
-
+                    cfg_act_vf_down(NIC_PCI, vid);
             }
 
             nic_control_word[cfg_msg.vid] = control;
 error:
-	    /* Complete the message */
-	    cfg_msg.msg_valid = 0;
-	    nfd_cfg_app_complete_cfg_msg(NIC_PCI, &cfg_msg,
-                                         NFD_CFG_BASE_LINK(NIC_PCI),
-                                         &nfd_cfg_sig_app_master0);
-	}
+            /* Complete the message */
+            cfg_msg.msg_valid = 0;
+            nfd_cfg_app_complete_cfg_msg(NIC_PCI, &cfg_msg,
+                                     NFD_CFG_BASE_LINK(NIC_PCI),
+                                     &nfd_cfg_sig_app_master0);
+        }
         ctx_swap();
     }
     /* NOTREACHED */
@@ -764,7 +782,7 @@ perq_stats_loop(void)
             sleep(PERQ_STATS_SLEEP);
         }
 
-        nic_local_epoch();
+	nic_local_epoch();
     }
     /* NOTREACHED */
 }
@@ -781,7 +799,7 @@ perq_stats_loop(void)
 
 /* Send an LSC MSI-X. return 0 if done or 1 if pending. vid corresponds to
    either a pf or a vf */
-__inline static int
+static int
 lsc_send(int vid)
 {
     __mem char *nic_ctrl_bar;
@@ -824,20 +842,14 @@ out:
 
 /* Check for VFs that should receive an interrupt for a link state change,
    update the link status, and try to generate an interrupt */
-__inline static void
+static void
 lsc_check_vf(int port, enum link_state ls)
 {
     __mem char *vf_ctrl_bar;
     unsigned int vf_vid;
-    unsigned int sts_en;
-    unsigned int sts_dis;
     __xwrite uint32_t sts;
     __xread uint32_t ctrl;
 
-    sts_en = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
-              NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
-    sts_dis = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
-               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 0;
     for (vf_vid = 0; vf_vid < NVNICS; vf_vid++) {
         /* Check if the VF should be receiving an interrupt. */
         if (NFD_VID_IS_VF(vf_vid) && LS_READ(vf_lsc_list[port], vf_vid)) {
@@ -845,10 +857,12 @@ lsc_check_vf(int port, enum link_state ls)
                VF as that of the PF. */
             if (ls == LINK_UP) {
                 LS_SET(ls_current, vf_vid);
-                sts = sts_en;
+                sts = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
+                      NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
             } else {
                 LS_CLEAR(ls_current, vf_vid);
-                sts = sts_dis;
+                sts = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
+		       NFP_NET_CFG_STS_LINK_RATE_SHIFT);
             }
 
             vf_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vf_vid);
@@ -867,7 +881,7 @@ lsc_check_vf(int port, enum link_state ls)
 }
 
 /* Check the Link state and try to generate an interrupt if it changed. */
-__inline static
+static
 void lsc_check(int port)
 {
     __mem char *nic_ctrl_bar;
@@ -1096,7 +1110,7 @@ main(void)
         cfg_changes_loop();
         break;
     case APP_MASTER_CTX_MAC_STATS:
-        nic_stats_loop();
+	nic_stats_loop();
         break;
     case APP_MASTER_CTX_PERQ_STATS:
         perq_stats_loop();
