@@ -49,7 +49,7 @@ __export __shared __emem struct macstats_port_accum mac_stats[24];
 
 #define MIN(x, y) ((x) > (y)) ? (y) : (x)
 
-__forceinline static void mac_stats_accumulate(void)
+static void mac_stats_accumulate(void)
 {
     __mem uint64_t *stat;
     __xread uint64_t head_drops;
@@ -122,7 +122,7 @@ __forceinline static void mac_stats_accumulate(void)
 }
 
 
-__forceinline static void
+static void
 update_vnic_queue_stat(nfd_qstats_t *nfd,
 	               uint32_t *vnic_stat, uint32_t queue_stat,
 		       unsigned int pkts,
@@ -191,7 +191,7 @@ update_vnic_queue_stat(nfd_qstats_t *nfd,
 }
 
 
-__forceinline static void update_vnic_bar_stats(uint32_t vid)
+static void update_vnic_bar_stats(uint32_t vid)
 {
     __xwrite uint64_t write_block[9];
 
@@ -238,7 +238,7 @@ __forceinline static void update_vnic_bar_stats(uint32_t vid)
 }
 
 
-__forceinline static void vnic_stats_remap(__lmem uint64_t *dst_stat,
+static void vnic_stats_remap(__lmem uint64_t *dst_stat,
 					   __lmem uint64_t *dst_total,
 					   __lmem uint64_t *src_stat,
 					   __lmem uint64_t *src_total)
@@ -251,7 +251,7 @@ __forceinline static void vnic_stats_remap(__lmem uint64_t *dst_stat,
     *src_stat = 0;
 }
 
-__forceinline static void vnic_stats_accumulate()
+static void vnic_stats_accumulate()
 {
     __xread uint64_t read_block[8];
     __xwrite uint64_t write_block[8];
