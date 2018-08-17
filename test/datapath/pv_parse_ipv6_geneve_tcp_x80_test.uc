@@ -16,10 +16,10 @@
 .reg expected_i_l4_offset
 .reg expected_proto
 .reg pkt_len
-
+.reg port_tun_args
 
 pv_get_length(pkt_len, pkt_vec)
-move(port_tun_args, 0x80f)
+move(port_tun_args, 0x101e)
 
 bitfield_extract__sz1(expected_i_l4_offset, BF_AML(pkt_vec, PV_HEADER_OFFSET_INNER_L4_bf))
 bitfield_extract__sz1(expected_i_l3_offset, BF_AML(pkt_vec, PV_HEADER_OFFSET_INNER_IP_bf))
@@ -54,13 +54,8 @@ test_assert_equal(proto, expected_proto)
 
 test_pass()
 
-#pragma warning(push)
-#pragma warning(disable: 4701)
-#pragma warning(disable: 5116)
 PV_HDR_PARSE_SUBROUTINE#:
-pv_hdr_parse_subroutine(pkt_vec, port_tun_args)
-#pragma warning(pop)
-
+pv_hdr_parse_subroutine(pkt_vec)
 
 PV_SEEK_SUBROUTINE#:
    pv_seek_subroutine(pkt_vec)

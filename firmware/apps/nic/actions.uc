@@ -88,12 +88,12 @@
 #endm
 
 
-#macro __actions_rx_host(out_pkt_vec, ERROR_MTU_LABEL, ERROR_PCI_LABEL)
+#macro __actions_rx_host(out_pkt_vec, DROP_LABEL)
 .begin
     .reg mtu
 
     __actions_read(mtu, 0xffff)
-    pkt_io_rx_host(out_pkt_vec, mtu, ERROR_MTU_LABEL, ERROR_PCI_LABEL)
+    pkt_io_rx_host(out_pkt_vec, mtu, DROP_LABEL)
     __actions_restore_t_idx()
 .end
 #endm
@@ -812,12 +812,6 @@ drop_proto#:
 error_parse#:
     pv_stats_update(io_pkt_vec, RX_ERROR_PARSE, drop#)
 
-error_pci#:
-    pv_stats_update(io_pkt_vec, TX_ERROR_PCI, drop#)
-
-error_mtu#:
-    pv_stats_update(io_pkt_vec, TX_ERROR_MTU, drop#)
-
 error_pkt_stack#:
     pv_stats_update(io_pkt_vec, ERROR_PKT_STACK, drop#)
 
@@ -850,7 +844,7 @@ tx_host#:
     __actions_next()
 
 rx_host#:
-    __actions_rx_host(io_pkt_vec, error_mtu#, error_pci#)
+    __actions_rx_host(io_pkt_vec, drop#)
     __actions_next()
 
 tx_wire#:

@@ -568,12 +568,8 @@ test_fail#:
 
 test_fail()
 
-#pragma warning(push)
-#pragma warning(disable: 4701)
-#pragma warning(disable: 5116)
 PV_HDR_PARSE_SUBROUTINE#:
-pv_hdr_parse_subroutine(pkt_vec, tunnel_args)
-#pragma warning(pop)
+pv_hdr_parse_subroutine(pkt_vec)
 
 PV_SEEK_SUBROUTINE#:
    pv_seek_subroutine(pkt_vec)

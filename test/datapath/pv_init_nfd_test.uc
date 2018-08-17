@@ -81,8 +81,6 @@ pv_reset(pkt_vec_addr, 0, __actions_t_idx, 64)
     // lword 2
     ld_field_w_clr[exp[2], 1100, pkt_no, <<16] // pkt num
     ld_field[exp[2], 0011, NFD_IN_DATA_OFFSET] // offset
-    alu[exp[2], exp[2], OR, 1, <<31] // ctm allocated
-
     // lword 3
     move(tmp1, ~(0x100 - NFD_IN_NUM_SEQRS)) // seq num & seq ctx
     alu[exp[3], $nfd_desc[0], AND, tmp1]
@@ -119,16 +117,19 @@ pv_reset(pkt_vec_addr, 0, __actions_t_idx, 64)
     // lword 7
     move(exp[7], 0)
     move(pkt_vec[6], 0)
-    pv_init_nfd(pkt_vec, pkt_no, $nfd_desc, mtu, error#, error#)
+    pv_init_nfd(pkt_vec, pkt_no, $nfd_desc, mtu, error#)
 
     .if ( drop_flag )
         test_assert_equal(i, 0xfe)
         test_fail()
     .endif
 
+    alu[exp[2], exp[2], OR, 1, <<31] // ctm allocated
+
     br[pv_data_check#]
 
     error#:
+        alu[exp[2], exp[2], AND~, 1, <<31]
         .if (!drop_flag )
             test_assert_equal(i, 0xff)
             test_fail()
@@ -159,5 +160,8 @@ pv_reset(pkt_vec_addr, 0, __actions_t_idx, 64)
 
 test_pass()
 
+PV_HDR_PARSE_SUBROUTINE#:
+    pv_hdr_parse_subroutine(pkt_vec)
+
 PV_SEEK_SUBROUTINE#:
-   pv_seek_subroutine(pkt_vec)
+    pv_seek_subroutine(pkt_vec)

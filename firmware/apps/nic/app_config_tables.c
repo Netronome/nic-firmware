@@ -774,15 +774,8 @@ cfg_act_append_rx_wire(action_list_t *acts, uint32_t pcie, uint32_t vid,
         instr_rx_wire.parse_vxlans = cfg_act_upd_vxlan_table(pcie, vid);
         instr_rx_wire.vxlan_nn_idx = VXLAN_PORTS_NN_IDX;
     }
-    else {
-        instr_rx_wire.parse_vxlans = 0;
-        instr_rx_wire.vxlan_nn_idx = 0;
-    }
 
     instr_rx_wire.parse_nvgre = nvgre;
-
-    // disable GENEVE until we have configuration ABI
-    instr_rx_wire.parse_geneve = 0;
 
     cfg_act_append(acts, INSTR_RX_WIRE, instr_rx_wire.__raw[0]);
 }
