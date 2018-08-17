@@ -139,9 +139,9 @@ enum instruction_ops {
  * INSTR_RX_WIRE:
  * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
- *       +-----------------------------+-+-------+-------------+-----+-+-+
- *    0  |              1              |P|   0   |VXLAN_NN_IDX |VXLAN|G|N|
- *       +-----------------------------+-+-------+-------------+-----+-+-+
+ *       +-----------------------------+-+-----+-------------+-----+-+-+-+
+ *    0  |              1              |P|  0  |VXLAN_NN_IDX |VXLAN|G|N|0|
+ *       +-----------------------------+-+-----+-------------+-----+-+-+-+
  *
  *       VXLAN_NN_IDX = NN base of VXLAN port table
  *       VXLAN = Number of VXLAN ports
@@ -315,11 +315,12 @@ typedef union {
     struct {
 	    uint32_t op: 15;
 	    uint32_t pipeline: 1;
-	    uint32_t reserved: 4;
+	    uint32_t reserved: 3;
 	    uint32_t vxlan_nn_idx: 7;
 	    uint32_t parse_vxlans: 3;
 	    uint32_t parse_geneve: 1;
 	    uint32_t parse_nvgre: 1;
+	    uint32_t host_encap: 1;
     };
     uint32_t __raw[1];
 } instr_rx_wire_t;
@@ -390,10 +391,11 @@ typedef union {
 #define INSTR_RSS_ROW_SHIFT_bf  1, 4, 0
 #define INSTR_RSS_KEY_bf        2, 31, 0
 
-#define INSTR_RX_VXLAN_NN_IDX_bf 1, 11, 5
-#define INSTR_RX_PARSE_VXLANS_bf 1, 4, 2
-#define INSTR_RX_PARSE_GENEVE_bf 1, 1, 1
-#define INSTR_RX_PARSE_NVGRE_bf  1, 0, 0
+#define INSTR_RX_VXLAN_NN_IDX_bf 0, 12, 6
+#define INSTR_RX_PARSE_VXLANS_bf 0, 5, 3
+#define INSTR_RX_PARSE_GENEVE_bf 0, 2, 2
+#define INSTR_RX_PARSE_NVGRE_bf  0, 1, 1
+#define INSTR_RX_HOST_ENCAP_bf   0, 0, 0
 
 #define INSTR_TX_CONTINUE_bf     0, 15, 15
 #define INSTR_TX_MULTICAST_bf    0, 14, 14

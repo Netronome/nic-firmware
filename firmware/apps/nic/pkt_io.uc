@@ -66,21 +66,16 @@ nfd_out_send_init()
 .reg_addr __pkt_io_quiescent 27 A
 .set __pkt_io_quiescent
 
-.reg global rtn_addr_reg
-.set rtn_addr_reg
-
-.reg global port_tun_args
-.set port_tun_args
 
 #macro pkt_io_drop(in_pkt_vec)
     pv_free($__pkt_io_gro_meta, pkt_vec)
 #endm
 
 
-#macro pkt_io_rx_host(io_vec, in_mtu, ERROR_MTU_LABEL, ERROR_PCI_LABEL)
+#macro pkt_io_rx_host(io_vec, in_mtu, DROP_LABEL)
     #pragma warning(push)
     #pragma warning(disable:5009) // rx_host is only invoked when $__pkt_io_nfd_desc ready
-    pv_init_nfd(io_vec, __pkt_io_nfd_pkt_no, $__pkt_io_nfd_desc, in_mtu, ERROR_MTU_LABEL, ERROR_PCI_LABEL)
+    pv_init_nfd(io_vec, __pkt_io_nfd_pkt_no, $__pkt_io_nfd_desc, in_mtu, DROP_LABEL)
     #pragma warning(pop)
 #endm
 

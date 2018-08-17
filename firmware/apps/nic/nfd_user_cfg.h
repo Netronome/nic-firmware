@@ -144,21 +144,22 @@
 /* Configuration mechanism defines */
 #define NFD_CFG_MAX_MTU         9216
 
-#define NFD_CFG_VF_CAP                                            \
-    (NFP_NET_CFG_CTRL_ENABLE   | NFP_NET_CFG_CTRL_PROMISC |       \
-     NFP_NET_CFG_CTRL_RXCSUM   | NFP_NET_CFG_CTRL_TXCSUM |        \
-     NFP_NET_CFG_CTRL_MSIXAUTO | NFP_NET_CFG_CTRL_CSUM_COMPLETE | \
-     NFP_NET_CFG_CTRL_GATHER   | NFP_NET_CFG_CTRL_LSO2 |          \
-     NFP_NET_CFG_CTRL_IRQMOD   | NFP_NET_CFG_CTRL_LIVE_ADDR)
+#define NFD_CFG_VF_CAP                                             \
+    (NFP_NET_CFG_CTRL_ENABLE    | NFP_NET_CFG_CTRL_PROMISC |       \
+     NFP_NET_CFG_CTRL_RXCSUM    | NFP_NET_CFG_CTRL_TXCSUM |        \
+     NFP_NET_CFG_CTRL_MSIXAUTO  | NFP_NET_CFG_CTRL_CSUM_COMPLETE | \
+     NFP_NET_CFG_CTRL_GATHER    | NFP_NET_CFG_CTRL_LSO |           \
+     NFP_NET_CFG_CTRL_IRQMOD)
 
-#define NFD_CFG_PF_CAP                                            \
-    (NFP_NET_CFG_CTRL_ENABLE   | NFP_NET_CFG_CTRL_PROMISC |       \
-     NFP_NET_CFG_CTRL_RXCSUM   | NFP_NET_CFG_CTRL_TXCSUM |        \
-     NFP_NET_CFG_CTRL_RSS      | NFP_NET_CFG_CTRL_RSS2 |          \
-     NFP_NET_CFG_CTRL_MSIXAUTO | NFP_NET_CFG_CTRL_CSUM_COMPLETE | \
-     NFP_NET_CFG_CTRL_GATHER   | NFP_NET_CFG_CTRL_LSO2 |          \
-     NFP_NET_CFG_CTRL_IRQMOD   | NFP_NET_CFG_CTRL_BPF |           \
-     NFP_NET_CFG_CTRL_LIVE_ADDR)
+#define NFD_CFG_PF_CAP                                             \
+    (NFP_NET_CFG_CTRL_ENABLE    | NFP_NET_CFG_CTRL_PROMISC |       \
+     NFP_NET_CFG_CTRL_RXCSUM    | NFP_NET_CFG_CTRL_TXCSUM |        \
+     NFP_NET_CFG_CTRL_RSS       | NFP_NET_CFG_CTRL_RSS2 |          \
+     NFP_NET_CFG_CTRL_MSIXAUTO  | NFP_NET_CFG_CTRL_CSUM_COMPLETE | \
+     NFP_NET_CFG_CTRL_GATHER    | NFP_NET_CFG_CTRL_LSO |           \
+     NFP_NET_CFG_CTRL_IRQMOD    | NFP_NET_CFG_CTRL_BPF |           \
+     NFP_NET_CFG_CTRL_LIVE_ADDR | NFP_NET_CFG_CTRL_VXLAN |         \
+     NFP_NET_CFG_CTRL_NVGRE)
 
 /* Set Core NIC ABI version and supported VF configuration capabilities. */
 #define NFD_VF_CFG_ABI_VER      2
