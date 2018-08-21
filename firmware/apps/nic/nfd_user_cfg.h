@@ -244,7 +244,8 @@
 #define NFD_PCIE0_FL_CACHE_MEM         emem0_cache_upper
 
 #define NFD_USE_TLV_PF
+#define NFD_USE_TLV_VF
 #define NFD_CFG_TLV_BLOCK_SZ           3072
-#define NFD_CFG_TLV_BLOCK_OFF          0x1800
+#define NFD_CFG_TLV_BLOCK_OFF          0x2200
 
 #endif /* !_NFD_USER_CFG_H_ */
