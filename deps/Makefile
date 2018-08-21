@@ -4,7 +4,7 @@
 # FLOWENV_REV - Tip as of Apr 23 2018
 FLOWENV_REV=a77d5b2
 # NFD_REV - Jun 22 2018
-NFD_REV=ebbe9a09
+NFD_REV=4640b43b
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
