@@ -624,7 +624,6 @@ cfg_changes_loop(void)
                         cfg_msg.error = 1;
                         goto error;
                     }
-                    nic_local_epoch();
                 }
 
                 /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
@@ -658,8 +657,6 @@ cfg_changes_loop(void)
                         /* stop processing packets: drop action */
                         cfg_act_pf_down(NIC_PCI, vid);
 
-                        nic_local_epoch();
-
                         /* wait for TM queues to drain */
                         for (i = 0; occupied && i < TMQ_DRAIN_RETRIES; ++i) {
                             occupied = 0;
@@ -681,6 +678,7 @@ cfg_changes_loop(void)
                         /* give Arbitrator ME time to react */
                         sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
                     }
+		    nic_local_epoch();
                 }
 
                 /* Handle SR-IOV setup changes */
