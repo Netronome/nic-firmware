@@ -27,8 +27,8 @@
 #define_eval __HASHMAP_CNTR_SUFFIX PKT_COUNTER_SUFFIX
 
 #macro __hashmap_lm_handles_define()
-    #define_eval HASHMAP_LM_HANDLE    2
-    #define_eval HASHMAP_LM_INDEX     *l$index2
+    #define_eval HASHMAP_LM_HANDLE    3
+    #define_eval HASHMAP_LM_INDEX     *l$index3
 #endm
 
 #macro __hashmap_lm_handles_undef()
