@@ -62,7 +62,7 @@ __intrinsic int mac_eth_check_rx_enable(unsigned int mac_isl,
  *
  * @note This function is not safe for multi-threaded use.
  */
-__intrinsic void mac_eth_disable_rx(unsigned int mac_isl,
+__intrinsic int mac_eth_disable_rx(unsigned int mac_isl,
                                     unsigned int mac_core,
                                     unsigned int mac_core_port,
                                     unsigned int num_lanes);

@@ -414,19 +414,22 @@ mac_port_enable_rx(unsigned int port)
 }
 
 
-__inline static void
+__inline static int
 mac_port_disable_rx(unsigned int port)
 {
     unsigned int mac_nbi_isl   = NS_PLATFORM_MAC(port);
     unsigned int mac_core      = NS_PLATFORM_MAC_CORE(port);
     unsigned int mac_core_port = NS_PLATFORM_MAC_CORE_SERDES_LO(port);
     unsigned int num_lanes     = NS_PLATFORM_MAC_NUM_SERDES(port);
+    int result;
 
     LOCAL_MUTEX_LOCK(mac_reg_lock);
 
-    mac_eth_disable_rx(mac_nbi_isl, mac_core, mac_core_port, num_lanes);
+    result = mac_eth_disable_rx(mac_nbi_isl, mac_core, mac_core_port, num_lanes);
 
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
+
+    return result;
 }
 
 
@@ -635,7 +638,10 @@ cfg_changes_loop(void)
                         int i, queue, occupied = 1;
 
                         /* stop receiving packets */
-                        mac_port_disable_rx(port);
+                        if (! mac_port_disable_rx(port)) {
+				cfg_msg.error = 1;
+				goto error;
+			}
 
                         /* allow workers to drain RX queue */
                         sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
