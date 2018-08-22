@@ -334,26 +334,15 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigne
 
     /* Update the link status for the VF. Report the link speed for the VF as
      * that of the PF. */
-    sts_en = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
+    if (mode == NFD_VF_CFG_CTRL_LINK_STATE_ENABLE || pf_link_state) {
+        LS_SET(ls_current, vf_vid);
+        sts_xw = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
-    sts_dis = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
-               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 0;
-    if (mode == NFD_VF_CFG_CTRL_LINK_STATE_DISABLE) {
-        /* Clear the link status. */
-        LS_CLEAR(ls_current, vf_vid);
-        sts_xw = sts_dis;
-    } else if (mode == NFD_VF_CFG_CTRL_LINK_STATE_ENABLE) {
-        /* Set the link status to always be up. */
-        LS_SET(ls_current, vf_vid);
-        sts_xw = sts_en;
-    } else if (pf_link_state) {
-        /* Set the link status to reflect the PF link is up. */
-        LS_SET(ls_current, vf_vid);
-        sts_xw = sts_en;
     } else {
         /* Clear the link status to reflect the PF link is down. */
         LS_CLEAR(ls_current, vf_vid);
-        sts_xw = sts_dis;
+        sts_xw = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
+		  NFP_NET_CFG_STS_LINK_RATE_SHIFT);
     }
 
     mem_write32(&sts_xw, cfg_bar + NFP_NET_CFG_STS, sizeof(sts_xw));
