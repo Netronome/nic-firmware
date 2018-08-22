@@ -62,8 +62,8 @@
 
 
 #macro __cmsg_print_lm_handles_define()
-	#define_eval CMSG_PRINT_LM_HANDLE 2
-	#define_eval CMSG_PRINT_LM_INDEX  *l$index2
+	#define_eval CMSG_PRINT_LM_HANDLE 3
+	#define_eval CMSG_PRINT_LM_INDEX  *l$index3
 #endm
 
 #macro __cmsg_print_lm_handles_undef()
