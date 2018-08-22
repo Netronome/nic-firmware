@@ -19,6 +19,7 @@
 
 
 #include <assert.h>
+#include <nfp/me.h>
 #include <nfp/remote_me.h>
 #include <nfp/xpb.h>
 #include <nfp6000/nfp_mac.h>
@@ -175,7 +176,7 @@ mac_eth_check_rx_enable(unsigned int mac_isl, unsigned int mac_core,
 }
 
 
-__intrinsic void
+__intrinsic int
 mac_eth_disable_rx(unsigned int mac_isl, unsigned int mac_core,
                    unsigned int mac_core_port, unsigned int num_lanes)
 {
@@ -184,6 +185,7 @@ mac_eth_disable_rx(unsigned int mac_isl, unsigned int mac_core,
     uint32_t mac_inhibit_done;
     uint32_t mac_inhibit_done_addr;
     uint32_t mac_port_mask;
+    uint32_t i = 0;
 
     /* Check the parameters */
     assert(mac_isl < MAX_MAC_ISLANDS_PER_NFP);
@@ -211,14 +213,19 @@ mac_eth_disable_rx(unsigned int mac_isl, unsigned int mac_core,
     issue_sync_me_cmd(mac_isl, mac_core, mac_core_port,
                       ARB_CODE_ETH_CMD_CFG_DISABLE_RX, 0);
 
+
     /* Verify that the MAC RX is disabled for the port. */
-    while (mac_eth_check_rx_enable(mac_isl, mac_core, mac_core_port)) { ; }
+    for (i = 0; i < 10; ++i) {
+        if (! mac_eth_check_rx_enable(mac_isl, mac_core, mac_core_port))
+	    break;
+        sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
+    }
 
     /* Disable the MAC RX enqueue inhibit. */
     mac_inhibit &= ~mac_port_mask;
     xpb_write(mac_inhibit_addr, mac_inhibit);
 
-    return;
+    return i < 10;
 }
 
 
