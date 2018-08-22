@@ -679,7 +679,6 @@ cfg_changes_loop(void)
                         /* give Arbitrator ME time to react */
                         sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
                     }
-		    nic_local_epoch();
                 }
 
                 /* Handle SR-IOV setup changes */
