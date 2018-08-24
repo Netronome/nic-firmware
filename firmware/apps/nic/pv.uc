@@ -1288,7 +1288,7 @@ end#:
 #define MAC_PARSE_VLAN_bf               MAC_PARSE_wrd, 17, 16
 #define MAC_CSUM_bf                     MAC_PARSE_wrd, 15, 0
 
-#macro pv_init_nbi(out_vec, in_nbi_desc, in_tunnel_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+#macro pv_init_nbi(out_vec, in_nbi_desc, in_rx_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
 .begin
     .reg cbs
     .reg dst_mac_bc
@@ -1336,7 +1336,17 @@ end#:
 max_cbs#:
     alu[BF_A(out_vec, PV_MU_ADDR_bf), BF_A(out_vec, PV_MU_ADDR_bf), OR, cbs, <<BF_L(PV_CBS_bf)]
 
-    // set TX host flags
+    immed[BF_A(out_vec, PV_TX_FLAGS_bf), 0]
+
+    br_bset[in_rx_args, BF_L(INSTR_RX_WIRE_CSUM_bf), propagate_csum#], defer[3]
+        alu[BF_A(out_vec, PV_CTM_ADDR_bf), BF_A(out_vec, PV_NUMBER_bf), AND~, BF_MASK(PV_CTM_ISL_bf), <<BF_L(PV_CTM_ISL_bf)]
+        alu[BF_A(out_vec, PV_CTM_ADDR_bf), BF_A(out_vec, PV_CTM_ADDR_bf), OR, 1, <<BF_L(PV_CTM_ALLOCATED_bf)]
+        ld_field[BF_A(out_vec, PV_CTM_ADDR_bf), 0011, (PKT_NBI_OFFSET + MAC_PREPEND_BYTES)]
+
+seek#:
+    pv_seek(out_vec, 0, PV_SEEK_INIT, read_pkt#)
+
+propagate_csum#:
     immed[l4_csum_tbl, 0x238c, <<8]
     alu[shift, (7 << 2), AND, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>(BF_L(MAC_PARSE_STS_bf) - 2)] ; MAC_PARSE_STS_bf
     alu[l3_csum_tbl, shift, B, 0xe0]
@@ -1344,24 +1354,18 @@ max_cbs#:
     alu[shift, (3 << 1), AND, BF_A(in_nbi_desc, MAC_PARSE_L3_bf), >>(BF_L(MAC_PARSE_L3_bf) - 1)] ; MAC_PARSE_L3_bf
     alu[BF_A(out_vec, PV_TX_HOST_L4_bf), shift, B, l4_flags, <<BF_L(PV_TX_HOST_L4_bf)] ; PV_TX_HOST_L4_bf
     alu[l3_flags, 0x3, AND, l3_csum_tbl, >>indirect]
-    alu[BF_A(out_vec, PV_TX_HOST_L3_bf), BF_A(out_vec, PV_TX_HOST_L3_bf), OR, l3_flags, <<BF_L(PV_TX_HOST_L3_bf)] ; PV_TX_HOST_L3_bf
-
-    alu[BF_A(out_vec, PV_CTM_ADDR_bf), BF_A(out_vec, PV_NUMBER_bf), AND~, BF_MASK(PV_CTM_ISL_bf), <<BF_L(PV_CTM_ISL_bf)]
-    alu[BF_A(out_vec, PV_CTM_ADDR_bf), BF_A(out_vec, PV_CTM_ADDR_bf), OR, 1, <<BF_L(PV_CTM_ALLOCATED_bf)]
-    ld_field[BF_A(out_vec, PV_CTM_ADDR_bf), 0011, (PKT_NBI_OFFSET + MAC_PREPEND_BYTES)]
-
-    immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
-
-    pv_seek(out_vec, 0, PV_SEEK_INIT, skip_hdr_parse#)
+    br[seek#], defer[1]
+        alu[BF_A(out_vec, PV_TX_HOST_L3_bf), BF_A(out_vec, PV_TX_HOST_L3_bf), OR, l3_flags, <<BF_L(PV_TX_HOST_L3_bf)] ; PV_TX_HOST_L3_bf
 
 hdr_parse#:
-    pv_hdr_parse(out_vec, in_tunnel_args, finalize#)
+    alu[--, *$index--, OR, 0]
+    pv_hdr_parse(out_vec, in_rx_args, finalize#)
 
-skip_hdr_parse#:
+read_pkt#:
     __pv_get_mac_dst_type(mac_dst_type, out_vec) // advances *$index by 2 words
     alu[vlan_len, (3 << 2), AND, BF_A(in_nbi_desc, MAC_PARSE_VLAN_bf), >>(BF_L(MAC_PARSE_VLAN_bf) - 2)]
     beq[skip_vlan#], defer[3]
-        alu[out_vec[PV_FLAGS_wrd], *$index++, B, 0]
+        alu[BF_A(out_vec, PV_META_TYPES_bf), *$index++, B, 0]
         alu[vlan_id, *$index++, B, 1, <<12]
         alu[vlan_id, vlan_id, -, 1] ; PV_VLAN_ID_bf
 
@@ -1371,7 +1375,7 @@ skip_vlan#:
     bits_set__sz1(BF_AL(out_vec, PV_VLAN_ID_bf), vlan_id)
     bitfield_extract__sz1(l3_type, BF_AML(in_nbi_desc, CAT_L3_CLASS_bf)) ; CAT_L3_CLASS_bf
     br!=byte[l3_type, 0, 4, hdr_parse#], defer[3] // if packet is not IPv4 perform parse
-        alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), *$index--, B, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
+        alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
         // map NBI sequencers to 0, 1, 2, 3
         alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nbi_desc, CAT_SEQ_NO_bf), OR, 0xff] ; PV_SEQ_NO_bf
         alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), AND~, 0xfc, <<8] ; PV_SEQ_CTX_bf
@@ -1383,10 +1387,10 @@ skip_vlan#:
     alu[l4_type, 0xe, AND, BF_A(in_nbi_desc, CAT_L4_CLASS_bf), >>BF_L(CAT_L4_CLASS_bf)] ; CAT_L4_CLASS_bf
     br!=byte[l4_type, 0, 2, hdr_parse#] // if packet is not TCP/UDP perform parse
 
-    br_bset[in_tunnel_args, BF_L(INSTR_RX_PARSE_NVGRE_bf), hdr_parse#]
+    br_bset[in_rx_args, BF_L(INSTR_RX_PARSE_NVGRE_bf), hdr_parse#]
 
     // check for possibility of UDP tunnels
-    alu[tunnel, in_tunnel_args, AND, ((BF_MASK(INSTR_RX_PARSE_VXLANS_bf) << BF_L(INSTR_RX_PARSE_VXLANS_bf)) | (1 << BF_L(INSTR_RX_PARSE_GENEVE_bf)))]
+    alu[tunnel, in_rx_args, AND, ((BF_MASK(INSTR_RX_PARSE_VXLANS_bf) << BF_L(INSTR_RX_PARSE_VXLANS_bf)) | (1 << BF_L(INSTR_RX_PARSE_GENEVE_bf)))]
     alu[--, 0, -, tunnel]
     alu[tunnel, tunnel, AND~, BF_A(in_nbi_desc, CAT_L4_CLASS_bf)]
     br_bset[tunnel, BF_L(CAT_L4_CLASS_bf), hdr_parse#]

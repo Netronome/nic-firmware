@@ -764,7 +764,7 @@ cfg_act_append_checksum(action_list_t *acts,
 
 __intrinsic void
 cfg_act_append_rx_wire(action_list_t *acts, uint32_t pcie, uint32_t vid,
-		       uint32_t vxlan, uint32_t nvgre)
+		       uint32_t vxlan, uint32_t nvgre, uint32_t rxcsum)
 {
     instr_rx_wire_t instr_rx_wire;
 
@@ -776,6 +776,7 @@ cfg_act_append_rx_wire(action_list_t *acts, uint32_t pcie, uint32_t vid,
     }
 
     instr_rx_wire.parse_nvgre = nvgre;
+    instr_rx_wire.host_encap_prop_csum = rxcsum;
 
     cfg_act_append(acts, INSTR_RX_WIRE, instr_rx_wire.__raw[0]);
 }
@@ -972,6 +973,7 @@ cfg_act_build_nbi(action_list_t *acts, uint32_t pcie, uint32_t vid,
     uint32_t nvgre = (control & NFP_NET_CFG_CTRL_NVGRE) ? 1 : 0;
     uint32_t promisc = (control & NFP_NET_CFG_CTRL_PROMISC) ? 1 : 0;
     uint32_t csum_compl = (control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) ? 1 : 0;
+    uint32_t rx_csum = (control & NFP_NET_CFG_CTRL_RXCSUM) ? 1 : 0;
     uint32_t update_rss = (update & NFP_NET_CFG_UPDATE_RSS ||
 			   update & NFP_NET_CFG_CTRL_BPF);
     uint32_t rss_v1 = (NFD_CFG_MAJOR_PF < 4 &&
@@ -983,7 +985,8 @@ cfg_act_build_nbi(action_list_t *acts, uint32_t pcie, uint32_t vid,
     if (type != NFD_VNIC_TYPE_PF)
         return;
 
-    cfg_act_append_rx_wire(acts, pcie, vid, vxlan, nvgre);
+    cfg_act_append_rx_wire(acts, pcie, vid, vxlan, nvgre,
+			   rx_csum && !csum_compl);
 
     if (veb_up)
         cfg_act_append_veb_lookup(acts, pcie, vid, promisc, 1);
@@ -1013,7 +1016,7 @@ __intrinsic void
 cfg_act_build_nbi_down(action_list_t *acts, uint32_t pcie, uint32_t vid)
 {
     cfg_act_init(acts);
-    cfg_act_append_rx_wire(acts, pcie, vid, 0, 0);
+    cfg_act_append_rx_wire(acts, pcie, vid, 0, 0, 0);
     cfg_act_append_drop(acts);
 }
 
