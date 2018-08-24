@@ -193,10 +193,10 @@ end#:
 #endm
 
 
-#macro pkt_io_rx_wire(io_vec, in_tunnel_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+#macro pkt_io_rx_wire(io_vec, in_rx_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
     #pragma warning(push)
     #pragma warning(disable:5009) // rx_wire is only invoked when $__pkt_io_nbi_desc ready
-    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, in_tunnel_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+    pv_init_nbi(io_vec, $__pkt_io_nbi_desc, in_rx_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
     #pragma warning(pop)
 #endm
 

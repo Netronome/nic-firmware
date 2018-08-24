@@ -79,10 +79,10 @@
 
 #macro __actions_rx_wire(out_pkt_vec, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
 .begin
-    .reg tunnel_args
+    .reg rx_args
 
-    __actions_read(tunnel_args, 0xffff)
-    pkt_io_rx_wire(out_pkt_vec, tunnel_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+    __actions_read(rx_args, 0xffff)
+    pkt_io_rx_wire(out_pkt_vec, rx_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
     __actions_restore_t_idx()
 .end
 #endm

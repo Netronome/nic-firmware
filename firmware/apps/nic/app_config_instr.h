@@ -140,13 +140,14 @@ enum instruction_ops {
  * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *       +-----------------------------+-+-----+-------------+-----+-+-+-+
- *    0  |              1              |P|  0  |VXLAN_NN_IDX |VXLAN|G|N|0|
+ *    0  |              1              |P|  0  |VXLAN_NN_IDX |VXLAN|G|N|C|
  *       +-----------------------------+-+-----+-------------+-----+-+-+-+
  *
  *       VXLAN_NN_IDX = NN base of VXLAN port table
  *       VXLAN = Number of VXLAN ports
  *       G = Parse GENEVE
  *       N = Parse NVGRE
+ *       C = Propagate MAC checksum
  *
  * INSTR_VEB_LOOKUP:
  * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
@@ -320,7 +321,7 @@ typedef union {
 	    uint32_t parse_vxlans: 3;
 	    uint32_t parse_geneve: 1;
 	    uint32_t parse_nvgre: 1;
-	    uint32_t host_encap: 1;
+	    uint32_t host_encap_prop_csum: 1;
     };
     uint32_t __raw[1];
 } instr_rx_wire_t;
@@ -396,6 +397,7 @@ typedef union {
 #define INSTR_RX_PARSE_GENEVE_bf 0, 2, 2
 #define INSTR_RX_PARSE_NVGRE_bf  0, 1, 1
 #define INSTR_RX_HOST_ENCAP_bf   0, 0, 0
+#define INSTR_RX_WIRE_CSUM_bf    0, 0, 0
 
 #define INSTR_TX_CONTINUE_bf     0, 15, 15
 #define INSTR_TX_MULTICAST_bf    0, 14, 14
