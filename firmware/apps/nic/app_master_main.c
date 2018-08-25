@@ -50,7 +50,6 @@
 #include "app_mac_vlan_config_cmsg.h"
 #include "maps/cmsg_map_types.h"
 #include "nic_tables.h"
-#include "trng.h"
 
 /*
  * The application master runs on a single ME and performs a number of
@@ -978,98 +977,6 @@ lsc_loop(void)
     /* NOTREACHED */
 }
 
-/*
- * Generate random Ethernet addresses (MAC) to all VFs, the MAC addresses
- * are not multicast and has the local assigned bit set.
- */
-static void
-init_vfs_random_macs(void)
-{
-    uint32_t vf;
-    int try;
-    uint32_t mac_hi;
-    uint32_t mac_lo;
-    uint32_t ts_lo;
-    __gpr uint64_t mac64;
-    __gpr struct nfp_vnic_setup_entry vnic_entry;
-    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
-    __xwrite struct nfp_vnic_setup_entry vnic_entry_wr;
-    __shared __lmem uint32_t sriov_act_list[NIC_MAC_VLAN_RESULT_SIZE_LW];
-    __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
-    __emem __addr40 uint8_t *vf_base;
-    __gpr struct sriov_cfg sriov_cfg_data;
-    __xread struct sriov_cfg sriov_cfg_data_rd;
-    __xwrite struct sriov_cfg sriov_cfg_data_wr;
-    __xread unsigned int cfg_bar_data[2];
-    __mem char *cfg_bar;
-    uint32_t update;
-    uint32_t control;
-    int success;
-
-    reg_zero(sriov_act_list, sizeof(sriov_act_list));
-
-    /* Start generating the MAC addresses */
-    for (vf = 0; NFD_MAX_VFS && vf < NFD_MAX_VFS; vf++) {
-        try = 0;
-        /* We are going to try twice per VF */
-        success = 0;
-        while (try < 10) {
-            try++;
-            trng_rd64(&mac_hi, &mac_lo);
-
-            /* Make sure we didn't generate all 0's or all 1's */
-            if ((mac_hi == 0 && mac_lo == 0) ||
-                (mac_hi == 0xFFFFFFFF && mac_lo == 0xFFFFFFFF)) {
-                continue;
-            }
-            /* Make sure no Multicast */
-            mac_hi = mac_hi & 0xFEFFFFFF;
-            /* Local assigned bit set */
-            mac_hi = mac_hi | 0x02000000;
-            /* MAC LO needs only 16 bits */
-            mac_lo = mac_lo & 0xFFFF0000;
-            mac64 = ((uint64_t)mac_hi << 32) | mac_lo;
-
-            /* Add to VEB */
-            load_vnic_setup_entry(NFD_VF2VID(vf), &vnic_entry_rd);
-            reg_cp(&vnic_entry, &vnic_entry_rd,
-                   sizeof(struct nfp_vnic_setup_entry));
-
-            /* read in the first 64bit of the Control BAR */
-            cfg_bar = NFD_CFG_BAR_ISL(NIC_PCI, vf);
-            mem_read64(cfg_bar_data, cfg_bar, sizeof (cfg_bar_data));
-            control = cfg_bar_data[0];
-            update = cfg_bar_data[1];
-
-            vnic_entry.src_mac = mac64 >> 16;
-            vnic_entry.vlan = NIC_NO_VLAN_ID;
-            reg_cp(&vnic_entry_wr, &vnic_entry,
-                   sizeof(struct nfp_vnic_setup_entry));
-            write_vnic_setup_entry(vf, &vnic_entry_wr);
-
-            /* Write the generated MAC into NFD's rtsym */
-            vf_base = NFD_VF_CFG_ADDR(vf_cfg_base, vf);
-            mem_read32(&sriov_cfg_data_rd, vf_base, sizeof(struct sriov_cfg));
-            reg_cp(&sriov_cfg_data, &sriov_cfg_data_rd,
-                    sizeof(struct sriov_cfg));
-            sriov_cfg_data.mac_hi = (mac64 >> 32) & 0xFFFFFFFF;
-            sriov_cfg_data.mac_lo = (mac64 >> 16) & 0x0000FFFF;
-            reg_cp(&sriov_cfg_data_wr, &sriov_cfg_data,
-                    sizeof(struct sriov_cfg));
-            mem_write32(&sriov_cfg_data_wr, vf_base, sizeof(struct sriov_cfg));
-
-            /* write the MAC to the VF BAR so it is ready to use even
-             * without an FLR */
-            mem_write8(&sriov_cfg_data_wr, NFD_CFG_BAR_ISL(NIC_PCI, vf) +
-                       NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
-
-            /* All went well, no need to try again */
-            success = 1;
-            break;
-        }
-    }
-}
-
 #ifndef UNIT_TEST
 int
 main(void)
@@ -1077,9 +984,7 @@ main(void)
 
     switch (ctx()) {
     case APP_MASTER_CTX_CONFIG_CHANGES:
-        trng_init();
         init_catamaran_chan2port_table();
-        init_vfs_random_macs();
         mac_csr_sync_start(DISABLE_GPIO_POLL);
         cfg_changes_loop();
         break;
