@@ -193,7 +193,7 @@
 #define NFD_IN_ADD_SEQN
 #define NFD_IN_NUM_WQS          1
 
-#define NFD_IN_NUM_SEQRS        2
+#define NFD_IN_NUM_SEQRS        8
 #define NFD_IN_SEQR_QSHIFT      0
 
 /* PCI.OUT block defines */

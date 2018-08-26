@@ -22,7 +22,7 @@
 #endif
 
 #ifndef GRO_CTX_PER_BLOCK
-    #define GRO_CTX_PER_BLOCK       2
+    #define GRO_CTX_PER_BLOCK       4
 #endif
 
 #if 0
@@ -53,22 +53,37 @@
 
 #macro gro_config_block(BLOCKNUM, CALLER)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 0, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 0, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048, 1024)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 1, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 1, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048, 1024)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 2, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 2, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048, 1024)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 3, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 4096, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 3, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048, 1024)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 4, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 4096, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 4, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 2048, 1024)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 5, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 4096, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 5, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 2048, 1024)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 6, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 4096, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 6, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 2048, 1024)
 
-        gro_declare_ctx(BLOCKNUM, CALLER, 7, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 4096, 2048)
+        gro_declare_ctx(BLOCKNUM, CALLER, 7, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 2048, 1024)
 
+        gro_declare_ctx(BLOCKNUM, CALLER, 8, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048, 1024)
+
+        gro_declare_ctx(BLOCKNUM, CALLER, 9, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048, 1024)
+
+        gro_declare_ctx(BLOCKNUM, CALLER, 10, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048, 1024)
+
+        gro_declare_ctx(BLOCKNUM, CALLER, 11, GRO_ISL, (24 | GRO_USE_CACHE_UPPER), 2048, 1024)
+
+        gro_declare_ctx(BLOCKNUM, CALLER, 12, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 2048, 1024)
+
+        gro_declare_ctx(BLOCKNUM, CALLER, 13, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 2048, 1024)
+
+        gro_declare_ctx(BLOCKNUM, CALLER, 14, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 2048, 1024)
+
+        gro_declare_ctx(BLOCKNUM, CALLER, 15, GRO_ISL, (25 | GRO_USE_CACHE_UPPER), 2048, 1024)
 
     /* Netdev wire does not send to NBI, so no NBI dest         */
     /* gro_declare_dest_nbi(BLOCKNUM, CALLER, 0, GRO_1_SEQR)    */

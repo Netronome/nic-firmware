@@ -13,10 +13,8 @@ rx_discard_act
 rx_discard_addr
 rx_discard_mru
 rx_discard_pci
-rx_discard_proto
 
 rx_errors
-rx_error_parse
 rx_error_veb
 
 tx_discards

@@ -70,7 +70,7 @@ move(loop_cntr, 64)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
     alu[expected[0], loop_cntr, -, MAC_PREPEND_BYTES]
 
@@ -141,7 +141,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
 
     alu[expected[0], (64 - MAC_PREPEND_BYTES), OR, loop_cntr, <<14]
@@ -203,7 +203,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
 
     move(temp, 0x3ff)
@@ -272,7 +272,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
 
     .if (loop_cntr == 0x20000000)
@@ -338,7 +338,7 @@ move(loop_cntr, 1)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
 
     #define_eval _PV_CHK_LOOP 0
@@ -393,7 +393,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, error#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
 
     alu[expected[1], --, B, loop_cntr, <<31]
@@ -422,11 +422,6 @@ move(loop_cntr, 0)
 
 
 test_pass()
-
-drop#:
-error#:
-
-test_fail()
 
 PV_HDR_PARSE_SUBROUTINE#:
 pv_hdr_parse_subroutine(pkt_vec)
