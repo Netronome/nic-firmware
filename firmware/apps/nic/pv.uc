@@ -1391,7 +1391,7 @@ skip_vlan#:
 
     // check for possibility of UDP tunnels
     alu[tunnel, in_rx_args, AND, ((BF_MASK(INSTR_RX_PARSE_VXLANS_bf) << BF_L(INSTR_RX_PARSE_VXLANS_bf)) | (1 << BF_L(INSTR_RX_PARSE_GENEVE_bf)))]
-    alu[--, 0, -, tunnel]
+    alu[tunnel, 0, -, tunnel]
     alu[tunnel, tunnel, AND~, BF_A(in_nbi_desc, CAT_L4_CLASS_bf)]
     br_bset[tunnel, BF_L(CAT_L4_CLASS_bf), hdr_parse#]
 
