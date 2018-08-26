@@ -36,6 +36,8 @@
 #define PV_MAX_CLONES 2
 passert(PV_MAX_CLONES, "EQ", 2)
 
+#define NULL_VLAN 0xfff
+
 .alloc_mem __pv_reserved_pkt_mem ctm+0 island (96*2048) 0
 .alloc_mem __pv_pkt_sequencer imem global 4 256
 
@@ -1293,7 +1295,6 @@ end#:
     .reg addr
     .reg cbs
     .reg dst_mac_bc
-    .reg not_frag
     .reg ip_ver
     .reg l3_csum_tbl
     .reg l3_flags
@@ -1301,6 +1302,7 @@ end#:
     .reg l3_type
     .reg l4_csum_tbl
     .reg l4_flags
+    .reg l4_tcp
     .reg l4_type
     .reg l4_offset
     .reg mac_dst_type
@@ -1311,6 +1313,10 @@ end#:
     .reg vlan_id
     .reg read $seq
     .sig sig_seq
+
+    #ifdef PARANOIA
+        br_bclr[BF_AL(in_nbi_desc, CAT_VALID_bf), fail#] ; CAT_VALID_bf
+    #endif
 
     alu[BF_A(out_vec, PV_LENGTH_bf), BF_A(in_nbi_desc, CAT_PKT_LEN_bf), -, MAC_PREPEND_BYTES]
 
@@ -1330,7 +1336,7 @@ end#:
      * spare the per packet CTM accesses. This decision should be revisited if the need
      * for the absolute address (also part of packet status) ever arises for NBI packets.
      */
-    alu[cbs, (PKT_NBI_OFFSET + MAC_PREPEND_BYTES - 1), +16, BF_A(out_vec, PV_LENGTH_bf)] ; PV_LENGTH_bf
+    alu[cbs, (PKT_NBI_OFFSET - 1), +16, BF_A(in_nbi_desc, CAT_PKT_LEN_bf)] ; CAT_PKT_LEN_bf
     alu[--, 0xf, AND, cbs, >>10]
     bne[max_cbs#], defer[3]
         alu[BF_A(out_vec, PV_MU_ADDR_bf), BF_A(in_nbi_desc, CAT_MUPTR_bf), AND~, BF_MASK(PV_CBS_bf), <<BF_L(PV_CBS_bf)]
@@ -1356,6 +1362,11 @@ map_seq#:
 seek#:
     pv_seek(out_vec, 0, PV_SEEK_INIT, read_pkt#)
 
+#ifdef PARANOIA
+fail#:
+    fatal_error("INVALID CATAMARAN METADATA") // fatal error, can't safely drop without valid sequencer info
+#endif
+
 propagate_csum#:
     immed[l4_csum_tbl, 0x238c, <<8]
     alu[shift, (7 << 2), AND, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>(BF_L(MAC_PARSE_STS_bf) - 2)] ; MAC_PARSE_STS_bf
@@ -1375,72 +1386,63 @@ alloc_seq#:
         alu[BF_A(out_vec, PV_SEQ_NO_bf), 0xff, OR, $seq, <<16]
 
 hdr_parse#:
-    alu[--, *$index--, OR, 0]
-    pv_hdr_parse(out_vec, in_rx_args, finalize#)
+    pv_hdr_parse(out_vec, in_rx_args, end#)
+
+ipv4_frag#:
+    br[finalize_l3#], defer[1]
+        ld_field[BF_A(out_vec, PV_PROTO_bf), 0001, PROTO_IPV4_FRAGMENT]
 
 read_pkt#:
     __pv_get_mac_dst_type(mac_dst_type, out_vec) // advances *$index by 2 words
     alu[vlan_len, (3 << 2), AND, BF_A(in_nbi_desc, MAC_PARSE_VLAN_bf), >>(BF_L(MAC_PARSE_VLAN_bf) - 2)]
     beq[skip_vlan#], defer[3]
-        alu[BF_A(out_vec, PV_META_TYPES_bf), *$index++, B, 0]
-        alu[vlan_id, *$index++, B, 1, <<12]
-        alu[vlan_id, vlan_id, -, 1] ; PV_VLAN_ID_bf
+        alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)] ; PV_MAC_DST_TYPE_bf
+        alu[BF_A(out_vec, PV_META_TYPES_bf), *$index++, B, 0] ; PV_META_TYPES_bf
+        immed[vlan_id, NULL_VLAN]
 
     alu[vlan_id, --, B, *$index, >>16]
 
 skip_vlan#:
-    bits_set__sz1(BF_AL(out_vec, PV_VLAN_ID_bf), vlan_id)
     bitfield_extract__sz1(l3_type, BF_AML(in_nbi_desc, CAT_L3_CLASS_bf)) ; CAT_L3_CLASS_bf
     br!=byte[l3_type, 0, 4, hdr_parse#], defer[2] // if packet is not IPv4 perform parse
-        alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
-        immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
+        bits_set__sz1(BF_AL(out_vec, PV_VLAN_ID_bf), vlan_id) ; PV_VLAN_ID_bf
+        passert(BF_L(PV_SEQ_CTX_bf), "EQ", 8)
+        ld_field[BF_A(out_vec, PV_SEQ_CTX_bf), 0010, seq_ctx, <<BF_L(PV_SEQ_CTX_bf)]
 
-    // handle fragments
-    alu[not_frag, 1, AND~, BF_A(in_nbi_desc, CAT_V4_FRAG_bf), >>BF_L(CAT_V4_FRAG_bf)] ; CAT_V4_FRAG_bf
-    alu[not_frag, not_frag, AND~, BF_A(in_nbi_desc, MAC_PARSE_V6_FRAG_bf), >>BF_L(MAC_PARSE_V6_FRAG_bf)] ; MAC_PARSE_V6_FRAG_bf
-    beq[store_l3_off#]
-    alu[l4_type, 0xe, AND, BF_A(in_nbi_desc, CAT_L4_CLASS_bf), >>BF_L(CAT_L4_CLASS_bf)] ; CAT_L4_CLASS_bf
-    br!=byte[l4_type, 0, 2, hdr_parse#] // if packet is not TCP/UDP perform parse
+    // packet is IPv4, classify fragments
+    br_bset[BF_AL(in_nbi_desc, CAT_V4_FRAG_bf), ipv4_frag#], defer[3]
+        bitfield_extract__sz1(l3_offset, BF_AML(in_nbi_desc, CAT_L3_OFFSET_bf)) ; CAT_L3_OFFSET_bf
+        alu[l3_offset, l3_offset, -, MAC_PREPEND_BYTES]
+        alu[BF_A(out_vec, PV_HEADER_STACK_bf), --, B, l3_offset, <<BF_L(PV_HEADER_OFFSET_INNER_IP_bf)]
 
+    // packet is IPv4, deep parse if NVGRE is configured
     br_bset[in_rx_args, BF_L(INSTR_RX_PARSE_NVGRE_bf), hdr_parse#]
 
-    // check for possibility of UDP tunnels
+    // packet is IPv4, deep parse if not TCP or UDP
+    alu[l4_type, 0xe, AND, BF_A(in_nbi_desc, CAT_L4_CLASS_bf), >>BF_L(CAT_L4_CLASS_bf)] ; CAT_L4_CLASS_bf
+    br!=byte[l4_type, 0, 2, hdr_parse#]
+
+    // deep parse if UDP tunnels are possible and configured
     alu[tunnel, in_rx_args, AND, ((BF_MASK(INSTR_RX_PARSE_VXLANS_bf) << BF_L(INSTR_RX_PARSE_VXLANS_bf)) | (1 << BF_L(INSTR_RX_PARSE_GENEVE_bf)))]
     alu[tunnel, 0, -, tunnel]
     alu[tunnel, tunnel, AND~, BF_A(in_nbi_desc, CAT_L4_CLASS_bf)]
-    br_bset[tunnel, BF_L(CAT_L4_CLASS_bf), hdr_parse#]
+    br_bset[tunnel, BF_L(CAT_L4_CLASS_bf), hdr_parse#] ; CAT_L4_CLASS_bf
 
-    // store L3 offset
-store_l3_off#:
-    bitfield_extract__sz1(l3_offset, BF_AML(in_nbi_desc, CAT_L3_OFFSET_bf)) ; CAT_L3_OFFSET_bf
-    alu[l3_offset, l3_offset, -, MAC_PREPEND_BYTES]
-    alu[BF_A(out_vec, PV_HEADER_STACK_bf), --, B, l3_offset, <<8]
-    alu[BF_A(out_vec, PV_HEADER_STACK_bf), BF_A(out_vec, PV_HEADER_STACK_bf), OR, l3_offset, <<24]
+    // set PV_PROTO_bf to IPv4 according to L4 protocol
+    alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, 0xfc] ; PV_PROTO_bf
+    alu[l4_tcp, 1, AND, BF_A(in_nbi_desc, CAT_L4_CLASS_bf), >>BF_L(CAT_L4_CLASS_bf)] ; CAT_L4_CLASS_bf
+    alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, l4_tcp] ; PV_PROTO_bf
 
-    alu[--, --, B, not_frag]
-    beq[finalize#], defer[3] // skip L4 for fragments
-        alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, not_frag]
-        alu[ip_ver, 0x7c, OR, BF_A(in_nbi_desc, CAT_L3_IP_VER_bf), >>BF_L(CAT_L3_IP_VER_bf)] ; CAT_L3_IP_VER_bf
-        alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, ip_ver, <<1] ; PV_PROTO_bf
-
-    alu[l4_type, 1, AND~, BF_A(in_nbi_desc, MAC_PARSE_STS_bf), >>(BF_L(MAC_PARSE_STS_bf) + 1)]
-    alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), OR, l4_type]
-    alu[BF_A(out_vec, PV_PROTO_bf), BF_A(out_vec, PV_PROTO_bf), AND~, 1, <<2] // L4 is known
-
-    // store L4 offset
+    // store header offsets
     bitfield_extract__sz1(l4_offset, BF_AML(in_nbi_desc, CAT_L4_OFFSET_bf)) ; CAT_L4_OFFSET_bf
     alu[l4_offset, l4_offset, -, MAC_PREPEND_BYTES]
-    alu[BF_A(out_vec, PV_HEADER_STACK_bf), BF_A(out_vec, PV_HEADER_STACK_bf), OR, l4_offset]
-    alu[BF_A(out_vec, PV_HEADER_STACK_bf), BF_A(out_vec, PV_HEADER_STACK_bf), OR, l4_offset, <<16]
+    alu[BF_A(out_vec, PV_HEADER_STACK_bf), BF_A(out_vec, PV_HEADER_STACK_bf), OR, l4_offset, <<BF_L(PV_HEADER_OFFSET_INNER_L4_bf)]
+    alu[BF_A(out_vec, PV_HEADER_STACK_bf), BF_A(out_vec, PV_HEADER_STACK_bf), OR, l4_offset, <<BF_L(PV_HEADER_OFFSET_OUTER_L4_bf)]
 
-finalize#:
-    // error checks after metadata is populated (will need for drop)
-    #ifdef PARANOIA // should never happen, Catamaran is buggy if it does
-       br_bset[BF_AL(in_nbi_desc, CAT_VALID_bf), valid#] ; CAT_VALID_bf
-           fatal_error("INVALID CATAMARAN METADATA") // fatal error, can't safely drop without valid sequencer info
-       valid#:
-    #endif
+finalize_l3#:
+    alu[BF_A(out_vec, PV_HEADER_STACK_bf), BF_A(out_vec, PV_HEADER_STACK_bf), OR, l3_offset, <<BF_L(PV_HEADER_OFFSET_OUTER_IP_bf)]
 
+end#:
 .end
 #endm
 

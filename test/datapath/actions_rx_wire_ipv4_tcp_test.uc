@@ -26,7 +26,7 @@ move(addr, 0x80)
 move($nbi_desc[0], ((0x40<<BF_L(CAT_PKT_LEN_bf)) | 1<<BF_L(CAT_BLS_bf)))
 move($nbi_desc[1], 0)
 move($nbi_desc[2], (0x2<<BF_L(CAT_SEQ_CTX_bf))]
-move($nbi_desc[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf) | 0x2<<BF_L(CAT_L4_TYPE_bf)))
+move($nbi_desc[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf) | 0x3<<BF_L(CAT_L4_TYPE_bf)))
 move($nbi_desc[4], 0)
 move($nbi_desc[5], 0)
 move($nbi_desc[6], 0)
