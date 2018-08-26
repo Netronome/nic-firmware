@@ -72,7 +72,7 @@ immed[__actions_t_idx, (32 * 4)]
 nop
 nop
 
-__actions_rx_wire(pkt_vec, drop_proto#, error_parse#)
+__actions_rx_wire(pkt_vec)
 
 test_assert_equal(*$index, 0xdeadbeef)
 
@@ -89,10 +89,6 @@ test_assert_equal(o_l4_offset, expected_o_l4_offset)
 test_assert_equal(o_l3_offset, expected_o_l3_offset)
 
 test_pass()
-
-error_parse#:
-drop_proto#:
-test_fail()
 
 PV_HDR_PARSE_SUBROUTINE#:
 pv_hdr_parse_subroutine(pkt_vec)

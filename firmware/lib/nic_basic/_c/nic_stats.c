@@ -174,7 +174,6 @@ update_vnic_queue_stat(nfd_qstats_t *nfd,
 	nfd->tx_pkts += pkts;
 	nfd->tx_bytes += bytes;
         break;
-    case NIC_STATS_QUEUE_RX_DISCARD_PROTO_IDX:
     case NIC_STATS_QUEUE_RX_DISCARD_ACT_IDX:
     case NIC_STATS_QUEUE_RX_DISCARD_MRU_IDX:
     case NIC_STATS_QUEUE_RX_DISCARD_ADDR_IDX:
@@ -182,9 +181,6 @@ update_vnic_queue_stat(nfd_qstats_t *nfd,
     case NIC_STATS_QUEUE_BPF_DISCARD_IDX:
 	_vnic_stats.rx_discards += pkts;
 	break;
-    case NIC_STATS_QUEUE_RX_ERROR_PARSE_IDX:
-        _vnic_stats.rx_errors += pkts;
-        break;
     case NIC_STATS_QUEUE_TX_DISCARD_ACT_IDX:
 	_vnic_stats.tx_discards += pkts;
 	break;
