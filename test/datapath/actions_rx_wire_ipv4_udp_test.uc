@@ -40,7 +40,7 @@ immed[__actions_t_idx, (32 * 4)]
 nop
 nop
 
-__actions_rx_wire(pkt_vec, drop_proto#, error_parse#)
+__actions_rx_wire(pkt_vec)
 
 bitfield_extract__sz1(protocol, BF_AML(pkt_vec, PV_PROTO_bf))
 
@@ -49,10 +49,6 @@ test_assert_equal(protocol, 0x3)
 test_assert_equal(*$index, 0xdeadbeef)
 
 test_pass()
-
-error_parse#:
-drop_proto#:
-test_fail()
 
 PV_HDR_PARSE_SUBROUTINE#:
 pv_hdr_parse_subroutine(pkt_vec)

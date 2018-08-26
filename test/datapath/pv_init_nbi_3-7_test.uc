@@ -77,7 +77,7 @@ move(loop_cntr, 1)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
 
     .if (loop_cntr == 0)
@@ -145,7 +145,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
     alu[expected[3], temp, OR, loop_cntr, <<16]
     alu[expected[3], expected[3], OR, 0x2]
@@ -211,7 +211,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
 
     //alu[expected[5], --, B, loop_cntr, <<29]
@@ -270,7 +270,7 @@ move(loop_cntr, 0)
 
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
 
     move(temp, 0x1)
@@ -329,7 +329,7 @@ move(loop_cntr, 0)
 
     alu[temp, --, B, loop_cntr, <<6]
 
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
 
     //alu[expected[6], expected[6], AND~, 0xff, <<23]
@@ -393,7 +393,7 @@ move(loop_cntr, 0)
     mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
 
     alu[temp, --, B, loop_cntr, <<6]
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
+    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
     //alu[expected[6], expected[6], AND~, 0xff, <<23]
     //alu[expected[6], expected[6], OR, loop_cntr, <<23]
@@ -424,145 +424,7 @@ move(loop_cntr, 0)
 /* PV Metadata Type Fields word always set to 0, already tested */
 
 
-/* Test all fields in PV are filled in when a "rx_discards_proto#" occurs */
-
-move(error_expected_flag, 1)
-
-load_addr[rtn_reg, error_expected_ret1#]
-
-move($nbi_desc_wr[0], 0x03ffe800)
-move($nbi_desc_wr[1], 0x9fffffff)
-move($nbi_desc_wr[2], 0xffff0000)
-move($nbi_desc_wr[3], 0x3000)
-move($nbi_desc_wr[4], 0xff00ff00)
-move($nbi_desc_wr[5], 0)
-move($nbi_desc_wr[6], 0)
-move($nbi_desc_wr[7], 0xe03fffff)
-
-move(expected[0], 0x3ffe7f8)
-move(expected[1], 0xffffffff)
-move(expected[2], 0x83ff0088)
-move(expected[3], 0xffff00ff)
-move(expected[4], 0x00000000)
-move(expected[5], 0)
-move(expected[6], 0x000fff00)
-move(expected[7], 0)
-
-
-mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
-
-br[test_fail#] // should always get error, so should never get here
-
-
-error_expected_ret1#:
-
-#define_eval _PV_CHK_LOOP 0
-
-#while (_PV_CHK_LOOP < SIZE_LW)
-
-    move(value, pkt_vec++)
-    // derived from packge
-    #if (_PV_CHK_LOOP == 4)
-        alu[value, value, AND~, 0xc]
-    #endif
-
-    #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
-#if (_PV_CHK_LOOP < 8)
-    test_assert_equal(value, _PV_INIT_EXPECT)
-#endif
-
-    #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
-
-#endloop
-
-
-/* Test all fields in PV are filled in when any "rx_errors_parse#" occurs */
-
-move(error_expected_flag, 2)
-
-load_addr[rtn_reg, error_expected_ret2#]
-
-move($nbi_desc_wr[0], 0x03ff00ff)
-move($nbi_desc_wr[1], 0x9fffffff)
-move($nbi_desc_wr[2], 0xffff0100)
-move($nbi_desc_wr[3], 0x3000)
-move($nbi_desc_wr[4], 0xff00ff00)
-move($nbi_desc_wr[5], 0)
-move($nbi_desc_wr[6], 0)
-move($nbi_desc_wr[7], 0xe03fffff)
-
-move(expected[0], 0x3ff00f7)
-move(expected[1], 0xbfffffff)
-move(expected[2], 0x83ff0088)
-move(expected[3], 0xffff01ff)
-move(expected[4], 0x00000000)
-move(expected[5], 0)
-move(expected[6], 0x000fff00)
-move(expected[7], 0)
-
-
-move(loop_cntr, 1)
-
-.while (loop_cntr <= 0x3)
-
-    alu[$nbi_desc_wr[5], --, B, loop_cntr, <<30]
-
-    mem[write32, $nbi_desc_wr[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-    mem[read32,  $nbi_desc_rd[0], 0, <<8, addr, (NBI_IN_META_SIZE_LW + (MAC_PREPEND_BYTES / 4))], ctx_swap[s]
-
-    pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args, drop#, fail#)
-
-    br[test_fail#] // should always get error, so should never get here
-
-error_expected_ret2#:
-
-    #define_eval _PV_CHK_LOOP 0
-
-    #while (_PV_CHK_LOOP < 8)
-
-        move(value, pkt_vec++)
-        // derived from packge
-        #if (_PV_CHK_LOOP == 4)
-            alu[value, value, AND~, 0xc]
-        #endif
-
-        #define_eval _PV_INIT_EXPECT 'expected[/**/_PV_CHK_LOOP/**/]'
-#if (_PV_CHK_LOOP < 8)
-        test_assert_equal(value, _PV_INIT_EXPECT)
-#endif
-        #define_eval _PV_CHK_LOOP (_PV_CHK_LOOP + 1)
-
-    #endloop
-
-    alu[loop_cntr, loop_cntr, +, 1]
-
-.endw
-
 test_pass()
-
-
-drop#:
-    .if (error_expected_flag == 1)
-        rtn[rtn_reg]
-        nop
-        nop
-        nop
-    .endif
-    br[test_fail#]
-
-fail#:
-    .if (error_expected_flag == 2)
-        rtn[rtn_reg]
-        nop
-        nop
-        nop
-    .endif
-
 
 test_fail#:
 

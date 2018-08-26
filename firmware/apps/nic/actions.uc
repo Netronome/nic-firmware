@@ -77,12 +77,12 @@
 #endm
 
 
-#macro __actions_rx_wire(out_pkt_vec, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+#macro __actions_rx_wire(out_pkt_vec)
 .begin
     .reg rx_args
 
     __actions_read(rx_args, 0xffff)
-    pkt_io_rx_wire(out_pkt_vec, rx_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+    pkt_io_rx_wire(out_pkt_vec, rx_args)
     __actions_restore_t_idx()
 .end
 #endm
@@ -804,14 +804,6 @@ next#:
     ins_14#: br[pkt_push#]
     ins_15#: br[tx_vlan#]
 
-drop_proto#:
-    // invalid protocols have no sequencer, must not go to reorder
-    pkt_io_drop(pkt_vec)
-    pv_stats_update(io_pkt_vec, RX_DISCARD_PROTO, ingress#)
-
-error_parse#:
-    pv_stats_update(io_pkt_vec, RX_ERROR_PARSE, drop#)
-
 error_pkt_stack#:
     pv_stats_update(io_pkt_vec, ERROR_PKT_STACK, drop#)
 
@@ -822,7 +814,7 @@ drop_act#:
     pv_stats_update(io_pkt_vec, RX_DISCARD_ACT, drop#)
 
 rx_wire#:
-    __actions_rx_wire(io_pkt_vec, drop_proto#, error_parse#)
+    __actions_rx_wire(io_pkt_vec)
     __actions_next()
 
 mac_match#:

@@ -686,24 +686,24 @@
  */
 #define GRO_ISL				48
 
-/* Ingress sequencer numbers (0/1/2/3) for packets from the wire will be
-   mapped to GRO CTX numbers 0/1/2/3; those for packets from NFD (0/1)
-   will be mapped to GRO CTX numbers 4/5/6/7.  So we need 8 GRO CTX's
-   total.  The number of GRO blocks is expected to be passed in from the
-   build via -D define, so we need to calculate GRO CTX's per block so
-   that we always have (at least) 8.
+/* Ingress sequencer numbers (0/1/2/3/4) for packets from the wire will
+   be mapped to GRO CTX numbers 0/2/3/4/5; those for packets from NFD
+   (0/1) will be mapped to GRO CTX numbers 8/9/10/11/12/13/14/15.  So
+   we need 16 GRO CTX's total.  The number of GRO blocks is expected
+   to be passed in from the build via -D define, so we need to calculate
+   GRO CTX's per block so that we always have (at least) 16.
 */
 #ifndef GRO_NUM_BLOCKS
     #error "GRO_NUM_BLOCKS must be defined"
 #endif
 
-#if (GRO_NUM_BLOCKS > 8)
+#if (GRO_NUM_BLOCKS > 16)
     #define GRO_CTX_PER_BLOCK       1
     #warning "Cannot properly configure GRO, GRO_NUM_BLOCKS is" GRO_NUM_BLOCKS "GRO_CTX_PER_BLOCK set to" GRO_CTX_PER_BLOCK
 #elseif (GRO_NUM_BLOCKS < 1)
     #error "Cannot properly configure GRO, GRO_NUM_BLOCKS must be >0 but is set to" GRO_NUM_BLOCKS
 #else
-    #define GRO_CTX_PER_BLOCK (8/GRO_NUM_BLOCKS)
+    #define GRO_CTX_PER_BLOCK (16/GRO_NUM_BLOCKS)
 #endif
 
 /*

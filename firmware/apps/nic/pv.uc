@@ -37,7 +37,7 @@
 passert(PV_MAX_CLONES, "EQ", 2)
 
 .alloc_mem __pv_reserved_pkt_mem ctm+0 island (96*2048) 0
-
+.alloc_mem __pv_pkt_sequencer imem global 4 256
 
 /**
  * Packet vector internal representation
@@ -283,7 +283,7 @@ passert(PV_MAX_CLONES, "EQ", 2)
 #define PROTO_UNKNOWN                      0xFF
 
 #ifndef PV_GRO_NFD_START
-    #define PV_GRO_NFD_START            4
+    #define PV_GRO_NFD_START            8
 #endif
 
 #if (defined(NFD_PCIE1_EMEM) || defined(NFD_PCIE2_EMEM) || defined(NFD_PCIE3_EMEM))
@@ -1288,8 +1288,9 @@ end#:
 #define MAC_PARSE_VLAN_bf               MAC_PARSE_wrd, 17, 16
 #define MAC_CSUM_bf                     MAC_PARSE_wrd, 15, 0
 
-#macro pv_init_nbi(out_vec, in_nbi_desc, in_rx_args, DROP_PROTO_LABEL, ERROR_PARSE_LABEL)
+#macro pv_init_nbi(out_vec, in_nbi_desc, in_rx_args)
 .begin
+    .reg addr
     .reg cbs
     .reg dst_mac_bc
     .reg not_frag
@@ -1303,10 +1304,13 @@ end#:
     .reg l4_type
     .reg l4_offset
     .reg mac_dst_type
+    .reg seq_ctx
     .reg shift
     .reg tunnel
     .reg vlan_len
     .reg vlan_id
+    .reg read $seq
+    .sig sig_seq
 
     alu[BF_A(out_vec, PV_LENGTH_bf), BF_A(in_nbi_desc, CAT_PKT_LEN_bf), -, MAC_PREPEND_BYTES]
 
@@ -1343,6 +1347,12 @@ max_cbs#:
         alu[BF_A(out_vec, PV_CTM_ADDR_bf), BF_A(out_vec, PV_CTM_ADDR_bf), OR, 1, <<BF_L(PV_CTM_ALLOCATED_bf)]
         ld_field[BF_A(out_vec, PV_CTM_ADDR_bf), 0011, (PKT_NBI_OFFSET + MAC_PREPEND_BYTES)]
 
+map_seq#:
+    bitfield_extract__sz1(seq_ctx, BF_AML(in_nbi_desc, CAT_SEQ_CTX_bf))
+    beq[alloc_seq#] // if null sequencer, allocate new sequence number
+    alu[seq_ctx, seq_ctx, +, 1] // balance over GRO blocks, seq_ctx = 2/3/4/5
+    alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nbi_desc, CAT_SEQ_NO_bf), OR, 0xff] ; PV_SEQ_NO_bf, PV_PROTO_bf (unkown)
+
 seek#:
     pv_seek(out_vec, 0, PV_SEEK_INIT, read_pkt#)
 
@@ -1354,8 +1364,15 @@ propagate_csum#:
     alu[shift, (3 << 1), AND, BF_A(in_nbi_desc, MAC_PARSE_L3_bf), >>(BF_L(MAC_PARSE_L3_bf) - 1)] ; MAC_PARSE_L3_bf
     alu[BF_A(out_vec, PV_TX_HOST_L4_bf), shift, B, l4_flags, <<BF_L(PV_TX_HOST_L4_bf)] ; PV_TX_HOST_L4_bf
     alu[l3_flags, 0x3, AND, l3_csum_tbl, >>indirect]
-    br[seek#], defer[1]
+    br[map_seq#], defer[1]
         alu[BF_A(out_vec, PV_TX_HOST_L3_bf), BF_A(out_vec, PV_TX_HOST_L3_bf), OR, l3_flags, <<BF_L(PV_TX_HOST_L3_bf)] ; PV_TX_HOST_L3_bf
+
+alloc_seq#:
+    move(addr, (__pv_pkt_sequencer >> 8))
+    ov_single(OV_IMMED8, 1)
+    mem[test_add_imm, $seq, addr, <<8, 0, 1], indirect_ref, ctx_swap[sig_seq]
+    br[seek#], defer[1]
+        alu[BF_A(out_vec, PV_SEQ_NO_bf), 0xff, OR, $seq, <<16]
 
 hdr_parse#:
     alu[--, *$index--, OR, 0]
@@ -1374,11 +1391,9 @@ read_pkt#:
 skip_vlan#:
     bits_set__sz1(BF_AL(out_vec, PV_VLAN_ID_bf), vlan_id)
     bitfield_extract__sz1(l3_type, BF_AML(in_nbi_desc, CAT_L3_CLASS_bf)) ; CAT_L3_CLASS_bf
-    br!=byte[l3_type, 0, 4, hdr_parse#], defer[3] // if packet is not IPv4 perform parse
+    br!=byte[l3_type, 0, 4, hdr_parse#], defer[2] // if packet is not IPv4 perform parse
         alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
-        // map NBI sequencers to 0, 1, 2, 3
-        alu[BF_A(out_vec, PV_SEQ_NO_bf), BF_A(in_nbi_desc, CAT_SEQ_NO_bf), OR, 0xff] ; PV_SEQ_NO_bf
-        alu[BF_A(out_vec, PV_SEQ_CTX_bf), BF_A(out_vec, PV_SEQ_CTX_bf), AND~, 0xfc, <<8] ; PV_SEQ_CTX_bf
+        immed[BF_A(out_vec, PV_META_TYPES_bf), 0]
 
     // handle fragments
     alu[not_frag, 1, AND~, BF_A(in_nbi_desc, CAT_V4_FRAG_bf), >>BF_L(CAT_V4_FRAG_bf)] ; CAT_V4_FRAG_bf
@@ -1425,12 +1440,6 @@ finalize#:
            fatal_error("INVALID CATAMARAN METADATA") // fatal error, can't safely drop without valid sequencer info
        valid#:
     #endif
-
-    bitfield_extract__sz1(--, BF_AML(in_nbi_desc, CAT_SEQ_CTX_bf)) ; CAT_SEQ_CTX_bf
-    beq[DROP_PROTO_LABEL] // drop without releasing sequence number for sequencer zero (errored packets are expected here)
-
-    bitfield_extract__sz1(--, BF_AML(in_nbi_desc, CAT_ERRORS_bf)) ; CAT_ERRORS_bf
-    bne[ERROR_PARSE_LABEL] // catch any other errors we miss (these appear to have valid sequence numbers)
 
 .end
 #endm
