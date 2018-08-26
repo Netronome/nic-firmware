@@ -119,7 +119,7 @@ error_expected_ret#:
 move($nbi_desc_wr[0], ((64<<BF_L(CAT_PKT_LEN_bf)) | 0<<BF_L(CAT_BLS_bf)))
 move($nbi_desc_wr[1], 0)
 move($nbi_desc_wr[2], (0<<BF_L(CAT_SEQ_CTX_bf))]
-move($nbi_desc_wr[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf) | 2<<BF_L(CAT_L4_TYPE_bf)))
+move($nbi_desc_wr[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf) | 3<<BF_L(CAT_L4_TYPE_bf)))
 move($nbi_desc_wr[4], 0)
 move($nbi_desc_wr[5], 0)
 move($nbi_desc_wr[6], 0)
@@ -147,6 +147,7 @@ move(loop_cntr, 0)
 
     pv_init_nbi(pkt_vec, $nbi_desc_rd, tunnel_args)
 
+    alu[temp, --, B, 2, <<8] // seq remap
     alu[expected[3], temp, OR, loop_cntr, <<16]
     alu[expected[3], expected[3], OR, 0x2]
 
@@ -190,7 +191,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // A always set, PKT_NBI_OFFSET = 128
-move(expected[3], 0x000001ff) // Seq
+move(expected[3], 0x000002ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x000fff00)
@@ -253,7 +254,7 @@ move($nbi_desc_wr[7], 0)
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x000001ff) // Seq
+move(expected[3], 0x000002ff) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x000fff00)
@@ -302,7 +303,7 @@ move(loop_cntr, 0)
 move($nbi_desc_wr[0], ((64<<BF_L(CAT_PKT_LEN_bf)) | 0<<BF_L(CAT_BLS_bf)))
 move($nbi_desc_wr[1], 0)
 move($nbi_desc_wr[2], (1<<BF_L(CAT_SEQ_CTX_bf))]
-move($nbi_desc_wr[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf) | 2<<BF_L(CAT_L4_TYPE_bf)))
+move($nbi_desc_wr[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf) | 3<<BF_L(CAT_L4_TYPE_bf)))
 move($nbi_desc_wr[4], 0)
 move($nbi_desc_wr[5], 0)
 move($nbi_desc_wr[6], 0)
@@ -311,7 +312,7 @@ move($nbi_desc_wr[7], (3<<BF_L(MAC_PARSE_L3_bf) | 2 << BF_L(MAC_PARSE_STS_bf)))
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000102) // Seq
+move(expected[3], 0x00000202) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x000fff00)
@@ -371,7 +372,7 @@ move($nbi_desc_wr[7], (3<<BF_L(MAC_PARSE_L3_bf) | 2 << BF_L(MAC_PARSE_STS_bf)))
 move(expected[0], (64 - MAC_PREPEND_BYTES))
 move(expected[1], 0)
 move(expected[2], 0x80000088) // PKT_NBI_OFFSET = 128
-move(expected[3], 0x00000102) // Seq
+move(expected[3], 0x00000203) // Seq
 move(expected[4], 0x00000000) // Seek
 move(expected[5], 0)
 move(expected[6], 0x000fff00)

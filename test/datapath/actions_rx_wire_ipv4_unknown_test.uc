@@ -40,13 +40,13 @@
 .reg expected_proto
 .reg pkt_num
 
-#define PKT_NUM_i 0
-#while PKT_NUM_i < 0x100
-    move(pkt_num, PKT_NUM_i)
+move(pkt_num, 0)
+.while(pkt_num < 0x100)
     pkt_buf_free_ctm_buffer(--, pkt_num)
-    #define_eval PKT_NUM_i (PKT_NUM_i + 1)
-#endloop
-#undef PKT_NUM_i
+    alu[pkt_num, pkt_num, +, 1]
+.endw
+pkt_buf_alloc_ctm(pkt_num, 3, --, test_fail)
+test_assert_equal(pkt_num, 0)
 
 move(addr, 0x200)
 move(expected_i_l3_offset, (14 + 4 + 4))
@@ -60,9 +60,12 @@ move(expected_proto, 6)
 move(pkt_vec[4], 0x3fc0)
 
 //set up CATAMARAN vector
-move($nbi_desc[0], ((0x52<<BF_L(CAT_PKT_LEN_bf)) | 0<<BF_L(CAT_BLS_bf)))
+.reg tmp
+move(tmp, ((0x52<<BF_L(CAT_PKT_LEN_bf)) | 0<<BF_L(CAT_BLS_bf)))
+alu[$nbi_desc[0], tmp, OR, pkt_num, <<16]
 move($nbi_desc[1], 0)
-move($nbi_desc[2], (0x2<<BF_L(CAT_SEQ_CTX_bf))]
+move(tmp, ((1 << BF_L(PV_CTM_ALLOCATED_bf)) | (0x88 << BF_L(PV_OFFSET_bf)))]
+alu[$nbi_desc[2], tmp, OR, pkt_num, <<16]
 move($nbi_desc[3], (CAT_L3_TYPE_IP<<BF_L(CAT_L3_TYPE_bf)))
 move($nbi_desc[4], 0)
 move($nbi_desc[5], 0)

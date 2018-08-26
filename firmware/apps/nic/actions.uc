@@ -20,8 +20,6 @@
 #include "pkt_io.uc"
 #include "ebpf.uc"
 
-#define NULL_VLAN 0xfff
-
 .alloc_mem __actions_sriov_keys lmem me 32 64
 
 .reg volatile read $__actions[NIC_MAX_INSTR]
