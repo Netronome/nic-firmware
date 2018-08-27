@@ -45,7 +45,11 @@
             alu[out_data, in_mask, AND, *$index++, in_shf]
         #endif
     #endif
-    alu[__actions_t_idx, __actions_t_idx, +, 4]
+    #ifdef __ACTIONS_T_IDX_DELTA
+        #define_eval __ACTIONS_T_IDX_DELTA (__ACTIONS_T_IDX_DELTA + 4)
+    #else
+        alu[__actions_t_idx, __actions_t_idx, +, 4]
+    #endif
 #endm
 
 #macro __actions_read(out_data, in_mask)
@@ -61,6 +65,16 @@
     __actions_read(--, --, --)
 #endm
 
+
+#macro __actions_read_begin()
+    #define __ACTIONS_T_IDX_DELTA 0
+#endm
+
+
+#macro __actions_read_end()
+    alu[__actions_t_idx, __actions_t_idx, +, __ACTIONS_T_IDX_DELTA]
+    #undef __ACTIONS_T_IDX_DELTA
+#endm
 
 #macro __actions_restore_t_idx()
     local_csr_wr[T_INDEX, __actions_t_idx]
@@ -119,8 +133,10 @@
 
     .sig sig_read
 
+    __actions_read_begin()
     __actions_read(port_mac[0], 0xffff)
     __actions_read(port_mac[1])
+    __actions_read_end()
 
     br_bset[BF_AL(in_pkt_vec, PV_MAC_DST_MC_bf), end#]
     pv_seek(in_pkt_vec, 0, PV_SEEK_DEFAULT, mac_match_check#)
@@ -197,8 +213,10 @@ end#:
     .reg mac_lo
     .reg port_mac[2]
 
+    __actions_read_begin()
     __actions_read(port_mac[0], 0xffff)
     __actions_read(port_mac[1])
+    __actions_read_end()
 
     br_bset[BF_AL(in_pkt_vec, PV_MAC_DST_MC_bf), end#]
     pv_seek(in_pkt_vec, 0)
@@ -237,9 +255,11 @@ end#:
     .reg rss_table_idx
     .reg write $metadata
 
+    __actions_read_begin()
     __actions_read(args[0])
     __actions_read(args[1])
     __actions_read(args[2])
+    __actions_read_end()
 
     br_bset[BF_AL(in_pkt_vec, PV_QUEUE_SELECTED_bf), queue_selected#]
 
