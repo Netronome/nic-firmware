@@ -68,7 +68,7 @@
 #endif
 
 #define BLM_NBI8_BLQ0_Q_SIZE                    2048
-#define BLM_NBI8_BLQ1_Q_SIZE                    2048
+#define BLM_NBI8_BLQ1_Q_SIZE                    4096
 #define BLM_NBI8_BLQ2_Q_SIZE                    2048
 #define BLM_NBI8_BLQ3_Q_SIZE                    1048576
 
@@ -142,9 +142,9 @@
 #define BLM_NBI8_BLQ1_EMU_IMEM1_NUM_BUFS        0
 #define BLM_NBI8_BLQ1_BDSRAM_IMEM1_NUM_BUFS     0
 #define BLM_NBI8_BLQ1_EMU_IMEM1_DENSITY         0
-#define BLM_NBI8_BLQ1_EMU_EMEM0_NUM_BUFS        400
+#define BLM_NBI8_BLQ1_EMU_EMEM0_NUM_BUFS        800
 #define BLM_NBI8_BLQ1_BDSRAM_EMEM0_NUM_BUFS     0
-#define BLM_NBI8_BLQ1_EMU_EMEM0_DENSITY         4
+#define BLM_NBI8_BLQ1_EMU_EMEM0_DENSITY         7
 #define BLM_NBI8_BLQ1_EMU_EMEM1_NUM_BUFS        0
 #define BLM_NBI8_BLQ1_BDSRAM_EMEM1_NUM_BUFS     0
 #define BLM_NBI8_BLQ1_EMU_EMEM1_DENSITY         0
