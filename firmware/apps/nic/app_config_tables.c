@@ -1099,6 +1099,7 @@ cfg_act_build_veb_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
 __intrinsic void
 cfg_act_cache_fl_buf_sz(uint32_t pcie, uint32_t vid)
 {
+    int i;
     __xread uint32_t rxb_r;
     __xwrite uint32_t rxb_w;
     __imem uint32_t *fl_buf_sz_cache = (__imem uint32_t *)
@@ -1106,7 +1107,8 @@ cfg_act_cache_fl_buf_sz(uint32_t pcie, uint32_t vid)
 
     mem_read32(&rxb_r, (__mem void*) (cfg_act_bar_ptr(pcie, vid) + NFP_NET_CFG_FLBUFSZ), sizeof(rxb_r));
     rxb_w = rxb_r;
-    mem_write32(&rxb_w, &fl_buf_sz_cache[pcie * 64 + vid], sizeof(rxb_w));
+    for (i = 0; i < NFD_VID_MAXQS(vid); ++i)
+        mem_write32(&rxb_w, &fl_buf_sz_cache[pcie * 64 + NFD_VID2NATQ(vid, i)], sizeof(rxb_w));
 }
 
 
