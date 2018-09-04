@@ -80,7 +80,7 @@ $(eval $(call fwdep.add_flowenv,$(PROJECT)))
 $(eval $(call fwdep.add_flowenv_nfp_init_flag,$(PROJECT),-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add GRO MEs
-$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei2.me11 mei3.me11,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE) -DNS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
+$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei3.me11 mei4.me11,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE) -DNS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 
 # Add 1 BLM ME
 $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
@@ -204,7 +204,7 @@ $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(GRO_DIR)))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,WORKERS_PER_ISLAND=4))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,GLOBAL_INIT=1))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
-$(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,mei1.me10))
+$(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,mei2.me11))
 
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
@@ -223,7 +223,6 @@ $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(DEPS_DIR)/
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnn_mode=1))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qip_no_inlining))
-$(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qustore_size=8192))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnolur=_cfg_changes_loop))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Ob0))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))
@@ -269,4 +268,6 @@ $(eval $(call nffw.add_obj_codeless,$(PROJECT),nfd_tlv_init))
 $(eval $(call nffw.add_link_flag,$(PROJECT),$(shell $(SCRIPT_DIR)/describe-head.sh --nfld_args $(FLAVOR))))
 $(eval $(call nffw.add_rtsyms,$(PROJECT),$(shell $(SCRIPT_DIR)/describe-head.sh --fw_id $(FLAVOR))))
 # TODO get link_w_analysis to work without adding a warning
+$(eval $(call nffw.add_link_flag,$(PROJECT),-codeshare mei2.me10 mei2.me11))
+$(eval $(call nffw.add_link_flag,$(PROJECT),-noecc)) # required for codeshare on B0
 $(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx,datapath))
