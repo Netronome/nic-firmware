@@ -1400,7 +1400,8 @@ read_pkt#:
         alu[BF_A(out_vec, PV_META_TYPES_bf), *$index++, B, 0] ; PV_META_TYPES_bf
         immed[vlan_id, NULL_VLAN]
 
-    alu[vlan_id, --, B, *$index, >>16]
+    alu[--, *$index++, OR, 0]
+    alu[vlan_id, --, B, *$index--, >>16]
 
 skip_vlan#:
     bitfield_extract__sz1(l3_type, BF_AML(in_nbi_desc, CAT_L3_CLASS_bf)) ; CAT_L3_CLASS_bf
