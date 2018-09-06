@@ -107,12 +107,13 @@ pv_reset(pkt_vec_addr, 0, __actions_t_idx, 64)
     // lword 5
     .if (drop_flag)
         move(exp[5],0x00000000) // stacked offsets - to be added
+        move(exp[6], 0)
     .else                       //  also not cleared from prior iteration
         move(exp[5],0x00000000) // stacked offsets - to be added
+        move(exp[6], 0x000fff00)
     .endif
 
     // lword 6
-    alu[exp[6], --, B, 0]
 
     // lword 7
     move(exp[7], 0)

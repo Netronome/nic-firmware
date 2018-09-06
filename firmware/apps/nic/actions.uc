@@ -731,12 +731,13 @@ end#:
     .reg offsets
     .reg stack
     .reg vlan_id
+    .reg vlan_tag
     .reg write $mac[4]
     .xfer_order $mac
     .sig sig_write
     .sig sig_read
 
-    __actions_read(vlan_id, 0xffff)
+    __actions_read(vlan_tag, 0xffff)
 
     pv_get_base_addr(addr_hi, addr_lo, io_pkt_vec)
     mem[read32, $__pv_pkt_data[0], addr_hi, <<8, addr_lo, 3], ctx_swap[sig_read], defer[2]
@@ -746,7 +747,7 @@ end#:
     alu[$mac[0], --, B, $__pv_pkt_data[0]]
     alu[$mac[1], --, B, $__pv_pkt_data[1]]
     alu[$mac[2], --, B, $__pv_pkt_data[2]]
-    alu[$mac[3], vlan_id, or, 0x81, <<24]
+    alu[$mac[3], vlan_tag, or, 0x81, <<24]
 
     mem[write32, $mac[0], addr_hi, <<8, addr_lo, 4], ctx_swap[sig_write], defer[2]
         alu[BF_A(io_pkt_vec, PV_LENGTH_bf), BF_A(io_pkt_vec, PV_LENGTH_bf), +, 4]
@@ -771,6 +772,7 @@ end#:
     alu[BF_A(io_pkt_vec, PV_HEADER_STACK_bf), BF_A(io_pkt_vec, PV_HEADER_STACK_bf), +, stack]
 
     immed[msk, NULL_VLAN]
+    alu[vlan_id, vlan_tag, AND, msk]
     bits_clr__sz1(BF_AL(io_pkt_vec, PV_VLAN_ID_bf), msk) ; PV_VLAN_ID_bf
     bits_set__sz1(BF_AL(io_pkt_vec, PV_VLAN_ID_bf), vlan_id) ; PV_VLAN_ID_bf
 
