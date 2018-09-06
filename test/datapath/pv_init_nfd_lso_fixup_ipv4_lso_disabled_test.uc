@@ -80,6 +80,7 @@ alu[expected[3], PROTO_UNKNOWN, OR, value, <<8]
 #define_eval _PV_INNER_L4_OFFSET (_PV_OUTER_L4_OFFSET)
 move(expected[5], ((_PV_OUTER_L3_OFFSET << 24) | (_PV_OUTER_L4_OFFSET << 16) | \
                    (_PV_INNER_L3_OFFSET <<  8) | (_PV_INNER_L4_OFFSET <<  0)))
+move(expected[6], 0x000fff00)
 
 #define_eval _PV_CHK_LOOP 0
 

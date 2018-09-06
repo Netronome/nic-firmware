@@ -34,7 +34,7 @@
 #include "app_config_instr.h"
 #include "ebpf.h"
 #include "nic_tables.h"
-
+#include "app_mac_vlan_config_cmsg.h"
 
 /*
     RXB tables (in CTM)
@@ -241,6 +241,21 @@ cfg_act_bar_ptr(uint32_t pcie, uint32_t vid)
     }
 
     return bar_base;
+}
+
+__intrinsic __emem __addr40 uint8_t*
+cfg_act_vf_cfg_ptr(uint32_t pcie)
+{
+    __emem __addr40 uint8_t *vf_cfg_base = 0;
+
+    switch (pcie) {
+        case 0: vf_cfg_base = NFD_VF_CFG_BASE_LINK(0); break;
+        case 1: vf_cfg_base = NFD_VF_CFG_BASE_LINK(1); break;
+        case 2: vf_cfg_base = NFD_VF_CFG_BASE_LINK(2); break;
+        case 3: vf_cfg_base = NFD_VF_CFG_BASE_LINK(3); break;
+    }
+
+    return vf_cfg_base;
 }
 
 /*
@@ -544,7 +559,6 @@ cfg_act_upd_vxlan_table(uint32_t pcie, uint32_t vid)
 
 
 __intrinsic void
-
 cfg_act_init(action_list_t *acts)
 {
     reg_zero(acts->instr, NIC_MAX_INSTR);
@@ -782,15 +796,33 @@ cfg_act_append_rx_wire(action_list_t *acts, uint32_t pcie, uint32_t vid,
 }
 
 __intrinsic void
+cfg_act_remove_strip_vlan(action_list_t *acts)
+{
+    uint32_t i, found = 0;
+
+    for (i = 0; i < acts->count - 1; ++i) {
+	if (found) {
+	    acts->instr[i] = acts->instr[i + 1];
+	}
+	else if (acts->instr[i].op == INSTR_POP_VLAN) {
+	    found = 1;
+	    acts->instr[i] = acts->instr[i + 1];
+	    acts->instr[i].pipeline = 0;
+	}
+    }
+    acts->count -= found;
+}
+
+__intrinsic void
 cfg_act_append_strip_vlan(action_list_t *acts)
 {
     cfg_act_append(acts, INSTR_POP_VLAN, 0);
 }
 
 __intrinsic void
-cfg_act_append_push_vlan(action_list_t *acts, uint32_t vlan_id)
+cfg_act_append_push_vlan(action_list_t *acts, uint32_t vlan_tag)
 {
-    cfg_act_append(acts, INSTR_PUSH_VLAN, vlan_id);
+    cfg_act_append(acts, INSTR_PUSH_VLAN, vlan_tag);
 }
 
 __intrinsic void
@@ -916,7 +948,8 @@ __intrinsic void
 cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
 		 uint32_t pf_control, uint32_t vf_control)
 {
-    __xread struct nfp_vnic_setup_entry entry;
+    __xread struct sriov_cfg sriov_cfg_data;
+    __emem __addr40 uint8_t *vf_cfg_base;
     uint32_t type, vnic;
     uint32_t csum_i, csum_o;
     uint32_t promisc;
@@ -933,9 +966,12 @@ cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
 
     cfg_act_append_rx_host(acts, pcie, vid);
 
-    if ((load_vnic_setup_entry(vid, &entry) == 0) &&
-	    (entry.vlan != NIC_NO_VLAN_ID))
-        cfg_act_append_push_vlan(acts, entry.vlan);
+    vf_cfg_base = cfg_act_vf_cfg_ptr(pcie);
+    mem_read32(&sriov_cfg_data,
+	       NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
+	       sizeof(struct sriov_cfg));
+    if (sriov_cfg_data.vlan_tag != 0)
+        cfg_act_append_push_vlan(acts, sriov_cfg_data.vlan_tag);
 
     cfg_act_append_veb_lookup(acts, pcie, vid, 0, 0);
 
@@ -945,12 +981,10 @@ cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
     cfg_act_append_tx_wire(acts, NS_PLATFORM_NBI_TM_QID_LO(0) /* vnic 0 */,
 			   promisc, 1);
 
-    if (promisc) {
-        if (csum_o)
-	    cfg_act_append_checksum(acts, 1, 0, 0); // O
+    if (csum_o)
+	 cfg_act_append_checksum(acts, 1, 0, 0); // O
 
-	cfg_act_append_tx_host(acts, pcie, NFD_PF2VID(0), 0, 1); // M
-    }
+    cfg_act_append_tx_host(acts, pcie, NFD_PF2VID(0), 0, 1); // M
 
     cfg_act_append_push_pkt(acts);
     cfg_act_append_tx_vlan(acts);
@@ -1054,12 +1088,12 @@ __intrinsic void
 cfg_act_build_veb_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
                      uint32_t pf_control, uint32_t vf_control, uint32_t update)
 {
-    __xread struct nfp_vnic_setup_entry entry;
+    __xread struct sriov_cfg sriov_cfg_data;
+    __emem __addr40 uint8_t *vf_cfg_base;
     uint32_t type, vnic;
+    uint32_t rss_v1;
     uint32_t csum_c = (vf_control & NFP_NET_CFG_CTRL_CSUM_COMPLETE) ? 1 : 0;
     uint32_t promisc = (pf_control & NFP_NET_CFG_CTRL_PROMISC) ? 1 : 0;
-    uint32_t rss_v1 = (NFD_CFG_MAJOR_PF < 4 &&
-                       !(pf_control & NFP_NET_CFG_CTRL_CHAIN_META));
 
     cfg_act_init(acts);
 
@@ -1067,31 +1101,36 @@ cfg_act_build_veb_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
     if (type != NFD_VNIC_TYPE_VF)
         return;
 
-    if (load_vnic_setup_entry(vid, &entry) == 0 &&
-	    entry.vlan != NIC_NO_VLAN_ID) {
-        if (promisc) {
-            cfg_act_append_push_pkt(acts);
-        }
-
-        cfg_act_append_strip_vlan(acts);
+    if (promisc) {
+        cfg_act_append_push_pkt(acts);
     }
+
+    vf_cfg_base = cfg_act_vf_cfg_ptr(pcie);
+    mem_read32(&sriov_cfg_data,
+	       NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
+	       sizeof(struct sriov_cfg));
+    if (sriov_cfg_data.vlan_tag != 0)
+        cfg_act_append_strip_vlan(acts);
 
     cfg_act_append_checksum(acts, 1, 1, csum_c); // O, I, C?
 
     cfg_act_append_tx_host(acts, pcie, vid, promisc, 0);
 
     if (promisc) {
-	cfg_act_append_pop_pkt(acts);
+        cfg_act_append_pop_pkt(acts);
 
-        cfg_act_append_checksum(acts, 0, 0, 1); // C
+	if (pf_control & NFP_NET_CFG_CTRL_CSUM_COMPLETE)
+	    cfg_act_append_checksum(acts, 0, 0, 1); // C
 
 	if (pf_control & NFP_NET_CFG_CTRL_BPF)
 	    cfg_act_append_bpf(acts, vnic);
 
-        if (pf_control & NFP_NET_CFG_CTRL_RSS_ANY || pf_control & NFP_NET_CFG_CTRL_BPF)
-            cfg_act_append_rss(acts, pcie, vid, 0, rss_v1);
+        if (pf_control & NFP_NET_CFG_CTRL_RSS_ANY || pf_control & NFP_NET_CFG_CTRL_BPF) {
+            rss_v1 = (NFD_CFG_MAJOR_PF < 4 && !(pf_control & NFP_NET_CFG_CTRL_CHAIN_META));
+	    cfg_act_append_rss(acts, pcie, NFD_PF2VID(0), 0, rss_v1);
+	}
 
-            cfg_act_append_tx_host(acts, pcie, NFD_PF2VID(0), 0, 0);
+        cfg_act_append_tx_host(acts, pcie, NFD_PF2VID(0), 0, 0);
     }
 }
 
@@ -1112,33 +1151,31 @@ cfg_act_cache_fl_buf_sz(uint32_t pcie, uint32_t vid)
 }
 
 
+__shared __mem struct nic_mac_vlan_key veb_stored_keys[NVNICS];
+
 enum cfg_msg_err
 cfg_act_write_veb(uint32_t vid, __lmem struct nic_mac_vlan_key *veb_key,
 		  action_list_t *acts)
 {
-    __gpr struct nfp_vnic_setup_entry vnic_entry;
-    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
-    __xwrite struct nfp_vnic_setup_entry vnic_entry_wr;
+    __xread struct nic_mac_vlan_key stored_key_rd;
+    __xwrite struct nic_mac_vlan_key stored_key_wr;
     __lmem struct nic_mac_vlan_key del_key;
     uint32_t new_vlan_id, vlan_id;
-    uint64_t old_mac_addr;
     uint64_t new_mac_addr = MAC64_FROM_VEB_KEY(*veb_key);
     enum cfg_msg_err err_code = NO_ERROR;
 
-    /* Fail if mac is 0, broadcast, or multicast */
-    if (new_mac_addr == 0 || new_mac_addr == 0xffffffffffffl ||
-	    ((new_mac_addr >> 40) & 0x01))
-        return MAC_VLAN_ADD_FAIL;
+    if (acts != 0) {
+        /* Fail if mac is 0 or multicast */
+        if (new_mac_addr == 0 || ((new_mac_addr >> 40) & 0x01))
+            return MAC_VLAN_ADD_FAIL;
 
-    if (acts == 0) {
-	new_mac_addr = 0;
-	new_vlan_id = 0;
-	veb_key->vlan_id = 0;
-    } else {
         new_vlan_id = veb_key->vlan_id;
         /* Add or overwrite VEB table entries */
-        for (vlan_id = 0; vlan_id <= new_vlan_id; vlan_id++) {
-            if (new_vlan_id == NIC_NO_VLAN_ID || vlan_id == new_vlan_id) {
+        for (vlan_id = 0; vlan_id <= NIC_NO_VLAN_ID; vlan_id++) {
+            if (new_vlan_id == NIC_NO_VLAN_ID || vlan_id == new_vlan_id ||
+		(new_vlan_id == 0 && vlan_id == NIC_NO_VLAN_ID)) {
+		if (vlan_id == NIC_NO_VLAN_ID)
+                    cfg_act_remove_strip_vlan(acts);
       	        veb_key->vlan_id = vlan_id;
                 if (nic_mac_vlan_entry_op_cmsg(veb_key,
 		        (__lmem uint32_t *) acts->instr,
@@ -1148,22 +1185,17 @@ cfg_act_write_veb(uint32_t vid, __lmem struct nic_mac_vlan_key *veb_key,
         }
     }
 
-    load_vnic_setup_entry(vid, &vnic_entry_rd);
-    reg_cp(&vnic_entry, &vnic_entry_rd, sizeof(struct nfp_vnic_setup_entry));
-    old_mac_addr = vnic_entry.src_mac;
+    mem_read32(&stored_key_rd, &veb_stored_keys[vid], sizeof(struct nic_mac_vlan_key)),
 
-    if (acts != 0) {
-        vnic_entry.src_mac = new_mac_addr;
-        vnic_entry.vlan = veb_key->vlan_id;
-        reg_cp(&vnic_entry_wr, &vnic_entry, sizeof(struct nfp_vnic_setup_entry));
-        write_vnic_setup_entry(vid, &vnic_entry_wr);
-    }
+    reg_cp(&stored_key_wr, veb_key, sizeof(struct nic_mac_vlan_key));
+    mem_write32(&stored_key_wr, &veb_stored_keys[vid], sizeof(struct nic_mac_vlan_key));
 
     /* Delete previously existing entries if the lookup key differs */
-    VEB_KEY_FROM_MAC64(del_key, old_mac_addr);
     for (vlan_id = 0; vlan_id <= NIC_NO_VLAN_ID; vlan_id++) {
-	if (new_mac_addr != old_mac_addr ||
+	if (veb_key->mac_addr_hi != stored_key_rd.mac_addr_hi ||
+	    veb_key->mac_addr_lo != stored_key_rd.mac_addr_lo ||
 	    (new_vlan_id != NIC_NO_VLAN_ID && vlan_id != new_vlan_id)) {
+	    reg_cp(&del_key, &stored_key_rd, sizeof(struct nic_mac_vlan_key));
             del_key.vlan_id = vlan_id;
             if (nic_mac_vlan_entry_op_cmsg(&del_key, 0,
                     CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL)
@@ -1179,23 +1211,30 @@ int
 cfg_act_vf_up(uint32_t pcie, uint32_t vid,
 	      uint32_t pf_control, uint32_t vf_control, uint32_t update)
 {
-    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
+    __xread struct sriov_cfg sriov_cfg_data;
+    __emem __addr40 uint8_t *vf_cfg_base;
     __shared __lmem struct nic_mac_vlan_key veb_key;
+    uint64_t mac_addr;
+    uint16_t vlan_id;
     action_list_t acts;
 
     cfg_act_build_veb_vf(&acts, pcie, vid, pf_control, vf_control, update);
 
-    load_vnic_setup_entry(vid, &vnic_entry_rd);
-    veb_key.__raw[0] = 0;
-    veb_key.mac_addr_hi = (vnic_entry_rd.src_mac >> 32);
-    veb_key.mac_addr_lo = vnic_entry_rd.src_mac;
-    veb_key.vlan_id = vnic_entry_rd.vlan;
+    vf_cfg_base = cfg_act_vf_cfg_ptr(pcie);
+    mem_read32(&sriov_cfg_data,
+	       NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
+	       sizeof(struct sriov_cfg));
+    vlan_id = sriov_cfg_data.vlan_tag ? sriov_cfg_data.vlan_id : NIC_NO_VLAN_ID;
+
+    mac_addr = MAC64_FROM_SRIOV_CFG(sriov_cfg_data);
+    VEB_KEY_FROM_MAC64(veb_key, mac_addr);
+    veb_key.vlan_id = vlan_id;
 
     if (cfg_act_write_veb(vid, &veb_key, &acts) != NO_ERROR)
         return 1;
 
     cfg_act_cache_fl_buf_sz(pcie, vid);
-    add_vlan_member(vnic_entry_rd.vlan, vid);
+    add_vlan_member(vlan_id, vid);
     upd_ctm_vlan_members();
 
     cfg_act_build_vf(&acts, pcie, vid, pf_control, vf_control);
@@ -1212,22 +1251,18 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid,
 int
 cfg_act_vf_down(uint32_t pcie, uint32_t vid)
 {
-    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
     __shared __lmem struct nic_mac_vlan_key veb_key;
     action_list_t acts;
 
     cfg_act_build_pcie_down(&acts, pcie, vid);
     cfg_act_write_host(pcie, vid, &acts);
 
-    load_vnic_setup_entry(vid, &vnic_entry_rd);
-    veb_key.__raw[0] = 0;
-    veb_key.mac_addr_hi = (vnic_entry_rd.src_mac >> 32);
-    veb_key.mac_addr_lo = vnic_entry_rd.src_mac;
-    veb_key.vlan_id = vnic_entry_rd.vlan;
+    VEB_KEY_FROM_MAC64(veb_key, 0ull)
 
-    cfg_act_write_veb(vid, &veb_key, 0);
+    if (cfg_act_write_veb(vid, &veb_key, 0) != NO_ERROR)
+	return 1;
 
-    remove_vlan_member(vnic_entry_rd.vlan, vid);
+    remove_vlan_member(vid);
     upd_ctm_vlan_members();
 
     return 0;
@@ -1293,7 +1328,8 @@ int cfg_act_pf_down(uint32_t pcie, uint32_t vid)
         veb_key.mac_addr_hi = (mac[0] >> 16);
         veb_key.mac_addr_lo = (mac[0] << 16) | (mac[1] >> 16);
 
-        cfg_act_write_veb(vid, &veb_key, 0);
+	if (cfg_act_write_veb(vid, &veb_key, 0) != NO_ERROR)
+	    return 1;
     }
 
     return 0;
