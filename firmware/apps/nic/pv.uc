@@ -1715,6 +1715,9 @@ ipv6#:
     alu[csum_ol3, shift, AND, BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_O_IPV4_CSUM_fld), >>(BF_L(NFD_IN_FLAGS_TX_O_IPV4_CSUM_fld) - 1)]
     alu[BF_A(out_vec, PV_CSUM_OFFLOAD_bf), csum_ol3, OR, csum_offload, <<indirect]
 
+    immed[vlan_id, NULL_VLAN]
+    bits_set__sz1(BF_AL(out_vec, PV_VLAN_ID_bf), vlan_id]
+
     pv_seek(out_vec, 0, PV_SEEK_INIT, preparse#)
 
 error_pci#:

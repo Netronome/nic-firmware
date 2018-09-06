@@ -365,8 +365,7 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigne
 
     /* Schedule notification interrupt to be sent from the
        link state change context */
-    if ((ctrl_xr & NFP_NET_CFG_CTRL_ENABLE) &&
-        (orig_link_state != LS_READ(ls_current, vf_vid))) {
+    if (ctrl_xr & NFP_NET_CFG_CTRL_ENABLE) {
         LS_SET(pending, vf_vid);
     }
 }
@@ -486,25 +485,12 @@ mac_port_disable_tx_flush(unsigned int mac, unsigned int mac_core,
     LOCAL_MUTEX_UNLOCK(mac_reg_lock);
 }
 
-__intrinsic uint32_t veb_up_check()
-{
-    uint32_t vid;
-
-    for (vid = 0; vid < NVNICS; vid++) {
-        if (NFD_VID_IS_VF(vid) && (nic_control_word[vid] & NFP_NET_CFG_CTRL_ENABLE))
-            return 1;
-    }
-    return 0;
-}
 
 static void
 handle_sriov_update(uint32_t pf_control)
 {
     __xread struct sriov_mb sriov_mb_data;
     __xread struct sriov_cfg sriov_cfg_data;
-    __gpr struct nfp_vnic_setup_entry vnic_entry;
-    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
-    __xwrite struct nfp_vnic_setup_entry vnic_entry_wr;
     __xwrite uint64_t new_mac_addr_wr;
     __xwrite int err_code = 0;
     __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
@@ -514,36 +500,11 @@ handle_sriov_update(uint32_t pf_control)
     mem_read32(&sriov_cfg_data, NFD_VF_CFG_ADDR(vf_cfg_base, sriov_mb_data.vf),
                sizeof(struct sriov_cfg));
 
-    load_vnic_setup_entry(NFD_VF2VID(sriov_mb_data.vf), &vnic_entry_rd);
-    reg_cp(&vnic_entry, &vnic_entry_rd, sizeof(struct nfp_vnic_setup_entry));
-
     if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_MAC) {
         reg_cp(&new_mac_addr_wr, &sriov_cfg_data, sizeof(new_mac_addr_wr));
         mem_write8(&new_mac_addr_wr, NFD_CFG_BAR_ISL(NIC_PCI, sriov_mb_data.vf) +
                    NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
-        vnic_entry.src_mac = MAC64_FROM_SRIOV_CFG(sriov_cfg_data);
-	add_vlan_member(vnic_entry_rd.vlan, NFD_VF2VID(sriov_mb_data.vf));
     }
-
-    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_VLAN) {
-        remove_vlan_member(vnic_entry_rd.vlan, NFD_VF2VID(sriov_mb_data.vf));
-        add_vlan_member(sriov_cfg_data.vlan_id, NFD_VF2VID(sriov_mb_data.vf));
-        vnic_entry.vlan = sriov_cfg_data.vlan_id;
-    }
-
-    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_SPOOF) {
-        vnic_entry.spoof_chk = sriov_cfg_data.ctrl_spoof;
-    }
-
-    if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_LINK_STATE) {
-        vnic_entry.link_state_mode = sriov_cfg_data.ctrl_link_state;
-        /* Update the list of VFs to be notified of link state changes. */
-        update_vf_lsc_list(0, sriov_mb_data.vf, pf_control,
-                           vnic_entry.link_state_mode);
-    }
-
-    reg_cp(&vnic_entry_wr, &vnic_entry, sizeof(struct nfp_vnic_setup_entry));
-    write_vnic_setup_entry(NFD_VF2VID(sriov_mb_data.vf), &vnic_entry_wr);
 
     mem_write8_le(&err_code,
 		  (__mem void*) (vf_cfg_base + NFD_VF_CFG_MB_RET_ofs), 2);
@@ -563,10 +524,11 @@ cfg_changes_loop(void)
     unsigned int ls_mode;
     __gpr uint32_t ctx_mode = 1;
     __emem __addr40 uint8_t *bar_base;
-    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
     __xwrite unsigned int link_state;
     action_list_t acts;
     uint32_t veb_up;
+    __xread struct sriov_cfg sriov_cfg_data;
+    __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
 
     /* Initialisation */
     MSIX_INIT_ISL(NIC_PCI);
@@ -590,7 +552,6 @@ cfg_changes_loop(void)
 
         if (cfg_msg.msg_valid && !cfg_msg.error) {
             vid = cfg_msg.vid;
-            veb_up = veb_up_check();
             /* read in the first 64bit of the Control BAR */
             mem_read64(cfg_bar_data, NFD_CFG_BAR_ISL(NIC_PCI, vid),
                        sizeof cfg_bar_data);
@@ -614,19 +575,37 @@ cfg_changes_loop(void)
                 mem_write32(&link_state,
                                 (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg.vid) +
                                 NFP_NET_CFG_STS), sizeof link_state);
-            } else if (type == NFD_VNIC_TYPE_PF) {
+           } else if (type == NFD_VNIC_TYPE_PF) {
                 port = vnic;
 
                 if (update & NFP_NET_CFG_UPDATE_BPF) {
                     nic_local_bpf_reconfig(&ctx_mode, vid, vnic);
                 }
 
+                if (update & NFP_NET_CFG_UPDATE_VF) {
+                    handle_sriov_update(control);
+                }
+
                 if (control & NFP_NET_CFG_CTRL_ENABLE) {
+		    veb_up = 0;
+                    for (i = 0; i < NFD_MAX_VFS; i++) {
+			if (nic_control_word[NFD_VF2VID(i)] & NFP_NET_CFG_CTRL_ENABLE) {
+			    if (cfg_act_vf_up(NIC_PCI, NFD_VF2VID(i),
+					      control,
+					      nic_control_word[NFD_VF2VID(i)],
+					      0)) {
+				cfg_msg.error = 1;
+				goto error;
+			    }
+			    veb_up = 1;
+			}
+                    }
+
                     if (cfg_act_pf_up(NIC_PCI, vid, veb_up, control, update)) {
                         cfg_msg.error = 1;
                         goto error;
                     }
-                }
+	        }
 
                 /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
                 if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
@@ -637,20 +616,14 @@ cfg_changes_loop(void)
                         sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
 
                         mac_port_enable_rx(port);
-
-                        for (i = 0; i < NVNICS; i++) {
-                            if (NFD_VID_IS_VF(i) &&
-                                        (nic_control_word[i] & NFP_NET_CFG_CTRL_ENABLE))
-                                cfg_act_vf_up(NIC_PCI, i, control, nic_control_word[i], 0);
-                        }
                     } else {
                         __xread struct nfp_nbi_tm_queue_status tmq_status;
                         int i, queue, occupied = 1;
 
                         /* stop receiving packets */
                         if (! mac_port_disable_rx(port)) {
-				cfg_msg.error = 1;
-				goto error;
+			    cfg_msg.error = 1;
+			    goto error;
 			}
 
                         /* allow workers to drain RX queue */
@@ -658,6 +631,12 @@ cfg_changes_loop(void)
 
                         /* stop processing packets: drop action */
                         cfg_act_pf_down(NIC_PCI, vid);
+			for (i = 0; i < NFD_MAX_VFS; ++i) {
+			    if (cfg_act_vf_down(NIC_PCI, NFD_VF2VID(i))) {
+			        cfg_msg.error = 1;
+				goto error;
+			    }
+			}
 
                         /* wait for TM queues to drain */
                         for (i = 0; occupied && i < TMQ_DRAIN_RETRIES; ++i) {
@@ -681,46 +660,45 @@ cfg_changes_loop(void)
                         sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
                     }
                 }
-
-                /* Handle SR-IOV setup changes */
-                if (update & NFP_NET_CFG_UPDATE_VF) {
-                    handle_sriov_update(control);
-                    //after a vf change via PF mailbox - rebuild all VF action lists
-                    for (i = 0; i < NVNICS; i++) {
-                        if (NFD_VID_IS_VF(i) &&
-                                    (nic_control_word[i] & NFP_NET_CFG_CTRL_ENABLE))
-                            cfg_act_vf_up(NIC_PCI, i, control, nic_control_word[i], 0);
-                    }
-                }
             } else if (type == NFD_VNIC_TYPE_VF) {
                 /* Set the link state handling control */
                 if (control & NFP_NET_CFG_CTRL_ENABLE) {
                     /* Retrieve the link state mode for the VF. */
-                    load_vnic_setup_entry(vid, &vnic_entry_rd);
-                    ls_mode = vnic_entry_rd.link_state_mode;
-                } else {
-                    /* Disable the link when interface is disabled. */
-                    ls_mode = NFD_VF_CFG_CTRL_LINK_STATE_DISABLE;
-                }
-                update_vf_lsc_list(0, vid, control, ls_mode);
+		    mem_read32(&sriov_cfg_data,
+			       NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
+			       sizeof(struct sriov_cfg));
+                    ls_mode = sriov_cfg_data.ctrl_link_state;
 
-                if ((nic_control_word[NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE) &&
-                                    (control & NFP_NET_CFG_CTRL_ENABLE)) {
+		    if (!(nic_control_word[NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE)) {
+			cfg_msg.error = 1;
+			goto error;
+		    }
 
-                    if (cfg_act_vf_up(NIC_PCI, vid, nic_control_word[NFD_PF2VID(0)],
-                                    control, update)) {
+                    if (cfg_act_vf_up(NIC_PCI, vid,
+				      nic_control_word[NFD_PF2VID(0)],
+                                      control, update)) {
                         cfg_msg.error = 1;
                         goto error;
                     }
+
 		    // rebuild PF action list because veb_up state may have changed
 		    if (cfg_act_pf_up(NIC_PCI, NFD_PF2VID(0), 1,
 				      nic_control_word[NFD_PF2VID(0)], 0)) {
                         cfg_msg.error = 1;
                         goto error;
                     }
-                } else if ((control & NFP_NET_CFG_CTRL_ENABLE) == 0)
-                    cfg_act_vf_down(NIC_PCI, vid);
-            }
+                } else {
+                    /* Disable the link when interface is disabled. */
+                    ls_mode = NFD_VF_CFG_CTRL_LINK_STATE_DISABLE;
+
+		    if (cfg_act_vf_down(NIC_PCI, vid)) {
+			cfg_msg.error = 1;
+			goto error;
+		    }
+                }
+
+		update_vf_lsc_list(0, vid, control, ls_mode);
+	    }
 
             nic_control_word[cfg_msg.vid] = control;
 error:
@@ -1003,9 +981,6 @@ init_vfs_random_macs(void)
     uint32_t mac_hi;
     uint32_t mac_lo;
     __gpr uint64_t mac64;
-    __gpr struct nfp_vnic_setup_entry vnic_entry;
-    __xread struct nfp_vnic_setup_entry vnic_entry_rd;
-    __xwrite struct nfp_vnic_setup_entry vnic_entry_wr;
     __shared __lmem uint32_t sriov_act_list[NIC_MAC_VLAN_RESULT_SIZE_LW];
     __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
     __emem __addr40 uint8_t *vf_base;
@@ -1024,22 +999,20 @@ init_vfs_random_macs(void)
             trng_rd64(&mac_hi, &mac_lo);
 
             /* Make sure no Multicast */
-            mac_hi = mac_hi & 0xFEFFFFFF;
+            mac_hi &= 0xFEFFFFFF;
 
             /* Local assigned bit set */
-            mac_hi = mac_hi | 0x02000000;
+            mac_hi |= 0x02000000;
 
-            mac64 = ((uint64_t)mac_hi << 16) | (mac_lo >> 16);
+            mac_lo = mac_lo >> 16;
 
             /* check previoust VFs for duplicates */
 	    for (i = 0; i <= vf; ) {
-                load_vnic_setup_entry(NFD_VF2VID(i), &vnic_entry_rd);
-                reg_cp(&vnic_entry, &vnic_entry_rd,
-                    sizeof(struct nfp_vnic_setup_entry));
+                vf_base = NFD_VF_CFG_ADDR(vf_cfg_base, i++);
+                mem_read32(&sriov_cfg_data_rd, vf_base, sizeof(struct sriov_cfg));
 
-		++i;
-
-		if (vnic_entry.src_mac == mac64)
+		if (sriov_cfg_data_rd.mac_hi == mac_hi &&
+		    sriov_cfg_data_rd.mac_lo == mac_lo)
 		    break;
 	    }
 
@@ -1047,20 +1020,11 @@ init_vfs_random_macs(void)
 	    if (i != vf + 1)
                 continue;
 
-            /* Add to VEB */
-            vnic_entry.src_mac = mac64;
-            vnic_entry.vlan = NIC_NO_VLAN_ID;
-            reg_cp(&vnic_entry_wr, &vnic_entry,
-                   sizeof(struct nfp_vnic_setup_entry));
-            write_vnic_setup_entry(vf, &vnic_entry_wr);
-
             /* Write the generated MAC into NFD's rtsym */
-            vf_base = NFD_VF_CFG_ADDR(vf_cfg_base, vf);
-            mem_read32(&sriov_cfg_data_rd, vf_base, sizeof(struct sriov_cfg));
             reg_cp(&sriov_cfg_data, &sriov_cfg_data_rd,
                     sizeof(struct sriov_cfg));
-            sriov_cfg_data.mac_hi = (mac64 >> 16) & 0xFFFFFFFF;
-            sriov_cfg_data.mac_lo = mac64 & 0xFFFF;
+            sriov_cfg_data.mac_hi = mac_hi;
+            sriov_cfg_data.mac_lo = mac_lo;
             reg_cp(&sriov_cfg_data_wr, &sriov_cfg_data,
                     sizeof(struct sriov_cfg));
             mem_write32(&sriov_cfg_data_wr, vf_base, sizeof(struct sriov_cfg));
