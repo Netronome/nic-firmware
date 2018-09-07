@@ -104,10 +104,10 @@
 
 #macro __actions_rx_host(out_pkt_vec, DROP_LABEL)
 .begin
-    .reg mtu
+    .reg rx_args
 
-    __actions_read(mtu, 0xffff)
-    pkt_io_rx_host(out_pkt_vec, mtu, DROP_LABEL)
+    __actions_read(rx_args, 0xffff)
+    pkt_io_rx_host(out_pkt_vec, rx_args, DROP_LABEL)
     __actions_restore_t_idx()
 .end
 #endm
