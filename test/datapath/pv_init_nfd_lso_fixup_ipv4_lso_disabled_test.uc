@@ -18,7 +18,7 @@
 .reg loop_cntr_masked
 .reg tmp
 .reg addr
-.reg mtu
+.reg args
 .reg value
 .reg pkt_no
 .reg drop_flag
@@ -31,7 +31,7 @@
 .xfer_order $pkt_rd
 
 
-move(mtu, 6000)
+move(args, (6000 << 2))
 move(addr, 0x00)
 
 move($nfd_desc_wr[0], 0)
@@ -56,7 +56,7 @@ mem[write32, $nfd_desc_wr[0], 0, <<8, addr, NFD_IN_META_SIZE_LW], ctx_swap[s]
 mem[read32,  $nfd_desc_rd[0], 0, <<8, addr, NFD_IN_META_SIZE_LW], ctx_swap[s]
 
 
-pv_init_nfd(pkt_vec, pkt_no, $nfd_desc_rd, mtu, error#)
+pv_init_nfd(pkt_vec, pkt_no, $nfd_desc_rd, args, error#)
 
 
 // Check PV

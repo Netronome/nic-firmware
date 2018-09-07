@@ -19,7 +19,7 @@
 .reg i
 .reg tmp1, tmp2
 .reg daddr
-.reg mtu
+.reg args
 .reg value
 .reg pkt_no
 .reg drop_flag
@@ -39,7 +39,7 @@
 alu[__actions_t_idx, --, B, 0]
 alu[pkt_vec_addr, (PV_META_BASE_wrd * 4), OR, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
 
-move(mtu, 6000)
+move(args, (6000 << 2))
 move(daddr, 0x00)
 move(i,0)
 
@@ -118,7 +118,7 @@ pv_reset(pkt_vec_addr, 0, __actions_t_idx, 64)
     // lword 7
     move(exp[7], 0)
     move(pkt_vec[6], 0)
-    pv_init_nfd(pkt_vec, pkt_no, $nfd_desc, mtu, error#)
+    pv_init_nfd(pkt_vec, pkt_no, $nfd_desc, args, error#)
 
     .if ( drop_flag )
         test_assert_equal(i, 0xfe)

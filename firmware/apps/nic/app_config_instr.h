@@ -223,9 +223,12 @@ enum instruction_ops {
  * INSTR_RX_HOST:
  * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
- *       +-----------------------------+-+---+-----------+---------------+
- *    0  |              8              |P| 0 |           MTU             |
- *       +-----------------------------+-+---+---------------------------+
+ *       +-----------------------------+-+---------------------------+-+-+
+ *    0  |              8              |P|           MTU             |C|c|
+ *       +-----------------------------+-+---------------------------+-+-+
+ *
+ * C - Enable outer L3 checksum processing
+ * c - Enable outer L4 checksum processing
  *
  * INSTR_TX_WIRE:
  * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
@@ -328,6 +331,17 @@ typedef union {
 
 typedef union {
     struct {
+	    uint32_t op: 15;
+	    uint32_t pipeline: 1;
+	    uint32_t mtu: 14;
+	    uint32_t csum_outer_l3: 1;
+	    uint32_t csum_outer_l4: 1;
+    };
+    uint32_t __raw[1];
+} instr_rx_host_t;
+
+typedef union {
+    struct {
         uint32_t op: 15;
         uint32_t pipeline: 1;
         uint32_t cont: 1;
@@ -391,6 +405,8 @@ typedef union {
 #define INSTR_RSS_TABLE_ADDR_bf 1, 11, 5
 #define INSTR_RSS_ROW_SHIFT_bf  1, 4, 0
 #define INSTR_RSS_KEY_bf        2, 31, 0
+
+#define INSTR_RX_HOST_MTU_bf     0, 15, 2
 
 #define INSTR_RX_VXLAN_NN_IDX_bf 0, 12, 6
 #define INSTR_RX_PARSE_VXLANS_bf 0, 5, 3

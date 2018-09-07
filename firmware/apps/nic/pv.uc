@@ -1641,7 +1641,7 @@ ipv6#:
 #define NFD_IN_LSO_L4_OFFS_fld      3, 15, 8
 
 
-#macro pv_init_nfd(out_vec, in_pkt_num, in_nfd_desc, in_mtu, DROP_LABEL)
+#macro pv_init_nfd(out_vec, in_pkt_num, in_nfd_desc, in_rx_args, DROP_LABEL)
 .begin
     .reg addr_hi
     .reg addr_lo
@@ -1652,6 +1652,7 @@ ipv6#:
     .reg hdr_parse
     .reg mac_dst_type
     .reg meta_len
+    .reg mtu
     .reg pcie
     .reg pkt_num
     .reg pkt_len
@@ -1706,7 +1707,8 @@ ipv6#:
     // note that pv_free() does not depend on state of 'A' bit
     br_bset[BF_AL(in_nfd_desc, NFD_IN_INVALID_fld), error_pci#]
 
-    __pv_mtu_check(out_vec, in_mtu, (4 * 2), error_mtu#)
+    alu[mtu, --, B, in_rx_args, >>BF_L(INSTR_RX_HOST_MTU_bf)]
+    __pv_mtu_check(out_vec, mtu, (4 * 2), error_mtu#)
 
     alu[csum_offload, 0x3, AND, BF_A(in_nfd_desc, NFD_IN_FLAGS_TX_TCP_CSUM_fld), >>BF_L(NFD_IN_FLAGS_TX_TCP_CSUM_fld)]
     bitfield_extract__sz1(csum_udp, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_UDP_CSUM_fld)) ; NFD_IN_FLAGS_TX_UDP_CSUM_fld
@@ -1731,9 +1733,11 @@ lso_fixup#:
 
 preparse#:
     __pv_get_mac_dst_type(mac_dst_type, out_vec) // advances *$index by 2 words
-    bitfield_extract__sz1(hdr_parse, BF_AML(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld))
-    alu[hdr_parse, hdr_parse, OR, BF_A(out_vec, PV_CSUM_OFFLOAD_bf), >>BF_L(PV_CSUM_OFFLOAD_IL4_bf)]
+    br_bset[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), hdr_parse#]
+    alu[hdr_parse, (3 << BF_L(PV_CSUM_OFFLOAD_OL3_bf)), OR, in_rx_args]
+    alu[--, hdr_parse, AND, BF_A(out_vec, PV_CSUM_OFFLOAD_bf)]
     beq[init_ctm#], defer[3]
+hdr_parse#:
         alu[BF_A(out_vec, PV_MAC_DST_TYPE_bf), BF_A(out_vec, PV_MAC_DST_TYPE_bf), OR, mac_dst_type, <<BF_L(PV_MAC_DST_TYPE_bf)]
         alu[BF_A(out_vec, PV_META_TYPES_bf), *$index++, B, 0]
         alu[BF_A(out_vec, PV_HEADER_STACK_bf), --, B, 0]
