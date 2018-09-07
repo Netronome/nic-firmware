@@ -639,13 +639,21 @@ cfg_act_append_drop(action_list_t *acts)
 
 
 __intrinsic void
-cfg_act_append_rx_host(action_list_t *acts, uint32_t pcie, uint32_t vid)
+cfg_act_append_rx_host(action_list_t *acts, uint32_t pcie, uint32_t vid, uint32_t outer_csum)
 {
+    instr_rx_host_t instr_rx_host;
     __xread uint32_t mtu;
+
+    instr_rx_host.__raw[0] = 0;
 
     mem_read32(&mtu, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
 				    NFP_NET_CFG_MTU), sizeof(mtu));
-    cfg_act_append(acts, INSTR_RX_HOST, mtu + NET_ETH_LEN + 1);
+
+    instr_rx_host.mtu = mtu + NET_ETH_LEN + 1;
+    instr_rx_host.csum_outer_l3 = outer_csum;
+    instr_rx_host.csum_outer_l4 = outer_csum;
+
+    cfg_act_append(acts, INSTR_RX_HOST, instr_rx_host.__raw[0]);
 }
 
 __intrinsic void
@@ -900,7 +908,7 @@ cfg_act_build_ctrl(action_list_t *acts, uint32_t pcie, uint32_t vid)
     if (type != NFD_VNIC_TYPE_CTRL)
         return;
 
-    cfg_act_append_rx_host(acts, pcie, vid);
+    cfg_act_append_rx_host(acts, pcie, vid, 0);
     cfg_act_append_cmsg(acts);
 }
 
@@ -924,7 +932,7 @@ cfg_act_build_pf(action_list_t *acts, uint32_t pcie, uint32_t vid,
     csum_i = (csum_o && (control & NFP_NET_CFG_CTRL_VXLAN)) ? 1 : 0;
     tmq = NS_PLATFORM_NBI_TM_QID_LO(vnic);
 
-    cfg_act_append_rx_host(acts, pcie, vid);
+    cfg_act_append_rx_host(acts, pcie, vid, veb_up);
 
     if (! veb_up)
         cfg_act_append_tx_wire(acts, tmq, 0, 0);
@@ -964,7 +972,7 @@ cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
     csum_i = (csum_o && (vf_control & NFP_NET_CFG_CTRL_VXLAN)) ? 1 : 0;
     promisc = (pf_control & NFP_NET_CFG_CTRL_PROMISC) ? 1 : 0;
 
-    cfg_act_append_rx_host(acts, pcie, vid);
+    cfg_act_append_rx_host(acts, pcie, vid, 1);
 
     vf_cfg_base = cfg_act_vf_cfg_ptr(pcie);
     mem_read32(&sriov_cfg_data,
@@ -994,7 +1002,7 @@ __intrinsic void
 cfg_act_build_pcie_down(action_list_t *acts, uint32_t pcie, uint32_t vid)
 {
     cfg_act_init(acts);
-    cfg_act_append_rx_host(acts, pcie, vid);
+    cfg_act_append_rx_host(acts, pcie, vid, 0);
     cfg_act_append_drop(acts);
 }
 
