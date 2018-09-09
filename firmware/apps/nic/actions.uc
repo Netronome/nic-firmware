@@ -48,6 +48,7 @@
     #ifdef __ACTIONS_T_IDX_DELTA
         #define_eval __ACTIONS_T_IDX_DELTA (__ACTIONS_T_IDX_DELTA + 4)
     #else
+        .reg_addr __actions_t_idx 28 B
         alu[__actions_t_idx, __actions_t_idx, +, 4]
     #endif
 #endm
@@ -72,6 +73,7 @@
 
 
 #macro __actions_read_end()
+    .reg_addr __actions_t_idx 28 B
     alu[__actions_t_idx, __actions_t_idx, +, __ACTIONS_T_IDX_DELTA]
     #undef __ACTIONS_T_IDX_DELTA
 #endm
