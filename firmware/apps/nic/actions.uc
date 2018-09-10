@@ -808,8 +808,8 @@ next#:
     ins_0#: br[drop_act#]
     ins_1#: br[rx_wire#]
     ins_2#: br[mac_match#]
-    ins_3#: br[rss#]
-    ins_4#: br[checksum#]
+    ins_3#: br[checksum#]
+    ins_4#: br[rss#]
     ins_5#: br[tx_host#]
     ins_6#: br[rx_host#]
     ins_7#: br[tx_wire#]
@@ -839,12 +839,12 @@ mac_match#:
     __actions_mac_match(io_pkt_vec, drop_mismatch#)
     __actions_next()
 
-rss#:
-    __actions_rss(io_pkt_vec)
-    __actions_next()
-
 checksum#:
     __actions_checksum(io_pkt_vec)
+    __actions_next()
+
+rss#:
+    __actions_rss(io_pkt_vec)
     __actions_next()
 
 tx_host#:
