@@ -175,17 +175,21 @@ update_vnic_queue_stat(nfd_qstats_t *nfd,
 	nfd->tx_bytes += bytes;
         break;
     case NIC_STATS_QUEUE_RX_DISCARD_ACT_IDX:
-    case NIC_STATS_QUEUE_RX_DISCARD_MRU_IDX:
     case NIC_STATS_QUEUE_RX_DISCARD_ADDR_IDX:
+    case NIC_STATS_QUEUE_RX_DISCARD_MRU_IDX:
     case NIC_STATS_QUEUE_RX_DISCARD_PCI_IDX:
     case NIC_STATS_QUEUE_BPF_DISCARD_IDX:
 	_vnic_stats.rx_discards += pkts;
 	break;
+    case NIC_STATS_QUEUE_RX_ERROR_VEB_IDX:
+	_vnic_stats.rx_errors += pkts;
     case NIC_STATS_QUEUE_TX_DISCARD_ACT_IDX:
 	_vnic_stats.tx_discards += pkts;
 	break;
+    case NIC_STATS_QUEUE_TX_ERROR_LSO_IDX:
     case NIC_STATS_QUEUE_TX_ERROR_PCI_IDX:
     case NIC_STATS_QUEUE_TX_ERROR_MTU_IDX:
+    case NIC_STATS_QUEUE_TX_ERROR_NO_CTM_IDX:
     case NIC_STATS_QUEUE_TX_ERROR_OFFSET_IDX:
 	_vnic_stats.tx_errors += pkts;
 	break;
