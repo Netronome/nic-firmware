@@ -71,8 +71,8 @@
     #define    INSTR_DROP              0
     #define    INSTR_RX_WIRE           1
     #define    INSTR_MAC_MATCH         2
-    #define    INSTR_RSS               3
-    #define    INSTR_CHECKSUM          4
+    #define    INSTR_CHECKSUM          3
+    #define    INSTR_RSS               4
     #define    INSTR_TX_HOST           5
     #define    INSTR_RX_HOST           6
     #define    INSTR_TX_WIRE           7
@@ -89,8 +89,8 @@ enum instruction_ops {
     INSTR_DROP = 0,
     INSTR_RX_WIRE,
     INSTR_MAC_MATCH,
-    INSTR_RSS,
     INSTR_CHECKSUM,
+    INSTR_RSS,
     INSTR_TX_HOST,
     INSTR_RX_HOST,
     INSTR_TX_WIRE,
