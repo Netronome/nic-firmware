@@ -55,7 +55,7 @@ cmsg_init()
     alu[my_act_ctx, my_act_ctx, and, 7]
 
     .if (ctx() == 0)
-	        hashmap_alloc_fd(SRIOV_TID, 8, 32, NIC_MAC_VLAN_TABLE__NUM_ENTRIES, --, swap, BPF_MAP_TYPE_HASH)
+	        hashmap_alloc_fd(SRIOV_TID, 8, 56, NIC_MAC_VLAN_TABLE__NUM_ENTRIES, --, swap, BPF_MAP_TYPE_HASH)
     .endif
 
 main_loop#:
