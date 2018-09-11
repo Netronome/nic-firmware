@@ -230,10 +230,11 @@ end#:
     bitfield_extract__sz1(bls, BF_AML(in_pkt_vec, PV_BLS_bf))
     br=byte[bls, 0, 3, tx_nbi#]
 
+    pv_get_gro_wire_desc($__pkt_io_gro_meta, in_pkt_vec, nbi, tm_q, pms_offset)
+
     br_bset[multicast, BF_L(INSTR_TX_CONTINUE_bf), multicast#]
 
-tx_gro#:
-    pv_get_gro_wire_desc($__pkt_io_gro_meta, in_pkt_vec, nbi, tm_q, pms_offset)
+terminate#:
     pv_stats_tx_wire(in_pkt_vec, IN_LABEL)
 
 error_offset#:
@@ -243,17 +244,18 @@ error_no_ctm#:
     pv_stats_update(in_pkt_vec, TX_ERROR_NO_CTM, drop#)
 
 multicast#:
-    pv_multicast_init(in_pkt_vec, bls, tx_gro#)
+    pv_multicast_init(in_pkt_vec, bls, continue#)
 
 tx_nbi#:
     pv_multicast_resend(in_pkt_vec)
     pv_setup_packet_ready(addr_hi, addr_lo, in_pkt_vec, nbi, tm_q, pms_offset)
     nbi[packet_ready_multicast_dont_free, $, addr_hi, <<8, addr_lo], indirect_ref
+
+    br_bclr[multicast, BF_L(INSTR_TX_CONTINUE_bf), terminate#]
+
+continue#:
     pv_stats_tx_wire(in_pkt_vec)
 
-    br_bclr[multicast, BF_L(INSTR_TX_CONTINUE_bf), IN_LABEL]
-
-end#:
 .end
 #endm
 
