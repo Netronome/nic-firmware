@@ -335,43 +335,33 @@ passert(PV_MAX_CLONES, "EQ", 2)
 
 #macro pv_push(io_vec, ERROR_LABEL)
 .begin
-    .reg cp_ptr
-    .reg md_ptr
+    .reg addr
     .reg pkt_num
-    .reg write $x[4]
-    .xfer_order $x
 
     br_bclr[BF_AL(io_vec, PV_CTM_ALLOCATED_bf), ERROR_LABEL]
 
-    alu[cp_ptr, (PV_SIZE_LW * 4 + PV_META_BASE_wrd * 4), OR, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
-    local_csr_wr[ACTIVE_LM_ADDR_0, cp_ptr]
+    alu[addr, (PV_SIZE_LW * 4 + PV_META_BASE_wrd * 4), OR, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
+    local_csr_wr[ACTIVE_LM_ADDR_0, addr]
 
-        bitfield_extract(pkt_num, BF_AML(io_vec, PV_NUMBER_bf))
-        alu[cp_ptr, --, B, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
+    pv_save_meta_lm_ptr(io_vec)
+    bitfield_extract(pkt_num, BF_AML(io_vec, PV_NUMBER_bf))
 
     #define LOOP 0
-    #while (LOOP < (PV_SIZE_LW - PV_META_BASE_wrd))
+    #while (LOOP < (PV_SIZE_LW - PV_META_BASE_wrd - 1))
         alu[*l$index0++, --, B, io_vec++]
         #define_eval LOOP (LOOP + 1)
     #endloop
     #undef LOOP
 
-    local_csr_wr[ACTIVE_LM_ADDR_0, cp_ptr]
+    local_csr_wr[ACTIVE_LM_ADDR_1, addr]
 
-        local_csr_rd[ACTIVE_LM_ADDR_2]
-        immed[md_ptr, 0]
-        alu[md_ptr, md_ptr, +, (PV_SIZE_LW * 4)]
-        local_csr_wr[ACTIVE_LM_ADDR_2, md_ptr]
-
-    #define LOOP 0
-    #while (LOOP < PV_META_BASE_wrd)
-        alu[io_vec++, --, B, *l$index0++]
-        #define_eval LOOP (LOOP + 1)
-    #endloop
-    #undef LOOP
+        alu[*l$index0, --, B, 0] ; PV_META_TYPES_bf
+        alu[addr, addr, -, (PV_META_BASE_wrd * 4)]
+        local_csr_wr[ACTIVE_LM_ADDR_2, addr]
 
     pkt_buf_copy_ctm_to_mu_head(pkt_num, BF_A(io_vec, PV_MU_ADDR_bf), BF_A(io_vec, PV_OFFSET_bf))
-    bits_clr__sz1(BF_AL(io_vec, PV_CTM_ALLOCATED_bf), 1)
+    bits_clr__sz1(BF_AL(io_vec, PV_CTM_ALLOCATED_bf), BF_MASK(PV_CTM_ALLOCATED_bf)) ; PV_CTM_ALLOCATED_bf
+    bits_clr__sz1(BF_AL(io_vec, PV_META_LM_PTR_bf), BF_MASK(PV_META_LM_PTR_bf)) ; PV_META_LM_PTR_bf
 .end
 #endm
 
@@ -379,24 +369,24 @@ passert(PV_MAX_CLONES, "EQ", 2)
 #macro pv_pop(io_vec, ERROR_LABEL)
 .begin
     .reg bls
-    .reg md_ptr
-    .reg pv_ptr
+    .reg addr
+    .reg write $x[4]
+    .xfer_order $x
 
     br_bset[BF_AL(io_vec, PV_CTM_ALLOCATED_bf), ERROR_LABEL]
 
-    bitfield_extract__sz1(bls, BF_AML(io_vec, PV_BLS_bf))
+    alu[addr, (PV_META_BASE_wrd * 4), OR, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
+    local_csr_wr[ACTIVE_LM_ADDR_1, addr]
 
-    alu[pv_ptr, (PV_META_BASE_wrd * 4), OR, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
-    local_csr_wr[ACTIVE_LM_ADDR_1, pv_ptr]
+        bitfield_extract__sz1(bls, BF_AML(io_vec, PV_BLS_bf)) // still old value
+        nop
+        nop
 
-        local_csr_rd[ACTIVE_LM_ADDR_2]
-        immed[md_ptr, 0]
-        alu[md_ptr, md_ptr, -, (PV_SIZE_LW * 4)]
-        local_csr_wr[ACTIVE_LM_ADDR_2, md_ptr]
+    pv_restore_meta_lm_ptr(io_vec)
 
-    bits_set__sz1(BF_AL(io_vec, PV_BLS_bf), bls)
-    nop
-    nop
+        bits_clr__sz1(BF_AL(io_vec, PV_BLS_bf), BF_MASK(PV_BLS_bf))
+        bits_set__sz1(BF_AL(io_vec, PV_BLS_bf), bls)
+        nop
 .end
 #endm
 
