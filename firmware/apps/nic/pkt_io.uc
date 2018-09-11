@@ -135,7 +135,11 @@ check_credits#:
 
     br=byte[bls, 0, 3, tx_nfd#]
 
+#ifdef PV_MULTI_PCI
     pv_get_gro_host_desc($__pkt_io_gro_meta, io_pkt_vec, buf_sz, meta_len, pci_isl, pci_q)
+#else
+    pv_get_gro_host_desc($__pkt_io_gro_meta, io_pkt_vec, buf_sz, meta_len, 0, pci_q)
+#endif
 
 tx_stats_update#:
     pv_stats_tx_host(io_pkt_vec, pci_isl, pci_q, multicast, IN_LABEL, end#)

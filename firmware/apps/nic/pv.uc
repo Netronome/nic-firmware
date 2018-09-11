@@ -939,14 +939,9 @@ end#:
     alu[desc, desc, OR, ctm_buf_sz, <<NFD_OUT_SPLIT_shf]
     ld_field[desc, 1100, BF_A(in_vec, PV_NUMBER_bf)] ; PV_CTM_ISL_bf, PV_NUMBER_bf
     alu[ctm_only, 1, AND~, BF_A(in_vec, PV_SPLIT_bf), >>BF_L(PV_SPLIT_bf)]
-    #ifndef PV_MULTI_PCI
-        alu[out_desc[NFD_OUT_OFFSET_wrd], desc, OR, ctm_only, <<NFD_OUT_CTM_ONLY_shf]
-    skip_ctm#:
-    #else
-        alu[desc, desc, OR, ctm_only, <<NFD_OUT_CTM_ONLY_shf]
-    skip_ctm#:
-        alu[out_desc[NFD_OUT_OFFSET_wrd, desc, OR, in_pci_isl, <<GRO_META_DEST_shf]
-    #endif
+    alu[desc, desc, OR, ctm_only, <<NFD_OUT_CTM_ONLY_shf]
+skip_ctm#:
+    alu[out_desc[NFD_OUT_OFFSET_wrd], desc, OR, in_pci_isl, <<GRO_META_DEST_shf]
 
     // Word 1
     alu[desc, BF_A(in_vec, PV_MU_ADDR_bf), AND~, ((BF_MASK(PV_SPLIT_bf) << BF_WIDTH(PV_CBS_bf)) | BF_MASK(PV_CBS_bf)), <<BF_L(PV_CBS_bf)]
