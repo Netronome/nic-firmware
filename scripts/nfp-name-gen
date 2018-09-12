@@ -59,6 +59,20 @@ if [ "x${UDEV_BIOSDEVNAME}" = "x1" ] ; then
     fi
 fi
 
+# Let's verify whether phys-port-name-gen has already renamed the interface.
+# If so, we just exit silently, no work to be done.
+case ${ID_NET_NAME_ONBOARD} in
+  (*n${PHYS_PORT_NAME}) exit 0;;
+esac
+
+case ${ID_NET_NAME_SLOT} in
+  (*n${PHYS_PORT_NAME}) exit 0;;
+esac
+
+case ${ID_NET_NAME_PATH} in
+  (*n${PHYS_PORT_NAME}) exit 0;;
+esac
+
 # From here on, we fall back to phys-port-name-gen
 
 # On-board index based names
