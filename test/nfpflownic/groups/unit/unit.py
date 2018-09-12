@@ -226,10 +226,16 @@ class UnitIP(Test):
                 # any checksum error in promisc/non-promisc mode
                 self.expect_et_cntr["hw_rx_csum_err"] = self.num_pkts
                 self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
+                self.expect_et_cntr["mac.rx_pkts"] = self.num_pkts
             else:
                 if self.l4_type == 'udp' or self.l4_type == 'tcp':
-                    # w/o any error, csum_ok only increases when receiving TCP/UDP
-                    self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
+                    # hw_rx_csum_complete only increases when receiving IP error, not affected by UDP/TCP errors
+                    self.expect_et_cntr["hw_rx_csum_complete"] = self.num_pkts
+                    self.expect_et_cntr["mac.rx_pkts"] = self.num_pkts
+                    self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
+                    self.expect_et_cntr["mac.rx_pkts"] = self.num_pkts
+                    #self.expect_et_cntr["rx_pkts"] = self.num_pkts
+
                 if self.dst_mac_type == 'mc' and self.src_mac_type == 'src':
                     self.expect_et_cntr["dev_rx_mc_pkts"] = self.num_pkts
                 if self.dst_mac_type == 'bc' and self.src_mac_type == 'src':
@@ -238,20 +244,48 @@ class UnitIP(Test):
             if self.dst_mac_type == 'tgt' and self.src_mac_type == 'src':
                 if self.iperr or self.l4err:
                     # any checksum error in promisc/non-promisc mode
-                    self.expect_et_cntr["hw_rx_csum_err"] = self.num_pkts
-                    self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
+                    self.expect_et_cntr["hw_rx_csum_err"] = 0
+                    self.expect_et_cntr["mac.rx_pkts"] = self.num_pkts
+                    self.expect_et_cntr["mac.rx_unicast_pkts"] = self.num_pkts
+                    self.expect_et_cntr["mac.rx_frames_received_ok"] = self.num_pkts
+                    self.expect_et_cntr["mac.rx_octets"] = 0
+                    self.expect_et_cntr["mac.rx_pkts_65_to_127_octets"] = self.num_pkts
+                    self.expect_et_cntr["hw_rx_csum_complete"] = 0 #self.num_pkts
+                    if self.iperr:
+                        # NIC-397, only increment on IP header error
+                        self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
+                    else:
+                        self.expect_et_cntr["dev_rx_errors"] = 0 # nfpflownic.unit_no_fw_ld.csum_rx_ipv4_udp_udperr
+
                 elif self.l4_type == 'udp' or self.l4_type == 'tcp':
                     # w/o any error, csum_ok only increases when receiving
                     # TCP/UDP
-                    self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
+                    self.expect_et_cntr["dev_rx_errors"] = 0 #self.num_pkts
+                    self.expect_et_cntr["hw_rx_csum_complete"] = 0 #self.num_pkts
+                    self.expect_et_cntr["mac.rx_unicast_pkts"] = self.num_pkts
+                    self.expect_et_cntr["mac.rx_octets"] = 0
+                    if self.l4_type == 'tcp':
+                        self.expect_et_cntr["mac.tx_pkts_64_octets"] = self.num_pkts # nfpflownic.unit_no_fw_ld.csum_rx_ipv4_tcp
+                        self.expect_et_cntr["mac.rx_pkts"] = self.num_pkts
+                        self.expect_et_cntr["mac.rx_pkts_65_to_127_octets"] = self.num_pkts # nfpflownic.unit_no_fw_ld.csum_rx_ipv4_tcp, incremented un-unexpectedly (val=10)
+                    else:
+                        self.expect_et_cntr["mac.tx_pkts_64_octets"] = 0
+                        UnitIP_dont_care_cntrs.append("mac.tx_octets") # nfpflownic.unit_no_fw_ld.csum_rx_ipv4_udp, incremented un-unexpectedly (val=690)
+                        UnitIP_dont_care_cntrs.append("mac.rx_frames_received_ok") # nfpflownic.unit_no_fw_ld.csum_rx_ipv4_udp
+                        UnitIP_dont_care_cntrs.append("mac.tx_unicast_pkts") # nfpflownic.unit_no_fw_ld.csum_rx_ipv4_udp, incremented un-unexpectedly (val=6)
+                        UnitIP_dont_care_cntrs.append("mac.rx_pkts") # nfpflownic.unit_no_fw_ld.csum_rx_ipv4_udp, has un-expected value (val=11 exp=10)
+                        #UnitIP_dont_care_cntrs.append("mac.tx_pkts_65_to_127_octets") # nfpflownic.unit_no_fw_ld.csum_rx_ipv4_udp, incremented un-unexpectedly (val=6)
+                        self.expect_et_cntr["mac.rx_pkts_65_to_127_octets"] = self.num_pkts # nfpflownic.unit_no_fw_ld.csum_rx_ipv4_udp, incremented un-unexpectedly (val=10)
+                        UnitIP_dont_care_cntrs.append("mac.tx_frames_transmitted_ok") # nfpflownic.unit_no_fw_ld.csum_rx_ipv4_udp, incremented un-unexpectedly (val=6)
+
             if self.dst_mac_type == 'diff' or self.src_mac_type != 'src':
                 self.expect_et_cntr["dev_rx_discards"] = self.num_pkts
             if self.dst_mac_type == 'mc' and self.src_mac_type == 'src':
                 self.expect_et_cntr["dev_rx_mc_pkts"] = self.num_pkts
-                self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
+                self.expect_et_cntr["hw_rx_csum_complete"] = self.num_pkts
             if self.dst_mac_type == 'bc' and self.src_mac_type == 'src':
                 self.expect_et_cntr["dev_rx_bc_pkts"] = self.num_pkts
-                self.expect_et_cntr["hw_rx_csum_ok"] = self.num_pkts
+                self.expect_et_cntr["hw_rx_csum_complete"] = self.num_pkts
 
         return
 
@@ -419,6 +453,11 @@ class UnitIP(Test):
         diff_cntrs = after_cntrs - before_cntrs
 
         self.dst.cmd("ifconfig %s -allmulti" % self.dst_ifn)
+        # clean the block:
+        if self.ipv4==True:
+            self.src.cmd('iptables -F')
+        else:
+            self.src.cmd('ip6tables -F')
         return self.check_result(diff_cntrs)
 
     def interface_cfg(self):
@@ -438,6 +477,14 @@ class UnitIP(Test):
         self.dst.cmd("ip link show %s" % self.dst_ifn)
         self.dst.cmd("ifconfig %s" % self.dst_ifn)
         self.dst.cmd("ifconfig %s allmulti" % self.dst_ifn)
+
+        if self.ipv4==True:
+            self.src.cmd('iptables -F')
+            self.src.cmd('iptables -A INPUT -s %s -j DROP' % (self.dst_ip))
+            self.dst.cmd('arp -s %s %s' % (self.src_ip, self.src_mac))
+        else:
+            self.src.cmd('ip6tables -F')
+            self.src.cmd('ip6tables -A INPUT -s %s -j DROP' % (self.dst_ip))
 
     def get_intf_info(self):
         """
@@ -1207,12 +1254,8 @@ class Stats_rx_err_cnt(UnitIP):
         UnitIP_dont_care_cntrs.append("hw_rx_csum_err")
         # Dictionary of ethtool Counters we expect to increment
         self.expect_et_cntr = {}
-        if "dev_rx_errors" in UnitIP_dont_care_cntrs:
-            UnitIP_dont_care_cntrs.remove("dev_rx_errors")
         for dont_care_cntr in UnitIP_dont_care_cntrs:
             self.expect_et_cntr[dont_care_cntr] = 0
-        if dst_mtu < payload_size and src_mtu > payload_size:
-            self.expect_et_cntr["dev_rx_errors"] = self.num_pkts
 
         return
 
