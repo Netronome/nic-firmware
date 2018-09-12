@@ -1719,7 +1719,7 @@ lso_fixup#:
 preparse#:
     __pv_get_mac_dst_type(mac_dst_type, out_vec) // advances *$index by 2 words
     br_bset[BF_AL(in_nfd_desc, NFD_IN_FLAGS_TX_LSO_fld), hdr_parse#]
-    alu[hdr_parse, (3 << BF_L(PV_CSUM_OFFLOAD_OL3_bf)), OR, in_rx_args]
+    alu[hdr_parse, (3 << BF_L(PV_CSUM_OFFLOAD_IL4_bf)), OR, in_rx_args]
     alu[--, hdr_parse, AND, BF_A(out_vec, PV_CSUM_OFFLOAD_bf)]
     beq[init_ctm#], defer[3]
 hdr_parse#:
