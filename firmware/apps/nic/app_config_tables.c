@@ -934,18 +934,17 @@ cfg_act_build_pf(action_list_t *acts, uint32_t pcie, uint32_t vid,
 
     cfg_act_append_rx_host(acts, pcie, vid, veb_up);
 
-    if (! veb_up)
-        cfg_act_append_tx_wire(acts, tmq, 0, 0);
-    else {
-	cfg_act_append_veb_lookup(acts, pcie, vid, 0, 0);
+    if (csum_i)
+        cfg_act_append_checksum(acts, 0, 1, 0); // I
 
-        if (csum_i)
-	    cfg_act_append_checksum(acts, 0, 1, 0); // I
+    if (veb_up)
+        cfg_act_append_veb_lookup(acts, pcie, vid, 0, 0);
 
-        cfg_act_append_tx_wire(acts, tmq, 0, 1); // M
+    cfg_act_append_tx_wire(acts, tmq, 0, veb_up); // M
 
+    if (veb_up) {
         if (csum_o)
-	    cfg_act_append_checksum(acts, 1, 0, 0); // O
+            cfg_act_append_checksum(acts, 1, 0, 0); // O
 
         cfg_act_append_push_pkt(acts);
         cfg_act_append_tx_vlan(acts);
