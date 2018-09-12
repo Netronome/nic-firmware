@@ -199,7 +199,7 @@
  * MU in the system. BLM_NBI8_BLQ0_Q_SIZE is the max number of MUs in the
  * system * MU descr size (4B). So NFD_IN_WQ_SZ = (BLM_NBI8_BLQ0_Q_SIZE/4)*16
  */
-#define NFD_IN_WQ_SZ           ((BLM_NBI8_BLQ0_Q_SIZE/4) * 16)
+#define NFD_IN_WQ_SZ           ((BLM_NBI8_BLQ1_Q_SIZE/4) * 16)
 
 /* Optional defines */
 #define NFD_IN_ADD_SEQN
