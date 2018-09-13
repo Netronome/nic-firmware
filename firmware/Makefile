@@ -170,7 +170,7 @@ $(1)__firmware_deb: $(1)__firmware_tree
 	$(Q)mkdir -p $(3)/DEBIAN
 	$(Q)cp -r $(FW_TREE)/$(1)/* $(3)
 	$(Q)mkdir -p $(3)/usr/share/initramfs-tools/hooks
-	$(Q)cp $(SCRIPT_DIR)/agilio-nic.initramfs-hook $(3)/usr/share/initramfs-tools/hooks/agilio-nic-firmware
+	$(Q)cp $(SCRIPT_DIR)/agilio-nic.initramfs-hook $(3)/usr/share/initramfs-tools/hooks/agilio-$(FLAVOR)-firmware
 	$(Q)cat $(FIRMWARE_DIR)/pkg/agilio-firmware.control \
 		| sed 's/__VERSION__/$(FW_PKG_VER)-1/g' \
 		| sed 's/__FW_NAME__/$(2)/g' \
