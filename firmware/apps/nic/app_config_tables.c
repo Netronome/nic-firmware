@@ -538,18 +538,17 @@ upd_slicc_hash_table(void)
 __intrinsic uint32_t
 cfg_act_upd_vxlan_table(uint32_t pcie, uint32_t vid)
 {
-    __xread uint32_t xrd_vxlan_data[NFP_NET_CFG_VXLAN_SZ_wrd];
-    __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_VXLAN_SZ_wrd];
-    uint32_t vxlan_data[NFP_NET_CFG_VXLAN_SZ_wrd];
+    __xread uint16_t xrd_vxlan_data[NFP_NET_CFG_VXLAN_SZ];
+    __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_VXLAN_SZ];
     uint32_t i;
     uint32_t n_vxlan = 0;
 
     mem_read32(xrd_vxlan_data, cfg_act_bar_ptr(pcie, vid) +
-	       NFP_NET_CFG_VXLAN_PORT, sizeof(xrd_vxlan_data));
-    for (i = 0; i < NFP_NET_CFG_VXLAN_SZ_wrd; i++) {
-        xwr_nn_info[i] = xrd_vxlan_data[i];
-	if ((xrd_vxlan_data[i] & 0xffff) != 0)
-	    n_vxlan++;
+                    NFP_NET_CFG_VXLAN_PORT, sizeof(xrd_vxlan_data));
+    for (i = 0; i < NFP_NET_CFG_VXLAN_SZ; i++) {
+	if (xrd_vxlan_data[i]) {
+            xwr_nn_info[n_vxlan++] = xrd_vxlan_data[i];
+	}
     }
 
     /* Write at NN register start_offset for all worker MEs */
