@@ -1,0 +1,46 @@
+From bf9a8e88c977894e3c60477ee258102c589202a9 Mon Sep 17 00:00:00 2001
+From: Edwin Peer <edwin.peer@netronome.com>
+Date: Wed, 19 Sep 2018 15:42:51 -0700
+Subject: [PATCH] lib/me: support longer sleep()
+
+The present sleep() API accepts a 32 bit unsigned int whereas
+the underlying FUTURE_COUNT based mechanism only supports 16
+bit timestamp deltas. As a consequence, callers passing cycle
+durations in the multi-millisecond range would experience far
+shorter sleeps than expected.
+
+This patch processes longer sleeps in batches that don't
+overflow the underlying register.
+
+Signed-off-by: Edwin Peer <edwin.peer@netronome.com>
+---
+ me/lib/nfp/_c/me.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/me/lib/nfp/_c/me.c b/me/lib/nfp/_c/me.c
+index 8f8e510..8e184cd 100644
+--- a/me/lib/nfp/_c/me.c
++++ b/me/lib/nfp/_c/me.c
+@@ -112,11 +112,16 @@ clear_alarm(void)
+ __intrinsic void
+ sleep(unsigned int cycles)
+ {
++    unsigned int batch;
+     SIGNAL sig;
+ 
+-    __implicit_write(&sig);
+-    set_alarm(cycles, &sig);
+-    wait_for_all(&sig);
++    do {
++        batch = (cycles > 0xfffff) ? 0xfffff : cycles;
++        __implicit_write(&sig);
++        set_alarm(batch, &sig);
++        wait_for_all(&sig);
++        cycles -= batch;
++    } while (cycles);
+ }
+ 
+ __intrinsic void
+-- 
+2.18.0
+
