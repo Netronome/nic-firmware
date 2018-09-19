@@ -296,6 +296,7 @@ ct_reflect_data(unsigned int dst_me, unsigned int dst_ctx,
     };
 }
 
+
 /*
  * Update flags to enable notification of link state change on port to
  * vf vf_vid.
@@ -598,12 +599,23 @@ cfg_changes_loop(void)
                 /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
                 if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
                     if (control & NFP_NET_CFG_CTRL_ENABLE) {
+			/* Driver enables link, wait up to 2 seconds for it */
+			for (i = 0; i < 200; ++i) {
+			    if(mac_eth_port_link_state(NS_PLATFORM_MAC(port),
+			       NS_PLATFORM_MAC_SERDES_LO(port),
+                               (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1))
+			           break;
+
+                            sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
+			}
+
+			/* Ensure TX is enabled before RX */
                         mac_port_enable_tx(port);
+			sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
 
-                        /* Wait for config to stabilize */
-                        sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
-
+			/* Open the taps, wait before notifying the driver */
                         mac_port_enable_rx(port);
+			sleep(250 * NS_PLATFORM_TCLK * 1000); // 250ms
                     } else {
                         __xread struct nfp_nbi_tm_queue_status tmq_status;
                         int i, queue, occupied = 1;
