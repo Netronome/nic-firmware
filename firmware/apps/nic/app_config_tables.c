@@ -860,11 +860,11 @@ cfg_act_append_tx_host(action_list_t *acts, uint32_t pcie, uint32_t vid,
     __xread uint32_t flbuf_sz;
 
     instr_tx_host.pcie = pcie;
-    instr_tx_host.queue = NFD_VID2QID(vid, 0); //to PF!
+    instr_tx_host.queue = NFD_VID2NATQ(vid, 0); //to PF!
     instr_tx_host.cont = cont;
     instr_tx_host.multicast = multicast;
 
-    mem_read32(&flbuf_sz, &fl_buf_sz_cache[pcie * 64 + vid], sizeof(flbuf_sz));
+    mem_read32(&flbuf_sz, &fl_buf_sz_cache[pcie * 64 + NFD_VID2NATQ(vid, 0)], sizeof(flbuf_sz));
     min_rxb = flbuf_sz >> 8;
     instr_tx_host.min_rxb = (min_rxb > 63) ? 63 : min_rxb;
 
@@ -1224,6 +1224,8 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid,
     uint16_t vlan_id;
     action_list_t acts;
 
+    cfg_act_cache_fl_buf_sz(pcie, vid);
+
     cfg_act_build_veb_vf(&acts, pcie, vid, pf_control, vf_control, update);
 
     vf_cfg_base = cfg_act_vf_cfg_ptr(pcie);
@@ -1239,7 +1241,6 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid,
     if (cfg_act_write_veb(vid, &veb_key, &acts) != NO_ERROR)
         return 1;
 
-    cfg_act_cache_fl_buf_sz(pcie, vid);
     add_vlan_member(vlan_id, vid);
     upd_ctm_vlan_members();
 
