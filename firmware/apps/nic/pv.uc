@@ -579,7 +579,7 @@ from_nbi#:
 #if (! streq('in_continue', '--'))
     br_bset[in_continue, BF_L(INSTR_TX_CONTINUE_bf), continue_from_nbi#]
 #endif
-    mem[stats_log, $idx_rx, addr, <<8, length, 2], sig_done[sig_rx]
+    mem[stats_log, $idx_rx, addr, <<8, length, 1], sig_done[sig_rx]
     ctx_arb[sig_rx], br[IN_TERM_LABEL], defer[2]
     #ifdef PV_MULTI_PCI
         alu[queue_idx, in_pci_q, OR, in_pci_isl, <<6]
@@ -591,7 +591,7 @@ from_nbi#:
 
 #if (! streq('in_continue', '--'))
 continue_from_nbi#:
-    mem[stats_log, $idx_rx, addr, <<8, length, 2], sig_done[sig_rx]
+    mem[stats_log, $idx_rx, addr, <<8, length, 1], sig_done[sig_rx]
     ctx_arb[sig_rx], br[IN_CONT_LABEL], defer[2]
 #endif
 
@@ -604,7 +604,7 @@ from_host#:
         alu[$idx_rx, type_idx, OR, in_pci_q, <<(log2(NIC_STATS_QUEUE_SIZE / 8))]
     #endif
 
-    mem[stats_log, $idx_rx, addr, <<8, length, 2], sig_done[sig_rx]
+    mem[stats_log, $idx_rx, addr, <<8, length, 1], sig_done[sig_rx]
 
     // update ingress queue's TX stats
 
@@ -616,7 +616,7 @@ from_host#:
         alu[length, --, B, io_vec++]
         alu[stat_idx, NIC_STATS_QUEUE_TX_IDX, +, type_idx]
 
-    mem[stats_log, $idx_tx, addr, <<8, length, 2], sig_done[sig_tx]
+    mem[stats_log, $idx_tx, addr, <<8, length, 1], sig_done[sig_tx]
     ctx_arb[sig_rx, sig_tx], br[IN_TERM_LABEL], defer[2]
         alu[queue_idx, --, B, BF_A(io_vec, PV_QUEUE_IN_bf), >>BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
         passert(log2(NIC_STATS_QUEUE_SIZE / 8), "GT", log2(NIC_STATS_QUEUE_TX_IDX))
@@ -624,7 +624,7 @@ from_host#:
 
 #if (! streq('in_continue', '--'))
 continue_from_host#:
-    mem[stats_log, $idx_tx, addr, <<8, length, 2], sig_done[sig_tx]
+    mem[stats_log, $idx_tx, addr, <<8, length, 1], sig_done[sig_tx]
     ctx_arb[sig_rx, sig_tx], br[IN_CONT_LABEL], defer[2]
         alu[queue_idx, --, B, BF_A(io_vec, PV_QUEUE_IN_bf), >>BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
         alu[$idx_tx, stat_idx, OR, queue_idx, <<(log2(NIC_STATS_QUEUE_SIZE / 8))]
@@ -659,7 +659,7 @@ continue_from_host#:
 
     #pragma warning(disable:5009)
     #pragma warning(disable:4700)
-    mem[stats_log, $idx, addr, <<8, length, 2], sig_done[sig_stat]
+    mem[stats_log, $idx, addr, <<8, length, 1], sig_done[sig_stat]
     #pragma warning(default:4700)
     ctx_arb[sig_stat], br[IN_LABEL], defer[2]
         alu[stat_idx, NIC_STATS_QUEUE_TX_IDX, +, type_idx]
@@ -694,9 +694,9 @@ end#:
     #if (is_ct_const(NIC_STATS_QUEUE_/**/IN_STAT/**/_IDX))
         #if (log2(NIC_STATS_QUEUE_/**/IN_STAT/**/_IDX, 1) < log2(NIC_STATS_QUEUE_SIZE / 8))
             #if (streq('IN_LABEL', '--'))
-                mem[stats_log, $idx, addr, <<8, length, 2], ctx_swap[sig_stat], defer[2]
+                mem[stats_log, $idx, addr, <<8, length, 1], ctx_swap[sig_stat], defer[2]
             #else
-                mem[stats_log, $idx, addr, <<8, length, 2], sig_done[sig_stat]
+                mem[stats_log, $idx, addr, <<8, length, 1], sig_done[sig_stat]
                 ctx_arb[sig_stat], br[IN_LABEL], defer[2]
             #endif
             #if (streq('IN_QUEUE', '--'))
@@ -710,9 +710,9 @@ end#:
                 alu[queue_idx, --, B, BF_A(io_vec, PV_QUEUE_IN_bf), >>BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
             #endif
             #if (streq('IN_LABEL', '--'))
-                mem[stats_log, $idx, addr, <<8, length, 2], ctx_swap[sig_stat], defer[2]
+                mem[stats_log, $idx, addr, <<8, length, 1], ctx_swap[sig_stat], defer[2]
             #else
-                mem[stats_log, $idx, addr, <<8, length, 2], sig_done[sig_stat]
+                mem[stats_log, $idx, addr, <<8, length, 1], sig_done[sig_stat]
                 ctx_arb[sig_stat], br[IN_LABEL], defer[2]
             #endif
             #if (streq('IN_QUEUE', '--'))
@@ -727,9 +727,9 @@ end#:
             alu[queue_idx, --, B, BF_A(io_vec, PV_QUEUE_IN_bf), >>BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
         #endif
         #if (streq('IN_LABEL', '--'))
-            mem[stats_log, $idx, addr, <<8, length, 2], ctx_swap[sig_stat], defer[2]
+            mem[stats_log, $idx, addr, <<8, length, 1], ctx_swap[sig_stat], defer[2]
         #else
-            mem[stats_log, $idx, addr, <<8, length, 2], sig_done[sig_stat]
+            mem[stats_log, $idx, addr, <<8, length, 1], sig_done[sig_stat]
             ctx_arb[sig_stat], br[IN_LABEL], defer[2]
         #endif
         #if (streq('IN_QUEUE', '--'))
