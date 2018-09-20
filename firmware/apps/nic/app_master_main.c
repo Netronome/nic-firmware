@@ -563,6 +563,11 @@ cfg_changes_loop(void)
             NFD_VID2VNIC(type, vnic, vid);
 
             if (type == NFD_VNIC_TYPE_CTRL) {
+                if (control & ~(NFD_CFG_CTRL_CAP)) {
+                    cfg_msg.error = 1;
+                    goto error;
+                }
+
                 cfg_act_build_ctrl(&acts, NIC_PCI, vid);
                 cfg_act_write_host(NIC_PCI, vid, &acts);
 
@@ -578,6 +583,16 @@ cfg_changes_loop(void)
                                 NFP_NET_CFG_STS), sizeof link_state);
            } else if (type == NFD_VNIC_TYPE_PF) {
                 port = vnic;
+
+		if (control & ~(NFD_CFG_PF_CAP)) {
+                    cfg_msg.error = 1;
+                    goto error;
+		}
+
+                if (update & ~(NFD_CFG_PF_LEGAL_UPD)) {
+                    cfg_msg.error = 1;
+                    goto error;
+		}
 
                 if (update & NFP_NET_CFG_UPDATE_BPF) {
                     nic_local_bpf_reconfig(&ctx_mode, vid, vnic);
@@ -673,6 +688,16 @@ cfg_changes_loop(void)
                     }
                 }
             } else if (type == NFD_VNIC_TYPE_VF) {
+		if (control & ~(NFD_CFG_VF_CAP)) {
+                    cfg_msg.error = 1;
+                    goto error;
+	        }
+
+		if (update & ~(NFD_CFG_VF_LEGAL_UPD)) {
+                    cfg_msg.error = 1;
+                    goto error;
+		}
+
                 /* Set the link state handling control */
                 if (control & NFP_NET_CFG_CTRL_ENABLE) {
                     /* Retrieve the link state mode for the VF. */
