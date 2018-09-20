@@ -139,6 +139,11 @@
      NFP_NET_CFG_CTRL_GATHER    | NFP_NET_CFG_CTRL_LSO |           \
      NFP_NET_CFG_CTRL_IRQMOD)
 
+#define NFD_CFG_VF_LEGAL_UPD \
+    (NFP_NET_CFG_UPDATE_GEN     | NFP_NET_CFG_UPDATE_RING |        \
+     NFP_NET_CFG_UPDATE_MSIX    | NFP_NET_CFG_UPDATE_RESET |       \
+     NFP_NET_CFG_UPDATE_IRQMOD  | NFP_NET_CFG_UPDATE_MACADDR)
+
 #define NFD_CFG_PF_CAP                                             \
     (NFP_NET_CFG_CTRL_ENABLE    | NFP_NET_CFG_CTRL_PROMISC |       \
      NFP_NET_CFG_CTRL_RXCSUM    | NFP_NET_CFG_CTRL_TXCSUM |        \
@@ -148,6 +153,13 @@
      NFP_NET_CFG_CTRL_IRQMOD    | NFP_NET_CFG_CTRL_BPF |           \
      NFP_NET_CFG_CTRL_LIVE_ADDR | NFP_NET_CFG_CTRL_VXLAN |         \
      NFP_NET_CFG_CTRL_NVGRE)
+
+#define NFD_CFG_PF_LEGAL_UPD \
+    (NFP_NET_CFG_UPDATE_GEN     | NFP_NET_CFG_UPDATE_RING |        \
+     NFP_NET_CFG_UPDATE_RSS     | NFP_NET_CFG_UPDATE_MSIX |        \
+     NFP_NET_CFG_UPDATE_RESET   | NFP_NET_CFG_UPDATE_IRQMOD |      \
+     NFP_NET_CFG_UPDATE_VXLAN   | NFP_NET_CFG_UPDATE_BPF |         \
+     NFP_NET_CFG_UPDATE_MACADDR | NFP_NET_CFG_UPDATE_VF)
 
 /* Set Core NIC ABI version and supported VF configuration capabilities. */
 #define NFD_VF_CFG_ABI_VER      2
