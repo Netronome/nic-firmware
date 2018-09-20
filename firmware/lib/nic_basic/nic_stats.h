@@ -30,11 +30,13 @@ typedef char ext_stats_key_t[32];
 
 __asm {
     .alloc_mem _nic_stats_queue imem+0 global (512 * NIC_STATS_QUEUE_SIZE) 256
+    .alloc_mem _nic_stats_vnic emem global (NVNICS * NIC_STATS_VNIC_SIZE) 256
 }
 
 #elif defined(__NFP_LANG_ASM)
 
 .alloc_mem _nic_stats_queue imem+0 global (512 * NIC_STATS_QUEUE_SIZE) 256
+.alloc_mem _nic_stats_vnic emem global (NVNICS * NIC_STATS_VNIC_SIZE) 256
 #endif
 
 #endif
