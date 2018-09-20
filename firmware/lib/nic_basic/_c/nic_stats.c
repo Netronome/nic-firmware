@@ -270,6 +270,7 @@ static void vnic_stats_accumulate()
     SIGNAL s1, s2;
 
     __imem nic_stats_queue_t *stats_queue = (__imem nic_stats_queue_t *) __link_sym("_nic_stats_queue");
+    __emem nic_stats_vnic_t *stats_vnic = (__emem nic_stats_vnic_t *) __link_sym("_nic_stats_vnic");
 
     for (vid = 0; vid < NVNICS; ++vid) {
 
@@ -278,8 +279,7 @@ static void vnic_stats_accumulate()
 	     offset < sizeof(nic_stats_vnic_t);
 	     offset += sizeof(read_block)) {
 	    size = MIN(sizeof(read_block), sizeof(nic_stats_vnic_t) - offset - 8);
-            mem_read64(&read_block, NFD_CFG_BAR_ISL(NIC_PCI, vid) +
-		       NIC_STATS_VNIC_BASE + offset, size);
+            mem_read64(&read_block, ((__emem char *) &stats_vnic[vid]) + offset, size);
             for (i = 0; i < size / 8; ++i) {
 	        _vnic_stats.__raw[(offset / 8) + i] = swapw64(read_block[i]);
             }
@@ -362,8 +362,7 @@ static void vnic_stats_accumulate()
             }
 
 	    size = MIN(sizeof(write_block), sizeof(nic_stats_vnic_t) - offset - 8);
-            mem_write64(&write_block, NFD_CFG_BAR_ISL(NIC_PCI, vid) +
-		        NIC_STATS_VNIC_BASE + offset, size);
+            mem_write64(&write_block, ((__emem char *) &stats_vnic[vid]) + offset, size);
         }
     }
 
