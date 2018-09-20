@@ -21,7 +21,8 @@ for FILE in /lib/firmware/netronome/*.nffw; do
 done
 
 # Add NFP kernel module
-if have_module nfp ; then
+if modprobe --set-version="${version}" --ignore-install \
+            --show-depends nfp >/dev/null 2>&1 ; then
     manual_add_modules nfp
 fi
 
