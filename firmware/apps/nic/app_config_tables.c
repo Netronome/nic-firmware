@@ -165,9 +165,6 @@ __export __emem uint64_t cfg_error_rss_cntr = 0;
 /* RSS table length in words */
 #define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
 
-/* VxLAN table length in words */
-#define  NFP_NET_CFG_VXLAN_SZ_wrd (NFP_NET_CFG_VXLAN_SZ >> 2)
-
 /* Cluster target NN write defines and structures */
 typedef enum CT_ADDR_MODE
 {
@@ -538,21 +535,24 @@ upd_slicc_hash_table(void)
 __intrinsic uint32_t
 cfg_act_upd_vxlan_table(uint32_t pcie, uint32_t vid)
 {
-    __xread uint16_t xrd_vxlan_data[NFP_NET_CFG_VXLAN_SZ];
-    __xwrite uint32_t xwr_nn_info[NFP_NET_CFG_VXLAN_SZ];
+    __xread uint16_t xrd_vxlan_data[NFP_NET_N_VXLAN_PORTS];
+    __xwrite uint32_t xwr_nn_info[NFP_NET_N_VXLAN_PORTS];
     uint32_t i;
     uint32_t n_vxlan = 0;
 
     mem_read32(xrd_vxlan_data, cfg_act_bar_ptr(pcie, vid) +
-                    NFP_NET_CFG_VXLAN_PORT, sizeof(xrd_vxlan_data));
-    for (i = 0; i < NFP_NET_CFG_VXLAN_SZ; i++) {
+               NFP_NET_CFG_VXLAN_PORT, sizeof(xrd_vxlan_data));
+    for (i = 0; i < NFP_NET_N_VXLAN_PORTS; i++) {
 	if (xrd_vxlan_data[i]) {
             xwr_nn_info[n_vxlan++] = xrd_vxlan_data[i];
 	}
     }
+    for (i = n_vxlan; i < NFP_NET_N_VXLAN_PORTS; ++i) {
+        xwr_nn_info[i] = 0;
+    }
 
     /* Write at NN register start_offset for all worker MEs */
-    upd_nn_table_instr(xwr_nn_info, VXLAN_PORTS_NN_IDX, NFP_NET_CFG_VXLAN_SZ_wrd);
+    upd_nn_table_instr(xwr_nn_info, VXLAN_PORTS_NN_IDX, NFP_NET_N_VXLAN_PORTS);
     return n_vxlan;
 }
 
