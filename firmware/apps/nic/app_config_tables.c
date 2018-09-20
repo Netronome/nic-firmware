@@ -1247,11 +1247,6 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid,
     cfg_act_build_vf(&acts, pcie, vid, pf_control, vf_control);
     cfg_act_write_host(pcie, vid, &acts);
 
-    cfg_act_build_nbi(&acts, pcie, NFD_PF2VID(0), 1, pf_control, 0);
-    cfg_act_write_wire(0, &acts);
-    cfg_act_build_pf(&acts, pcie, NFD_PF2VID(0), 1, pf_control, 0);
-    cfg_act_write_host(pcie, NFD_PF2VID(0), &acts);
-
     return 0;
 }
 
