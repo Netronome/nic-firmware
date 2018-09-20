@@ -96,7 +96,6 @@ $(eval $(call nffw.add_obj,$(PROJECT),mcr,mei0.me10))
 
 # Add microcode datapath
 $(eval $(call dep.gen_awk,$(PROJECT),datapath,firmware/lib/nic_basic/nic_stats_gen.h,firmware/lib/nic_basic/nic_stats.def,scripts/nic_stats.awk))
-$(eval $(call dep.gen_awk,$(PROJECT),datapath,firmware/apps/nic/tlv_stats.uc,firmware/lib/nic_basic/nic_stats.def,scripts/tlv_stats.awk))
 $(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
 $(eval $(call microcode.add_tests,$(PROJECT),datapath))
 $(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
