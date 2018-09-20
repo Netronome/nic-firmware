@@ -306,7 +306,7 @@ check_l4#:
     bitfield_extract__sz1(l4_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_INNER_L4_bf)) ; PV_HEADER_OFFSET_INNER_L4_bf
     beq[end#] // unknown L4
 
-    pv_seek(in_pkt_vec, l4_offset, PV_SEEK_T_INDEX_ONLY, process_l4#)
+    pv_seek(in_pkt_vec, l4_offset, PV_SEEK_DEFAULT, process_l4#)
 
 queue_selected#:
     bitfield_extract__sz1(max_queue, BF_AML(args, INSTR_RSS_MAX_QUEUE_bf))
