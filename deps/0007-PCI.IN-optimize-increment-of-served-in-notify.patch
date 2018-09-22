@@ -1,0 +1,54 @@
+From 1ba3648766f8f1b7f1a78ec229ce8837868253ee Mon Sep 17 00:00:00 2001
+From: Edwin Peer <edwin.peer@netronome.com>
+Date: Sat, 22 Sep 2018 14:04:39 -0700
+Subject: [PATCH 7/9] [PCI.IN] optimize increment of served in notify
+
+The increment of served can be pushed down into the ctx_arb[] defer
+shadow. The inline assembler does not appear to be able to reference
+the pointer type. The assignment and retrieval of the pointer to a
+local GPR is certainly ugly, but nfcc generates the correct code.
+
+Signed-off-by: Edwin Peer <edwin.peer@netronome.com>
+---
+ me/blocks/vnic/pci_in/notify.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/me/blocks/vnic/pci_in/notify.c b/me/blocks/vnic/pci_in/notify.c
+index 90d9be13..c971eafe 100644
+--- a/me/blocks/vnic/pci_in/notify.c
++++ b/me/blocks/vnic/pci_in/notify.c
+@@ -460,6 +460,7 @@ _notify(__gpr unsigned int *complete, __gpr unsigned int *served,
+         __gpr mem_ring_addr_t lso_ring_addr)
+ {
+ 
++    unsigned int __served;
+     unsigned int n_batch;
+     unsigned int q_batch;
+     unsigned int qc_queue;
+@@ -481,18 +482,19 @@ _notify(__gpr unsigned int *complete, __gpr unsigned int *served,
+         /* Process whole batch */
+         __critical_path();
+ 
+-        /* Increment data_dma_seq_served before swapping */
+-        *served += 1;
+-
+         ctm_ring_get(NOTIFY_RING_ISL, input_ring, &batch_in.pkt0,
+                      (sizeof(struct nfd_in_issued_desc) * 4), &msg_sig0);
+         ctm_ring_get(NOTIFY_RING_ISL, input_ring, &batch_in.pkt4,
+                      (sizeof(struct nfd_in_issued_desc) * 4), &msg_sig1);
+ 
++        __served = *served;
+         __asm {
+-            ctx_arb[--], defer[1];
++            ctx_arb[--], defer[2];
++            /* Increment data_dma_seq_served before swapping */
++            alu[__served, __served, +, 1]
+             local_csr_wr[local_csr_active_ctx_wakeup_events, wait_msk];
+         }
++        *served = __served;
+ 
+         wait_msk = __signals(&wq_sig0, &wq_sig1, &wq_sig2, &wq_sig3,
+                              &wq_sig4, &wq_sig5, &wq_sig6, &wq_sig7,
+-- 
+2.19.0
+
