@@ -28,6 +28,10 @@
 #include <flavors.h>
 
 #define NFD_USE_OVERSUBSCRIPTION
+#define NFD_PD_ALWAYS_HAS_CTM
+#if (NS_FLAVOR_TYPE == NS_FLAVOR_SRIOV)
+    #define NFD_PD_MCR_BLQ 3
+#endif
 
 /* The absolute max number of VNICs we can support */
 #define NVNICS_ABSOLUTE_MAX 64

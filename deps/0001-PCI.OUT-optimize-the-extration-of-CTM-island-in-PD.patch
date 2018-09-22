@@ -1,0 +1,31 @@
+From 46e3e183677d142dc7b0e4148701045f514c776d Mon Sep 17 00:00:00 2001
+From: Edwin Peer <edwin.peer@netronome.com>
+Date: Fri, 21 Sep 2018 17:03:02 -0700
+Subject: [PATCH 1/9] [PCI.OUT] optimize the extration of CTM island in PD
+
+The CTM_ISL field appears in the most significant bits of the descriptor word.
+The shift operation can thus simultaneously serve the dual purpose of moving
+and masking the required bits.
+
+Signed-off-by: Edwin Peer <edwin.peer@netronome.com>
+---
+ me/blocks/vnic/pci_out_pd.uc | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/me/blocks/vnic/pci_out_pd.uc b/me/blocks/vnic/pci_out_pd.uc
+index e96558fa..ddf23a74 100644
+--- a/me/blocks/vnic/pci_out_pd.uc
++++ b/me/blocks/vnic/pci_out_pd.uc
+@@ -375,8 +375,7 @@ ctm_only#:
+     alu[out_dma0[0], word, OR, 1, <<31] // Packet format bit
+ 
+     // Word 1
+-    wsm_extract(word, in_work, SB_WQ_CTM_ISL)
+-    alu[word, word, OR, g_dma_word1_vals]
++    alu[word, g_dma_word1_vals, OR, in_work[SB_WQ_CTM_ISL_wrd], >>SB_WQ_CTM_ISL_shf]
+     alu[out_dma0[1], word, OR, (&dma_sig), <<PCIE_DMA_SIGNUM_shf]
+ 
+     // Word 2
+-- 
+2.19.0
+

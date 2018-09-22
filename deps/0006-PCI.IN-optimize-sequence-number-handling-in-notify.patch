@@ -1,0 +1,47 @@
+From 37e0b75d13a6cb50d0cda3c0ddec7b6e648cefdc Mon Sep 17 00:00:00 2001
+From: Edwin Peer <edwin.peer@netronome.com>
+Date: Sat, 22 Sep 2018 14:02:59 -0700
+Subject: [PATCH 6/9] [PCI.IN] optimize sequence number handling in notify
+
+Switching to byte oriented LM addressing enables nfcc to do a better
+job of managing LM index registers, avoiding the introduction of
+temporary registers. It also permits a more optimal combined mask
+and shift operation when calculating the LM address.
+
+Signed-off-by: Edwin Peer <edwin.peer@netronome.com>
+---
+ me/blocks/vnic/pci_in/notify.c | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/me/blocks/vnic/pci_in/notify.c b/me/blocks/vnic/pci_in/notify.c
+index 58a3f14e..90d9be13 100644
+--- a/me/blocks/vnic/pci_in/notify.c
++++ b/me/blocks/vnic/pci_in/notify.c
+@@ -218,17 +218,16 @@ do {                                                                    \
+ static __shared __lmem unsigned int seq_nums[NFD_IN_NUM_SEQRS];
+ 
+ /*
+- * XXX this ugly bit of code was the best way I could find to make the
+- * compiler generate intelligent assembly here.  This should just be
+- * a shift + AND operation to get the LM address.  But if I use the
+- * NFD_IN_SEQR_NUM(q), I get 2-4 extra instructions and this is on the
+- * fast path in a potentially down-clocked ME.
++ * XXX this even uglier bit of code generates optimal assembly
+  */
+ #define NFD_IN_ADD_SEQN_PROC                                            \
+ do {                                                                    \
+-    pkt_desc_tmp.seq_num =                                              \
+-        seq_nums[(pkt_desc_tmp.__raw[0] >> NFD_IN_SEQR_QSHIFT) &        \
+-                 (NFD_IN_NUM_SEQRS - 1)]++;                             \
++    unsigned int sel = pkt_desc_tmp.__raw[0] >> NFD_IN_SEQR_QSHIFT;     \
++    unsigned int off = ((NFD_IN_NUM_SEQRS - 1) << 2) & (sel << 2);      \
++    __lmem unsigned int *dst_q_seqn =                                   \
++        (__lmem unsigned int *) (((__lmem char *) &seq_nums[0]) + off); \
++    pkt_desc_tmp.seq_num = *dst_q_seqn;                                 \
++    *dst_q_seqn = *dst_q_seqn + 1;                                      \
+ } while (0)
+ 
+ #endif /* (NFD_IN_NUM_SEQRS == 1) */
+-- 
+2.19.0
+

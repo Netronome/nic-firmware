@@ -1,0 +1,56 @@
+From 4d5471df2aff8b2aaefe219851bad79ad988f3d8 Mon Sep 17 00:00:00 2001
+From: Edwin Peer <edwin.peer@netronome.com>
+Date: Sat, 22 Sep 2018 14:05:51 -0700
+Subject: [PATCH 8/9] [PCI.IN] save a move by removing q_batch local in notify
+
+The local variable causes nfcc to introduce an unnecessary move
+operation in the generated code. Removing the local variable
+eliminates this additional cycle.
+
+Signed-off-by: Edwin Peer <edwin.peer@netronome.com>
+---
+ me/blocks/vnic/pci_in/notify.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/me/blocks/vnic/pci_in/notify.c b/me/blocks/vnic/pci_in/notify.c
+index c971eafe..87515223 100644
+--- a/me/blocks/vnic/pci_in/notify.c
++++ b/me/blocks/vnic/pci_in/notify.c
+@@ -462,7 +462,6 @@ _notify(__gpr unsigned int *complete, __gpr unsigned int *served,
+ 
+     unsigned int __served;
+     unsigned int n_batch;
+-    unsigned int q_batch;
+     unsigned int qc_queue;
+ 
+     unsigned int out_msg_sz = sizeof(struct nfd_in_pkt_desc);
+@@ -518,7 +517,7 @@ _notify(__gpr unsigned int *complete, __gpr unsigned int *served,
+          * all the packets should also be zero, so that notify will
+          * essentially skip the batch.
+          */
+-        q_batch = batch_in.pkt0.q_num;
++        pkt_desc_tmp.q_num = batch_in.pkt0.q_num;
+         n_batch = batch_in.pkt0.num_batch;
+ 
+ #ifdef NFD_VNIC_DBG_CHKS
+@@ -529,7 +528,6 @@ _notify(__gpr unsigned int *complete, __gpr unsigned int *served,
+ 
+         /* Interface and queue info are the same for all packets in batch */
+         pkt_desc_tmp.intf = PCIE_ISL;
+-        pkt_desc_tmp.q_num = q_batch;
+ #ifndef NFD_IN_ADD_SEQN
+         pkt_desc_tmp.seq_num = 0;
+ #endif
+@@ -550,7 +548,8 @@ _notify(__gpr unsigned int *complete, __gpr unsigned int *served,
+ 
+         /* Map batch.queue to a QC queue and increment the TX_R pointer
+          * for that queue by n_batch */
+-        qc_queue = NFD_NATQ2QC(NFD_BMQ2NATQ(q_batch), NFD_IN_TX_QUEUE);
++        qc_queue = NFD_NATQ2QC(NFD_BMQ2NATQ(pkt_desc_tmp.q_num),
++			       NFD_IN_TX_QUEUE);
+         __qc_add_to_ptr(PCIE_ISL, qc_queue, QC_RPTR, n_batch, &qc_xfer,
+                         sig_done, &qc_sig);
+     } else {
+-- 
+2.19.0
+
