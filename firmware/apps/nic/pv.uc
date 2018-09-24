@@ -1532,7 +1532,7 @@ ipv4#:
 
     mem[write32, $ip, addr_hi, <<8, addr_lo, 1], sig_done[sig_write_ip]
     alu[encap, l4_offset, XOR, BF_A(io_vec, PV_HEADER_STACK_bf)]
-    br!=byte[encap, 0, 0, repeat#]
+    br!=byte[encap, 0, 0, repeat_from_ipv4#]
     ctx_arb[--], defer[2], br[DONE_LABEL]
         .io_completed sig_write_ip, sig_write_udp_len, sig_write_tcp_seq, sig_write_tcp_flags
         alu[sig_mask, sig_mask, OR, mask(sig_write_ip), <<(&sig_write_ip)]
@@ -1546,6 +1546,10 @@ ctx_arb_lso_error#:
 
 lso_error#:
     pv_stats_update(io_vec, TX_ERROR_LSO, ERROR_LABEL)
+
+repeat_from_ipv4#:
+    // force outer L3 CSUM offload
+    alu[BF_A(io_vec, PV_CSUM_OFFLOAD_bf), BF_A(io_vec, PV_CSUM_OFFLOAD_bf), OR, 1, <<BF_L(PV_CSUM_OFFLOAD_OL3_bf)]
 
 repeat#:
     bitfield_extract(l3_offset, BF_AML(io_vec, PV_HEADER_OFFSET_INNER_IP_bf))
