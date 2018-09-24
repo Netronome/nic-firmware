@@ -62,7 +62,7 @@ move(expected[0], 0x8c)
 move(expected[1], 0x13000000)
 move(expected[2], 0x80)
 move(expected[3], PROTO_IPV4_UDP_VXLAN_IPV4_TCP)
-move(expected[4], 0x0)
+move(expected[4], (1 << BF_L(PV_CSUM_OFFLOAD_OL3_bf)))
 move(expected[5], ((_PV_OUTER_L3_OFFSET << 24) | (_PV_OUTER_L4_OFFSET << 16) | \
                    (_PV_INNER_L3_OFFSET <<  8) | (_PV_INNER_L4_OFFSET <<  0)))
 
