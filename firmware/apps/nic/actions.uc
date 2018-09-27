@@ -636,7 +636,7 @@ write_csum#:
         alu[csum_complete, csum_complete, +carry, 0]
 
 write_mu#:
-    alu[mu_addr, --, B, BF_A(in_pkt_vec, PV_MU_ADDR_bf), <<(31 - BF_L(PV_MU_ADDR_bf))]
+    alu[mu_addr, --, B, BF_A(in_pkt_vec, PV_MU_ADDR_bf), <<(31 - BF_M(PV_MU_ADDR_bf))]
     mem[write8, $checksum, mu_addr, <<8, buf_offset, 2], sig_done[sig_write]
     ctx_arb[sig_write], defer[2], br[check_work#]
         alu[csum_complete, csum_complete, +16, checksum]
