@@ -626,26 +626,33 @@ cfg_changes_loop(void)
                 /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
                 if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
                     if (control & NFP_NET_CFG_CTRL_ENABLE) {
-			/* Driver enables link, wait up to 2 seconds for it */
-			for (i = 0; i < 200; ++i) {
-			    if(mac_eth_port_link_state(NS_PLATFORM_MAC(port),
-			       NS_PLATFORM_MAC_SERDES_LO(port),
-                               (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1))
-			           break;
+			/* Permit lsc_check() to bring up RX/TX */
+		        nic_control_word[cfg_msg.vid] = control;
 
-                            sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
+			/* Swap and give link state thread opportunity to enable RX/TX */
+			sleep(50 * NS_PLATFORM_TCLK * 1000); // 50ms
+
+			/* Verify link up and RX enabled, give up after 2 seconds */
+			for (i = 0; i < 10; ++i) {
+			    int rx_enabled = mac_eth_check_rx_enable(NS_PLATFORM_MAC(port),
+                                                 NS_PLATFORM_MAC_CORE(port),
+						 NS_PLATFORM_MAC_CORE_SERDES_LO(port));
+			    int link_up    = mac_eth_port_link_state(NS_PLATFORM_MAC(port),
+                                                 NS_PLATFORM_MAC_SERDES_LO(port),
+                                                 (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1);
+
+			    /* Wait a minimal settling time after querying MAC */
+                            sleep(200 * NS_PLATFORM_TCLK * 1000); // 200ms
+
+			    if (rx_enabled && link_up)
+			        break;
 			}
-
-			/* Ensure TX is enabled before RX */
-                        mac_port_enable_tx(port);
-			sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
-
-			/* Open the taps, wait before notifying the driver */
-                        mac_port_enable_rx(port);
-			sleep(250 * NS_PLATFORM_TCLK * 1000); // 250ms
                     } else {
                         __xread struct nfp_nbi_tm_queue_status tmq_status;
                         int i, queue, occupied = 1;
+
+			/* Prevent lsc_check() from overriding RX disable */
+		        nic_control_word[cfg_msg.vid] = control;
 
                         /* stop receiving packets */
                         if (! mac_port_disable_rx(port)) {
@@ -680,11 +687,6 @@ cfg_changes_loop(void)
                             }
                             sleep(NS_PLATFORM_TCLK * 1000); // 1ms
                         }
-
-                        mac_port_disable_tx(port);
-
-                        /* give Arbitrator ME time to react */
-                        sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
                     }
                 }
             } else if (type == NFD_VNIC_TYPE_VF) {
@@ -932,11 +934,12 @@ void lsc_check(int port)
             mac_port_enable_tx_flush(NS_PLATFORM_MAC(port),
                                      NS_PLATFORM_MAC_CORE(port),
                                      NS_PLATFORM_MAC_CORE_SERDES_LO(port));
-        } else {
-            /* Re-enable MAC TX datapath. */
-            mac_port_disable_tx_flush(
-                NS_PLATFORM_MAC(port), NS_PLATFORM_MAC_CORE(port),
-                NS_PLATFORM_MAC_CORE_SERDES_LO(port));
+        } else if (vs) {
+            mac_port_enable_rx(port);
+            mac_port_enable_tx(port);
+            mac_port_disable_tx_flush(NS_PLATFORM_MAC(port),
+                                      NS_PLATFORM_MAC_CORE(port),
+                                      NS_PLATFORM_MAC_CORE_SERDES_LO(port));
         }
     }
 
@@ -948,6 +951,16 @@ void lsc_check(int port)
     } else {
         sts = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
                NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
+        /* ugly hack: be forceful if unexpected RX state occurs */
+        if (vs && ! mac_eth_check_rx_enable(NS_PLATFORM_MAC(port),
+                                            NS_PLATFORM_MAC_CORE(port),
+                                            NS_PLATFORM_MAC_CORE_SERDES_LO(port))) {
+	    mac_port_enable_rx(port);
+            mac_port_enable_tx(port);
+            mac_port_disable_tx_flush(
+                NS_PLATFORM_MAC(port), NS_PLATFORM_MAC_CORE(port),
+                NS_PLATFORM_MAC_CORE_SERDES_LO(port));
+	}
     }
     mem_write32(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
     /* Make sure the config BAR is updated before we send
