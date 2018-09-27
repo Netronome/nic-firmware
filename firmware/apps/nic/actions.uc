@@ -628,7 +628,7 @@ write_csum#:
     alu[split_offset, cbs, B, 1, <<8]
     alu[split_offset, --, B, split_offset, <<indirect]
     alu[--, split_offset, -, buf_offset]
-    blo[write_mu#]
+    ble[write_mu#]
 
     mem[write8, $checksum, BF_A(in_pkt_vec, PV_CTM_ADDR_bf), csum_offset, 2], sig_done[sig_write]
     ctx_arb[sig_write], defer[2], br[check_work#]
