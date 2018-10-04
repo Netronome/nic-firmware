@@ -524,10 +524,11 @@ check_work#:
 
 process_l4#:
     // determine L4 offset (inner / outer)
-    alu[shift, 16, AND~, work, <<(4 - BF_L(INSTR_CSUM_IL4_bf))] // 16 if inner, else 0
+    alu[shift, 16, AND~, work, <<(4 - BF_L(INSTR_CSUM_IL4_bf))] // 16 if outer, else 0
     alu[iteration_words, shift, B, 0]
     ld_field_w_clr[offset, 0011, BF_A(in_pkt_vec, PV_HEADER_STACK_bf), >>indirect], load_cc
-    beq[invalid_offset#]
+    br=byte[offset, 0, 0, invalid_offset#] // if L4 offset 0 done
+                                           // assuming case of L3 offset = 0, L4 offset != 0 can't happen
 
     alu[l4_offset, 0xff, AND, offset] // l4_offset
     alu[l4_len, pkt_len, -, l4_offset]
@@ -573,7 +574,7 @@ process_l4#:
 
 process_l3#:
     // determine IPv4 offset
-    alu[shift, 16, AND~, work, <<(4 - BF_L(INSTR_CSUM_IL3_bf))] // 16 if inner, else 0
+    alu[shift, 16, AND~, work, <<(4 - BF_L(INSTR_CSUM_IL3_bf))] // 16 if outer, else 0
     alu[shift, shift, OR, 8] // 24 if inner, else 8
     alu[--, shift, OR, 0]
     alu[ip_offset, 0xff, AND, BF_A(in_pkt_vec, PV_HEADER_STACK_bf), >>indirect]
