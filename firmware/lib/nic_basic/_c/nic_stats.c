@@ -278,7 +278,7 @@ static void vnic_stats_accumulate()
         for (offset = 0;
 	     offset < sizeof(nic_stats_vnic_t);
 	     offset += sizeof(read_block)) {
-	    size = MIN(sizeof(read_block), sizeof(nic_stats_vnic_t) - offset - 8);
+	    size = MIN(sizeof(read_block), sizeof(nic_stats_vnic_t) - offset);
             mem_read64(&read_block, ((__emem char *) &stats_vnic[vid]) + offset, size);
             for (i = 0; i < size / 8; ++i) {
 	        _vnic_stats.__raw[(offset / 8) + i] = swapw64(read_block[i]);
@@ -361,7 +361,7 @@ static void vnic_stats_accumulate()
 	        write_block[i] = swapw64(_vnic_stats.__raw[(offset / 8) + i]);
             }
 
-	    size = MIN(sizeof(write_block), sizeof(nic_stats_vnic_t) - offset - 8);
+	    size = MIN(sizeof(write_block), sizeof(nic_stats_vnic_t) - offset);
             mem_write64(&write_block, ((__emem char *) &stats_vnic[vid]) + offset, size);
         }
     }
