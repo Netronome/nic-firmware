@@ -189,7 +189,7 @@ dummy0#:
 dummy1#:
     nop
 
-    br_addr[NFD_BPF_START_OFF], rtn[ebpf_reentry#], visits[HTAB_MAP_LOOKUP_SUBROUTINE#]
+    br_addr[NFD_BPF_START_OFF], rtn[ebpf_reentry#], targets[HTAB_MAP_LOOKUP_SUBROUTINE#]
 .end
 #endm
 
