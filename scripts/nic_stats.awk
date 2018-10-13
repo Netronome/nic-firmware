@@ -31,7 +31,7 @@ END{
     x = log(QUEUE_COUNT) / log(2)
     queue_size = 8 * 2 ^ ((x == int(x)) ? x : int(x) + 1)
 
-    x = log(VNIC_COUNT * 2) / log(2)
+    x = log(VNIC_COUNT) / log(2)
     vnic_size = 8 * 2 ^ ((x == int(x)) ? x : int(x) + 1)
 
     print "/* This file is generated during build. Do not edit! */"
