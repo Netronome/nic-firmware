@@ -327,7 +327,7 @@ passert(PV_MAX_CLONES, "EQ", 2)
     .reg addr
 
     alu[addr, (BF_MASK(PV_META_LM_PTR_bf) << 2), AND, BF_A(in_vec, PV_META_LM_PTR_bf), >>(BF_L(PV_META_LM_PTR_bf) - 2)]
-    alu[addr, addr, OR, t_idx_ctx, <<(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
+    alu[addr, addr, OR, t_idx_ctx, >>(8 - log2((PV_SIZE_LW * 4 * PV_MAX_CLONES), 1))]
     local_csr_wr[ACTIVE_LM_ADDR_2, addr]
 .end
 #endm
