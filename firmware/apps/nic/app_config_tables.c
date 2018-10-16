@@ -224,21 +224,6 @@ void ct_nn_write(
     }
 }
 
-__intrinsic __emem __addr40 uint8_t*
-cfg_act_bar_ptr(uint32_t pcie, uint32_t vid)
-{
-
-    __emem __addr40 uint8_t* bar_base = 0;
-
-    switch (pcie) {
-        case 0: bar_base = NFD_CFG_BAR_ISL(0, vid); break;
-        case 1: bar_base = NFD_CFG_BAR_ISL(1, vid); break;
-        case 2: bar_base = NFD_CFG_BAR_ISL(2, vid); break;
-        case 3: bar_base = NFD_CFG_BAR_ISL(3, vid); break;
-    }
-
-    return bar_base;
-}
 
 __intrinsic __emem __addr40 uint8_t*
 cfg_act_vf_cfg_ptr(uint32_t pcie)
@@ -246,10 +231,18 @@ cfg_act_vf_cfg_ptr(uint32_t pcie)
     __emem __addr40 uint8_t *vf_cfg_base = 0;
 
     switch (pcie) {
+#ifdef NFD_PCIE0_EMEM
         case 0: vf_cfg_base = NFD_VF_CFG_BASE_LINK(0); break;
+#endif
+#ifdef NFD_PCIE1_EMEM
         case 1: vf_cfg_base = NFD_VF_CFG_BASE_LINK(1); break;
+#endif
+#ifdef NFD_PCIE2_EMEM
         case 2: vf_cfg_base = NFD_VF_CFG_BASE_LINK(2); break;
+#endif
+#ifdef NFD_PCIE3_EMEM
         case 3: vf_cfg_base = NFD_VF_CFG_BASE_LINK(3); break;
+#endif
     }
 
     return vf_cfg_base;
@@ -540,7 +533,7 @@ cfg_act_upd_vxlan_table(uint32_t pcie, uint32_t vid)
     uint32_t i;
     uint32_t n_vxlan = 0;
 
-    mem_read32(xrd_vxlan_data, cfg_act_bar_ptr(pcie, vid) +
+    mem_read32(xrd_vxlan_data, nfd_cfg_bar_base(pcie, vid) +
                NFP_NET_CFG_VXLAN_PORT, sizeof(xrd_vxlan_data));
     for (i = 0; i < NFP_NET_N_VXLAN_PORTS; i++) {
 	if (xrd_vxlan_data[i]) {
@@ -645,7 +638,7 @@ cfg_act_append_rx_host(action_list_t *acts, uint32_t pcie, uint32_t vid, uint32_
 
     instr_rx_host.__raw[0] = 0;
 
-    mem_read32(&mtu, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
+    mem_read32(&mtu, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
 				    NFP_NET_CFG_MTU), sizeof(mtu));
 
     instr_rx_host.mtu = mtu + NET_ETH_LEN + 1;
@@ -667,7 +660,7 @@ cfg_act_append_veb_lookup(action_list_t *acts, uint32_t pcie, uint32_t vid,
         acts->instr[acts->count++].value = 0;
     } else {
         if (mac_match) {
-            mem_read64(bar_mac, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
+            mem_read64(bar_mac, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
 				NFP_NET_CFG_MACADDR), sizeof(mac));
             mac[0] = bar_mac[0];
             mac[1] = bar_mac[1];
@@ -685,7 +678,7 @@ cfg_act_append_mac_match(action_list_t *acts, uint32_t pcie, uint32_t vid)
 {
     __xread uint32_t mac[2];
 
-    mem_read64(mac, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
+    mem_read64(mac, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
 				   NFP_NET_CFG_MACADDR), sizeof(mac));
     cfg_act_append(acts, INSTR_MAC_MATCH, mac[0] >> 16);
     acts->instr[acts->count++].value = (mac[0] << 16) | (mac[1] >> 16);
@@ -708,7 +701,7 @@ cfg_act_append_rss(action_list_t *acts, uint32_t pcie, uint32_t vid, int update_
     uint32_t type, vnic;
     instr_rss_t instr_rss;
 
-    bar_base = cfg_act_bar_ptr(pcie, vid);
+    bar_base = nfd_cfg_bar_base(pcie, vid);
 
     /* RSS remapping table with NN register index as start offset */
     NFD_VID2VNIC(type, vnic, vid);
@@ -1150,7 +1143,7 @@ cfg_act_cache_fl_buf_sz(uint32_t pcie, uint32_t vid)
     __imem uint32_t *fl_buf_sz_cache = (__imem uint32_t *)
                                         __link_sym("_fl_buf_sz_cache");
 
-    mem_read32(&rxb_r, (__mem void*) (cfg_act_bar_ptr(pcie, vid) + NFP_NET_CFG_FLBUFSZ), sizeof(rxb_r));
+    mem_read32(&rxb_r, (__mem void*) (nfd_cfg_bar_base(pcie, vid) + NFP_NET_CFG_FLBUFSZ), sizeof(rxb_r));
     rxb_w = rxb_r;
     for (i = 0; i < NFD_VID_MAXQS(vid); ++i)
         mem_write32(&rxb_w, &fl_buf_sz_cache[pcie * 64 + NFD_VID2NATQ(vid, i)], sizeof(rxb_w));
@@ -1292,7 +1285,7 @@ cfg_act_pf_up(uint32_t pcie, uint32_t vid, uint32_t veb_up,
     if (vnic == 0) { // VFs are only associated with the first PF VNIC (for now)
         cfg_act_build_veb_pf(&acts, pcie, vid, control, update);
 
-        mem_read64(mac, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
+        mem_read64(mac, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
 				       NFP_NET_CFG_MACADDR), sizeof(mac));
         veb_key.__raw[0] = 0;
         veb_key.mac_addr_hi = (mac[0] >> 16);
@@ -1324,7 +1317,7 @@ int cfg_act_pf_down(uint32_t pcie, uint32_t vid)
     cfg_act_write_host(pcie, vid, &acts);
 
     if (vnic == 0) {
-	mem_read64(mac, (__mem void*) (cfg_act_bar_ptr(pcie, vid) +
+	mem_read64(mac, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
 	    		               NFP_NET_CFG_MACADDR), sizeof(mac));
         veb_key.__raw[0] = 0;
         veb_key.mac_addr_hi = (mac[0] >> 16);
