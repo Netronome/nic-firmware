@@ -500,6 +500,34 @@ handle_sriov_update(uint32_t pf_control)
 }
 
 
+static int
+process_ctrl_reconfig(uint32_t control, uint32_t vid,
+                        struct nfd_cfg_msg *cfg_msg)
+{
+    __xwrite unsigned int link_state;
+    action_list_t acts;
+
+    if (control & ~(NFD_CFG_CTRL_CAP)) {
+        cfg_msg->error = 1;
+        return 1;
+    }
+
+    cfg_act_build_ctrl(&acts, NIC_PCI, vid);
+    cfg_act_write_host(NIC_PCI, vid, &acts);
+
+    /* Set link state */
+    if (!cfg_msg->error &&
+        (control & NFP_NET_CFG_CTRL_ENABLE)) {
+        link_state = NFP_NET_CFG_STS_LINK;
+    } else {
+        link_state = 0;
+    }
+    mem_write32(&link_state,
+                    (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg->vid) +
+                    NFP_NET_CFG_STS), sizeof link_state);
+    return 0;
+}
+
 static void
 cfg_changes_loop(void)
 {
@@ -513,8 +541,6 @@ cfg_changes_loop(void)
     unsigned int ls_mode;
     __gpr uint32_t ctx_mode = 1;
     __emem __addr40 uint8_t *bar_base;
-    __xwrite unsigned int link_state;
-    action_list_t acts;
     uint32_t veb_up;
     __xread struct sriov_cfg sriov_cfg_data;
     __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
@@ -537,25 +563,10 @@ cfg_changes_loop(void)
             NFD_VID2VNIC(type, vnic, vid);
 
             if (type == NFD_VNIC_TYPE_CTRL) {
-                if (control & ~(NFD_CFG_CTRL_CAP)) {
-                    cfg_msg.error = 1;
+                if (process_ctrl_reconfig(control, vid, &cfg_msg))
                     goto error;
-                }
 
-                cfg_act_build_ctrl(&acts, NIC_PCI, vid);
-                cfg_act_write_host(NIC_PCI, vid, &acts);
-
-                /* Set link state */
-                if (!cfg_msg.error &&
-                    (control & NFP_NET_CFG_CTRL_ENABLE)) {
-                    link_state = NFP_NET_CFG_STS_LINK;
-                } else {
-                    link_state = 0;
-                }
-                mem_write32(&link_state,
-                                (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg.vid) +
-                                NFP_NET_CFG_STS), sizeof link_state);
-           } else if (type == NFD_VNIC_TYPE_PF) {
+            } else if (type == NFD_VNIC_TYPE_PF) {
                 port = vnic;
 
                 if (control & ~(NFD_CFG_PF_CAP)) {
