@@ -519,21 +519,7 @@ cfg_changes_loop(void)
     __xread struct sriov_cfg sriov_cfg_data;
     __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
 
-    /* Initialisation */
-    MSIX_INIT_ISL(NIC_PCI);
-
-    for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
-        mac_port_disable_rx(port);
-    }
-
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
-    nic_local_init(0, 0);		/* dummy regs right now */
-
-    /* Wait for MAC disable and NN registers to come up in reflect mode */
-    sleep((NS_PLATFORM_TCLK * 1000000) / 20); // 50ms
-
-    init_nn_tables();
-    upd_slicc_hash_table();
 
     for (;;) {
         cfg_msg.error = 0;
@@ -1080,6 +1066,32 @@ init_vfs_random_macs(void)
     }
 }
 
+static void
+init_msix(void)
+{
+    /* Initialisation */
+    MSIX_INIT_ISL(NIC_PCI);
+}
+
+static void
+mac_rx_disable(void)
+{
+    uint32_t port;
+    for (port = 0; port < NS_PLATFORM_NUM_PORTS; ++port) {
+        mac_port_disable_rx(port);
+    }
+    /* Wait for MAC disable and NN registers to come up in reflect mode */
+    sleep((NS_PLATFORM_TCLK * 1000000) / 20); // 50ms
+}
+
+static void
+init_nic(void)
+{
+    nic_local_init(0, 0);       /* dummy regs right now */
+
+    init_nn_tables();
+    upd_slicc_hash_table();
+}
 
 #ifndef UNIT_TEST
 int
@@ -1091,7 +1103,10 @@ main(void)
         trng_init();
         init_catamaran_chan2port_table();
         init_vfs_random_macs();
+        init_msix();
         mac_csr_sync_start(DISABLE_GPIO_POLL);
+        mac_rx_disable();
+        init_nic();
         cfg_changes_loop();
         break;
     case APP_MASTER_CTX_MAC_STATS:
