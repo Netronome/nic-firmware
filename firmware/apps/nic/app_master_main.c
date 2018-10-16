@@ -645,6 +645,65 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
     return 0;
 }
 
+static int
+process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
+                    struct nfd_cfg_msg *cfg_msg)
+{
+    __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
+    __xread struct sriov_cfg sriov_cfg_data;
+    unsigned int ls_mode;
+
+    if (control & ~(NFD_CFG_VF_CAP)) {
+        cfg_msg->error = 1;
+        return 1;
+    }
+
+    if (update & ~(NFD_CFG_VF_LEGAL_UPD)) {
+        cfg_msg->error = 1;
+        return 1;
+    }
+
+    /* Set the link state handling control */
+    if (control & NFP_NET_CFG_CTRL_ENABLE) {
+        /* Retrieve the link state mode for the VF. */
+        mem_read32(&sriov_cfg_data,
+            NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
+            sizeof(struct sriov_cfg));
+
+        ls_mode = sriov_cfg_data.ctrl_link_state;
+
+        if (!(nic_control_word[NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE)) {
+            cfg_msg->error = 1;
+            return 1;
+        }
+
+        if (cfg_act_vf_up(NIC_PCI, vid,
+                    nic_control_word[NFD_PF2VID(0)],
+                    control, update)) {
+            cfg_msg->error = 1;
+            return 1;
+        }
+
+        // rebuild PF action list because veb_up state may have changed
+        if (cfg_act_pf_up(NIC_PCI, NFD_PF2VID(0), 1,
+                    nic_control_word[NFD_PF2VID(0)], 0)) {
+            cfg_msg->error = 1;
+            return 1;
+        }
+    } else {
+        /* Disable the link when interface is disabled. */
+        ls_mode = NFD_VF_CFG_CTRL_LINK_STATE_DISABLE;
+
+        if (cfg_act_vf_down(NIC_PCI, vid)) {
+            cfg_msg->error = 1;
+            return 1;
+        }
+    }
+
+    update_vf_lsc_list(0, vid, control, ls_mode);
+    return 0;
+}
+
 static void
 cfg_changes_loop(void)
 {
@@ -654,10 +713,7 @@ cfg_changes_loop(void)
     uint32_t vid, type, vnic;
     uint32_t update;
     uint32_t control;
-    unsigned int ls_mode;
     __emem __addr40 uint8_t *bar_base;
-    __xread struct sriov_cfg sriov_cfg_data;
-    __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
 
     nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
 
@@ -685,54 +741,8 @@ cfg_changes_loop(void)
                     goto error;
 
             } else if (type == NFD_VNIC_TYPE_VF) {
-                if (control & ~(NFD_CFG_VF_CAP)) {
-                    cfg_msg.error = 1;
+                if (process_vf_reconfig(control, update, vid, &cfg_msg))
                     goto error;
-                }
-
-                if (update & ~(NFD_CFG_VF_LEGAL_UPD)) {
-                    cfg_msg.error = 1;
-                    goto error;
-                }
-
-                /* Set the link state handling control */
-                if (control & NFP_NET_CFG_CTRL_ENABLE) {
-                    /* Retrieve the link state mode for the VF. */
-                    mem_read32(&sriov_cfg_data,
-                        NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
-                        sizeof(struct sriov_cfg));
-
-                    ls_mode = sriov_cfg_data.ctrl_link_state;
-
-                    if (!(nic_control_word[NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE)) {
-                        cfg_msg.error = 1;
-                        goto error;
-                    }
-
-                    if (cfg_act_vf_up(NIC_PCI, vid,
-                                nic_control_word[NFD_PF2VID(0)],
-                                control, update)) {
-                        cfg_msg.error = 1;
-                        goto error;
-                    }
-
-                    // rebuild PF action list because veb_up state may have changed
-                    if (cfg_act_pf_up(NIC_PCI, NFD_PF2VID(0), 1,
-                                nic_control_word[NFD_PF2VID(0)], 0)) {
-                        cfg_msg.error = 1;
-                        goto error;
-                    }
-                } else {
-                    /* Disable the link when interface is disabled. */
-                    ls_mode = NFD_VF_CFG_CTRL_LINK_STATE_DISABLE;
-
-                    if (cfg_act_vf_down(NIC_PCI, vid)) {
-                        cfg_msg.error = 1;
-                        goto error;
-                    }
-                }
-
-                update_vf_lsc_list(0, vid, control, ls_mode);
             }
 
             nic_control_word[cfg_msg.vid] = control;
