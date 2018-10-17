@@ -154,6 +154,7 @@ ebpf_init_cap_finalize()
     br_bset[rc, EBPF_RET_DROP, drop#]
 
     pv_set_tx_flag(_ebpf_pkt_vec, BF_L(PV_TX_HOST_RX_BPF_bf))
+    pv_invalidate_cache(_ebpf_pkt_vec)
 
     __actions_restore_t_idx()
     br_bset[rc, EBPF_RET_PASS, actions#]
@@ -202,7 +203,6 @@ cmsg_init()
 	#pragma warning(disable: 4702) // disable warning "unreachable code"
 
 HTAB_MAP_LOOKUP_SUBROUTINE#:
-	pv_invalidate_cache(_ebpf_pkt_vec)
 	htab_map_lookup_subr_func()
 HTAB_MAP_UPDATE_SUBROUTINE#:
 //	htab_map_update_subr_func()
