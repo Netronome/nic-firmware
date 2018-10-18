@@ -66,6 +66,7 @@ $(DEPS_DIR)/ng-nfd.git:
 	cd $(NFD_DIR) && patch -p1 < ../0008-PCI.IN-save-a-move-by-removing-q_batch-local-in-noti.patch && cd -
 	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_abi3.patch && cd -
 	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_tlv.patch && cd -
+	cd $(NFD_DIR) && patch -p1 < ../0001-Add-nfd_vf_cfg_base-function.patch && cd -
 
 GIT_DEPS += $(NFD_DIR)
 GIT_REVS += $(NFD_REV)

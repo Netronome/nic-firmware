@@ -225,29 +225,6 @@ void ct_nn_write(
 }
 
 
-__intrinsic __emem __addr40 uint8_t*
-cfg_act_vf_cfg_ptr(uint32_t pcie)
-{
-    __emem __addr40 uint8_t *vf_cfg_base = 0;
-
-    switch (pcie) {
-#ifdef NFD_PCIE0_EMEM
-        case 0: vf_cfg_base = NFD_VF_CFG_BASE_LINK(0); break;
-#endif
-#ifdef NFD_PCIE1_EMEM
-        case 1: vf_cfg_base = NFD_VF_CFG_BASE_LINK(1); break;
-#endif
-#ifdef NFD_PCIE2_EMEM
-        case 2: vf_cfg_base = NFD_VF_CFG_BASE_LINK(2); break;
-#endif
-#ifdef NFD_PCIE3_EMEM
-        case 3: vf_cfg_base = NFD_VF_CFG_BASE_LINK(3); break;
-#endif
-    }
-
-    return vf_cfg_base;
-}
-
 /*
  * Config change management.
  *
@@ -965,7 +942,7 @@ cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
 
     cfg_act_append_rx_host(acts, pcie, vid, 1);
 
-    vf_cfg_base = cfg_act_vf_cfg_ptr(pcie);
+    vf_cfg_base = nfd_vf_cfg_base(pcie);
     mem_read32(&sriov_cfg_data,
 	       NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
 	       sizeof(struct sriov_cfg));
@@ -1104,7 +1081,7 @@ cfg_act_build_veb_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
         cfg_act_append_push_pkt(acts);
     }
 
-    vf_cfg_base = cfg_act_vf_cfg_ptr(pcie);
+    vf_cfg_base = nfd_vf_cfg_base(pcie);
     mem_read32(&sriov_cfg_data,
 	       NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
 	       sizeof(struct sriov_cfg));
@@ -1221,7 +1198,7 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid,
 
     cfg_act_build_veb_vf(&acts, pcie, vid, pf_control, vf_control, update);
 
-    vf_cfg_base = cfg_act_vf_cfg_ptr(pcie);
+    vf_cfg_base = nfd_vf_cfg_base(pcie);
     mem_read32(&sriov_cfg_data,
 	       NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
 	       sizeof(struct sriov_cfg));
