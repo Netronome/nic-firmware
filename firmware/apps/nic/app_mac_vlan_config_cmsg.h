@@ -22,7 +22,7 @@
 
 /* *** NIC MAC+VLAN Table Configuration Settings. *** */
 
-#define NIC_MAC_VLAN_TABLE__NUM_ENTRIES 0x4000
+#define NIC_MAC_VLAN_TABLE__NUM_ENTRIES 0x60000
 
 /* *** NIC MAC+VLAN table result types. *** */
 #define NIC_MAC_VLAN_RES_TYPE_TO_HOST 0
