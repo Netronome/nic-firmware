@@ -79,7 +79,7 @@ remove_vlan_member(uint16_t vid)
     for (vlan = 0; vlan <= NIC_MAX_VLAN_ID; ++vlan) {
         mem_read64(&members_r, &nic_vlan_to_vnics_map_tbl[vlan], sizeof(uint64_t));
         members = members_r & ((1ull << NFD_MAX_VFS) - 1);
-        members &= ~(1ul << vid);
+        members &= ~(1ull << vid);
         if (members) {
             min_rxb = (1 << 6) - 1;
             for (vid_idx = 0; NFD_MAX_VFS && vid_idx < NFD_MAX_VFS; vid_idx++) {
@@ -98,4 +98,3 @@ remove_vlan_member(uint16_t vid)
 
     return 0;
 }
-
