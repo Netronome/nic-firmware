@@ -145,6 +145,9 @@ NFD_VF_CFG_DECLARE(NIC_PCI)
 NFD_FLR_DECLARE;
 MSIX_DECLARE;
 
+/* config change message */
+struct nfd_cfg_msg cfg_msg;
+
 /* A global synchronization counter to check if all APP MEs has reconfigured */
 __export __dram struct synch_cnt nic_cfg_synch;
 
@@ -707,15 +710,12 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
 static void
 cfg_changes_loop(void)
 {
-    struct nfd_cfg_msg cfg_msg;
     __xread unsigned int cfg_bar_data[2];
     /* out volatile __xwrite uint32_t cfg_pci_vnic; */
     uint32_t vid, type, vnic;
     uint32_t update;
     uint32_t control;
     __emem __addr40 uint8_t *bar_base;
-
-    nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
 
     for (;;) {
         cfg_msg.error = 0;
@@ -1133,6 +1133,11 @@ main(void)
 
     switch (ctx()) {
     case APP_MASTER_CTX_CONFIG_CHANGES:
+        /* WARNING!
+         * nfd_cfg_init_cfg_msg() introduces the live range for the remote
+         * signal, call it before anything else that might reuse the signal
+         */
+        nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
         trng_init();
         init_catamaran_chan2port_table();
         init_vfs_random_macs();
