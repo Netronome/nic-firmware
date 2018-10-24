@@ -242,7 +242,11 @@
 #define NFD_BPF_ABI             2
 #define NFD_BPF_STACK_SZ        512
 
-#define NFD_NET_APP_ID		(1)
+#if NS_FLAVOR_TYPE == NS_FLAVOR_BPF
+    #define NFD_NET_APP_ID		(2)
+#else
+    #define NFD_NET_APP_ID		(1)
+#endif
 
 /* enable cmsg */
 #define NFD_USE_CTRL
