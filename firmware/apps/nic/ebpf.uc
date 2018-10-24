@@ -77,17 +77,17 @@
 #endm
 
 #macro ebpf_init_cap_finalize()
-    .alloc_mem bpf_capabilities emem global __EBPF_CAP_LENGTH 256
+    .alloc_mem _abi_bpf_capabilities emem global __EBPF_CAP_LENGTH 256
     // remove "0," from front of list
     #define_eval __EBPF_CAP_DATA strright('__EBPF_CAP_DATA', -2)
     #define __EBPF_CAP_OFFSET 0
     #while (__EBPF_CAP_OFFSET < (__EBPF_CAP_LENGTH - 4))
         #define_eval VALUE strleft('__EBPF_CAP_DATA', strstr('__EBPF_CAP_DATA', ',') - 1)
         #define_eval __EBPF_CAP_DATA strright('__EBPF_CAP_DATA', strlen('__EBPF_CAP_DATA') - strstr('__EBPF_CAP_DATA', ','))
-        .init bpf_capabilities+__EBPF_CAP_OFFSET VALUE
+        .init _abi_bpf_capabilities+__EBPF_CAP_OFFSET VALUE
         #define_eval __EBPF_CAP_OFFSET (__EBPF_CAP_OFFSET + 4)
     #endloop
-    .init bpf_capabilities+__EBPF_CAP_OFFSET __EBPF_CAP_DATA
+    .init _abi_bpf_capabilities+__EBPF_CAP_OFFSET __EBPF_CAP_DATA
 #endm
 
 
