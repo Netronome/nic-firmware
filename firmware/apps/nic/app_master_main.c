@@ -733,10 +733,7 @@ cfg_changes_loop(void)
         cfg_msg.error = 0;
         nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
 
-        if (cfg_msg.msg_valid) {
-            if (cfg_msg.error)
-                goto error;
-
+        if (cfg_msg.msg_valid && !cfg_msg.error) {
             vid = cfg_msg.vid;
             /* read in the first 64bit of the Control BAR */
             mem_read64(cfg_bar_data, NFD_CFG_BAR_ISL(NIC_PCI, vid),
