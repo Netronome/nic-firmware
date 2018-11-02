@@ -262,7 +262,7 @@ cfg_changes_loop(void)
                     goto error;
             }
 
-            nic_control_word[cfg_msg.vid] = control;
+            nic_control_word[NIC_PCI][cfg_msg.vid] = control;
 error:
             /* Complete the message */
             cfg_msg.msg_valid = 0;
@@ -346,7 +346,7 @@ lsc_send(int vid)
         goto out;
 
     /* Work out which masking mode we should use */
-    automask = nic_control_word[vid] & NFP_NET_CFG_CTRL_MSIXAUTO;
+    automask = nic_control_word[NIC_PCI][vid] & NFP_NET_CFG_CTRL_MSIXAUTO;
 
     /* If we don't auto-mask, check the ICR */
     if (!automask) {
@@ -429,7 +429,7 @@ void lsc_check(int port)
                                     (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1);
 
     /* link state according to VNIC */
-    vs = nic_control_word[pf_vid] & NFP_NET_CFG_CTRL_ENABLE;
+    vs = nic_control_word[NIC_PCI][pf_vid] & NFP_NET_CFG_CTRL_ENABLE;
 
     if (ls != LS_READ(ls_current, pf_vid)) {
         changed = 1;

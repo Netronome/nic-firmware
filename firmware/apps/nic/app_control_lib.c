@@ -384,10 +384,10 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
     if (control & NFP_NET_CFG_CTRL_ENABLE) {
         veb_up = 0;
         for (i = 0; i < NFD_MAX_VFS; i++) {
-            if (nic_control_word[NFD_VF2VID(i)] & NFP_NET_CFG_CTRL_ENABLE) {
+            if (nic_control_word[NIC_PCI][NFD_VF2VID(i)] & NFP_NET_CFG_CTRL_ENABLE) {
                 if (cfg_act_vf_up(NIC_PCI, NFD_VF2VID(i),
                             control,
-                            nic_control_word[NFD_VF2VID(i)],
+                            nic_control_word[NIC_PCI][NFD_VF2VID(i)],
                             0)) {
                     cfg_msg->error = 1;
                     return 1;
@@ -403,10 +403,10 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
     }
 
     /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
-    if ((nic_control_word[vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
+    if ((nic_control_word[NIC_PCI][vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
         if (control & NFP_NET_CFG_CTRL_ENABLE) {
             /* Permit lsc_check() to bring up RX/TX */
-            nic_control_word[cfg_msg->vid] = control;
+            nic_control_word[NIC_PCI][cfg_msg->vid] = control;
 
             /* Swap and give link state thread opportunity to enable RX/TX */
             sleep(50 * NS_PLATFORM_TCLK * 1000); // 50ms
@@ -418,7 +418,7 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
             int i, queue, occupied = 1;
 
             /* Prevent lsc_check() from overriding RX disable */
-            nic_control_word[cfg_msg->vid] = control;
+            nic_control_word[NIC_PCI][cfg_msg->vid] = control;
 
             /* stop receiving packets */
             if (! mac_port_disable_rx(port)) {
@@ -473,13 +473,13 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
         /* Retrieve the link state mode for the VF. */
         ls_mode = sriov_cfg_data.ctrl_link_state;
 
-        if (!(nic_control_word[NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE)) {
+        if (!(nic_control_word[NIC_PCI][NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE)) {
             cfg_msg->error = 1;
             return 1;
         }
 
         if (cfg_act_vf_up(NIC_PCI, vid,
-                    nic_control_word[NFD_PF2VID(0)],
+                    nic_control_word[NIC_PCI][NFD_PF2VID(0)],
                     control, update)) {
             cfg_msg->error = 1;
             return 1;
@@ -487,7 +487,7 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
 
         // rebuild PF action list because veb_up state may have changed
         if (cfg_act_pf_up(NIC_PCI, NFD_PF2VID(0), 1,
-                    nic_control_word[NFD_PF2VID(0)], 0)) {
+                    nic_control_word[NIC_PCI][NFD_PF2VID(0)], 0)) {
             cfg_msg->error = 1;
             return 1;
         }

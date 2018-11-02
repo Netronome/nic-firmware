@@ -27,7 +27,7 @@ __shared __gpr volatile int mac_reg_lock = 0;
     } while (0)
 
 /* Current value of NFP_NET_CFG_CTRL (shared between all contexts) */
-__shared __lmem volatile uint32_t nic_control_word[NVNICS];
+__shared __lmem volatile uint32_t nic_control_word[NFD_MAX_ISL][NVNICS];
 
 /* Current state of the link state and the pending interrupts. */
 #define LS_ARRAY_LEN           ((NVNICS + 31) >> 5)
@@ -54,13 +54,13 @@ __shared __lmem uint32_t vf_lsc_list[NS_PLATFORM_NUM_PORTS][LS_ARRAY_LEN];
 uint32_t
 get_nic_control_word(const int pcie, uint32_t vid)
 {
-    return nic_control_word[vid];
+    return nic_control_word[pcie][vid];
 }
 
 void
 set_nic_control_word(const int pcie, uint32_t vid, uint32_t control)
 {
-    nic_control_word[vid] = control;
+    nic_control_word[pcie][vid] = control;
 }
 
 /*Interface to vs_current*/
