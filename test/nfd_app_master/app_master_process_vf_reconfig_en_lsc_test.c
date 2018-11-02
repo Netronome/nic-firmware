@@ -55,7 +55,7 @@ void verify_vf_lsc(uint32_t port, uint32_t expected)
 {
     int vf;
     for (vf = 0; vf < NFD_MAX_VFS; vf++)
-        test_assert_equal(get_vf_lsc(NIC_PCI, port, NFD_VF2VID(vf)), expected);
+        test_assert_equal(get_vf_lsc(port, NIC_PCI, NFD_VF2VID(vf)), expected);
 
 }
 
@@ -66,7 +66,7 @@ void verify_other_vf_lsc(uint32_t port, uint32_t expected)
     for (vf = 0; vf < NFD_MAX_VFS; vf++) {
         for (i = 0; i < NS_PLATFORM_NUM_PORTS; i++) {
             if (i != port)
-                test_assert_equal(get_vf_lsc(NIC_PCI, i, NFD_VF2VID(vf)), expected);
+                test_assert_equal(get_vf_lsc(i, NIC_PCI, NFD_VF2VID(vf)), expected);
         }
     }
 }

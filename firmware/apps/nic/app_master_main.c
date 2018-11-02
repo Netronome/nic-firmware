@@ -377,15 +377,15 @@ lsc_check_vf(int port, enum link_state ls)
 
     for (vf_vid = 0; vf_vid < NVNICS; vf_vid++) {
         /* Check if the VF should be receiving an interrupt. */
-        if (NFD_VID_IS_VF(vf_vid) && LS_READ(vf_lsc_list[port], vf_vid)) {
+        if (NFD_VID_IS_VF(vf_vid) && LS_READ(vf_lsc_list[port][NIC_PCI], vf_vid)) {
             /* Update the link state status. Report the link speed for the
                VF as that of the PF. */
             if (ls == LINK_UP) {
-                LS_SET(ls_current, vf_vid);
+                LS_SET(ls_current[NIC_PCI], vf_vid);
                 sts = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
                       NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
             } else {
-                LS_CLEAR(ls_current, vf_vid);
+                LS_CLEAR(ls_current[NIC_PCI], vf_vid);
                 sts = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
                 NFP_NET_CFG_STS_LINK_RATE_SHIFT);
             }
@@ -398,9 +398,9 @@ lsc_check_vf(int port, enum link_state ls)
 
             /* Send the interrupt. */
             if (lsc_send(vf_vid))
-                LS_SET(pending, vf_vid);
+                LS_SET(pending[NIC_PCI], vf_vid);
             else
-                LS_CLEAR(pending, vf_vid);
+                LS_CLEAR(pending[NIC_PCI], vf_vid);
         }
     }
 }
@@ -430,22 +430,22 @@ void lsc_check(int port)
     /* link state according to VNIC */
     vs = nic_control_word[NIC_PCI][pf_vid] & NFP_NET_CFG_CTRL_ENABLE;
 
-    if (ls != LS_READ(ls_current, pf_vid)) {
+    if (ls != LS_READ(ls_current[NIC_PCI], pf_vid)) {
         changed = 1;
         if (ls)
-            LS_SET(ls_current, pf_vid);
+            LS_SET(ls_current[NIC_PCI], pf_vid);
         else
-            LS_CLEAR(ls_current, pf_vid);
+            LS_CLEAR(ls_current[NIC_PCI], pf_vid);
     }
 
-    if (vs != LS_READ(vs_current, pf_vid)) {
+    if (vs != LS_READ(vs_current[NIC_PCI], pf_vid)) {
         changed = 1;
         if (vs)
-            LS_SET(vs_current, pf_vid);
+            LS_SET(vs_current[NIC_PCI], pf_vid);
         else {
             /* a disabled VNIC overrides MAC link state */
             ls = LINK_DOWN;
-            LS_CLEAR(vs_current, pf_vid);
+            LS_CLEAR(vs_current[NIC_PCI], pf_vid);
         }
     }
 
@@ -489,11 +489,11 @@ void lsc_check(int port)
     mem_read32(&ctrl, nic_ctrl_bar + NFP_NET_CFG_CTRL, sizeof(ctrl));
 
     /* If the link state changed, try to send in interrupt */
-    if (changed || LS_READ(pending, pf_vid)) {
+    if (changed || LS_READ(pending[NIC_PCI], pf_vid)) {
         if (lsc_send(pf_vid))
-            LS_SET(pending, pf_vid);
+            LS_SET(pending[NIC_PCI], pf_vid);
         else
-            LS_CLEAR(pending, pf_vid);
+            LS_CLEAR(pending[NIC_PCI], pf_vid);
 
         /* Now, notify the VFs that follow the port's link state. */
         if (changed)
@@ -522,11 +522,11 @@ lsc_loop(void)
         lsc_count++;
 
         for (vid = 0; vid < NVNICS; vid++) {
-            if (LS_READ(pending, vid)) {
+            if (LS_READ(pending[NIC_PCI], vid)) {
                 if (lsc_send(vid))
-                    LS_SET(pending, vid);
+                    LS_SET(pending[NIC_PCI], vid);
                 else
-                    LS_CLEAR(pending, vid);
+                    LS_CLEAR(pending[NIC_PCI], vid);
             }
         }
 

@@ -254,36 +254,36 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigne
     __xwrite uint32_t sts_xw;
     uint32_t pf_vid = NFD_PF2VID(port);
     unsigned int idx = LS_IDX(vf_vid);
-    unsigned int orig_link_state = LS_READ(ls_current, vf_vid);
-    unsigned int pf_link_state = LS_READ(ls_current, pf_vid);
+    unsigned int orig_link_state = LS_READ(ls_current[NIC_PCI], vf_vid);
+    unsigned int pf_link_state = LS_READ(ls_current[NIC_PCI], pf_vid);
     __mem char *cfg_bar = NFD_CFG_BAR_ISL(NIC_PCI, vf_vid);
 
     if (control & NFP_NET_CFG_CTRL_ENABLE)
-        LS_SET(vs_current, vf_vid);
+        LS_SET(vs_current[NIC_PCI], vf_vid);
     else
-        LS_CLEAR(vs_current, vf_vid);
+        LS_CLEAR(vs_current[NIC_PCI], vf_vid);
 
     /* Enable notification on selected vf from port */
     if (mode == NFD_VF_CFG_CTRL_LINK_STATE_AUTO)
-        LS_SET(vf_lsc_list[port], vf_vid);
+        LS_SET(vf_lsc_list[port][NIC_PCI], vf_vid);
     else
-        LS_CLEAR(vf_lsc_list[port], vf_vid);
+        LS_CLEAR(vf_lsc_list[port][NIC_PCI], vf_vid);
 
     /* Disable notification to selected vf from other ports */
     for (i = 0; i < NS_PLATFORM_NUM_PORTS; i++) {
         if (i != port)
-            LS_CLEAR(vf_lsc_list[i], vf_vid);
+            LS_CLEAR(vf_lsc_list[i][NIC_PCI], vf_vid);
     }
 
     /* Update the link status for the VF. Report the link speed for the VF as
      * that of the PF. */
     if (mode == NFD_VF_CFG_CTRL_LINK_STATE_ENABLE || pf_link_state) {
-        LS_SET(ls_current, vf_vid);
+        LS_SET(ls_current[NIC_PCI], vf_vid);
         sts_xw = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
     } else {
         /* Clear the link status to reflect the PF link is down. */
-        LS_CLEAR(ls_current, vf_vid);
+        LS_CLEAR(ls_current[NIC_PCI], vf_vid);
         sts_xw = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
                     NFP_NET_CFG_STS_LINK_RATE_SHIFT);
     }
@@ -296,7 +296,7 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigne
     /* Schedule notification interrupt to be sent from the
        link state change context */
     if (ctrl_xr & NFP_NET_CFG_CTRL_ENABLE) {
-        LS_SET(pending, vf_vid);
+        LS_SET(pending[NIC_PCI], vf_vid);
     }
 }
 
