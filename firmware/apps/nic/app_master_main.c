@@ -452,8 +452,6 @@ void lsc_check(int pcie, int port)
                                     NS_PLATFORM_MAC_SERDES_LO(port),
                                     (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1);
 
-    /* link state according to VNIC */
-    vs = nic_control_word[pcie][pf_vid] & NFP_NET_CFG_CTRL_ENABLE;
 
     if (ls != LS_READ(ls_current[pcie], pf_vid)) {
         changed = 1;
@@ -463,6 +461,9 @@ void lsc_check(int pcie, int port)
             LS_CLEAR(ls_current[pcie], pf_vid);
     }
 
+    /* link state according to the VNICs */
+    /* if any VNIC is up, vs is up */
+    vs = nic_control_check_up(pf_vid);
     if (vs != LS_READ(vs_current[pcie], pf_vid)) {
         changed = 1;
         if (vs)
@@ -491,10 +492,8 @@ void lsc_check(int pcie, int port)
 
     /* Make sure the status bit reflects the link state. Write this
      * every time to avoid a race with resetting the BAR state. */
-    if (ls == LINK_DOWN) {
-        sts = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
-               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 0;
-    } else {
+    if ((ls == LINK_UP) &&
+        (nic_control_word[pcie][pf_vid] & NFP_NET_CFG_CTRL_ENABLE)) {
         sts = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
                NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
         /* ugly hack: be forceful if unexpected RX state occurs */
@@ -507,14 +506,19 @@ void lsc_check(int pcie, int port)
                 NS_PLATFORM_MAC(port), NS_PLATFORM_MAC_CORE(port),
                 NS_PLATFORM_MAC_CORE_SERDES_LO(port));
         }
+    } else {
+        sts = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
+                NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 0;
     }
+
     mem_write32(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
     /* Make sure the config BAR is updated before we send
        the notification interrupt */
     mem_read32(&ctrl, nic_ctrl_bar + NFP_NET_CFG_CTRL, sizeof(ctrl));
 
-    /* If the link state changed, try to send in interrupt */
-    if (changed || LS_READ(pending[pcie], pf_vid)) {
+    /* If the link state changed, try to send in interrupt if vNIC is up */
+    if ((changed || LS_READ(pending[pcie], pf_vid)) &&
+        (nic_control_word[pcie][pf_vid] & NFP_NET_CFG_CTRL_ENABLE)) {
         if (lsc_send(pcie, pf_vid))
             LS_SET(pending[pcie], pf_vid);
         else
@@ -541,11 +545,15 @@ handle_pending_interrupts(int pcie)
     __gpr int vid;
 
     for (vid = 0; vid < NVNICS; vid++) {
-        if (LS_READ(pending[pcie], vid)) {
-            if (lsc_send(pcie, vid))
-                LS_SET(pending[pcie], vid);
-            else
-                LS_CLEAR(pending[pcie], vid);
+       if (nic_control_word[pcie][vid] & NFP_NET_CFG_CTRL_ENABLE) {
+            if (LS_READ(pending[pcie], vid)) {
+                if (lsc_send(pcie, vid))
+                    LS_SET(pending[pcie], vid);
+                else
+                    LS_CLEAR(pending[pcie], vid);
+            }
+        } else {
+            LS_CLEAR(pending[pcie], vid);
         }
     }
 }

@@ -72,6 +72,18 @@ SIGNAL nfd_cfg_sig_app_master3;
 __xread struct nfd_cfg_msg cfg_msg_rd3;
 #endif
 
+uint32_t
+nic_control_check_up(uint32_t vid)
+{
+    uint32_t up_test = 0;
+    uint32_t pcie;
+
+    for (pcie = 0; pcie < NFD_MAX_ISL; pcie++)
+        up_test |= nic_control_word[pcie][vid];
+
+    return up_test & NFP_NET_CFG_CTRL_ENABLE;
+}
+
 /* Translate port speed to link rate encoding */
 __intrinsic static unsigned int
 port_speed_to_link_rate(unsigned int port_speed)
@@ -442,10 +454,12 @@ process_pf_reconfig(int pcie, uint32_t control, uint32_t update, uint32_t vid,
             __xread struct nfp_nbi_tm_queue_status tmq_status;
             int i, queue, occupied = 1;
 
-            /* stop receiving packets */
-            if (! mac_port_disable_rx(port)) {
-                cfg_msg->error = 1;
-                return 1;
+            /* stop receiving packets, only if no other vNIC's are up */
+            if (! nic_control_check_up(vid)) {
+                if (! mac_port_disable_rx(port)) {
+                    cfg_msg->error = 1;
+                    return 1;
+                }
             }
 
             /* allow workers to drain RX queue */
