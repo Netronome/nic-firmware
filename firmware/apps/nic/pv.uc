@@ -608,13 +608,13 @@ from_host#:
 
     // update ingress queue's TX stats
 
-    alu[addr, addr, OR, 2, <<(16-8)] // 32 bit unpacked addressin
+    alu[stat_idx, NIC_STATS_QUEUE_TX_IDX, +, type_idx]
 #if (! streq('in_continue', '--'))
     br_bset[in_continue, BF_L(INSTR_TX_CONTINUE_bf), continue_from_host#], defer[3]
 #endif
         alu[--, io_vec--, OR, 0]
         alu[length, --, B, io_vec++]
-        alu[stat_idx, NIC_STATS_QUEUE_TX_IDX, +, type_idx]
+        ld_field[length, 1100, 2, <<16] // 32 bit unpacked addressing
 
     mem[stats_log, $idx_tx, addr, <<8, length, 1], sig_done[sig_tx]
     ctx_arb[sig_rx, sig_tx], br[IN_TERM_LABEL], defer[2]
@@ -653,9 +653,9 @@ continue_from_host#:
     alu[type_idx, BF_MASK(PV_MAC_DST_TYPE_bf), AND, BF_A(io_vec, PV_MAC_DST_TYPE_bf), >>BF_L(PV_MAC_DST_TYPE_bf)] ; PV_MAC_DST_TYPE_bf
     alu[queue_idx, --, B, BF_A(io_vec, PV_QUEUE_IN_bf), >>BF_L(PV_QUEUE_IN_bf)] ; PV_QUEUE_IN_bf
     immed[addr, (_nic_stats_queue >> 24), <<(24-8)]
-    alu[addr, addr, OR, 2, <<(16 - 8)] // 32 bit unpacked addressing
     alu[--, io_vec--, OR, 0]
     alu[length, --, B, io_vec++]
+    ld_field[length, 1100, 2, <<16] // 32 bit unpacked addressing
 
     #pragma warning(disable:5009)
     #pragma warning(disable:4700)
@@ -684,9 +684,11 @@ end#:
     .sig sig_stat
 
     immed[addr, (_nic_stats_queue >> 24), <<(24-8)]
-    alu[addr, addr, OR, 2, <<(16-8)] // 32 bit unpacked addressing
 
     alu[length, BF_A(io_vec, PV_LENGTH_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
+
+    // bit[31-18] reserved, bit[17-16] - stats addr pack, 2=32 bit unpacked addr
+    ld_field[length, 1100, 2, <<16] 
 
     #pragma warning(push)
     #pragma warning(disable:5009)
