@@ -350,7 +350,7 @@ perq_stats_loop(void)
 /* Send an LSC MSI-X. return 0 if done or 1 if pending. vid corresponds to
    either a pf or a vf */
 static int
-lsc_send(int vid)
+lsc_send(int pcie, int vid)
 {
     __mem char *nic_ctrl_bar;
     unsigned int automask;
@@ -360,7 +360,7 @@ lsc_send(int vid)
     __xwrite uint32_t mask_w;
     int ret = 0;
 
-    nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vid);
+    nic_ctrl_bar = nfd_cfg_bar_base(pcie, vid);
 
     mem_read32_le(&tmp, nic_ctrl_bar + NFP_NET_CFG_LSC, sizeof(tmp));
     entry = tmp & 0xff;
@@ -370,7 +370,7 @@ lsc_send(int vid)
         goto out;
 
     /* Work out which masking mode we should use */
-    automask = nic_control_word[NIC_PCI][vid] & NFP_NET_CFG_CTRL_MSIXAUTO;
+    automask = nic_control_word[pcie][vid] & NFP_NET_CFG_CTRL_MSIXAUTO;
 
     /* If we don't auto-mask, check the ICR */
     if (!automask) {
@@ -384,7 +384,7 @@ lsc_send(int vid)
         mem_write8_le(&mask_w, nic_ctrl_bar + NFP_NET_CFG_ICR(entry), 1);
     }
 
-    ret = msix_pf_send(NIC_PCI, PCIE_CPP2PCIE_LSC, entry, automask);
+    ret = msix_pf_send(pcie, PCIE_CPP2PCIE_LSC, entry, automask);
 
 out:
     return ret;
@@ -393,7 +393,7 @@ out:
 /* Check for VFs that should receive an interrupt for a link state change,
    update the link status, and try to generate an interrupt */
 static void
-lsc_check_vf(int port, enum link_state ls)
+lsc_check_vf(int pcie, int port, enum link_state ls)
 {
     __mem char *vf_ctrl_bar;
     unsigned int vf_vid;
@@ -402,37 +402,37 @@ lsc_check_vf(int port, enum link_state ls)
 
     for (vf_vid = 0; vf_vid < NVNICS; vf_vid++) {
         /* Check if the VF should be receiving an interrupt. */
-        if (NFD_VID_IS_VF(vf_vid) && LS_READ(vf_lsc_list[port][NIC_PCI], vf_vid)) {
+        if (NFD_VID_IS_VF(vf_vid) && LS_READ(vf_lsc_list[port][pcie], vf_vid)) {
             /* Update the link state status. Report the link speed for the
                VF as that of the PF. */
             if (ls == LINK_UP) {
-                LS_SET(ls_current[NIC_PCI], vf_vid);
+                LS_SET(ls_current[pcie], vf_vid);
                 sts = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
                       NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
             } else {
-                LS_CLEAR(ls_current[NIC_PCI], vf_vid);
+                LS_CLEAR(ls_current[pcie], vf_vid);
                 sts = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
                 NFP_NET_CFG_STS_LINK_RATE_SHIFT);
             }
 
-            vf_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, vf_vid);
+            vf_ctrl_bar = nfd_cfg_bar_base(pcie, vf_vid);
             mem_write32(&sts, vf_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
             /* Make sure the config BAR is updated before we send
                the notification interrupt */
             mem_read32(&ctrl, vf_ctrl_bar + NFP_NET_CFG_CTRL, sizeof(ctrl));
 
             /* Send the interrupt. */
-            if (lsc_send(vf_vid))
-                LS_SET(pending[NIC_PCI], vf_vid);
+            if (lsc_send(pcie, vf_vid))
+                LS_SET(pending[pcie], vf_vid);
             else
-                LS_CLEAR(pending[NIC_PCI], vf_vid);
+                LS_CLEAR(pending[pcie], vf_vid);
         }
     }
 }
 
 /* Check the Link state and try to generate an interrupt if it changed. */
 static
-void lsc_check(int port)
+void lsc_check(int pcie, int port)
 {
     __mem char *nic_ctrl_bar;
     __gpr enum link_state ls;
@@ -445,7 +445,7 @@ void lsc_check(int port)
 
     /* Update pf corresponding to port */
     pf_vid = NFD_PF2VID(port);
-    nic_ctrl_bar = NFD_CFG_BAR_ISL(NIC_PCI, pf_vid);
+    nic_ctrl_bar = nfd_cfg_bar_base(pcie, pf_vid);
 
     /* link state according to MAC */
     ls = mac_eth_port_link_state(NS_PLATFORM_MAC(port),
@@ -453,24 +453,24 @@ void lsc_check(int port)
                                     (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1);
 
     /* link state according to VNIC */
-    vs = nic_control_word[NIC_PCI][pf_vid] & NFP_NET_CFG_CTRL_ENABLE;
+    vs = nic_control_word[pcie][pf_vid] & NFP_NET_CFG_CTRL_ENABLE;
 
-    if (ls != LS_READ(ls_current[NIC_PCI], pf_vid)) {
+    if (ls != LS_READ(ls_current[pcie], pf_vid)) {
         changed = 1;
         if (ls)
-            LS_SET(ls_current[NIC_PCI], pf_vid);
+            LS_SET(ls_current[pcie], pf_vid);
         else
-            LS_CLEAR(ls_current[NIC_PCI], pf_vid);
+            LS_CLEAR(ls_current[pcie], pf_vid);
     }
 
-    if (vs != LS_READ(vs_current[NIC_PCI], pf_vid)) {
+    if (vs != LS_READ(vs_current[pcie], pf_vid)) {
         changed = 1;
         if (vs)
-            LS_SET(vs_current[NIC_PCI], pf_vid);
+            LS_SET(vs_current[pcie], pf_vid);
         else {
             /* a disabled VNIC overrides MAC link state */
             ls = LINK_DOWN;
-            LS_CLEAR(vs_current[NIC_PCI], pf_vid);
+            LS_CLEAR(vs_current[pcie], pf_vid);
         }
     }
 
@@ -501,12 +501,12 @@ void lsc_check(int port)
         if (vs && ! mac_eth_check_rx_enable(NS_PLATFORM_MAC(port),
                                             NS_PLATFORM_MAC_CORE(port),
                                             NS_PLATFORM_MAC_CORE_SERDES_LO(port))) {
-	    mac_port_enable_rx(port);
+            mac_port_enable_rx(port);
             mac_port_enable_tx(port);
             mac_port_disable_tx_flush(
                 NS_PLATFORM_MAC(port), NS_PLATFORM_MAC_CORE(port),
                 NS_PLATFORM_MAC_CORE_SERDES_LO(port));
-	}
+        }
     }
     mem_write32(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
     /* Make sure the config BAR is updated before we send
@@ -514,29 +514,63 @@ void lsc_check(int port)
     mem_read32(&ctrl, nic_ctrl_bar + NFP_NET_CFG_CTRL, sizeof(ctrl));
 
     /* If the link state changed, try to send in interrupt */
-    if (changed || LS_READ(pending[NIC_PCI], pf_vid)) {
-        if (lsc_send(pf_vid))
-            LS_SET(pending[NIC_PCI], pf_vid);
+    if (changed || LS_READ(pending[pcie], pf_vid)) {
+        if (lsc_send(pcie, pf_vid))
+            LS_SET(pending[pcie], pf_vid);
         else
-            LS_CLEAR(pending[NIC_PCI], pf_vid);
+            LS_CLEAR(pending[pcie], pf_vid);
 
         /* Now, notify the VFs that follow the port's link state. */
         if (changed)
-           lsc_check_vf(port, ls);
+            lsc_check_vf(pcie, port, ls);
+    }
+}
+
+static void
+lsc_check_ports(int pcie)
+{
+    __gpr int port;
+    for (port = 0; port < NS_PLATFORM_NUM_PORTS; port++) {
+        lsc_check(pcie, port);
+    }
+}
+
+static void
+handle_pending_interrupts(int pcie)
+{
+    __gpr int vid;
+
+    for (vid = 0; vid < NVNICS; vid++) {
+        if (LS_READ(pending[pcie], vid)) {
+            if (lsc_send(pcie, vid))
+                LS_SET(pending[pcie], vid);
+            else
+                LS_CLEAR(pending[pcie], vid);
+        }
     }
 }
 
 static void
 lsc_loop(void)
 {
-    __gpr int vid;
-    __gpr int port;
     __gpr int lsc_count = 0;
 
     /* Set the initial port state. */
-    for (port = 0; port < NS_PLATFORM_NUM_PORTS; port++) {
-        lsc_check(port);
-    }
+#ifdef NFD_PCIE0_EMEM
+    lsc_check_ports(0);
+#endif
+
+#ifdef NFD_PCIE1_EMEM
+    lsc_check_ports(1);
+#endif
+
+#ifdef NFD_PCIE2_EMEM
+    lsc_check_ports(2);
+#endif
+
+#ifdef NFD_PCIE3_EMEM
+    lsc_check_ports(3);
+#endif
 
     /* Need to handle pending interrupts more frequent than we need to
      * check for link state changes.  To keep it simple, have a single
@@ -546,20 +580,39 @@ lsc_loop(void)
         sleep(LSC_POLL_PERIOD);
         lsc_count++;
 
-        for (vid = 0; vid < NVNICS; vid++) {
-            if (LS_READ(pending[NIC_PCI], vid)) {
-                if (lsc_send(vid))
-                    LS_SET(pending[NIC_PCI], vid);
-                else
-                    LS_CLEAR(pending[NIC_PCI], vid);
-            }
-        }
+    #ifdef NFD_PCIE0_EMEM
+        handle_pending_interrupts(0);
+    #endif
+
+    #ifdef NFD_PCIE1_EMEM
+        handle_pending_interrupts(1);
+    #endif
+
+    #ifdef NFD_PCIE2_EMEM
+        handle_pending_interrupts(2);
+    #endif
+
+    #ifdef NFD_PCIE3_EMEM
+        handle_pending_interrupts(3);
+    #endif
 
         if (lsc_count > 19) {
             lsc_count = 0;
-            for (port = 0; port < NS_PLATFORM_NUM_PORTS; port++) {
-                lsc_check(port);
-            }
+        #ifdef NFD_PCIE0_EMEM
+            lsc_check_ports(0);
+        #endif
+
+        #ifdef NFD_PCIE1_EMEM
+            lsc_check_ports(1);
+        #endif
+
+        #ifdef NFD_PCIE2_EMEM
+            lsc_check_ports(2);
+        #endif
+
+        #ifdef NFD_PCIE3_EMEM
+            lsc_check_ports(3);
+        #endif
         }
     }
     /* NOTREACHED */
@@ -569,7 +622,21 @@ static void
 init_msix(void)
 {
     /* Initialisation */
-    MSIX_INIT_ISL(NIC_PCI);
+#ifdef NFD_PCIE0_EMEM
+    MSIX_INIT_ISL(0);
+#endif
+
+#ifdef NFD_PCIE1_EMEM
+    MSIX_INIT_ISL(1);
+#endif
+
+#ifdef NFD_PCIE2_EMEM
+    MSIX_INIT_ISL(2);
+#endif
+
+#ifdef NFD_PCIE3_EMEM
+    MSIX_INIT_ISL(3);
+#endif
 }
 
 static void
