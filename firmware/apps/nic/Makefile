@@ -111,6 +111,21 @@ NFD0_NOTIFY_ME=mei3.me10
 NFD0_SB_ME=ila0.me1
 NFD0_PD_MES=ila0.me2 ila0.me3
 
+#NFD for PCIE1
+NFD1_NOTIFY_ME=
+NFD1_SB_ME=
+NFD1_PD_MES=
+
+#NFD for PCIE2
+NFD2_NOTIFY_ME=
+NFD2_SB_ME=
+NFD2_PD_MES=
+
+#NFD for PCIE3
+NFD3_NOTIFY_ME=
+NFD3_SB_ME=
+NFD3_PD_MES=
+
 #Multicast reaper ME
 MCR_ME=mei0.me10
 
@@ -125,6 +140,8 @@ $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/include))
 $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/deps/nfp-bsp-boardconfig))
 $(eval $(call nffw.add_include,$(PROJECT),$(NFP_COMMON)/deps/npfw))
 $(eval $(call nffw.add_ppc,$(PROJECT),i8,$(PICOCODE_DIR)/catamaran/catamaran.npfw))
+$(eval $(call nffw.add_define,$(PROJECT),NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
+$(eval $(call nffw.add_define,$(PROJECT),NS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add flowenv to the project
 $(eval $(call fwdep.add_flowenv,$(PROJECT)))
@@ -138,7 +155,6 @@ $(eval $(call fwdep.add_gro_flag,$(PROJECT),$(GRO_MES),-DNS_PLATFORM_TYPE=$(NS_P
 $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add Multicast Buffer Reaper
-$(eval $(call microcode.assemble,$(PROJECT),mcr,apps/nic,mc_reaper.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,firmware/lib))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,firmware/apps/nic/lib))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,deps/ng-nfd.hg))
@@ -150,7 +166,6 @@ $(eval $(call nffw.add_obj,$(PROJECT),mcr,$(MCR_ME)))
 $(eval $(call dep.gen_awk,$(PROJECT),datapath,firmware/lib/nic_basic/nic_stats_gen.h,firmware/lib/nic_basic/nic_stats.def,scripts/nic_stats.awk))
 $(eval $(call microcode.assemble,$(PROJECT),datapath,apps/nic,datapath.uc))
 $(eval $(call microcode.add_tests,$(PROJECT),datapath))
-$(eval $(call microcode.add_flags,$(PROJECT),datapath,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_flags,$(PROJECT),datapath,-O))
 #$(eval $(call microcode.add_flags,$(PROJECT),datapath,-d40))
 #$(eval $(call microcode.add_flags,$(PROJECT),datapath,-verbose))
@@ -165,7 +180,6 @@ $(eval $(call microcode.add_define,$(PROJECT),datapath,SS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=$(WORKERS_PER_ISLAND)))
-$(eval $(call microcode.add_define,$(PROJECT),datapath,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 #$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
 $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
         mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5 mei0.me6 mei0.me7 mei0.me8 mei0.me9 \
@@ -254,13 +268,10 @@ $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(BLM_DIR)))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(GRO_DIR)))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,WORKERS_PER_ISLAND=$(WORKERS_PER_ISLAND)))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,GLOBAL_INIT=1))
-$(eval $(call microcode.add_define,$(PROJECT),mapcmsg,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,$(MAPCMSG_ME)))
 
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
-$(eval $(call micro_c.add_flags,$(PROJECT),nfd_svc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call micro_c.add_define,$(PROJECT),nfd_svc,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,app_config_tables))
 $(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,$(APP_MASTER_ME),$(NFD_SVC_ME)))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,nic_basic))
@@ -271,7 +282,6 @@ $(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,app_mac_vla
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,trng))
 $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(DEPS_DIR)/flowenv.git/me/blocks/blm,libblm))
 $(eval $(call micro_c.add_src_lib.abspath,$(PROJECT),nfd_app_master,$(DEPS_DIR)/flowenv.git/me/lib/pkt,libpkt))
-$(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnn_mode=1))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qip_no_inlining))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnolur=_cfg_changes_loop))
@@ -279,39 +289,41 @@ $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Ob0))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_WORKER_ISLAND_LIST=$(NIC_APP_ISLANDS)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,CFG_NIC_LIB_DBG_JOURNAL=1))
-$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call micro_c.add_tests,$(PROJECT),nfd_app_master))
 
 # Add NFD for PCIE0
-$(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_issue0,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
-$(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_issue1,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_issue1,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
-$(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_gather,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_gather,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
-$(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_notify,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_notify,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call fwdep.add_nfd_in,$(PROJECT),0,$(NFD0_NOTIFY_ME))) # specify Notify ME
-$(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_cache,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_cache,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
-$(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_sb,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call microcode.add_define,$(PROJECT),nfd_pcie0_sb,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
-$(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_pd,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call microcode.add_define,$(PROJECT),nfd_pcie0_pd,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call fwdep.add_nfd_out,$(PROJECT),0,$(NFD0_SB_ME),$(NFD0_PD_MES))) # Stage batch, then packet DMA MEs
 
+ifneq ($(NFD1_NOTIFY_ME),)
+# Add NFD for PCIE1
+    $(eval $(call fwdep.add_nfd_in,$(PROJECT),1,$(NFD1_NOTIFY_ME))) # specify Notify ME
+    $(eval $(call fwdep.add_nfd_out,$(PROJECT),1,$(NFD1_SB_ME),$(NFD1_PD_MES))) # Stage batch, then packet DMA MEs
+endif
+
+ifneq ($(NFD2_NOTIFY_ME),)
+# Add NFD for PCIE2
+    $(eval $(call fwdep.add_nfd_in,$(PROJECT),2,$(NFD2_NOTIFY_ME))) # specify Notify ME
+    $(eval $(call fwdep.add_nfd_out,$(PROJECT),2,$(NFD2_SB_ME),$(NFD2_PD_MES))) # Stage batch, then packet DMA MEs
+endif
+
+ifneq ($(NFD3_NOTIFY_ME),)
+# Add NFD for PCIE3
+    $(eval $(call fwdep.add_nfd_in,$(PROJECT),3,$(NFD3_NOTIFY_ME))) # specify Notify ME
+    $(eval $(call fwdep.add_nfd_out,$(PROJECT),3,$(NFD3_SB_ME),$(NFD3_PD_MES))) # Stage batch, then packet DMA MEs
+endif
+
 # Add TM PM initialization (codeless)
-$(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pms.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pms.uc))
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
 
 # Add dump_spec (codeless)
 $(eval $(call dep.dump_spec,$(PROJECT),datapath,dump_spec.in))
-$(eval $(call microcode.assemble.codeless,$(PROJECT),dump_spec,apps/nic,dump_spec_init.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call microcode.assemble.codeless,$(PROJECT),dump_spec,apps/nic,dump_spec_init.uc))
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),dump_spec))
 
 # Add NFD config BAR TLVs
-$(eval $(call microcode.assemble.codeless,$(PROJECT),nfd_tlv_init,apps/nic,init_tlv.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
-$(eval $(call microcode.add_define,$(PROJECT),nfd_tlv_init,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
+$(eval $(call microcode.assemble.codeless,$(PROJECT),nfd_tlv_init,apps/nic,init_tlv.uc))
 $(eval $(call nffw.add_obj_codeless,$(PROJECT),nfd_tlv_init))
 
 # Link stage
