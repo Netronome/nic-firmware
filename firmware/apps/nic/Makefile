@@ -92,6 +92,32 @@ else ifeq ($(PLATFORM),Starfighter_1x100_passive)
 endif
 PROJECT = $(FLAVOR)/nic_$(AMDA)_$(MEDIA)
 
+#Location of ME's. These can differ between platform families.
+
+#GRO ME's
+GRO_MES=mei0.me11 mei1.me11 mei3.me11 mei4.me11
+
+#cmsg map handler
+MAPCMSG_ME=mei2.me11
+
+#App_master ME
+APP_MASTER_ME=mei2.me10
+
+#NFD SVC ME
+NFD_SVC_ME=mei4.me10
+
+#NFD for PCIE0
+NFD0_NOTIFY_ME=mei3.me10
+NFD0_SB_ME=ila0.me1
+NFD0_PD_MES=ila0.me2 ila0.me3
+
+#Multicast reaper ME
+MCR_ME=mei0.me10
+
+#Amount of workers per island. Maintainers must keep this in sync with the
+#NIC_APP_MES variable and the datapath ME placement.
+WORKERS_PER_ISLAND=10
+
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
 $(eval $(call nffw.set_amda,$(PROJECT),$(AMDA)))
 $(eval $(call nffw.set_chip,$(PROJECT),$(CHIP)))
@@ -106,7 +132,7 @@ $(eval $(call fwdep.add_flowenv,$(PROJECT)))
 $(eval $(call fwdep.add_flowenv_nfp_init_flag,$(PROJECT),-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add GRO MEs
-$(eval $(call fwdep.add_gro_flag,$(PROJECT),mei0.me11 mei1.me11 mei3.me11 mei4.me11,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE) -DNS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
+$(eval $(call fwdep.add_gro_flag,$(PROJECT),$(GRO_MES),-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE) -DNS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 
 # Add 1 BLM ME
 $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
@@ -118,7 +144,7 @@ $(eval $(call microcode.add_include,$(PROJECT),mcr,firmware/apps/nic/lib))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,deps/ng-nfd.hg))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,$(BLM_DIR)))
 $(eval $(call microcode.add_define,$(PROJECT),mcr,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
-$(eval $(call nffw.add_obj,$(PROJECT),mcr,mei0.me10))
+$(eval $(call nffw.add_obj,$(PROJECT),mcr,$(MCR_ME)))
 
 # Add microcode datapath
 $(eval $(call dep.gen_awk,$(PROJECT),datapath,firmware/lib/nic_basic/nic_stats_gen.h,firmware/lib/nic_basic/nic_stats.def,scripts/nic_stats.awk))
@@ -138,7 +164,7 @@ $(eval $(call microcode.add_include,$(PROJECT),datapath,$(GRO_DIR)))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,SS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
-$(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=10))
+$(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=$(WORKERS_PER_ISLAND)))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 #$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
 $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
@@ -226,17 +252,17 @@ $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,deps/ng-nfd.hg))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(DEPS_DIR)/flowenv.git/me/blocks/blm))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(BLM_DIR)))
 $(eval $(call microcode.add_include,$(PROJECT),mapcmsg,$(GRO_DIR)))
-$(eval $(call microcode.add_define,$(PROJECT),mapcmsg,WORKERS_PER_ISLAND=4))
+$(eval $(call microcode.add_define,$(PROJECT),mapcmsg,WORKERS_PER_ISLAND=$(WORKERS_PER_ISLAND)))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,GLOBAL_INIT=1))
 $(eval $(call microcode.add_define,$(PROJECT),mapcmsg,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
-$(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,mei2.me11))
+$(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,$(MAPCMSG_ME)))
 
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_svc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_svc,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,app_config_tables))
-$(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,mei2.me10,mei4.me10))
+$(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,$(APP_MASTER_ME),$(NFD_SVC_ME)))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,nic_basic))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,link_state))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,npfw))
@@ -265,14 +291,14 @@ $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_gather,-DNS_PLATFORM_TYPE=$
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_gather,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_notify,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_notify,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
-$(eval $(call fwdep.add_nfd_in,$(PROJECT),0,mei3.me10)) # specify Notify ME
+$(eval $(call fwdep.add_nfd_in,$(PROJECT),0,$(NFD0_NOTIFY_ME))) # specify Notify ME
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_pcie0_cache,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_pcie0_cache,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_sb,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_define,$(PROJECT),nfd_pcie0_sb,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 $(eval $(call microcode.add_flags,$(PROJECT),nfd_pcie0_pd,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 $(eval $(call microcode.add_define,$(PROJECT),nfd_pcie0_pd,NS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
-$(eval $(call fwdep.add_nfd_out,$(PROJECT),0,ila0.me1,ila0.me2 ila0.me3)) # Stage batch, then packet DMA MEs
+$(eval $(call fwdep.add_nfd_out,$(PROJECT),0,$(NFD0_SB_ME),$(NFD0_PD_MES))) # Stage batch, then packet DMA MEs
 
 # Add TM PM initialization (codeless)
 $(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pms.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
@@ -293,6 +319,6 @@ $(eval $(call nffw.add_obj_codeless,$(PROJECT),nfd_tlv_init))
 $(eval $(call nffw.add_link_flag,$(PROJECT),$(shell $(SCRIPT_DIR)/describe-head.sh --nfld_args $(FLAVOR))))
 $(eval $(call nffw.add_rtsyms,$(PROJECT),$(shell $(SCRIPT_DIR)/describe-head.sh --fw_id $(FLAVOR))))
 # TODO get link_w_analysis to work without adding a warning
-$(eval $(call nffw.add_link_flag,$(PROJECT),-codeshare mei2.me10 mei2.me11))
+$(eval $(call nffw.add_link_flag,$(PROJECT),-codeshare $(APP_MASTER_ME) $(MAPCMSG_ME)))
 $(eval $(call nffw.add_link_flag,$(PROJECT),-noecc)) # required for codeshare on B0
 $(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx,datapath))
