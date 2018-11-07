@@ -19,119 +19,179 @@ ifeq ($(PLATFORM),Hydrogen)
     MEDIA = 1x40
     AMDA = AMDA0081-0001
     CHIP = AMDA0081-0001:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Hydrogen_4x10)
     NS_PLATFORM_TYPE = 2
     MEDIA = 4x10
     AMDA = AMDA0081-0001
     CHIP = AMDA0081-0001:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Lithium)
     NS_PLATFORM_TYPE = 3
     MEDIA = 2x10
     AMDA = AMDA0096-0001
     CHIP = AMDA0096-0001:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Beryllium)
     NS_PLATFORM_TYPE = 7
     MEDIA = 2x40
     AMDA = AMDA0097-0001
     CHIP = AMDA0097-0001:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Beryllium_4x10_1x40)
     NS_PLATFORM_TYPE = 8
     MEDIA = 4x10_1x40
     AMDA = AMDA0097-0001
     CHIP = AMDA0097-0001:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Beryllium_8x10)
     NS_PLATFORM_TYPE = 9
     MEDIA = 8x10
     AMDA = AMDA0097-0001
     CHIP = AMDA0097-0001:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Carbon)
     NS_PLATFORM_TYPE = 10
     MEDIA = 2x25
     AMDA = AMDA0099-0001
     CHIP = AMDA0099-0001:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Carbon_2x10)
     NS_PLATFORM_TYPE = 11
     MEDIA = 2x10
     AMDA = AMDA0099-0001
     CHIP = AMDA0099-0001:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Carbon_1x10_1x25)
     NS_PLATFORM_TYPE = 12
     MEDIA = 1x10_1x25
     AMDA = AMDA0099-0001
     CHIP = AMDA0099-0001:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Starfighter_2x40)
     NS_PLATFORM_TYPE = 13
     MEDIA = 2x40
     AMDA = AMDA0058-0011
     CHIP = AMDA0058-0011:0
+    FLOORPLAN=Agilio_LX
 else ifeq ($(PLATFORM),Starfighter_1x100)
     NS_PLATFORM_TYPE = 14
     MEDIA = 1x100
     AMDA = AMDA0078-0011
     CHIP = AMDA0078-0011:0
+    FLOORPLAN=Agilio_LX
 else ifeq ($(PLATFORM),Starfighter_2x40_passive)
     NS_PLATFORM_TYPE = 15
     MEDIA = 2x40
     AMDA = AMDA0058-0012
     CHIP = AMDA0058-0012:0
+    FLOORPLAN=Agilio_LX
 else ifeq ($(PLATFORM),Sodium_2x10)
     NS_PLATFORM_TYPE = 16
     MEDIA = 2x10
     AMDA = AMDA0119-0001
     CHIP = AMDA0119-0001:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Sodium_2x10_crypto)
     NS_PLATFORM_TYPE = 17
     MEDIA = 2x10
     AMDA = AMDA0119-0002
     CHIP = AMDA0119-0002:0
+    FLOORPLAN=Agilio_CX
 else ifeq ($(PLATFORM),Starfighter_1x100_passive)
     NS_PLATFORM_TYPE = 18
     MEDIA = 1x100
     AMDA = AMDA0078-0012
     CHIP = AMDA0078-0012:0
+    FLOORPLAN=Agilio_LX
 endif
 PROJECT = $(FLAVOR)/nic_$(AMDA)_$(MEDIA)
 
 #Location of ME's. These can differ between platform families.
+ifeq ($(FLOORPLAN),Agilio_LX)
+    #Note: This is still the same as the CX  NIC, but could be improved.
+    #E.g: Some LX NICS can use 2 PCIe islands, and all SF's have more mei's
 
-#GRO ME's
-GRO_MES=mei0.me11 mei1.me11 mei3.me11 mei4.me11
+    #GRO ME's
+    GRO_MES=mei0.me11 mei1.me11 mei3.me11 mei4.me11
 
-#cmsg map handler
-MAPCMSG_ME=mei2.me11
+    #cmsg map handler
+    MAPCMSG_ME=mei2.me11
 
-#App_master ME
-APP_MASTER_ME=mei2.me10
+    #App_master ME
+    APP_MASTER_ME=mei2.me10
 
-#NFD SVC ME
-NFD_SVC_ME=mei4.me10
+    #NFD SVC ME
+    NFD_SVC_ME=mei4.me10
 
-#NFD for PCIE0
-NFD0_NOTIFY_ME=mei3.me10
-NFD0_SB_ME=ila0.me1
-NFD0_PD_MES=ila0.me2 ila0.me3
+    #NFD for PCIE0
+    NFD0_NOTIFY_ME=mei3.me10
+    NFD0_SB_ME=ila0.me1
+    NFD0_PD_MES=ila0.me2 ila0.me3
 
-#NFD for PCIE1
-NFD1_NOTIFY_ME=
-NFD1_SB_ME=
-NFD1_PD_MES=
+    #NFD for PCIE1
+    NFD1_NOTIFY_ME=
+    NFD1_SB_ME=
+    NFD1_PD_MES=
 
-#NFD for PCIE2
-NFD2_NOTIFY_ME=
-NFD2_SB_ME=
-NFD2_PD_MES=
+    #NFD for PCIE2
+    NFD2_NOTIFY_ME=
+    NFD2_SB_ME=
+    NFD2_PD_MES=
 
-#NFD for PCIE3
-NFD3_NOTIFY_ME=
-NFD3_SB_ME=
-NFD3_PD_MES=
+    #NFD for PCIE3
+    NFD3_NOTIFY_ME=
+    NFD3_SB_ME=
+    NFD3_PD_MES=
 
-#Multicast reaper ME
-MCR_ME=mei0.me10
+    #Multicast reaper ME
+    MCR_ME=mei0.me10
 
-#Amount of workers per island. Maintainers must keep this in sync with the
-#NIC_APP_MES variable and the datapath ME placement.
-WORKERS_PER_ISLAND=10
+    #Amount of workers per island. Maintainers must keep this in sync with the
+    #NIC_APP_MES variable and the datapath ME placement.
+    WORKERS_PER_ISLAND=10
+else
+    #All other NICS
+
+    #GRO ME's
+    GRO_MES=mei0.me11 mei1.me11 mei3.me11 mei4.me11
+
+    #cmsg map handler
+    MAPCMSG_ME=mei2.me11
+
+    #App_master ME
+    APP_MASTER_ME=mei2.me10
+
+    #NFD SVC ME
+    NFD_SVC_ME=mei4.me10
+
+    #NFD for PCIE0
+    NFD0_NOTIFY_ME=mei3.me10
+    NFD0_SB_ME=ila0.me1
+    NFD0_PD_MES=ila0.me2 ila0.me3
+
+    #NFD for PCIE1
+    NFD1_NOTIFY_ME=
+    NFD1_SB_ME=
+    NFD1_PD_MES=
+
+    #NFD for PCIE2
+    NFD2_NOTIFY_ME=
+    NFD2_SB_ME=
+    NFD2_PD_MES=
+
+    #NFD for PCIE3
+    NFD3_NOTIFY_ME=
+    NFD3_SB_ME=
+    NFD3_PD_MES=
+
+    #Multicast reaper ME
+    MCR_ME=mei0.me10
+
+    #Amount of workers per island. Maintainers must keep this in sync with the
+    #NIC_APP_MES variable and the datapath ME placement.
+    WORKERS_PER_ISLAND=10
+endif
 
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
 $(eval $(call nffw.set_amda,$(PROJECT),$(AMDA)))
