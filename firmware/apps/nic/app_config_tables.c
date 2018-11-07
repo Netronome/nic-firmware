@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Netronome Systems, Inc. All rights reserved.
+ * Copyright 2017-2020 Netronome Systems, Inc. All rights reserved.
  *
  * @file  app_config_tables.c
  * @brief Control plane management component for datapath action interpreter.
@@ -1274,7 +1274,7 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid,
     if (cfg_act_write_veb(vid, &veb_key, &acts) != NO_ERROR)
         return 1;
 
-    add_vlan_member(vlan_id, vid);
+    add_vlan_member(pcie, vlan_id, vid);
     upd_ctm_vlan_members();
 
     cfg_act_build_vf(&acts, pcie, vid, pf_control, vf_control);
@@ -1297,7 +1297,7 @@ cfg_act_vf_down(uint32_t pcie, uint32_t vid)
     if (cfg_act_write_veb(vid, &veb_key, 0) != NO_ERROR)
         return 1;
 
-    remove_vlan_member(vid);
+    remove_vlan_member(pcie, vid);
     upd_ctm_vlan_members();
 
     return 0;

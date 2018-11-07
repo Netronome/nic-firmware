@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 Netronome Systems, Inc. All rights reserved.
+ * Copyright (c) 2016-2020 Netronome Systems, Inc. All rights reserved.
  *
  * @file          apps/nic/nic_tables.h
  * @brief         data structures for Core NIC tables
@@ -41,37 +41,40 @@ struct vlan_filter_cfg {
 #define NIC_NO_VLAN_ID  4095
 
 /* VLAN to vid mapping table */
-__export __shared __mem uint64_t nic_vlan_to_vnics_map_tbl[NIC_NUM_VLANS];
+__export __shared __mem uint64_t nic_vlan_to_vnics_map_tbl[NFD_MAX_ISL][NIC_NUM_VLANS];
 
 
 /**
  * Load the VLAN's VNIC members bitmap
  *
+ * @param pcie      PCIe number (0..3)
  * @param vlan_id   The VLAN id (can also be the NIC_NO_VLAN_ID)
  * @param members   The returned 64bit VNIC members bitmap
  *
  * @return 0 on success, -1 on failure
  */
-__intrinsic int load_vlan_members(uint16_t vlan_id,
+__intrinsic int load_vlan_members(uint32_t pcie, uint16_t vlan_id,
                                   __xread uint64_t *members);
 
 /**
  * Adds a VNIC to the VLAN's VNIC members bitmap
  *
+ * @param pcie      PCIe number (0..3)
  * @param vlan_id   The VLAN id (can also be the NIC_NO_VLAN_ID)
  * @param vid       The VNIC vid to be added
  *
  * @return 0 on success, -1 on failure
  */
-__intrinsic int add_vlan_member(uint16_t vlan_id, uint16_t vid);
+__intrinsic int add_vlan_member(uint32_t pcie, uint16_t vlan_id, uint16_t vid);
 
 /**
  * Remove a VNIC from the VLAN's VNIC members bitmap
  *
+ * @param pcie      PCIe number (0..3)
  * @param vid       The VNIC vid to be removed
  *
  * @return 0 on success, -1 on failure
  */
-__intrinsic int remove_vlan_member(uint16_t vid);
+__intrinsic int remove_vlan_member(uint32_t pcie, uint16_t vid);
 
 #endif /* _NIC_TABLES_H_ */
