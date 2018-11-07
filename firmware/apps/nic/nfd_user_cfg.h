@@ -123,6 +123,23 @@
 
 #define NFD_PCIE0_EMEM          emem0
 
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+
+    #define NFD_PCIE1_EMEM          emem0
+    #define NFD_PCIE2_EMEM          emem0
+    #define NFD_PCIE3_EMEM          emem0
+
+    #define NFD_OUT_FL_BUFS_PER_QUEUE       256
+    #define NFD_PCIE0_FL_CACHE_MEM          pcie0.ctm
+    #define NFD_PCIE1_FL_CACHE_MEM          pcie1.ctm
+    #define NFD_PCIE2_FL_CACHE_MEM          pcie2.ctm
+    #define NFD_PCIE3_FL_CACHE_MEM          pcie3.ctm
+
+#else
+    #define NFD_OUT_FL_BUFS_PER_QUEUE      1024
+    #define NFD_PCIE0_FL_CACHE_MEM         emem0_cache_upper
+#endif
+
 #define NFD_IN_DATA_OFFSET      128
 
 /* Number of credits allocated per VNIC queue */
@@ -197,18 +214,22 @@
 #define NFD_IN_HAS_ISSUE1       1
 #define NFD_IN_ISSUE_DMA_QSHIFT 1
 #define NFD_IN_ISSUE_DMA_QXOR   0
-
 /* NFD_IN_WQ_SZ must be large enough to hold an nfd_in_pkt_desc (16B) for each
- * MU in the system. BLM_NBI8_BLQ0_Q_SIZE is the max number of MUs in the
- * system * MU descr size (4B). So NFD_IN_WQ_SZ = (BLM_NBI8_BLQ0_Q_SIZE/4)*16
+ * MU in the system. BLM_NBI8_BLQ1_Q_SIZE is the max number of MUs in the
+ * system * MU descr size (4B). So NFD_IN_WQ_SZ = (BLM_NBI8_BLQ1_Q_SIZE/4)*16
  */
 #define NFD_IN_WQ_SZ           ((BLM_NBI8_BLQ1_Q_SIZE/4) * 16)
+
 
 /* Optional defines */
 #define NFD_IN_ADD_SEQN
 #define NFD_IN_NUM_WQS          1
 
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+#define NFD_IN_NUM_SEQRS        2
+#else
 #define NFD_IN_NUM_SEQRS        8
+#endif
 #define NFD_IN_SEQR_QSHIFT      0
 
 /* PCI.OUT block defines */
@@ -247,14 +268,15 @@
 /* # of PFs + # VFs + # CTRLs */
 #define NVNICS (NFD_MAX_PFS + NFD_MAX_VFS + NFD_MAX_CTRL)
 
-#define NFD_OUT_FL_BUFS_PER_QUEUE      1024
-#define NFD_PCIE0_FL_CACHE_MEM         emem0_cache_upper
-
 #define NFD_USE_TLV_PF
 #define NFD_USE_TLV_VF
 #define NFD_CFG_TLV_BLOCK_SZ           3072
 #define NFD_CFG_TLV_BLOCK_OFF          0x2200
 
 #define NFD_OUT_USE_RX_BATCH_TGT
+
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+#define NFD_USE_MULTI_HOST
+#endif
 
 #endif /* !_NFD_USER_CFG_H_ */

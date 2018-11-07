@@ -14,6 +14,7 @@ else ifeq ($(FLAVOR), sriov)
     NS_FLAVOR_TYPE = 2
 endif
 
+DEDUP=
 ifeq ($(PLATFORM),Hydrogen)
     NS_PLATFORM_TYPE = 1
     MEDIA = 1x40
@@ -104,6 +105,14 @@ else ifeq ($(PLATFORM),Starfighter_1x100_passive)
     AMDA = AMDA0078-0012
     CHIP = AMDA0078-0012:0
     FLOORPLAN=Agilio_LX
+else ifeq ($(PLATFORM),Cadmium_DDR_1x50)
+    CHIP = AMDA0133-0001:0
+    NS_PLATFORM_TYPE = 19
+    MEDIA = 1x50
+    AMDA = AMDA0133-0001
+    CHIP = AMDA0133-0001:0
+    FLOORPLAN=OCP_Multihost
+    DEDUP=-dedup
 endif
 PROJECT = $(FLAVOR)/nic_$(AMDA)_$(MEDIA)
 
@@ -150,6 +159,46 @@ ifeq ($(FLOORPLAN),Agilio_LX)
     #Amount of workers per island. Maintainers must keep this in sync with the
     #NIC_APP_MES variable and the datapath ME placement.
     WORKERS_PER_ISLAND=10
+
+else ifeq ($(FLOORPLAN),OCP_Multihost)
+
+    #GRO ME's
+    GRO_MES=ila0.me2 mei2.me11 mei3.me11 mei4.me11
+
+    #App master ME (codeshare with MAPCMSG_ME)
+    APP_MASTER_ME=mei5.me6
+
+    #cmsg map handler
+    MAPCMSG_ME=mei5.me7
+
+    #NFD SVC ME
+    NFD_SVC_ME=mei3.me9
+
+    #NFD for PCIE 0
+    NFD0_NOTIFY_ME=ila0.me3
+    NFD0_SB_ME=mei0.me9
+    NFD0_PD_MES=mei0.me10 mei0.me11
+
+    #NFD for PCIE 1
+    NFD1_NOTIFY_ME=mei1.me7
+    NFD1_SB_ME=mei1.me9
+    NFD1_PD_MES=mei1.me10 mei1.me11
+
+    #NFD for PCIE 2
+    NFD2_NOTIFY_ME=mei2.me7
+    NFD2_SB_ME=mei6.me9
+    NFD2_PD_MES=mei6.me10 mei6.me11
+
+    #NFD for PCIE 3
+    NFD3_NOTIFY_ME=mei3.me8
+    NFD3_SB_ME=mei5.me9
+    NFD3_PD_MES=mei5.me10 mei5.me11
+
+    #Multicast reaper ME
+    MCR_ME=mei0.me6
+
+    WORKERS_PER_ISLAND=6
+
 else
     #All other NICS
 
@@ -241,18 +290,93 @@ $(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=$(WORKERS_PER_ISLAND)))
 #$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
-$(eval $(call nffw.add_obj,$(PROJECT),datapath, \
+
+ifeq ($(FLOORPLAN),OCP_Multihost)
+    $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
+        mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5 \
+        mei1.me0 mei1.me1 mei1.me2 mei1.me3 mei1.me4 mei1.me5 \
+        mei2.me0 mei2.me1 mei2.me2 mei2.me3 mei2.me4 mei2.me5 \
+        mei3.me0 mei3.me1 mei3.me2 mei3.me3 mei3.me4 mei3.me5 \
+        mei4.me0 mei4.me1 mei4.me2 mei4.me3 mei4.me4 mei4.me5 \
+        mei5.me0 mei5.me1 mei5.me2 mei5.me3 mei5.me4 mei5.me5 \
+        mei6.me0 mei6.me1 mei6.me2 mei6.me3 mei6.me4 mei6.me5 \
+        ))
+else
+    $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
         mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5 mei0.me6 mei0.me7 mei0.me8 mei0.me9 \
         mei1.me0 mei1.me1 mei1.me2 mei1.me3 mei1.me4 mei1.me5 mei1.me6 mei1.me7 mei1.me8 mei1.me9 \
         mei2.me0 mei2.me1 mei2.me2 mei2.me3 mei2.me4 mei2.me5 mei2.me6 mei2.me7 mei2.me8 mei2.me9 \
 	mei3.me0 mei3.me1 mei3.me2 mei3.me3 mei3.me4 mei3.me5 mei3.me6 mei3.me7 mei3.me8 mei3.me9 \
 	mei4.me0 mei4.me1 mei4.me2 mei4.me3 mei4.me4 mei4.me5 mei4.me6 mei4.me7 mei4.me8 mei4.me9 \
 	))
+endif
 
 # Custom config to give ME list to the app master
 define NIC_ISL_ME_DEST
 ((($(1) + 32) << 4) + ($(2) + 4))
 endef
+
+ifeq ($(FLOORPLAN),OCP_Multihost)
+    NIC_APP_ISLANDS := \
+        "$(call NIC_ISL_ME_DEST, 0, 0), \
+        $(call NIC_ISL_ME_DEST, 1, 0), \
+        $(call NIC_ISL_ME_DEST, 2, 0), \
+        $(call NIC_ISL_ME_DEST, 3, 0), \
+        $(call NIC_ISL_ME_DEST, 4, 0), \
+        $(call NIC_ISL_ME_DEST, 5, 0), \
+        $(call NIC_ISL_ME_DEST, 6, 0)"
+
+    NIC_APP_MES := \
+            "$(call NIC_ISL_ME_DEST, 0, 0), \
+            $(call NIC_ISL_ME_DEST, 0, 1), \
+            $(call NIC_ISL_ME_DEST, 0, 2), \
+            $(call NIC_ISL_ME_DEST, 0, 3), \
+            $(call NIC_ISL_ME_DEST, 0, 4), \
+            $(call NIC_ISL_ME_DEST, 0, 5), \
+            \
+            $(call NIC_ISL_ME_DEST, 1, 0), \
+            $(call NIC_ISL_ME_DEST, 1, 1), \
+            $(call NIC_ISL_ME_DEST, 1, 2), \
+            $(call NIC_ISL_ME_DEST, 1, 3), \
+            $(call NIC_ISL_ME_DEST, 1, 4), \
+            $(call NIC_ISL_ME_DEST, 1, 5), \
+            \
+            $(call NIC_ISL_ME_DEST, 2, 0), \
+            $(call NIC_ISL_ME_DEST, 2, 1), \
+            $(call NIC_ISL_ME_DEST, 2, 2), \
+            $(call NIC_ISL_ME_DEST, 2, 3), \
+            $(call NIC_ISL_ME_DEST, 2, 4), \
+            $(call NIC_ISL_ME_DEST, 2, 5), \
+            \
+            $(call NIC_ISL_ME_DEST, 3, 0), \
+            $(call NIC_ISL_ME_DEST, 3, 1), \
+            $(call NIC_ISL_ME_DEST, 3, 2), \
+            $(call NIC_ISL_ME_DEST, 3, 3), \
+            $(call NIC_ISL_ME_DEST, 3, 4), \
+            $(call NIC_ISL_ME_DEST, 3, 5), \
+            \
+            $(call NIC_ISL_ME_DEST, 4, 0), \
+            $(call NIC_ISL_ME_DEST, 4, 1), \
+            $(call NIC_ISL_ME_DEST, 4, 2), \
+            $(call NIC_ISL_ME_DEST, 4, 3), \
+            $(call NIC_ISL_ME_DEST, 4, 4), \
+            $(call NIC_ISL_ME_DEST, 4, 5), \
+            \
+            $(call NIC_ISL_ME_DEST, 5, 0), \
+            $(call NIC_ISL_ME_DEST, 5, 1), \
+            $(call NIC_ISL_ME_DEST, 5, 2), \
+            $(call NIC_ISL_ME_DEST, 5, 3), \
+            $(call NIC_ISL_ME_DEST, 5, 4), \
+            $(call NIC_ISL_ME_DEST, 5, 5), \
+            \
+            $(call NIC_ISL_ME_DEST, 6, 0), \
+            $(call NIC_ISL_ME_DEST, 6, 1), \
+            $(call NIC_ISL_ME_DEST, 6, 2), \
+            $(call NIC_ISL_ME_DEST, 6, 3), \
+            $(call NIC_ISL_ME_DEST, 6, 4), \
+            $(call NIC_ISL_ME_DEST, 6, 5)"
+
+else
 
 NIC_APP_ISLANDS := \
 	"$(call NIC_ISL_ME_DEST, 0, 0), \
@@ -316,6 +440,7 @@ NIC_APP_MES := \
         $(call NIC_ISL_ME_DEST, 4, 7), \
         $(call NIC_ISL_ME_DEST, 4, 8), \
         $(call NIC_ISL_ME_DEST, 4, 9)"
+endif
 
 # Add cmsg map handler
 $(eval $(call microcode.assemble,$(PROJECT),mapcmsg,apps/nic/maps,cmsg_app.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
@@ -393,4 +518,5 @@ $(eval $(call nffw.add_rtsyms,$(PROJECT),$(shell $(SCRIPT_DIR)/describe-head.sh 
 # TODO get link_w_analysis to work without adding a warning
 $(eval $(call nffw.add_link_flag,$(PROJECT),-codeshare $(APP_MASTER_ME) $(MAPCMSG_ME)))
 $(eval $(call nffw.add_link_flag,$(PROJECT),-noecc)) # required for codeshare on B0
+$(eval $(call nffw.add_link_flag,$(PROJECT),$(DEDUP))) #Don't duplicate list files. Makes smaller NFFW
 $(eval $(call nffw.link,$(PROJECT),nic_rx,nic_tx,datapath))

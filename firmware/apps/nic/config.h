@@ -41,8 +41,13 @@
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND2   1,255,51
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND3   1,255,51
 #define NBI0_DMA_BPE_CONFIG_ME_ISLAND4   1,255,51
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND5   0,0,0
-#define NBI0_DMA_BPE_CONFIG_ME_ISLAND6   0,0,0
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+    #define NBI0_DMA_BPE_CONFIG_ME_ISLAND5   1,255,51
+    #define NBI0_DMA_BPE_CONFIG_ME_ISLAND6   1,255,51
+#else
+    #define NBI0_DMA_BPE_CONFIG_ME_ISLAND5   0,0,0
+    #define NBI0_DMA_BPE_CONFIG_ME_ISLAND6   0,0,0
+#endif
 #define NBI1_DMA_BPE_CONFIG_ME_ISLAND0   0,0,0
 #define NBI1_DMA_BPE_CONFIG_ME_ISLAND1   0,0,0
 #define NBI1_DMA_BPE_CONFIG_ME_ISLAND2   0,0,0
@@ -702,7 +707,7 @@
 #if (GRO_NUM_BLOCKS > 16)
     #define GRO_CTX_PER_BLOCK       1
     #warning "Cannot properly configure GRO, GRO_NUM_BLOCKS is" GRO_NUM_BLOCKS "GRO_CTX_PER_BLOCK set to" GRO_CTX_PER_BLOCK
-#elseif (GRO_NUM_BLOCKS < 1)
+#elif (GRO_NUM_BLOCKS < 1)
     #error "Cannot properly configure GRO, GRO_NUM_BLOCKS must be >0 but is set to" GRO_NUM_BLOCKS
 #else
     #define GRO_CTX_PER_BLOCK (16/GRO_NUM_BLOCKS)
@@ -711,9 +716,8 @@
 /*
  * NFD configuration
  */
-#define PCIE_ISL                0
-#define PCI                     PCIE_ISL
-#define NIC_PCI                 PCIE_ISL
+#define PCI                     0
+#define NIC_PCI                 0
 #define NFD_OUT_SB_WQ_NUM       15
 
 /*

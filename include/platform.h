@@ -42,8 +42,9 @@
 #define NS_PLATFORM_SODIUM_2x10                 16
 #define NS_PLATFORM_SODIUM_2x10_crypto          17
 #define NS_PLATFORM_STARFIGHTER_1x100_passive   18
+#define NS_PLATFORM_CADMIUM_DDR_1x50            19
 
-#define NS_PLATFORM_LAST                        NS_PLATFORM_STARFIGHTER_1x100_passive
+#define NS_PLATFORM_LAST                        NS_PLATFORM_CADMIUM_DDR_1x50
 
 
 /*
@@ -627,6 +628,29 @@
     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
+
+/* Cadmium with crypto and DDR 1x50GE */
+#elif (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+     #define NS_PLATFORM_MAC_CORE(_port)           (((_port) == 0) ? 0 : 1)
+     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) 0
+     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
+             (NS_PLATFORM_MAC_CORE_SERDES_LO(_port) + 3)
+     #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+             (((_core) == 0) ? 0 : 12)
+     #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     (((_port) == 0) ? 0 : 64)
+     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
+             (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
+     #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
+     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
+     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       1
+     #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+     #define NS_PLATFORM_PCLK                      500
+     #define NS_PLATFORM_PORT_SPEED(_port)         (((_port) == 0) ? 50 : 1)
+     #define NS_PLATFORM_TCLK                      500
+     #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x001
+     #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
+     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
+     #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
 #endif
 
 
