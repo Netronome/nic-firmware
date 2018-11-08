@@ -287,7 +287,13 @@
     .init __HASHMAP_LOCK_TBL 0
 
     /* fd table */
-    .alloc_mem __HASHMAP_FD_TBL imem global (__HASHMAP_FD_TBL_SZ_LW * 4 * HASHMAP_MAX_TID) 256
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+    #define HASH_MAP_IMEM imem1
+#else
+    #define HASH_MAP_IMEM imem
+#endif
+    /* fd table */
+    .alloc_mem __HASHMAP_FD_TBL    HASH_MAP_IMEM global (__HASHMAP_FD_TBL_SZ_LW * 4 * HASHMAP_MAX_TID) 256
     .init __HASHMAP_FD_TBL 0
 #endm
 

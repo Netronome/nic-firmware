@@ -13,9 +13,15 @@
 #define SLICC_HASH_PAD_NN_IDX           64
 #define SLICC_HASH_PAD_SIZE_LW          40
 
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+    #define SLICC_HASH_MEM imem1
+#else
+    #define SLICC_HASH_MEM imem
+#endif
+
 #if defined(__NFP_LANG_ASM)
     // crytographic pad (should be initialized using secure random generator at boot)
-    .alloc_mem SLICC_HASH_PAD_DATA imem global (SLICC_HASH_PAD_SIZE_LW * 4) 256
+    .alloc_mem SLICC_HASH_PAD_DATA SLICC_HASH_MEM global (SLICC_HASH_PAD_SIZE_LW * 4) 256
 
     // TODO: SLICC_HASH_PAD_DATA is initialized by host
 
@@ -33,9 +39,8 @@
 
 #elif defined(__NFP_LANG_MICROC)
     __asm {
-        .alloc_mem SLICC_HASH_PAD_DATA imem global (SLICC_HASH_PAD_SIZE_LW * 4) 256
+        .alloc_mem SLICC_HASH_PAD_DATA SLICC_HASH_MEM global (SLICC_HASH_PAD_SIZE_LW * 4) 256
     }
-
 #endif
 
 

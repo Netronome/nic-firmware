@@ -34,7 +34,13 @@
 
     passert(MAX_KEY_LENGTH, "LE", (CAMP_HASH_PAD_SIZE_LW - 2))
 
-    .alloc_mem CAMP_HASH_PAD_DATA imem global (CAMP_HASH_PAD_SIZE_LW * 4) 256
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+    #define CAMP_HASH_MEM imem1
+#elsei
+    #define CAMP_HASH_MEM imem
+#endif
+
+    .alloc_mem CAMP_HASH_PAD_DATA CAMP_HASH_MEM global (CAMP_HASH_PAD_SIZE_LW * 4) 256
 
     // FUTURE TODO: wait here until CAMP_HASH_PAD_DATA is initialized with secure random data from the host
     // for now simply do a static init (to keep hash outputs predictable for debugging purposes)
