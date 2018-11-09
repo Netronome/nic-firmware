@@ -21,7 +21,8 @@
 #define NFD_USE_OVERSUBSCRIPTION
 #define NFD_OUT_ALWAYS_FREE_CTM
 #define NFD_OUT_ADD_ZERO_TKT
-#if (NS_FLAVOR_TYPE == NS_FLAVOR_SRIOV)
+#if ((NS_FLAVOR_TYPE == NS_FLAVOR_SRIOV) || \
+        (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50))
     #define NFD_OUT_SKIP_FREE_BLQ 3
 #endif
 
@@ -163,6 +164,20 @@
      NFP_NET_CFG_UPDATE_IRQMOD  | NFP_NET_CFG_UPDATE_MACADDR |     \
      NFP_NET_CFG_UPDATE_VXLAN)
 
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+
+#define NFD_CFG_PF_CAP                                             \
+    (NFP_NET_CFG_CTRL_ENABLE    | \
+     NFP_NET_CFG_CTRL_RXCSUM    | NFP_NET_CFG_CTRL_TXCSUM |        \
+     NFP_NET_CFG_CTRL_RSS       | NFP_NET_CFG_CTRL_RSS2 |          \
+     NFP_NET_CFG_CTRL_MSIXAUTO  | NFP_NET_CFG_CTRL_CSUM_COMPLETE | \
+     NFP_NET_CFG_CTRL_GATHER    | NFP_NET_CFG_CTRL_LSO |           \
+     NFP_NET_CFG_CTRL_IRQMOD    | NFP_NET_CFG_CTRL_BPF |           \
+     NFP_NET_CFG_CTRL_LIVE_ADDR | NFP_NET_CFG_CTRL_VXLAN |         \
+     NFP_NET_CFG_CTRL_NVGRE)
+
+#else
+
 #define NFD_CFG_PF_CAP                                             \
     (NFP_NET_CFG_CTRL_ENABLE    | NFP_NET_CFG_CTRL_PROMISC |       \
      NFP_NET_CFG_CTRL_RXCSUM    | NFP_NET_CFG_CTRL_TXCSUM |        \
@@ -172,6 +187,8 @@
      NFP_NET_CFG_CTRL_IRQMOD    | NFP_NET_CFG_CTRL_BPF |           \
      NFP_NET_CFG_CTRL_LIVE_ADDR | NFP_NET_CFG_CTRL_VXLAN |         \
      NFP_NET_CFG_CTRL_NVGRE)
+
+#endif
 
 #define NFD_CFG_PF_LEGAL_UPD \
     (NFP_NET_CFG_UPDATE_GEN     | NFP_NET_CFG_UPDATE_RING |        \
@@ -256,10 +273,14 @@
 #define NFD_BPF_ABI             2
 #define NFD_BPF_STACK_SZ        512
 
-#if NS_FLAVOR_TYPE == NS_FLAVOR_BPF
-    #define NFD_NET_APP_ID      (2)
+#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+#define NFD_NET_APP_ID              (4)
 #else
-    #define NFD_NET_APP_ID      (1)
+    #if NS_FLAVOR_TYPE == NS_FLAVOR_BPF
+        #define NFD_NET_APP_ID      (2)
+    #else
+        #define NFD_NET_APP_ID      (1)
+    #endif
 #endif
 
 /* enable cmsg */
@@ -278,5 +299,7 @@
 #if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
 #define NFD_USE_MULTI_HOST
 #endif
+
+#define NFD_IN_WQ_SHARED               emem0
 
 #endif /* !_NFD_USER_CFG_H_ */
