@@ -101,6 +101,7 @@
     #define    INSTR_PUSH_PKT          15
     #define    INSTR_TX_VLAN           16
     #define    INSTR_L2_SWITCH_WIRE    17
+    #define    INSTR_L2_SWITCH_HOST    18
 #elif defined(__NFP_LANG_MICROC)
 enum instruction_ops {
     INSTR_DROP = 0,
@@ -120,7 +121,8 @@ enum instruction_ops {
     INSTR_POP_PKT,
     INSTR_PUSH_PKT,
     INSTR_TX_VLAN,
-    INSTR_L2_SWITCH_WIRE
+    INSTR_L2_SWITCH_WIRE,
+    INSTR_L2_SWITCH_HOST
 };
 
 /* this maping will eventually be replaced at build time with actual offsets
@@ -306,6 +308,12 @@ enum instruction_ops {
  *    0  |              17             |P|                               |
  *       +-----------------------------+-+-------------------------------+
  *
+ * INSTR_L2_SWITCH_HOST:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+-------------------------------+
+ *    0  |              18             |P|                               |
+ *       +-----------------------------+-+-------------------------------+
  */
 
 /* Instruction format of NIC_CFG_INSTR_TBL table. Some 32-bit words will

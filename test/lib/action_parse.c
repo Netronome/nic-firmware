@@ -184,6 +184,12 @@ static void parse_action_list(void)
             case INSTR_L2_SWITCH_WIRE:
                 action_next = _action_list[i];
                 if (action_next.pipeline)
+                    test_assert_equal(action.value, INSTR_L2_SWITCH_HOST);
+                 break;
+
+            case INSTR_L2_SWITCH_HOST:
+                action_next = _action_list[i];
+                if (action_next.pipeline)
                     test_assert_equal(action.value, 0);
                 break;
 
