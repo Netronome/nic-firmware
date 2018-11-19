@@ -28,9 +28,10 @@
 #include <flavors.h>
 
 #define NFD_USE_OVERSUBSCRIPTION
-#define NFD_PD_ALWAYS_HAS_CTM
+#define NFD_OUT_ALWAYS_HAS_CTM
+#define NFD_OUT_ADD_ZERO_TKT
 #if (NS_FLAVOR_TYPE == NS_FLAVOR_SRIOV)
-    #define NFD_PD_MCR_BLQ 3
+    #define NFD_OUT_SKIP_FREE_BLQ 3
 #endif
 
 /* The absolute max number of VNICs we can support */
@@ -128,13 +129,6 @@
 #ifndef NFD_MAX_PFS
 #define NFD_MAX_PFS             NS_PLATFORM_NUM_PORTS
 #endif
-
-/* Configure VF expansion BARs to access the NFP, this seems to be required
- * even when just using the PF */
-#define NFD_VNIC_VF
-
-/* Use a service ME which will handle MSIX generation when enabled */
-//#define USE_SVC_ME
 
 #define NFD_PCIE0_EMEM          emem0
 

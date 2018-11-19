@@ -1,10 +1,10 @@
 #
 # Change these revisions to suit the project
 #
-# FLOWENV_REV - Tip as of Apr 23 2018
-FLOWENV_REV=a77d5b2
-# NFD_REV - Jun 22 2018
-NFD_REV=4640b43b
+# FLOWENV_REV - Tip as of Nov 19 2018
+FLOWENV_REV=b4cc7f0
+# NFD_REV - Tip as of Nov 19 2018
+NFD_REV=0b1007b
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
@@ -56,16 +56,7 @@ $(DEPS_DIR)/ng-nfd.git:
 	git clone -q --no-checkout \
 		git://source.netronome.com/ng-nfd.git $(NFD_DIR)
 	cd $(NFD_DIR) && git checkout $(NFD_REV)
-	cd $(NFD_DIR) && patch -p1 < ../0001-PCI.OUT-optimize-the-extration-of-CTM-island-in-PD.patch && cd -
-	cd $(NFD_DIR) && patch -p1 < ../0002-PCI.OUT-optimize-len-calc-in-PD.patch && cd -
-	cd $(NFD_DIR) && patch -p1 < ../0003-PCI.OUT-optimize-ticket-release-in-PD.patch && cd -
-	cd $(NFD_DIR) && patch -p1 < ../0004-PCI.OUT-introduce-NFD_PD_ALWAYS_HAS_CTM-mode.patch && cd -
-	cd $(NFD_DIR) && patch -p1 < ../0005-PCI.OUT-add-support-for-multicast-accounting.patch && cd -
-	cd $(NFD_DIR) && patch -p1 < ../0006-PCI.IN-optimize-sequence-number-handling-in-notify.patch && cd -
-	cd $(NFD_DIR) && patch -p1 < ../0007-PCI.IN-optimize-increment-of-served-in-notify.patch && cd -
-	cd $(NFD_DIR) && patch -p1 < ../0008-PCI.IN-save-a-move-by-removing-q_batch-local-in-noti.patch && cd -
 	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_abi3.patch && cd -
-	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_tlv.patch && cd -
 	cd $(NFD_DIR) && patch -p1 < ../0001-Add-nfd_vf_cfg_base-function.patch && cd -
 
 GIT_DEPS += $(NFD_DIR)
