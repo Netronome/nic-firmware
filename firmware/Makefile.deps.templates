@@ -389,16 +389,6 @@ $(eval $(call micro_c.add_includes,$1,nfd_svc,			\
 	$(NFD_DIR)/me/blocks/shared				\
 	))
 $(eval $(call micro_c.add_flags,$1,nfd_svc,-Qnn_mode=1))
-$(eval $(call micro_c.add_defines,$1,nfd_svc,			\
-	NFD_CFG_NEXT_ME0="__nfp_idstr2meid(\"$4\")" 		\
-	NFD_CFG_SIG_NEXT_ME0="nfd_cfg_sig_app_master0"		\
-	NFD_CFG_NEXT_ME1="__nfp_idstr2meid(\"$4\")" 		\
-	NFD_CFG_SIG_NEXT_ME1="nfd_cfg_sig_app_master1"		\
-	NFD_CFG_NEXT_ME2="__nfp_idstr2meid(\"$4\")" 		\
-	NFD_CFG_SIG_NEXT_ME2="nfd_cfg_sig_app_master2"		\
-	NFD_CFG_NEXT_ME3="__nfp_idstr2meid(\"$4\")" 		\
-	NFD_CFG_SIG_NEXT_ME3="nfd_cfg_sig_app_master3"		\
-	))
 $(eval $(call nffw.add_obj,$1,nfd_svc,$5))
 
 $1__NFD_SVC_ME = $5
@@ -434,6 +424,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_gather,		\
 	PCIE_ISL=$2						\
 	NFD_IN_DATA_DMA_ME0="__nfp_idstr2meid(\"pcie$2.me2\")"	\
 	NFD_IN_DATA_DMA_ME1="__nfp_idstr2meid(\"pcie$2.me3\")"	\
+	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")"             \
 	NFD_OUT_CACHE_ME="__nfp_idstr2meid(\"pcie$2.me0\")"	\
 	))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_gather,pcie$2.me1))
@@ -461,7 +452,7 @@ $(eval $(call micro_c.set_nctx,$1,nfd_pcie$2_issue0,4))
 $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_issue0,		\
 	PCIE_ISL=$2						\
 	PCI_IN_ISSUE_DMA_IDX=0					\
-	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")" 		\
+	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")"		\
 	))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_issue0,pcie$2.me2))
 $$($1__nfd_pcie$2_issue0__LIST): $(DEPS_DIR)/Makefile
@@ -488,7 +479,7 @@ $(eval $(call micro_c.set_nctx,$1,nfd_pcie$2_issue1,4))
 $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_issue1,		\
 	PCIE_ISL=$2						\
 	PCI_IN_ISSUE_DMA_IDX=1					\
-	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")" 		\
+	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")"		\
 	))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_issue1,pcie$2.me3))
 $$($1__nfd_pcie$2_issue1__LIST): $(DEPS_DIR)/Makefile
@@ -506,7 +497,9 @@ $(eval $(call micro_c.add_includes,$1,nfd_pcie$2_notify,	\
 	$(NFD_DIR)/me/blocks/vnic				\
 	$(NFD_DIR)/me/blocks/shared				\
 	))
-$(eval $(call micro_c.set_nctx,$1,nfd_pcie$2_notify,4))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_notify,		\
+	-Qlmpt_reserve_option=0x8				\
+	))
 $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_notify,\
 	PCIE_ISL=$2						\
 	NFD_IN_DATA_DMA_ME0="__nfp_idstr2meid(\"pcie$2.me2\")" \
@@ -546,9 +539,10 @@ $(eval $(call micro_c.add_includes,$1,nfd_pcie$2_cache,		\
 $(eval $(call micro_c.add_flags,$1,nfd_pcie$2_cache,-Qlm_start=512))
 $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_cache,		\
 	PCIE_ISL=$2						\
-	NFD_CFG_NEXT_ME="__nfp_idstr2meid(\"$3\")"		\
-	NFD_CFG_SIG_NEXT_ME="nfd_cfg_sig_sb"			\
 	))
+$(foreach pd_me,$(shell seq $(words $4)),			\
+        $(call micro_c.add_defines,$1,nfd_pcie$2_cache,		\
+        NFD_OUT_PD_ME$(shell expr ${pd_me} - 1)="__nfp_idstr2meid(\"$(word ${pd_me}, $4)\")"))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_cache,pcie$2.me0))
 $$($1__nfd_pcie$2_cache__LIST): $(DEPS_DIR)/Makefile
 
@@ -567,8 +561,6 @@ $(eval $(call microcode.add_defines,$1,nfd_pcie$2_sb,		\
 	STAGE_BATCH_MANAGER_CTX=0				\
 	STAGE_BATCH_FIRST_WORKER=1				\
 	STAGE_BATCH_NUM_WORKERS=7				\
-	NFD_CFG_NEXT_ME="__nfp_idstr2meid(\"$$($1__NFD_SVC_ME)\")"\
-	NFD_CFG_SIG_NEXT_ME="_nfd_cfg_sig_svc_me$2"		\
 	))
 $(eval $(call microcode.add_flags,$1,nfd_pcie$2_sb,-keep_unreachable_code))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_sb,$3))
