@@ -139,7 +139,8 @@ __shared __lmem uint32_t vf_lsc_list[NS_PLATFORM_NUM_PORTS][LS_ARRAY_LEN];
 #endif
 
 
-__visible SIGNAL nfd_cfg_sig_app_master0;
+SIGNAL nfd_cfg_sig_app_master0;
+__xread struct nfd_cfg_msg cfg_msg_rd0;
 NFD_CFG_BASE_DECLARE(0);
 NFD_VF_CFG_DECLARE(NIC_PCI)
 NFD_FLR_DECLARE;
@@ -719,7 +720,8 @@ cfg_changes_loop(void)
 
     for (;;) {
         cfg_msg.error = 0;
-        nfd_cfg_master_chk_cfg_msg(&cfg_msg, &nfd_cfg_sig_app_master0, 0);
+        nfd_cfg_master_chk_cfg_msg(NIC_PCI, &cfg_msg, &cfg_msg_rd0,
+                                   &nfd_cfg_sig_app_master0);
 
         if (cfg_msg.msg_valid && !cfg_msg.error) {
             vid = cfg_msg.vid;
@@ -750,8 +752,7 @@ error:
             /* Complete the message */
             cfg_msg.msg_valid = 0;
             nfd_cfg_app_complete_cfg_msg(NIC_PCI, &cfg_msg,
-                                     NFD_CFG_BASE_LINK(NIC_PCI),
-                                     &nfd_cfg_sig_app_master0);
+                                         NFD_CFG_BASE_LINK(NIC_PCI));
         }
         ctx_swap();
     }
@@ -1134,7 +1135,8 @@ main(void)
          * nfd_cfg_init_cfg_msg() introduces the live range for the remote
          * signal, call it before anything else that might reuse the signal
          */
-        nfd_cfg_init_cfg_msg(&nfd_cfg_sig_app_master0, &cfg_msg);
+	nfd_cfg_master_init_cfg_msg(NIC_PCI, &cfg_msg, &cfg_msg_rd0,
+                                    &nfd_cfg_sig_app_master0);
         trng_init();
         init_catamaran_chan2port_table();
         init_vfs_random_macs();
