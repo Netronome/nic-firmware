@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Netronome Systems, Inc. All rights reserved.
+ * Copyright(C) 2017-2020 Netronome Systems, Inc. All rights reserved.
  *
  * @file  action_parse.c
  *
@@ -180,6 +180,12 @@ static void parse_action_list(void)
                 /* terminal action, no need to check pipeline bit*/
                 /* Terminate processing */
                 goto check_length;
+
+            case INSTR_L2_SWITCH_WIRE:
+                action_next = _action_list[i];
+                if (action_next.pipeline)
+                    test_assert_equal(action.value, 0);
+                break;
 
             default:
                 test_assert_equal(action.value, 0);

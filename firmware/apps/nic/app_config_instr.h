@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2019 Netronome Systems, Inc. All rights reserved.
+ * Copyright (C) 2015-2020 Netronome Systems, Inc. All rights reserved.
  *
  * @file          app_config_instr.h
  * @brief         Header file for App Config ME instruction table
@@ -100,6 +100,7 @@
     #define    INSTR_POP_PKT           14
     #define    INSTR_PUSH_PKT          15
     #define    INSTR_TX_VLAN           16
+    #define    INSTR_L2_SWITCH_WIRE    17
 #elif defined(__NFP_LANG_MICROC)
 enum instruction_ops {
     INSTR_DROP = 0,
@@ -118,7 +119,8 @@ enum instruction_ops {
     INSTR_VEB_LOOKUP,
     INSTR_POP_PKT,
     INSTR_PUSH_PKT,
-    INSTR_TX_VLAN
+    INSTR_TX_VLAN,
+    INSTR_L2_SWITCH_WIRE
 };
 
 /* this maping will eventually be replaced at build time with actual offsets
@@ -297,6 +299,12 @@ enum instruction_ops {
  *    0  |             15              |P|                               |
  *       +-----------------------------+-+-------------------------------+
  *
+ * INSTR_L2_SWITCH_WIRE:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+-------------------------------+
+ *    0  |              17             |P|                               |
+ *       +-----------------------------+-+-------------------------------+
  *
  */
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017-2019 Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2017-2020 Netronome Systems, Inc.  All rights reserved.
  *
  * @file   action.uc
  * @brief  Action interpreter and core NIC data plane actions.
@@ -21,13 +21,21 @@
 #include "pv.uc"
 #include "pkt_io.uc"
 #include "ebpf.uc"
+#include "app_mac_lkup.h"
+#include "mem_lkup.uc"
+
 
 .alloc_mem __actions_sriov_keys lmem me 32 64
+
+.reg global volatile g_mac_lkup_addr[2]
 
 .reg volatile read $__actions[NIC_MAX_INSTR]
 .addr $__actions[0] 32
 .xfer_order $__actions
 .reg volatile __actions_t_idx
+
+mem_lkup_init_hash_tbl(_mac_lkup_tbl, imem0, MAC_LKUP_NUM_BUCKETS, MAC_LKUP_BUCKET_SZ)
+mem_lkup_init_hash_addr(g_mac_lkup_addr, _mac_lkup_tbl, HASH_OP_CAMR48_64B, 0, MAC_LKUP_NUM_BUCKETS, MAC_LKUP_BUCKET_SZ)
 
 #macro __actions_read(out_data, in_mask, in_shf)
     #if (streq('in_mask', '--'))
@@ -235,6 +243,52 @@ end#:
 
     alu[--, mac_lo, OR, mac_hi, <<16]
     bne[DROP_LABEL]
+
+end#:
+.end
+#endm
+
+#macro __actions_l2_switch_wire(in_pkt_vec, DROP_LABEL)
+.begin
+
+    .reg $mac_lkup[2]
+    .xfer_order $mac_lkup
+    .sig lkup_sig
+    .reg tmp, act_addr
+    .sig sig_actions
+
+    __actions_read()
+
+    //Broadcast/Multicast: skip this step.
+    br_bset[BF_AL(in_pkt_vec, PV_MAC_DST_MC_bf), end#]
+
+    pv_seek(in_pkt_vec, 0)
+
+    //Do with lookup MAC in packet header
+    alu[$mac_lkup[1], 0, +16, *$index++]
+    move($mac_lkup[0], *$index)
+
+    //Lookup the MAC address
+    mem[lookup, $mac_lkup[0], g_mac_lkup_addr[0], <<8, g_mac_lkup_addr[1], 1], sig_done[lkup_sig]
+    ctx_arb[lkup_sig]
+
+    //restore here in case of dropping
+    __actions_restore_t_idx()
+
+    //Mac not found,
+    br_bclr[$mac_lkup[0], MAC_LKUP_IN_USE_bit, DROP_LABEL]
+
+    //Read rest of action list from a new address
+    alu[act_addr, $mac_lkup[0], AND~, 1, <<MAC_LKUP_IN_USE_bit]
+    ov_start(OV_LENGTH)
+    ov_set_use(OV_LENGTH, 16, OVF_SUBTRACT_ONE)
+    ov_clean()
+    cls[read, $__actions[0], 0, act_addr, max_16], indirect_ref, defer[2], ctx_swap[sig_actions]
+        .reg_addr __actions_t_idx 28 B
+        alu[__actions_t_idx, t_idx_ctx, OR, &$__actions[0], <<2]
+        nop
+
+    __actions_restore_t_idx()
 
 end#:
 .end
@@ -851,7 +905,7 @@ end#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#, ins_12#, ins_13#, ins_14#, ins_15#, ins_16#]
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#, ins_12#, ins_13#, ins_14#, ins_15#, ins_16#, ins_17#]
 
     ins_0#: br[drop_act#]
     ins_1#: br[rx_wire#]
@@ -870,6 +924,7 @@ next#:
     ins_14#: br[pkt_pop#]
     ins_15#: br[pkt_push#]
     ins_16#: br[tx_vlan#]
+    ins_17#: br[l2_switch_wire#]
 
 error_pkt_stack#:
     pv_stats_update(io_pkt_vec, ERROR_PKT_STACK, drop#)
@@ -949,6 +1004,10 @@ cmsg#:
 ebpf#:
     __actions_read(ebpf_addr, 0xffff)
     ebpf_call(io_pkt_vec, ebpf_addr)
+
+l2_switch_wire#:
+    __actions_l2_switch_wire(io_pkt_vec, drop_mismatch#)
+    __actions_next()
 
 .end
 #endm
