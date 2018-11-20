@@ -246,4 +246,6 @@
 #define NFD_CFG_TLV_BLOCK_SZ           3072
 #define NFD_CFG_TLV_BLOCK_OFF          0x2200
 
+#define NFD_OUT_USE_RX_BATCH_TGT
+
 #endif /* !_NFD_USER_CFG_H_ */
