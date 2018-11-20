@@ -494,6 +494,8 @@
     _pf0_net_bar0
     _nic_cfg_synch
     bpf_capabilities
+    nfd_cfg_msg_jrnl
+    nfd_cfg_state_jrnl
     nfd_cfg_pf0_num_ports
     nfd_cfg_ring_mem00
     nfd_cfg_ring_mem01
@@ -3646,6 +3648,8 @@
     _pf0_net_bar0
     _nic_cfg_synch
     bpf_capabilities
+    nfd_cfg_msg_jrnl
+    nfd_cfg_state_jrnl
     nfd_cfg_pf0_num_ports
     nfd_cfg_ring_mem00
     nfd_cfg_ring_mem01
