@@ -179,6 +179,18 @@ __export __dram struct synch_cnt nic_cfg_synch;
 #define   NFP_NET_CFG_STS_LINK_RATE_50G           6
 #define   NFP_NET_CFG_STS_LINK_RATE_100G          7
 
+#ifdef NFD_PCIE0_EMEM
+__export __emem uint32_t abi_nfd_out_red_offload_0 = 0;
+#endif
+#ifdef NFD_PCIE1_EMEM
+__export __emem uint32_t abi_nfd_out_red_offload_1 = 0;
+#endif
+#ifdef NFD_PCIE2_EMEM
+__export __emem uint32_t abi_nfd_out_red_offload_2 = 0;
+#endif
+#ifdef NFD_PCIE3_EMEM
+__export __emem uint32_t abi_nfd_out_red_offload_3 = 0;
+#endif
 
 __intrinsic void nic_local_epoch();
 
