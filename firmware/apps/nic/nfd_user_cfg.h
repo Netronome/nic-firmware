@@ -28,7 +28,7 @@
 #include <flavors.h>
 
 #define NFD_USE_OVERSUBSCRIPTION
-#define NFD_OUT_ALWAYS_HAS_CTM
+#define NFD_OUT_ALWAYS_FREE_CTM
 #define NFD_OUT_ADD_ZERO_TKT
 #if (NS_FLAVOR_TYPE == NS_FLAVOR_SRIOV)
     #define NFD_OUT_SKIP_FREE_BLQ 3
