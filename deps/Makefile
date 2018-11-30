@@ -57,6 +57,7 @@ $(DEPS_DIR)/ng-nfd.git:
 		git://source.netronome.com/ng-nfd.git $(NFD_DIR)
 	cd $(NFD_DIR) && git checkout $(NFD_REV)
 	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_abi3.patch && cd -
+	cd $(NFD_DIR) && patch -p1 < ../nfd_always_free_ctm.patch && cd -
 	cd $(NFD_DIR) && patch -p1 < ../0001-Add-nfd_vf_cfg_base-function.patch && cd -
 
 GIT_DEPS += $(NFD_DIR)
