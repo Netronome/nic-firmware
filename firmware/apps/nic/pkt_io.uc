@@ -153,7 +153,7 @@ tx_nfd#:
     pv_multicast_resend(io_pkt_vec)
     immed[addr_lo, nfd_out_ring_info]
     #ifdef PV_MULTI_PCI
-        alu[addr_lo, addr_lo, OR, pci_isl]
+        alu[addr_lo, addr_lo, OR, pci_isl, <<(log2(NFD_OUT_RING_INFO_ITEM_SZ))]
     #endif
 
     local_csr_wr[ACTIVE_LM_ADDR_0, addr_lo]
