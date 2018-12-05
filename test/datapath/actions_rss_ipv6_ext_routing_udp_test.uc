@@ -1,5 +1,4 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x7fe3
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xff3f8c02
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0xf0bf
 
 #include "pkt_ipv6_ext_routing_udp_x80.uc"
 
