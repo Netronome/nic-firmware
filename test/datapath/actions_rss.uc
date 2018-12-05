@@ -1,38 +1,70 @@
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xc0ffee
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_35=0xdeadbeef
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_96=0x04030201
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_97=0x08070605
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_98=0x0c0b0a09
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_99=0x100f0e0d
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_100=0x14131211
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_101=0x18171615
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_102=0x1c1b1a19
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_103=0x201f1e1d
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_104=0x24232221
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_105=0x28272625
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_106=0x2c2b2a29
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_107=0x302f2e2d
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_108=0x34333231
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_109=0x38373635
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_110=0x3c3b3a39
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_111=0x403f3e3d
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_112=0x44434241
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_113=0x48474645
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_114=0x4c4b4a49
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_115=0x504f4e4d
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_116=0x54535251
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_117=0x58575655
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_118=0x5c5b5a59
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_119=0x605f5e5d
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_120=0x64636261
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_121=0x68676665
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_122=0x6c6b6a69
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_123=0x706f6e6d
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_124=0x74737271
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_125=0x78777675
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_126=0x7c7b7a79
-;TEST_INIT_EXEC nfp-reg mereg:i32.me0.NextNeighbor_127=0x807f7e7d
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xc0ffee
+;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_34=0xdeadbeef
 
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:0   0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:4   0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:8   0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:12  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:16  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:20  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:24  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:28  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:32  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:36  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:40  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:44  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:48  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:52  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:56  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:60  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:64  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:68  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:72  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:76  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:80  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:84  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:88  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:92  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:96  0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:100 0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:104 0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:108 0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:112 0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:116 0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:120 0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:124 0
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:128 0x01020304
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:132 0x05060708
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:136 0x090a0b0c
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:140 0x0d0e0f10
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:144 0x11121314
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:148 0x15161718
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:152 0x191a1b1c
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:156 0x1d1e1f20
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:160 0x21222324
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:164 0x25262728
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:168 0x292a2b2c
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:172 0x2d2e2f30
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:176 0x31323334
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:180 0x35363738
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:184 0x393a3b3c
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:188 0x3d3e3f40
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:192 0x41424344
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:196 0x45464748
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:200 0x494a4b4c
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:204 0x4d4e4f50
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:208 0x51525354
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:212 0x55565758
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:216 0x595a5b5c
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:220 0x5d5e5f60
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:224 0x61626364
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:228 0x65666768
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:232 0x696a6b6c
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:236 0x6d6e6f70
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:240 0x71727374
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:244 0x75767778
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:248 0x797a7b7c
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:252 0x7d7e7f80
 #include <single_ctx_test.uc>
 
 #include "actions_harness.uc"
@@ -45,31 +77,8 @@
 
 local_csr_wr[NN_GET, 96]
 
-test_assert_equal($__actions[2], 0xc0ffee)
-test_assert_equal($__actions[3], 0xdeadbeef)
-
-.reg nn_idx
-.reg nn_entry
-.reg nn_data
-.reg nn_expected
-move(nn_idx, 0)
-.while (nn_idx < 32)
-    move(nn_data, *n$index++)
-    alu[nn_entry, 0xff, AND, nn_data]
-    alu[nn_expected, --, B, nn_idx, <<2]
-    alu[nn_expected, nn_expected, +, 1]
-    test_assert_equal(nn_entry, nn_expected)
-    alu[nn_entry, 0xff, AND, nn_data, >>8]
-    alu[nn_expected, nn_expected, +, 1]
-    test_assert_equal(nn_entry, nn_expected)
-    alu[nn_entry, 0xff, AND, nn_data, >>16]
-    alu[nn_expected, nn_expected, +, 1]
-    test_assert_equal(nn_entry, nn_expected)
-    alu[nn_entry, 0xff, AND, nn_data, >>24]
-    alu[nn_expected, nn_expected, +, 1]
-    test_assert_equal(nn_entry, nn_expected)
-    alu[nn_idx, nn_idx, +, 1]
-.endw
+test_assert_equal($__actions[1], 0xc0ffee)
+test_assert_equal($__actions[2], 0xdeadbeef)
 
 #macro rss_reset_test(in_pkt_vec)
     local_csr_wr[T_INDEX, (32 * 4)]

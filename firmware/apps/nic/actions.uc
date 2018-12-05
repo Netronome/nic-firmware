@@ -238,9 +238,8 @@ end#:
 
 #macro __actions_rss(in_pkt_vec)
 .begin
-    .reg args[3]
+    .reg args[2]
     .reg cfg_proto
-    .reg col_msk
     .reg data
     .reg hash
     .reg hash_type
@@ -250,17 +249,15 @@ end#:
     .reg proto_delta
     .reg proto_shf
     .reg queue
-    .reg queue_msk
-    .reg queue_shf
-    .reg row_msk
     .reg rss_table_addr
     .reg rss_table_idx
     .reg write $metadata
+    .reg read $rss_tbl_row
+    .sig rss_tbl_sig
 
     __actions_read_begin()
     __actions_read(args[0])
     __actions_read(args[1])
-    __actions_read(args[2])
     __actions_read_end()
 
     br_bset[BF_AL(in_pkt_vec, PV_QUEUE_SELECTED_bf), queue_selected#]
@@ -300,8 +297,12 @@ check_l4#:
     bitfield_extract(cfg_proto, BF_AML(args, INSTR_RSS_CFG_PROTO_bf)) ; INSTR_RSS_CFG_PROTO_bf
     alu[--, BF_A(in_pkt_vec, PV_PROTO_bf), OR, 0] ; PV_PROTO_bf
     alu[--, cfg_proto, AND, 1, <<indirect]
-    beq[skip_l4#], defer[1]
-        bitfield_extract__sz1(rss_table_addr, BF_AML(args, INSTR_RSS_TABLE_ADDR_bf)) ; INSTR_RSS_TABLE_ADDR_bf
+    beq[skip_l4#], defer[2]
+        passert(BF_L(INSTR_RSS_TABLE_IDX_bf), "EQ", LOG2(NFP_NET_CFG_RSS_ITBL_SZ))
+        passert(NIC_RSS_TBL_ADDR, "POWER_OF_2")
+        passert(LOG2(NIC_RSS_TBL_ADDR), "GT", BF_M(INSTR_RSS_TABLE_IDX_bf))
+        alu[rss_table_addr, BF_A(args, INSTR_RSS_TABLE_IDX_bf), AND, BF_MASK(INSTR_RSS_TABLE_IDX_bf), <<BF_L(INSTR_RSS_TABLE_IDX_bf)]
+        alu[rss_table_addr, rss_table_addr, OR, 1, <<(log2(NIC_RSS_TBL_ADDR))]
 
     bitfield_extract__sz1(l4_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_INNER_L4_bf)) ; PV_HEADER_OFFSET_INNER_L4_bf
     beq[end#] // unknown L4
@@ -336,19 +337,17 @@ skip_l4#:
     pv_meta_push_type__sz1(in_pkt_vec, NFP_NET_META_HASH)
 
 skip_meta_type#:
-    bitfield_extract__sz1(row_msk, BF_AML(args, INSTR_RSS_ROW_MASK_bf)) ; INSTR_RSS_ROW_MASK_bf
-    alu[*l$index2++, BF_A(args, INSTR_RSS_COL_SHIFT_bf), B, hash]
-    alu[queue_shf, BF_A(args, INSTR_RSS_ROW_SHIFT_bf), B, hash, <<indirect]
-    alu[rss_table_idx, row_msk, AND, hash, >>indirect]
-    alu[rss_table_addr, rss_table_addr, +, rss_table_idx]
-    local_csr_wr[NN_GET, rss_table_addr]
 
-    bits_set__sz1(BF_AL(in_pkt_vec, PV_TX_HOST_RX_RSS_bf), 1)
+    /* Select queue = rss_tbl[hash % NFP_NET_CFG_RSS_ITBL_SZ] */
+    alu[rss_table_idx, (NFP_NET_CFG_RSS_ITBL_SZ - 1), AND, hash]
+    cls[read, $rss_tbl_row, rss_table_addr, rss_table_idx, 1], ctx_swap[rss_tbl_sig], defer[2]
+        alu[*l$index2++, --, B, hash]
+        bits_set__sz1(BF_AL(in_pkt_vec, PV_TX_HOST_RX_RSS_bf), 1)
+
     __actions_restore_t_idx()
-    passert(BF_M(INSTR_RSS_QUEUE_MASK_bf), "EQ", 31)
-    alu[queue_msk, queue_shf, B, BF_A(args, INSTR_RSS_QUEUE_MASK_bf), >>BF_L(INSTR_RSS_QUEUE_MASK_bf)]
-    alu[queue, queue_msk, AND, *n$index, >>indirect]
-    pv_set_queue_offset__sz1(in_pkt_vec, queue)
+
+    /* CLS doesn't provide read8, required byte is in the top 8 bits */
+    ld_field[BF_A(in_pkt_vec, PV_QUEUE_OFFSET_bf), 0001, $rss_tbl_row, >>24]; PV_QUEUE_OFFSET_bf
 
 end#:
 .end

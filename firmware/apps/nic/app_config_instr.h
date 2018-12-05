@@ -8,6 +8,8 @@
 #ifndef _APP_CONFIG_INSTR_H_
 #define _APP_CONFIG_INSTR_H_
 
+#include <kernel/nfp_net_ctrl.h>
+#include <vnic/shared/nfd.h>
 
 #define NUM_PCIE_Q          64      // number of queues configured per PCIe
 #define NUM_PCIE_Q_PER_PORT NFD_MAX_PF_QUEUES // nr queues cfg per port
@@ -16,7 +18,9 @@
 #define NIC_CFG_INSTR_TBL_ADDR 0x00
 #define NIC_CFG_INSTR_TBL_SIZE 32768
 
-#define RSS_TBL_SIZE_LW     64
+#define RSS_TBL_SIZE_LW     (NFP_NET_CFG_RSS_ITBL_SZ / 4)
+#define NIC_RSS_TBL_SIZE    (NFP_NET_CFG_RSS_ITBL_SZ * NS_PLATFORM_NUM_PORTS * NFD_MAX_ISL)
+#define NIC_RSS_TBL_ADDR    NIC_CFG_INSTR_TBL_SIZE
 
 #define VLAN_TO_VNICS_MAP_TBL_SIZE ((1<<12) * 8)
 
@@ -29,6 +33,9 @@
     .alloc_mem NIC_CFG_INSTR_TBL cls+NIC_CFG_INSTR_TBL_ADDR \
                 island NIC_CFG_INSTR_TBL_SIZE addr40
 
+    .alloc_mem NIC_RSS_TBL cls+NIC_RSS_TBL_ADDR \
+                island NIC_RSS_TBL_SIZE addr40
+
     .alloc_mem _vf_vlan_cache ctm island VLAN_TO_VNICS_MAP_TBL_SIZE 65536
 
     /* PCIe Queue RX BUF SZ table*/
@@ -40,6 +47,12 @@
     {
         .alloc_mem NIC_CFG_INSTR_TBL cls + NIC_CFG_INSTR_TBL_ADDR \
             island NIC_CFG_INSTR_TBL_SIZE addr40
+    }
+
+    __asm
+    {
+        .alloc_mem NIC_RSS_TBL cls + NIC_RSS_TBL_ADDR \
+            island NIC_RSS_TBL_SIZE addr40
     }
 
     __asm
@@ -163,12 +176,10 @@ enum instruction_ops {
  * INSTR_RSS:
  * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
- *       +-----------------------------+-+-+-----------+-+-+-+-+---------+
- *    0  |              4              |P|1| MAX Queue |u|t|U|T| C Shift |
- *       +---------------+-------------+-+-+-----+-----+-+-+-+-+---------+
- *    1  |  Queue Mask   |  Row Mask   |    -    | Table Addr  | R Shift |
- *       +---------------+-------------+---------+-------------+---------+
- *    2  |                            RSS Key                            |
+ *       +-----------------------------+-+-+-+-+-+---------+-+-+---------+
+ *    0  |              4              |P|u|t|U|T| Tbl idx |1| MAX Queue |
+ *       +---------------+-------------+-+-+-+-+-+---------+-+-+---------+
+ *    1  |                            RSS Key                            |
  *       +---------------------------------------------------------------+
  *
  *       u - Enable IPV4_UDP
@@ -289,18 +300,13 @@ typedef union {
     struct {
         uint32_t op : 15;
         uint32_t pipeline : 1;
+        uint32_t cfg_proto : 4;
+        uint32_t tbl_idx : 5;
         uint32_t v1_meta : 1;
         uint32_t max_queue : 6;
-        uint32_t cfg_proto : 4;
-        uint32_t col_shf : 5;
-        uint32_t queue_mask : 8;
-        uint32_t row_mask : 7;
-        uint32_t reserved : 5;
-        uint32_t table_addr : 7;
-        uint32_t row_shf : 5;
-	uint32_t key;
+        uint32_t key;
     };
-    uint32_t __raw[3];
+    uint32_t __raw[2];
 } instr_rss_t;
 
 typedef union {
@@ -382,17 +388,11 @@ typedef union {
 #define INSTR_PIPELINE_BIT 16
 #define INSTR_OPCODE_LSB   17
 
-
-#define INSTR_RSS_V1_META_bf    0, 15, 15
-#define INSTR_RSS_MAX_QUEUE_bf  0, 14, 9
-#define INSTR_RSS_CFG_PROTO_bf  0, 8, 5
-#define INSTR_RSS_COL_SHIFT_bf  0, 4, 0
-#define INSTR_RSS_QUEUE_MASK_bf 1, 31, 24
-#define INSTR_RSS_ROW_MASK_bf   1, 23, 17
-#define INSTR_RSS_COL_MASK_bf   1, 16, 12
-#define INSTR_RSS_TABLE_ADDR_bf 1, 11, 5
-#define INSTR_RSS_ROW_SHIFT_bf  1, 4, 0
-#define INSTR_RSS_KEY_bf        2, 31, 0
+#define INSTR_RSS_CFG_PROTO_bf  0, 15, 12
+#define INSTR_RSS_TABLE_IDX_bf  0, 11, 7
+#define INSTR_RSS_V1_META_bf    0, 6, 6
+#define INSTR_RSS_MAX_QUEUE_bf  0, 5, 0
+#define INSTR_RSS_KEY_bf        1, 31, 0
 
 #define INSTR_RX_HOST_MTU_bf     0, 15, 2
 
