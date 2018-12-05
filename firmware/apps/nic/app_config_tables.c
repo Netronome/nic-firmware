@@ -309,6 +309,38 @@ init_nn_tables()
 }
 
 
+/* Write RSS indirection table */
+__intrinsic void
+wr_rss_tbl(__xwrite uint32_t *xwr_rss,
+                   uint32_t start_offset, uint32_t count)
+{
+    __cls __addr32 void *nic_rss_tbl = (__cls __addr32 void*)
+                                        __link_sym("NIC_RSS_TBL");
+    SIGNAL sig;
+    uint32_t addr_hi;
+    uint32_t addr_lo;
+    uint32_t isl;
+    struct nfp_mecsr_prev_alu ind;
+
+    ctassert(count <= 32);
+
+    for (isl = 0; isl < sizeof(app_isl_ids) / sizeof(uint32_t); isl++) {
+        addr_lo = (uint32_t) nic_rss_tbl + start_offset;
+        addr_hi = app_isl_ids[isl] >> 4; /* only use island, mask out ME */
+        addr_hi = (addr_hi << (34 - 8)); /* address shifted by 8 in instr */
+
+        ind.__raw = 0;
+        ind.ov_len = 1;
+        ind.length = count - 1;
+        __asm {
+            alu[--, --, B, ind.__raw]
+            cls[write, *xwr_rss, addr_hi, <<8, addr_lo, \
+                    __ct_const_val(count)], ctx_swap[sig], indirect_ref
+        }
+    }
+    return;
+}
+
 /* Update RX wire instr -> one table entry per NBI queue/port */
 __intrinsic void
 upd_rx_wire_instr(__xwrite uint32_t *xwr_instr,
@@ -417,60 +449,21 @@ upd_ctm_vlan_members()
 //for each port size of table must be known and configured accordingly
 __intrinsic void upd_rss_table(uint32_t start_offset, __emem __addr40 uint8_t *bar_base, uint32_t vnic_port)
 {
-    __xread uint32_t rss_rd[NFP_NET_CFG_RSS_ITBL_SZ_wrd];
-    __xwrite uint32_t rss_wr[32];
-    uint32_t i, j, tmp, data, shf, rows, cols;
-    uint32_t rss_tmp[32];
+    __xread uint32_t rss_rd[RSS_TBL_SIZE_LW];
+    __xwrite uint32_t rss_wr[RSS_TBL_SIZE_LW];
+    uint32_t i;
 
-    if (((start_offset + (RSS_TBL_SIZE_LW / NS_PLATFORM_NUM_PORTS)) > SLICC_HASH_PAD_NN_IDX) || (vnic_port > NS_PLATFORM_NUM_PORTS)) {
+    if ((start_offset + NFP_NET_CFG_RSS_ITBL_SZ > NIC_RSS_TBL_SIZE) || (vnic_port > NS_PLATFORM_NUM_PORTS)) {
         cfg_error_rss_cntr++;
         return;
     }
 
-    mem_read32(rss_rd, bar_base + NFP_NET_CFG_RSS_ITBL, sizeof(rss_rd));
+    mem_read32_swap(rss_rd, bar_base + NFP_NET_CFG_RSS_ITBL, sizeof(rss_rd));
 
-    #if (NFD_MAX_PF_QUEUES <= 4)
-        #define ACTION_RSS_ROW_MASK  0x7
-        #define ACTION_RSS_COL_SHIFT 0x1
-        #define ACTION_RSS_ROW_SHIFT 0x4
-        #define ACTION_RSS_Q_MASK    0x3
-        rows = 8;
-        cols = 16;
-    #elif (NFD_MAX_PF_QUEUES <= 16)
-        #define ACTION_RSS_ROW_MASK  0xf
-        #define ACTION_RSS_COL_SHIFT 0x2
-        #define ACTION_RSS_ROW_SHIFT 0x3
-        #define ACTION_RSS_Q_MASK    0xf
-        rows = 16;
-        cols = 8;
-    #else
-        #define ACTION_RSS_ROW_MASK  0x1f
-        #define ACTION_RSS_COL_SHIFT 0x3
-        #define ACTION_RSS_ROW_SHIFT 0x2
-        #define ACTION_RSS_Q_MASK    0xff
-        rows = 32;
-        cols = 4;
-    #endif
+    for (i = 0; i < RSS_TBL_SIZE_LW; i++)
+        rss_wr[i] = rss_rd[i];
 
-    shf = 32 / cols;
-    for (i = 0; i < rows; ++i) {
-        rss_tmp[i] = 0;
-        for (j = 0; j < cols; ++j) {
-            uint32_t idx = i * cols + j;
-            __gpr uint32_t tmp = rss_rd[idx / 4]; // coerce rss_rd[idx / 4] into GPR, see THSDK-4039
-            tmp = (tmp >> ((idx % 4) * 8)) & ((1 << shf) - 1);
-            if (tmp >= NFD_MAX_PF_QUEUES)
-                continue;
-            rss_tmp[i] |= (tmp << (j * shf));
-        }
-    }
-
-    // separate loop for rss_wr[i] to avoid T_INDEX bug, see THSDK-4040
-    for (i = 0; i < rows; ++i) {
-        rss_wr[i] = rss_tmp[i];
-    }
-
-    upd_nn_table_instr(rss_wr, start_offset, rows);
+    wr_rss_tbl(rss_wr, start_offset, RSS_TBL_SIZE_LW);
 }
 
 __intrinsic void
@@ -674,7 +667,7 @@ cfg_act_append_rss(action_list_t *acts, uint32_t pcie, uint32_t vid, int update_
     __xread uint32_t rss_ctrl;
     __xread uint32_t rx_rings[2];
     __xread uint32_t rss_key[NFP_NET_CFG_RSS_KEY_SZ / sizeof(uint32_t)];
-    uint32_t rss_tbl_nnidx;
+    uint32_t rss_tbl_idx;
     uint32_t type, vnic;
     instr_rss_t instr_rss;
 
@@ -682,9 +675,9 @@ cfg_act_append_rss(action_list_t *acts, uint32_t pcie, uint32_t vid, int update_
 
     /* RSS remapping table with NN register index as start offset */
     NFD_VID2VNIC(type, vnic, vid);
-    rss_tbl_nnidx = vnic * (RSS_TBL_SIZE_LW / NS_PLATFORM_NUM_PORTS);
+    rss_tbl_idx = vnic + pcie * NS_PLATFORM_NUM_PORTS;
     if (update_map)
-        upd_rss_table(rss_tbl_nnidx, bar_base, vnic);
+        upd_rss_table(rss_tbl_idx * NFP_NET_CFG_RSS_ITBL_SZ, bar_base, vnic);
 
     /* Read RSS configuration from BAR */
     __mem_read32(&rss_ctrl, (__mem void*) (bar_base + NFP_NET_CFG_RSS_CTRL),
@@ -710,15 +703,10 @@ cfg_act_append_rss(action_list_t *acts, uint32_t pcie, uint32_t vid, int update_
     instr_rss.max_queue = ((~rx_rings[0]) ? ffs(~rx_rings[0]) : 32 + ffs(~rx_rings[1]) - 1);
 
     instr_rss.v1_meta = v1_meta;
-    instr_rss.col_shf = ACTION_RSS_COL_SHIFT;
-    instr_rss.queue_mask = ACTION_RSS_Q_MASK;
-    instr_rss.row_mask = ACTION_RSS_ROW_MASK;
-    instr_rss.table_addr = rss_tbl_nnidx;
-    instr_rss.row_shf = ACTION_RSS_ROW_SHIFT;
+    instr_rss.tbl_idx = rss_tbl_idx;
 
     cfg_act_append(acts, INSTR_RSS, instr_rss.__raw[0]);
     acts->instr[acts->count++].value = instr_rss.__raw[1];
-    acts->instr[acts->count++].value = instr_rss.__raw[2];
 }
 
 
