@@ -617,9 +617,10 @@ ret#:
 .end
 #endm	/* __hashmap_lock_release */
 
-#macro __hashmap_lock_release_and_invalidate(in_idx, state)
+#macro __hashmap_lock_release_and_invalidate(in_idx, state, in_fd)
 .begin
-	.reg $desc_xfer
+	.reg $desc_xfer[2]
+    .xfer_order $desc_xfer
 	.reg tmp
 	.sig lock_rel_invalid_sig
 	.reg lk_addr_hi
@@ -628,8 +629,9 @@ ret#:
 	move(lk_addr_hi, __HASHMAP_LOCK_TBL >>8)
 	alu[lk_addr_lo, --, b, in_idx, <<HASHMAP_LOCK_SZ_SHFT]
 	alu_shf[tmp, --,b, 1, <<__HASHMAP_DESC_VALID_BIT]
-	alu_shf[$desc_xfer, tmp, or, state]
-	mem[sub, $desc_xfer, lk_addr_hi, <<8, lk_addr_lo, 1], ctx_swap[lock_rel_invalid_sig]
+	alu_shf[$desc_xfer[0],tmp, or, state]
+    alu[$desc_xfer[1], --, b, in_fd]
+	mem[sub64, $desc_xfer[0], lk_addr_hi, <<8, lk_addr_lo, 1], ctx_swap[lock_rel_invalid_sig]
 	immed[state, 0]
 	/* TODO for LRU
 	 *		clear ref flag
@@ -784,7 +786,7 @@ found#:		/* found entry which matches the key */
 		__hashmap_table_return_credits(fd)
 		__hashmap_set_opt_field(out_ent_lw, 0)
 		br_bset[ent_state, __HASHMAP_DESC_OV_BIT, delete_ov_ent#]
-        __hashmap_lock_release_and_invalidate(ent_index, ent_state)
+        __hashmap_lock_release_and_invalidate(ent_index, ent_state, fd)
     	br[ret#]
     #elif ( (OP == HASHMAP_OP_GETNEXT) || (OP == HASHMAP_OP_GETFIRST) )
 getnext_loop#:

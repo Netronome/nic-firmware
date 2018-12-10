@@ -807,7 +807,7 @@ del_ent#:
         __hashmap_lock_upgrade(ent_index, ent_state, loop#)
         __hashmap_set_opt_field(out_ent_lw, 0)
         br_bset[ent_state, __HASHMAP_DESC_OV_BIT, delete_ov_ent#]
-        __hashmap_lock_release_and_invalidate(ent_index, ent_state)
+        __hashmap_lock_release_and_invalidate(ent_index, ent_state, in_fd)
 
 		alu[del_entries, 1, +, del_entries]
 		br[loop#]
