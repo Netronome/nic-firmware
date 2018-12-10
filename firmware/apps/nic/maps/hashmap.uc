@@ -87,6 +87,7 @@
 #define HASHMAP_PARTITIONS           1
 #define HASHMAP_TOTAL_ENTRIES        (1024<<12)
 #define HASHMAP_OVERFLOW_ENTRIES     (512<<14)
+#define HASHMAP_MAX_ENTRIES          (1024*2000)
 /* the first 1-127 tids are used by ebpf, and managed by cmsg_map.uc */
 /* tid 128-254 are reserved for internal use */
 #define HASHMAP_MAX_TID_EBPF         128
