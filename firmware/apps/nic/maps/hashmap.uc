@@ -754,11 +754,7 @@ ret#:
 	__hashmap_lm_handles_undef()
 
     #if (OP == HASHMAP_OP_GETFIRST)
-		immed[ent_index, 0]
-    	__hashmap_lock_init(ent_state, ent_addr_hi, offset, mu_partition, ent_index)
-		alu[tbl_addr_hi, --, b, ent_addr_hi]
-    	__hashmap_lock_shared(ent_index, fd, found#, found#)
-		br[found#]
+        br[getfirst_ent#]
 	#else
 		slicc_hash_words(hash, fd, lm_key_addr, key_lwsz, key_mask)
     	__hashmap_index_from_hash(hash[0], ent_index)
@@ -841,7 +837,19 @@ add_error#:
     /* falls thru to miss if entry is not valid, not found, and not add/update function */
 miss#:
     __hashmap_lock_release(ent_index, ent_state)
-    br[NOTFOUND_LABEL]
+    #if (OP != HASHMAP_OP_GETNEXT)
+        br[NOTFOUND_LABEL]
+    #else
+        br[getfirst_ent#]
+    #endif
+#if ((OP == HASHMAP_OP_GETNEXT) || (OP == HASHMAP_OP_GETFIRST))
+getfirst_ent#:
+        immed[ent_index, 0]
+        __hashmap_lock_init(ent_state, ent_addr_hi, offset, mu_partition, ent_index)
+        alu[tbl_addr_hi, --, b, ent_addr_hi]
+        __hashmap_lock_shared(ent_index, fd, found#, found#)
+        br[found#]
+#endif
 #if (OP == HASHMAP_OP_REMOVE)
 delete_ov_ent#:
 	__hashmap_ov_delete(tbl_addr_hi, ent_index, offset, ent_state)
