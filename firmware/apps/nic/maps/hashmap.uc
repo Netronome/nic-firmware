@@ -355,7 +355,6 @@
 
 #macro __hashmap_calc_value_addr(in_val, in_bytes, out_val)
 .begin
-	.reg tmp
 	alu[out_val, in_val, +, in_bytes]
 	alu[out_val, out_val, +, 7]
 	alu[out_val, out_val, and~, 0x7]
