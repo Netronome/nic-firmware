@@ -34,13 +34,9 @@ cmsg_init()
 
 .begin
     .reg my_act_ctx
-	.reg @cmsg_rx_cntr
-	.reg @cmsg_rx_init
 	.sig volatile g_ordersig
 
 	.if (ctx() == 0)
-		move(@cmsg_rx_init, 0)
-		move(@cmsg_rx_cntr, 0)
 		local_csr_wr[MAILBOX0, 0]
 		local_csr_wr[MAILBOX1, 0]
 		local_csr_wr[MAILBOX2, 0]
@@ -61,9 +57,6 @@ cmsg_init()
 main_loop#:
 	ctx_sig_next()
     cmsg_rx()
-	alu[@cmsg_rx_cntr, 1, +, @cmsg_rx_cntr]
-    local_csr_wr[MAILBOX0, @cmsg_rx_cntr]
-		//__hashmap_dbg_print(0x1002, 0, ctx_num)
 
 	ctx_arb[g_ordersig]
     br[main_loop#]
