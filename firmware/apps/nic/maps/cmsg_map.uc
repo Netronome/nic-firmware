@@ -444,12 +444,11 @@ ret#:
     .sig q_sig
 	.sig cmsg_type_read_sig
 	.reg nfd_pkt_meta[CMSG_DESC_LW]		; need to save first 3 words of nfd meta
-	.reg mem_location
+	.reg cmsg_addr_hi
 	.reg cmsg_type
-	.reg reply_pktlen
+	.reg cmsg_reply_pktlen
 	.reg nfd_meta_len
 	.reg c_offset
-    .reg rx_queue
 	.reg read $cmsg_data[6]
 	.xfer_order $cmsg_data
 	.reg cmsg_hdr_w0
@@ -473,19 +472,17 @@ ret#:
 	alu[nfd_pkt_meta[2], --, b, $nfd_data[2]]
 
 	// extract buffer address.
-	cmsg_get_mem_addr(mem_location, $nfd_data)
-
-    bitfield_extract(rx_queue, BF_AML($nfd_data, NFD_OUT_QID_fld))
+	cmsg_get_mem_addr(cmsg_addr_hi, $nfd_data)
 
     .sig read_sig
 	move(c_offset, NFD_IN_DATA_OFFSET)
-	mem[read32, $cmsg_data[0], c_offset, mem_location, <<8, 6], ctx_swap[read_sig]
+	mem[read32, $cmsg_data[0], c_offset, cmsg_addr_hi, <<8, 6], ctx_swap[read_sig]
 	alu[cmsg_hdr_w0, --, b, $cmsg_data[0]]
 
 	cmsg_validate(cmsg_type, cmsg_tag, cmsg_hdr_w0, cmsg_error#)
 
-    cmsg_proc(mem_location, reply_pktlen, cmsg_type, cmsg_tag, rx_queue, $cmsg_data, cmsg_exit_free_error#, cmsg_exit_free#)
-	cmsg_reply(nfd_pkt_meta, reply_pktlen, cmsg_no_credit#)
+    cmsg_proc($cmsg_data, cmsg_exit_free_error#, cmsg_exit_free#)
+	cmsg_reply(nfd_pkt_meta, cmsg_reply_pktlen, cmsg_no_credit#)
 	br[cmsg_exit#]
 
 cmsg_error#:
@@ -542,7 +539,7 @@ cmsg_exit#:
 #endm
 
 
- #macro cmsg_proc(in_addr_hi, out_pktlen, in_cmsg_type, in_cmsg_tag, in_rx_queue, HDR_DATA, ERROR_LABEL, FREE_LABEL)
+ #macro cmsg_proc(HDR_DATA, ERROR_LABEL, FREE_LABEL)
 .begin
     .reg read $pkt_data[CMSG_TXFR_COUNT]
     .xfer_order $pkt_data
@@ -557,7 +554,7 @@ cmsg_exit#:
 	.sig sig_reply_map_ops
 	.reg map_op
 	.reg l_cmsg_type
-	.reg in_fd
+	.reg cur_fd
 	.reg map_type
 
 	#define __CMSG_DATA_OFFSET__ (NFD_IN_DATA_OFFSET)
@@ -568,8 +565,8 @@ cmsg_exit#:
     immed[ctx_num, 0]
     alu[ctx_num, ctx_num, and, 7]
 
-	immed[out_pktlen, 0]
-	alu[l_cmsg_type, --, b, in_cmsg_type]
+	immed[cmsg_reply_pktlen, 0]
+	alu[l_cmsg_type, --, b, cmsg_type]
 
 
     // cmsg type  has been validated
@@ -581,7 +578,7 @@ cmsg_exit#:
         #error "_CMSG_LOOP is already defined" (_CMSG_LOOP)
     #endif
     #define_eval _CMSG_LOOP 0
-    jump[in_cmsg_type, j0#], targets[PREPROC_LIST]
+    jump[cmsg_type, j0#], targets[PREPROC_LIST]
     #while (_CMSG_LOOP < MAX_JUMP)
         j/**/_CMSG_LOOP#:
             br[s/**/_CMSG_LOOP#]
@@ -600,14 +597,14 @@ cmsg_exit#:
 			bne[alloc_cont#]
 			immed[map_type, BPF_MAP_TYPE_HASH]		; default is hash
 alloc_cont#:
-			_cmsg_alloc_fd(keysz, valuesz, maxent, in_addr_hi, in_cmsg_tag, out_pktlen, swap, map_type)
+			_cmsg_alloc_fd(keysz, valuesz, maxent, swap, map_type)
 			br[cmsg_proc_ret#]
 		 .end
 
 	s0#:
     s/**/CMSG_TYPE_MAP_FREE#:
-			alu[in_fd, --, b, HDR_DATA[CMSG_MAP_TID_IDX]]
-			_cmsg_free_fd(in_fd, in_addr_hi, in_cmsg_tag, out_pktlen)
+			alu[cur_fd, --, b, HDR_DATA[CMSG_MAP_TID_IDX]]
+			_cmsg_free_fd(cur_fd)
 			br[cmsg_proc_ret#]
 
     s/**/CMSG_TYPE_MAP_LOOKUP#:
@@ -628,22 +625,22 @@ alloc_cont#:
 
 			cmsg_lm_ctx_addr(lm_key_offset,lm_value_offset, ctx_num)
 			cmsg_lm_handles_define()
-			immed[out_pktlen, 0]
+			immed[cmsg_reply_pktlen, 0]
 			immed[rtn_count, 0]
 			immed[cur_key, 0]
 			immed[le_key, 0]
 
-			alu[in_fd, --, b, HDR_DATA[CMSG_MAP_TID_IDX]]
+			alu[cur_fd, --, b, HDR_DATA[CMSG_MAP_TID_IDX]]
 			alu[count, --, b, HDR_DATA[CMSG_MAP_OP_COUNT_IDX]]
 			alu[flags, --, b, HDR_DATA[CMSG_MAP_OP_FLAGS_IDX]]
 			alu[key_offset, addr_lo, +, (CMSG_OP_HDR_LW*4)]
-			alu[l_cmsg_type, --, b, in_cmsg_type]
+			alu[l_cmsg_type, --, b, cmsg_type]
 
 			immed[save_rc, CMSG_RC_ERR_MAP_FD]
-			hashmap_get_fd_attr(in_fd, map_type, max_entries, done#)
+			hashmap_get_fd_attr(cur_fd, map_type, max_entries, done#)
 			immed[save_rc, CMSG_RC_SUCCESS]
 
-			.if (in_cmsg_type == CMSG_TYPE_MAP_ADD)
+			.if (cmsg_type == CMSG_TYPE_MAP_ADD)
 				.if (flags == CMSG_BPF_NOEXIST)
 					immed[l_cmsg_type, HASHMAP_OP_ADD_ONLY]
 				.elif (flags == CMSG_BPF_EXIST)
@@ -660,12 +657,12 @@ proc_loop#:
 			alu[--, map_type, -, BPF_MAP_TYPE_ARRAY]
 			beq[proc_array_map#]
     		ov_single(OV_LENGTH, CMSG_TXFR_COUNT, OVF_SUBTRACT_ONE) // Length in 32-bit LWs
-    		mem[read32_swap, $pkt_data[0], in_addr_hi, <<8, key_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
+    		mem[read32_swap, $pkt_data[0], cmsg_addr_hi, <<8, key_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
 			ctx_arb[rd_sig]
 			aggregate_copy(CMSG_KEY_LM_INDEX, ++, $pkt_data, 0, (CMSG_TXFR_COUNT-1))
 			br[proc_loop_cont#]
 proc_array_map#:
-    		mem[read32_swap, $pkt_data[0], in_addr_hi, <<8, key_offset, 1], sig_done[rd_sig]
+    		mem[read32_swap, $pkt_data[0], cmsg_addr_hi, <<8, key_offset, 1], sig_done[rd_sig]
 			ctx_arb[rd_sig]
 			alu[cur_key, --, b, $pkt_data[0]]
 			.if (l_cmsg_type == CMSG_TYPE_MAP_GETFIRST)
@@ -683,7 +680,7 @@ proc_loop_cont#:
 			alu[value_offset, key_offset, +, 64]		; value & key offset in cmsg
 
     		ov_single(OV_LENGTH, CMSG_TXFR_COUNT, OVF_SUBTRACT_ONE) // Length in 32-bit LWs
-    		mem[read32_swap, $pkt_data[0], in_addr_hi, <<8, value_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
+    		mem[read32_swap, $pkt_data[0], cmsg_addr_hi, <<8, value_offset, max_/**/CMSG_TXFR_COUNT], indirect_ref, sig_done[rd_sig]
 			ctx_arb[rd_sig]
 
 			aggregate_copy(CMSG_VALUE_LM_INDEX, ++, $pkt_data, 0, CMSG_TXFR_COUNT)
@@ -693,12 +690,12 @@ proc_loop_cont#:
 do_op#:
 			swap(le_key, cur_key, NO_LOAD_CC)
 
-			_cmsg_hashmap_op(l_cmsg_type, in_fd, lm_key_offset, lm_value_offset, in_addr_hi, key_offset, value_offset, flags, rc, swap, le_key, cur_key)
+			_cmsg_hashmap_op(l_cmsg_type, cur_fd, lm_key_offset, lm_value_offset, cmsg_addr_hi, key_offset, value_offset, flags, rc, swap, le_key, cur_key)
     /* check if reply required */
-            alu[--, in_fd, -, SRIOV_TID]
+            alu[--, cur_fd, -, SRIOV_TID]
             beq[FREE_LABEL]
 			alu[key_offset, value_offset, +, 64]
-			alu[out_pktlen, out_pktlen, +, (64*2)]
+			alu[cmsg_reply_pktlen, cmsg_reply_pktlen, +, (64*2)]
 			alu[save_rc, save_rc, or, rc]
 			.if (rc == CMSG_RC_SUCCESS)
 				alu[rtn_count, 1, +, rtn_count]
@@ -725,12 +722,12 @@ do_op#:
 
 done#:
 			/* fill in header here */
-			cmsg_set_reply($reply[0], in_cmsg_type, in_cmsg_tag)
+			cmsg_set_reply($reply[0], cmsg_type, cmsg_tag)
 			alu[$reply[1], --, b, save_rc]
 			alu[$reply[2], --, b, rtn_count]
 			immed[addr_lo, NFD_IN_DATA_OFFSET]
-    		mem[write32, $reply[0], in_addr_hi, <<8, addr_lo, 3], sig_done[sig_reply_map_ops]
-    		alu[out_pktlen, out_pktlen, +, (4*4)]
+    		mem[write32, $reply[0], cmsg_addr_hi, <<8, addr_lo, 3], sig_done[sig_reply_map_ops]
+    		alu[cmsg_reply_pktlen, cmsg_reply_pktlen, +, (4*4)]
 			ctx_arb[sig_reply_map_ops]
 
 		.end
@@ -739,7 +736,7 @@ cmsg_proc_ret#:
 .end
 #endm
 
-#macro _cmsg_alloc_fd(key_sz, value_sz, max_entries, in_addr_hi, in_cmsg_tag, out_len, endian, map_type)
+#macro _cmsg_alloc_fd(key_sz, value_sz, max_entries, endian, map_type)
 .begin
 		.reg fd
 		.reg $reply[3]
@@ -761,10 +758,10 @@ cmsg_proc_ret#:
 		alu[$reply[2], --, b, fd]
 
 cont#:
-		cmsg_set_reply($reply[0], CMSG_TYPE_MAP_ALLOC, in_cmsg_tag)
+		cmsg_set_reply($reply[0], CMSG_TYPE_MAP_ALLOC, cmsg_tag)
 		immed[addr_lo, NFD_IN_DATA_OFFSET]
-		mem[write32, $reply[0], in_addr_hi, <<8, addr_lo, 3], sig_done[sig_reply_map_alloc]
-		immed[out_len, (3<<2)]
+		mem[write32, $reply[0], cmsg_addr_hi, <<8, addr_lo, 3], sig_done[sig_reply_map_alloc]
+		immed[cmsg_reply_pktlen, (3<<2)]
 		ctx_arb[sig_reply_map_alloc]
 
 
@@ -772,10 +769,9 @@ ret#:
 .end
 #endm
 
-#macro _cmsg_free_fd(in_key, in_addr_hi, in_cmsg_tag, out_len)
+#macro _cmsg_free_fd(in_fd)
 .begin
 		.reg del_entries
-		.reg fd
 		.reg $reply[3]
 		.xfer_order $reply
 		.sig sig_reply_map_free
@@ -785,26 +781,25 @@ ret#:
 		.reg ent_state, ent_addr_hi, ent_offset, mu_partition, ent_index
 		.reg tbl_addr_hi, out_ent_lw
 
-		alu[fd, --, b, in_key]
 		immed[del_entries, 0]
 
 		immed[$reply[1], CMSG_RC_ERR_MAP_FD]			;
-		cmsg_free_fd_from_bm(fd, ret#)
+		cmsg_free_fd_from_bm(in_fd, ret#)
 
-		__hashmap_table_delete(fd)		/* set num entries to 0 */
+		__hashmap_table_delete(in_fd)		/* set num entries to 0 */
 
 		immed[ent_index, 0]
 loop#:
 		__hashmap_lock_init(ent_state, ent_addr_hi, ent_offset, mu_partition, ent_index)
 		alu[tbl_addr_hi, --, b, ent_addr_hi]
-		__hashmap_lock_shared(ent_index, fd, cont#, cont#)
+		__hashmap_lock_shared(ent_index, in_fd, cont#, cont#)
 cont#:
         /* check overflow first */
-        __hashmap_ov_getnext(tbl_addr_hi, ent_index, fd, ent_addr_hi, ent_offset, ent_state, del_ent#)
+        __hashmap_ov_getnext(tbl_addr_hi, ent_index, in_fd, ent_addr_hi, ent_offset, ent_state, del_ent#)
         __hashmap_lock_release(ent_index, ent_state)
         __hashmap_select_next_/**/HASHMAP_PARTITIONS/**/_partition(mu_partition,ent_index, end_loop#)
         __hashmap_lock_init(ent_state, tbl_addr_hi, ent_offset, mu_partition, ent_index)
-        __hashmap_lock_shared(ent_index, fd, cont#, cont#)
+        __hashmap_lock_shared(ent_index, in_fd, cont#, cont#)
         alu[ent_addr_hi, --, b, tbl_addr_hi]
 del_ent#:
         __hashmap_lock_upgrade(ent_index, ent_state, loop#)
@@ -829,10 +824,10 @@ end_loop#:
 ret#:
 		alu[$reply[2], --, b, del_entries]
 
-		cmsg_set_reply($reply[0], CMSG_TYPE_MAP_FREE, in_cmsg_tag)
+		cmsg_set_reply($reply[0], CMSG_TYPE_MAP_FREE, cmsg_tag)
 		immed[addr_lo, NFD_IN_DATA_OFFSET]
-		mem[write32, $reply[0], in_addr_hi, <<8, addr_lo, 3], sig_done[sig_reply_map_free]
-		immed[out_len, (3<<2)]
+		mem[write32, $reply[0], cmsg_addr_hi, <<8, addr_lo, 3], sig_done[sig_reply_map_free]
+		immed[cmsg_reply_pktlen, (3<<2)]
 		ctx_arb[sig_reply_map_free]
 
 .end
