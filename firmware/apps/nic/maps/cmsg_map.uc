@@ -991,7 +991,7 @@ reply_keys#:
 	cmsg_lm_handles_undef()
 
 	alu[tmp, --, b, reply_lw, <<2]
-	alu[r_addr[1], r_addr[1], +, tmp]
+    __hashmap_calc_value_addr(r_addr[1], tmp, r_addr[1])
 	alu[reply_lw, 16, -, reply_lw]
 	ctx_arb[sig_reply_map_ops]				; falls thru
 
