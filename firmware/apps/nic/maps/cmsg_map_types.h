@@ -217,15 +217,20 @@
 #define CMSG_MAP_KEY_LW					 10
 #define CMSG_MAP_VALUE_LW				  6
 #define CMSG_MAP_KEY_VALUE_LW			 16
+#define CMSG_MAP_KEY_VALUE_SZ            (CMSG_MAP_KEY_VALUE_LW * 4)
 
-#define CMSG_RC_SUCCESS				0
-#define CMSG_RC_ERR_MAP_FD			(1<<0)
-#define CMSG_RC_ERR_MAP_NOENT		(1<<1)
-#define CMSG_RC_ERR_MAP_ERR			(1<<2)
-#define CMSG_RC_ERR_MAP_PARSE		(1<<3)
-#define CMSG_RC_ERR_NOMEM			(1<<4)
-#define CMSG_RC_ERR_E2BIG			(1<<5)
-#define CMSG_RC_ERR_EINVAL			(1<<6)
+#define CMSG_RC_SUCCESS             0
+#define CMSG_RC_ERR_MAP_FD          1
+#define CMSG_RC_ERR_MAP_NOENT       2   /* ENOENT */
+#define CMSG_RC_ERR_MAP_ERR         3   /* EINVAL used by cmsg */
+#define CMSG_RC_ERR_MAP_PARSE       4   /* EIO */
+#define CMSG_RC_ERR_MAP_EXIST       5   /* EEXIST used by cmsg */
+#define CMSG_RC_ERR_NOMEM           6
+#define CMSG_RC_ERR_ENOENT          2
+#define CMSG_RC_ERR_E2BIG           7
+#define CMSG_RC_ERR_EINVAL          22
+#define CMSG_RC_ERR_EEXIST          17
+#define CMSG_RC_ERR_ENOMEM          12
 
 #define CMSG_OP_HDR_LW			4
 

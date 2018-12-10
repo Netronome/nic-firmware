@@ -902,53 +902,30 @@ s2#:
 	immed[out_rc, CMSG_RC_ERR_MAP_PARSE]
 
 s/**/HASHMAP_OP_LOOKUP#:
-	hashmap_ops(in_fd, in_lm_key, --, HASHMAP_OP_LOOKUP, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian)
+	hashmap_ops(in_fd, in_lm_key, --, HASHMAP_OP_LOOKUP, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian, out_rc)
 	alu[--, reply_lw, -, 0]				;error if 0
 	bne[reply_value#]
 	br[error_map_function#], defer[1]
 	immed[out_rc, CMSG_RC_ERR_MAP_ERR]
 
 s/**/HASHMAP_OP_ADD_ANY#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD_ANY, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --, endian)
-
-	alu[--, reply_lw, -, 0]				;add & delete returns 0
-	beq[ret#], defer[1]
-	immed[out_rc, CMSG_RC_SUCCESS]
-
-	br[error_map_function#], defer[1]
-	immed[out_rc, CMSG_RC_ERR_MAP_ERR]
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD_ANY, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --, endian, out_rc)
+    br[ret#]
 
 s/**/HASHMAP_OP_UPDATE#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_UPDATE, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --, endian)
-
-	alu[--, reply_lw, -, 0]				;add & delete returns 0
-	beq[ret#], defer[1]
-	immed[out_rc, CMSG_RC_SUCCESS]
-
-	br[error_map_function#], defer[1]
-	immed[out_rc, CMSG_RC_ERR_MAP_ERR]
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_UPDATE, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --, endian, out_rc)
+    br[ret#]
 
 s/**/HASHMAP_OP_ADD_ONLY#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD_ONLY, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --, endian)
-
-	alu[--, reply_lw, -, 0]				;add & delete returns 0
-	beq[ret#], defer[1]
-	immed[out_rc, CMSG_RC_SUCCESS]
-
-	br[error_map_function#], defer[1]
-	immed[out_rc, CMSG_RC_ERR_MAP_ERR]
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_ADD_ONLY, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, --, endian, out_rc)
+    br[ret#]
 
 s/**/HASHMAP_OP_REMOVE#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_REMOVE, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian)
-	alu[--, reply_lw, -, 0]				;add & delete returns 0
-	beq[ret#], defer[1]
-	immed[out_rc, CMSG_RC_SUCCESS]
-
-	br[error_map_function#], defer[1]
-	immed[out_rc, CMSG_RC_ERR_MAP_ERR]
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_REMOVE, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian, out_rc)
+    br[ret#]
 
 s/**/HASHMAP_OP_GETNEXT#:
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_GETNEXT, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian)
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_GETNEXT, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian, out_rc)
 	alu[--, reply_lw, -, 0]				;error if 0
 	bne[reply_keys#]
 	br[error_map_function#], defer[1]
@@ -957,7 +934,7 @@ s/**/HASHMAP_OP_GETNEXT#:
 s/**/HASHMAP_OP_GETFIRST#:
 	#pragma warning(push)
     #pragma warning(disable: 4702) // disable warning "unreachable code"
-	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_GETFIRST, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian)
+	hashmap_ops(in_fd, in_lm_key, in_lm_value, HASHMAP_OP_GETFIRST, error_map_fd#, not_found#,HASHMAP_RTN_ADDR,reply_lw, --, r_addr, endian, out_rc)
 	alu[--, reply_lw, -, 0]				;error if 0
 	bne[reply_keys#]
 	br[error_map_function#], defer[1]
@@ -973,6 +950,11 @@ not_found#:
 	immed[out_rc, CMSG_RC_ERR_MAP_NOENT]
 
 error_map_function#:
+    .if (out_rc == CMSG_RC_ERR_EEXIST)
+        immed[out_rc, CMSG_RC_ERR_MAP_EXIST]
+    .elif (out_rc == CMSG_RC_ERR_ENOMEM)
+        immed[out_rc, CMSG_RC_ERR_NOMEM]
+    .endif
 	move(error_value, 0xffff0000)
 	alu[$ent_reply[0], error_value, or, out_rc]
 	alu[ent_offset, in_key_offset, +, (15*4)]				; write FFs and rc to last 1 words of key
@@ -980,6 +962,9 @@ error_map_function#:
 	ctx_arb[sig_reply_map_ops], br[ret#]
 
 reply_keys#:
+    alu[--, reply_lw, -, 0]
+    beq[error_map_function#], defer[1]
+        immed[out_rc, CMSG_RC_ERR_MAP_ERR]
 	ov_start(OV_LENGTH)
     ov_set_use(OV_LENGTH, reply_lw, OVF_SUBTRACT_ONE)   ; length is in 32-bit LWs
     ov_clean
@@ -1006,6 +991,9 @@ reply_keys#:
 	ctx_arb[sig_reply_map_ops]				; falls thru
 
 reply_value#:
+    alu[--, reply_lw, -, 0]
+    beq[error_map_function#], defer[1]
+        immed[out_rc, CMSG_RC_ERR_MAP_ERR]
 	ov_start(OV_LENGTH)
     ov_set_use(OV_LENGTH, reply_lw, OVF_SUBTRACT_ONE)   ; length is in 32-bit LWs
     ov_clean
