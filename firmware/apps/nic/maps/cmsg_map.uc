@@ -313,8 +313,8 @@ ret#:
     bitfield_extract(ctm_isl, BF_AML(in_nfd_out_desc, NFD_OUT_CTM_ISL_fld))
 	pkt_buf_free_ctm_buffer(ctm_isl, ctm_pnum)
 
-    nfd_out_fill_desc(nfdo_desc, 0, 0, 0, nfd_bls,
-                      mu_ptr, pkt_offset, plen,
+    nfd_out_fill_desc(nfdo_desc, 0, 0, nfd_bls,
+                      mu_ptr, plen, 0, pkt_offset,
                       meta_len)
 
     nfd_lm_handle_define()
