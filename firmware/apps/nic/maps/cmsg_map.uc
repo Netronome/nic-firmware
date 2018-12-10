@@ -240,18 +240,20 @@ ret#:
 	.reg bm_offset
 	.reg bm_idx
 	.reg tid
+    .reg tmp
 
 	alu[--, in_tid, -, HASHMAP_MAX_TID_EBPF]
 	bge[ERROR_LABEL]
 
-	immed[lm_addr, LM_CMSG_FD_BITMAP]
-	alu[tid, in_tid, -, 1]
-	alu[bm_offset, --, b, tid, >>3]
-	alu[lm_addr, lm_addr, +, bm_offset]
+    immed[lm_addr, LM_CMSG_FD_BITMAP]
+    alu[tid, in_tid, -, 1]
+    alu[bm_offset, --, b, tid, >>5]
+    alu[tmp, --, b, bm_offset, <<2]
+    alu[lm_addr, lm_addr, +, tmp]
 
 	cmsg_bm_lm_define()
 	local_csr_wr[ACTIVE_LM_ADDR_/**/CMSG_BM_LM_HANDLE, lm_addr]
-	alu[bm_offset, --, b, bm_offset, <<3]
+	alu[bm_offset, --, b, bm_offset, <<5]
 	alu[bm_idx, tid, -, bm_offset]
 	nop
 	alu[--, bm_idx, or, 0]
