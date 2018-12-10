@@ -942,6 +942,9 @@ ret#:
 
 htab_lookup_error_map#:
 htab_lookup_not_found#:
+    // restore stack LM before returning from map function
+    local_csr_wr[ACTIVE_LM_ADDR_/**/HTAB_EBPF_LM_KEY_HANDLE, lm_key_offset]
+
 	#pragma warning(push)
 	#pragma warning(disable: 5186) //disable warning "gpr_wrboth is experimental"
 	.reg_addr ebpf_rc 0 A
