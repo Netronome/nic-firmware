@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2019 Netronome Systems, Inc. All rights reserved.
+ * Copyright 2014-2020 Netronome Systems, Inc. All rights reserved.
  *
  * @file          app_master_main.c
  * @brief         ME serving as the NFD NIC application master.
@@ -308,29 +308,34 @@ error:
 static void
 perq_stats_loop(void)
 {
-    SIGNAL rxq_sig;
-    SIGNAL txq_sig;
-    unsigned int rxq;
-    unsigned int txq;
+    SIGNAL q_sig;
+    unsigned int q = 0;
 
     /* Initialisation */
     nfd_in_recv_init();
     nfd_out_send_init();
 
     for (;;) {
-        for (txq = 0;
-             txq < (NFD_TOTAL_VFQS + NFD_TOTAL_CTRLQS + NFD_TOTAL_PFQS);
-             txq++) {
-            __nfd_out_push_pkt_cnt(NIC_PCI, txq, ctx_swap, &txq_sig);
-            sleep(PERQ_STATS_SLEEP);
-        }
+#ifdef NFD_PCIE0_EMEM
+        __nfd_out_push_pkt_cnt(0, q, ctx_swap, &q_sig);
+        __nfd_in_push_pkt_cnt(0, q, ctx_swap, &q_sig);
+#endif
+#ifdef NFD_PCIE1_EMEM
+        __nfd_out_push_pkt_cnt(1, q, ctx_swap, &q_sig);
+        __nfd_in_push_pkt_cnt(1, q, ctx_swap, &q_sig);
+#endif
+#ifdef NFD_PCIE2_EMEM
+        __nfd_out_push_pkt_cnt(2, q, ctx_swap, &q_sig);
+        __nfd_in_push_pkt_cnt(2, q, ctx_swap, &q_sig);
+#endif
+#ifdef NFD_PCIE3_EMEM
+        __nfd_out_push_pkt_cnt(3, q, ctx_swap, &q_sig);
+        __nfd_in_push_pkt_cnt(3, q, ctx_swap, &q_sig);
+#endif
+        if (++q >= (NFD_TOTAL_VFQS + NFD_TOTAL_CTRLQS + NFD_TOTAL_PFQS))
+            q = 0;
 
-        for (rxq = 0;
-             rxq < (NFD_TOTAL_VFQS + NFD_TOTAL_CTRLQS + NFD_TOTAL_PFQS);
-             rxq++) {
-            __nfd_in_push_pkt_cnt(NIC_PCI, rxq, ctx_swap, &rxq_sig);
-            sleep(PERQ_STATS_SLEEP);
-        }
+        sleep(PERQ_STATS_SLEEP);
 
         nic_local_epoch();
     }
