@@ -667,15 +667,25 @@ proc_array_map#:
     		mem[read32_swap, $pkt_data[0], cmsg_addr_hi, <<8, key_offset, 1], sig_done[rd_sig]
 			ctx_arb[rd_sig]
 			alu[cur_key, --, b, $pkt_data[0]]
-			.if (l_cmsg_type == CMSG_TYPE_MAP_GETFIRST)
-				immed[cur_key, 0]
-				immed[l_cmsg_type, CMSG_TYPE_MAP_ARRAY_GETNEXT]
-			.else
-				.if (l_cmsg_type == CMSG_TYPE_MAP_GETNEXT)
-					alu[cur_key, cur_key, +, 1]
-					immed[l_cmsg_type, CMSG_TYPE_MAP_ARRAY_GETNEXT]
-				.endif
-			.endif
+            .if (l_cmsg_type == CMSG_TYPE_MAP_GETFIRST)
+                br[array_map_setkey#], defer[2]
+                    immed[cur_key, 0]
+                    immed[l_cmsg_type, CMSG_TYPE_MAP_ARRAY_GETNEXT]
+            .elif (l_cmsg_type == CMSG_TYPE_MAP_GETNEXT)
+                immed[l_cmsg_type, CMSG_TYPE_MAP_ARRAY_GETNEXT]
+                alu[cur_key, cur_key, +, 1]
+                alu[--, max_entries, -, cur_key]
+                bge[array_map_setkey#]
+                immed[cur_key, 0]
+                br[array_map_setkey#]
+            .endif
+            alu[--, max_entries, -, cur_key]
+            bgt[array_map_setkey#]
+            immed[save_rc, CMSG_RC_ERR_E2BIG]
+            br[done#], defer[2]
+                alu[value_offset, key_offset, +,64]
+                alu[cmsg_reply_pktlen, cmsg_reply_pktlen, +, (64*2)]
+        array_map_setkey#:
 			alu[CMSG_KEY_LM_INDEX++, --, b, cur_key]
 
 proc_loop_cont#:
