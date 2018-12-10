@@ -719,6 +719,10 @@ ret#:
  */
 
 #macro hashmap_ops(fd, lm_key_addr, lm_value_addr, OP, INVALID_MAP_LABEL, NOTFOUND_LABEL, RTN_OPT, out_ent_lw, out_ent_tindex, out_ent_addr, endian)
+    hashmap_ops(fd, lm_key_addr, lm_value_addr, OP, INVALID_MAP_LABEL, NOTFOUND_LABEL, RTN_OPT, out_ent_lw, out_ent_tindex, out_ent_addr, endian, --)
+#endm
+
+#macro hashmap_ops(fd, lm_key_addr, lm_value_addr, OP, INVALID_MAP_LABEL, NOTFOUND_LABEL, RTN_OPT, out_ent_lw, out_ent_tindex, out_ent_addr, endian, out_rc)
 .begin
 	.reg ent_addr_hi
 	.reg tbl_addr_hi
@@ -763,10 +767,12 @@ ret#:
 	#endif
 
 retry#:
+    __hashmap_set_opt_field(out_rc, CMSG_RC_ERR_ENOENT)
     __hashmap_lock_shared(ent_index, fd, check_ov#, check_ov_valid#)
 
     __hashmap_compare(map_tindex, lm_key_addr, ent_addr_hi, offset, key_lwsz, check_ov_valid#, endian, map_type)
 found#:		/* found entry which matches the key */
+    __hashmap_set_opt_field(out_rc, CMSG_RC_SUCCESS)
 	#if (OP == HASHMAP_OP_LOOKUP)
 		alu[bytes, --, b, key_lwsz, <<2]
 		__hashmap_calc_value_addr(offset, bytes, offset)
@@ -806,6 +812,7 @@ read_next_key#:
 		__hashmap_lock_release(ent_index, ent_state)
         br[ret#]
 	#else
+        __hashmap_set_opt_field(out_rc, CMSG_RC_ERR_EEXIST)
 		br[miss#]
     #endif
 
@@ -815,6 +822,7 @@ check_ov#:
 	__hashmap_ov_lookup(hash[1], fd, tbl_addr_hi, ent_index, lm_key_addr, key_lwsz, map_tindex, ent_addr_hi, offset, ent_state, found#, endian, map_type)
 #if ( (OP == HASHMAP_OP_ADD_ANY) || (OP == HASHMAP_OP_ADD_ONLY) )	/* entry does not exist */
         __hashmap_lock_upgrade(ent_index, ent_state, retry#)
+        __hashmap_set_opt_field(out_rc, CMSG_RC_ERR_E2BIG)
 		__hashmap_table_take_credits(fd, miss#)
 		br_bclr[ent_state, __HASHMAP_DESC_VALID_BIT, write_tid_key#], defer[1]
 		alu[ent_state, ent_state, and~, 1, <<__HASHMAP_DESC_VALID_BIT]
@@ -830,6 +838,7 @@ write_key#:
 		__hashmap_calc_value_addr(offset, bytes, offset)
 		__hashmap_write_field(lm_value_addr, value_mask, ent_addr_hi, offset, value_lwsz, endian)
 		__hashmap_lock_release(ent_index, ent_state)
+        __hashmap_set_opt_field(out_rc, CMSG_RC_SUCCESS)
         br[ret#]
 add_error#:
 	__hashmap_table_return_credits(fd)
