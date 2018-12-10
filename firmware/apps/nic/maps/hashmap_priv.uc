@@ -426,7 +426,7 @@ write_cont#:
 	move(lk_addr_hi, __HASHMAP_LOCK_TBL >>8)
 	alu[lk_addr_lo, --, b, in_idx, <<HASHMAP_LOCK_SZ_SHFT]
 	alu[lk_addr_lo, 4, +, lk_addr_lo]
-	mem[write32, $tid_value, lk_addr_hi, <<8, lk_addr_lo, 1], sig_done[write_tid_sig]
+	mem[atomic_write, $tid_value, lk_addr_hi, <<8, lk_addr_lo, 1], sig_done[write_tid_sig]
 	ctx_arb[write_tid_sig]
 .end
 #endm
