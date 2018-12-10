@@ -450,14 +450,11 @@
 	alu[tbl_offset, tbl_offset, +, __CUR_CRED_OFFSET__]
 	#undef __CUR_CRED_OFFSET__
 
-	alu[$fd_credits, --, b, 1]
-	mem[test_sub, $fd_credits, base, <<8, tbl_offset, 1], sig_done[fd_inc_sig]
-	ctx_arb[fd_inc_sig]
-	alu[--, $fd_credits, -, 0]
-	bgt[ret#], defer[1]
-		immed[$fd_credits, 0]
-	mem[atomic_write, $fd_credits, base, <<8, tbl_offset, 1], sig_done[fd_inc_sig]
-	ctx_arb[fd_inc_sig], br[FULL_LABEL]
+    alu[$fd_credits, --, b, 1]
+    mem[test_subsat, $fd_credits, base, <<8, tbl_offset, 1], sig_done[fd_inc_sig]
+    ctx_arb[fd_inc_sig]
+    alu[--, --, b, $fd_credits]
+    beq[FULL_LABEL]
 ret#:
 .end
 #endm
