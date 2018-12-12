@@ -307,18 +307,8 @@ check_l4#:
     bitfield_extract__sz1(l4_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_INNER_L4_bf)) ; PV_HEADER_OFFSET_INNER_L4_bf
     beq[skip_l4#] // unknown L4
 
-    pv_seek(in_pkt_vec, l4_offset, PV_SEEK_DEFAULT, process_l4#)
+    pv_seek(in_pkt_vec, l4_offset, PV_SEEK_DEFAULT)
 
-queue_selected#:
-    bitfield_extract__sz1(max_queue, BF_AML(args, INSTR_RSS_MAX_QUEUE_bf))
-    bitfield_extract__sz1(queue, BF_AML(in_pkt_vec, PV_QUEUE_OFFSET_bf))
-    alu[--, max_queue, -, queue]
-    bhs[end#]
-
-    br[begin#], defer[1]
-        pv_set_queue_offset__sz1(in_pkt_vec, 0)
-
-process_l4#:
     byte_align_be[--, *$index++]
     byte_align_be[data, *$index++]
     crc_be[crc_32, --, data]
@@ -335,10 +325,21 @@ skip_l4#:
 
     /* Select queue = rss_tbl[hash % NFP_NET_CFG_RSS_ITBL_SZ] */
     alu[rss_table_idx, (NFP_NET_CFG_RSS_ITBL_SZ - 1), AND, hash]
-    cls[read, $rss_tbl_row, rss_table_addr, rss_table_idx, 1], ctx_swap[rss_tbl_sig], defer[2]
+    cls[read, $rss_tbl_row, rss_table_addr, rss_table_idx, 1], sig_done[rss_tbl_sig]
+    ctx_arb[rss_tbl_sig], defer[2], br[finalize#]
         alu[*l$index2++, --, B, hash]
         bits_set__sz1(BF_AL(in_pkt_vec, PV_TX_HOST_RX_RSS_bf), 1)
 
+queue_selected#:
+    bitfield_extract__sz1(max_queue, BF_AML(args, INSTR_RSS_MAX_QUEUE_bf))
+    bitfield_extract__sz1(queue, BF_AML(in_pkt_vec, PV_QUEUE_OFFSET_bf))
+    alu[--, max_queue, -, queue]
+    bhs[end#]
+
+    br[begin#], defer[1]
+        pv_set_queue_offset__sz1(in_pkt_vec, 0)
+
+finalize#:
     __actions_restore_t_idx()
 
     br_bset[BF_AL(args, INSTR_RSS_V1_META_bf), end#], defer[1]
