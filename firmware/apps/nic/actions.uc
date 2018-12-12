@@ -305,7 +305,7 @@ check_l4#:
         alu[rss_table_addr, rss_table_addr, OR, 1, <<(log2(NIC_RSS_TBL_ADDR))]
 
     bitfield_extract__sz1(l4_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_INNER_L4_bf)) ; PV_HEADER_OFFSET_INNER_L4_bf
-    beq[end#] // unknown L4
+    beq[skip_l4#] // unknown L4
 
     pv_seek(in_pkt_vec, l4_offset, PV_SEEK_DEFAULT, process_l4#)
 
@@ -329,14 +329,9 @@ process_l4#:
     alu[hash_type, hash_type, +, proto_delta]
 
 skip_l4#:
-    br_bset[BF_AL(args, INSTR_RSS_V1_META_bf), skip_meta_type#], defer[3]
-        pv_meta_push_type__sz1(in_pkt_vec, hash_type)
-        local_csr_rd[CRC_REMAINDER]
-        immed[hash, 0]
-
-    pv_meta_push_type__sz1(in_pkt_vec, NFP_NET_META_HASH)
-
-skip_meta_type#:
+    pv_meta_push_type__sz1(in_pkt_vec, hash_type)
+    local_csr_rd[CRC_REMAINDER]
+    immed[hash, 0]
 
     /* Select queue = rss_tbl[hash % NFP_NET_CFG_RSS_ITBL_SZ] */
     alu[rss_table_idx, (NFP_NET_CFG_RSS_ITBL_SZ - 1), AND, hash]
@@ -346,8 +341,11 @@ skip_meta_type#:
 
     __actions_restore_t_idx()
 
-    /* CLS doesn't provide read8, required byte is in the top 8 bits */
-    ld_field[BF_A(in_pkt_vec, PV_QUEUE_OFFSET_bf), 0001, $rss_tbl_row, >>24]; PV_QUEUE_OFFSET_bf
+    br_bset[BF_AL(args, INSTR_RSS_V1_META_bf), end#], defer[1]
+        /* CLS doesn't provide read8, required byte is in the top 8 bits */
+        ld_field[BF_A(in_pkt_vec, PV_QUEUE_OFFSET_bf), 0001, $rss_tbl_row, >>24]; PV_QUEUE_OFFSET_bf
+
+    pv_meta_push_type__sz1(in_pkt_vec, NFP_NET_META_HASH) // RSSv2
 
 end#:
 .end
