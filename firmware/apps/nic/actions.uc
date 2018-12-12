@@ -239,13 +239,13 @@ end#:
 #macro __actions_rss(in_pkt_vec)
 .begin
     .reg args[2]
-    .reg cfg_proto
     .reg data
-    .reg hash
     .reg hash_type
     .reg l3_offset
     .reg l4_offset
+    .reg l4_data
     .reg max_queue
+    .reg process_l4
     .reg proto_delta
     .reg proto_shf
     .reg queue
@@ -266,17 +266,40 @@ begin#:
     bitfield_extract__sz1(l3_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_INNER_IP_bf)) ; PV_HEADER_OFFSET_INNER_IP_bf
     beq[end#] // unknown L3
 
-    // seek to IP source address
-    alu[l3_offset, l3_offset, +, (8 + 2)] // 8 bytes of IP header, 2 bytes seek align
-    alu[proto_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PROTO_bf), <<1] // 4 bytes extra for IPv4
-    alu[l3_offset, l3_offset, +, proto_delta]
+    /* Read and cache L4 data first because seeking might context swap. The
+     * additional branch later to skip L4 when not required is cheaper than
+     * waiting for CRC instruction latencies to save and restore CRC state.
+     * The l4_offset is used as discriminator for processing L4. It is zero
+     * in the packet vector if L4 is unrecognized and we set it to zero here
+     * by masking out the bits if L4 is not configured for the packet. Note,
+     * L4 will also be skipped for fragments since PV_PROTO is 7, effectively
+     * disabling L4 by shifting the 4 configuration bits out of the register.
+     */
+    .set l4_data
+    bitfield_extract(process_l4, BF_AML(args, INSTR_RSS_CFG_PROTO_bf)) ; INSTR_RSS_CFG_PROTO_bf
+    alu[hash_type, BF_A(in_pkt_vec, PV_PROTO_bf), B, 1] ; PV_PROTO_bf
+    alu[process_l4, 1, AND~, process_l4, >>indirect] // 1 if L4 is disabled for proto
+    alu[process_l4, process_l4, -, 1] // generate mask of 0xffffffff if L4 is enabled
+    passert(BF_L(PV_HEADER_OFFSET_INNER_L4_bf), "EQ", 0)
+    /* extract non-zero l4_offset if and only if L4 is valid and it is enabled */
+    alu[l4_offset, BF_A(in_pkt_vec, PV_HEADER_OFFSET_INNER_L4_bf), AND, process_l4, >>(31 - BF_M(PV_HEADER_OFFSET_INNER_L4_bf))] ; PV_HEADER_OFFSET_INNER_L4_bf
+    beq[process_l3#], defer[3]
+        alu[l3_offset, l3_offset, +, (8 + 2)] // 8 bytes of IP header, 2 bytes seek align
+        alu[proto_delta, (1 << 2), AND, BF_A(in_pkt_vec, PV_PROTO_bf), <<1] // 4 bytes extra for IPv4
+        alu[l3_offset, l3_offset, +, proto_delta]
+
+    pv_seek(in_pkt_vec, l4_offset)
+
+    byte_align_be[--, *$index++]
+    byte_align_be[l4_data, *$index++]
+
+process_l3#:
     pv_seek(in_pkt_vec, l3_offset, PV_SEEK_PAD_INCLUDED)
 
     local_csr_wr[CRC_REMAINDER, BF_A(args, INSTR_RSS_KEY_bf)]
-    immed[hash_type, 1]
     byte_align_be[--, *$index++]
     byte_align_be[data, *$index++]
-    br_bset[BF_A(in_pkt_vec, PV_PROTO_bf), 1, check_l4#], defer[3] // branch if IPv4, 2 words hashed
+    br_bset[BF_A(in_pkt_vec, PV_PROTO_bf), 1, process_l4#], defer[3] // branch if IPv4, 2 words hashed
         crc_be[crc_32, --, data]
         byte_align_be[data, *$index++]
         crc_be[crc_32, --, data]
@@ -292,26 +315,11 @@ begin#:
 
     alu[hash_type, hash_type, +, 1]
 
-check_l4#:
-    // skip L4 if RSS not configured for protocol (this will also skip fragments)
-    bitfield_extract(cfg_proto, BF_AML(args, INSTR_RSS_CFG_PROTO_bf)) ; INSTR_RSS_CFG_PROTO_bf
-    alu[--, BF_A(in_pkt_vec, PV_PROTO_bf), OR, 0] ; PV_PROTO_bf
-    alu[--, cfg_proto, AND, 1, <<indirect]
-    beq[skip_l4#], defer[2]
-        passert(BF_L(INSTR_RSS_TABLE_IDX_bf), "EQ", LOG2(NFP_NET_CFG_RSS_ITBL_SZ))
-        passert(NIC_RSS_TBL_ADDR, "POWER_OF_2")
-        passert(LOG2(NIC_RSS_TBL_ADDR), "GT", BF_M(INSTR_RSS_TABLE_IDX_bf))
+process_l4#:
+    br=byte[l4_offset, 0, 0, skip_l4#], defer[1]
         alu[rss_table_addr, BF_A(args, INSTR_RSS_TABLE_IDX_bf), AND, BF_MASK(INSTR_RSS_TABLE_IDX_bf), <<BF_L(INSTR_RSS_TABLE_IDX_bf)]
-        alu[rss_table_addr, rss_table_addr, OR, 1, <<(log2(NIC_RSS_TBL_ADDR))]
 
-    bitfield_extract__sz1(l4_offset, BF_AML(in_pkt_vec, PV_HEADER_OFFSET_INNER_L4_bf)) ; PV_HEADER_OFFSET_INNER_L4_bf
-    beq[skip_l4#] // unknown L4
-
-    pv_seek(in_pkt_vec, l4_offset, PV_SEEK_DEFAULT)
-
-    byte_align_be[--, *$index++]
-    byte_align_be[data, *$index++]
-    crc_be[crc_32, --, data]
+    crc_be[crc_32, --, l4_data]
 
     alu[proto_shf, BF_A(in_pkt_vec, PV_PROTO_bf), AND, 1]
     alu[proto_delta, proto_shf, B, 3]
@@ -319,15 +327,19 @@ check_l4#:
     alu[hash_type, hash_type, +, proto_delta]
 
 skip_l4#:
-    pv_meta_push_type__sz1(in_pkt_vec, hash_type)
+    passert(BF_L(INSTR_RSS_TABLE_IDX_bf), "EQ", LOG2(NFP_NET_CFG_RSS_ITBL_SZ))
+    passert(NIC_RSS_TBL_ADDR, "POWER_OF_2")
+    passert(LOG2(NIC_RSS_TBL_ADDR), "GT", BF_M(INSTR_RSS_TABLE_IDX_bf))
+    alu[rss_table_addr, rss_table_addr, OR, 1, <<(log2(NIC_RSS_TBL_ADDR))]
+
     local_csr_rd[CRC_REMAINDER]
-    immed[hash, 0]
+    immed[*l$index2, 0]
 
     /* Select queue = rss_tbl[hash % NFP_NET_CFG_RSS_ITBL_SZ] */
-    alu[rss_table_idx, (NFP_NET_CFG_RSS_ITBL_SZ - 1), AND, hash]
+    alu[rss_table_idx, (NFP_NET_CFG_RSS_ITBL_SZ - 1), AND, *l$index2++]
     cls[read, $rss_tbl_row, rss_table_addr, rss_table_idx, 1], sig_done[rss_tbl_sig]
     ctx_arb[rss_tbl_sig], defer[2], br[finalize#]
-        alu[*l$index2++, --, B, hash]
+        pv_meta_push_type__sz1(in_pkt_vec, hash_type)
         bits_set__sz1(BF_AL(in_pkt_vec, PV_TX_HOST_RX_RSS_bf), 1)
 
 queue_selected#:
