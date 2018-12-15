@@ -1,0 +1,12 @@
+p {
+    text-align: justify;
+}
+
+table.action-encoding {
+    transform: scale(0.58);
+    -webkit-transform-origin-x: 0;
+}
+
+table.action-encoding td {
+    text-align: center;
+}
