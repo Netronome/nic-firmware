@@ -2,7 +2,6 @@
 
 #include "pkt_ipv4_udp_x88.uc"
 
-#include <actions.uc>
 #include "actions_rss.uc"
 
 .reg pkt_len

@@ -2,7 +2,6 @@
 
 #include <bitfields.uc>
 
-#include <actions.uc>
 #include "actions_rss.uc"
 
 #include "pkt_ipv4_tcp_x88.uc"

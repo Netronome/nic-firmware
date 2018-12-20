@@ -4,8 +4,6 @@
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_35=0xdeadbeef
 
 #include "pkt_vlan_ipv4_udp_x84.uc"
-#include <actions.uc>
-#include "single_ctx_test.uc"
 #include <global.uc>
 #include "actions_harness.uc"
 #include "actions_classify_veb_insertion.uc"
