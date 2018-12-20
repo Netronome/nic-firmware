@@ -51,9 +51,6 @@
 	#include "hashmap_priv.uc"
 #endif
 
-#define CMSG_TXFR_COUNT 16
-#define HASHMAP_TXFR_COUNT 16
-#define	HASHMAP_RXFR_COUNT 16
 #define CMSG_DESC_LW	3
 
 #ifndef NFD_META_MAX_LW
@@ -137,6 +134,10 @@
 
 	.alloc_mem LM_CMSG_BASE	lm me (NUM_CONTEXT * (CMSG_LM_FIELD_SZ * 4)) 8
 	.init LM_CMSG_BASE 0
+
+    #define CMSG_TXFR_COUNT 16
+    #define HASHMAP_TXFR_COUNT 16
+    #define HASHMAP_RXFR_COUNT 16
 
 	.reg volatile read $map_rxfr[HASHMAP_RXFR_COUNT]
 	.xfer_order $map_rxfr
