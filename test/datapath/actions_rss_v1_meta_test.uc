@@ -3,7 +3,6 @@
 
 #include "pkt_ipv4_tcp_x88.uc"
 
-#include <actions.uc>
 #include "actions_rss.uc"
 
 rss_reset_test(pkt_vec)

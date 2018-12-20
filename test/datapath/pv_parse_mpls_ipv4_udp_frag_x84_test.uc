@@ -1,6 +1,5 @@
 #include "pkt_mpls_ipv4_udp_frag_x84.uc"
 
-#include <actions.uc>
 #include "actions_harness.uc"
 #include "global.uc"
 

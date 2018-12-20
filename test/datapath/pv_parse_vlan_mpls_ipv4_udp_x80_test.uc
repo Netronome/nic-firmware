@@ -1,6 +1,5 @@
 #include "pkt_vlan_mpls_ipv4_udp_x80.uc"
 
-#include <actions.uc>
 #include "actions_harness.uc"
 #include "global.uc"
 

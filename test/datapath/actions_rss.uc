@@ -65,9 +65,9 @@
 ;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:244 0x75767778
 ;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:248 0x797a7b7c
 ;TEST_INIT_EXEC nfp-rtsym i32.NIC_RSS_TBL:252 0x7d7e7f80
-#include <single_ctx_test.uc>
 
 #include "actions_harness.uc"
+#include <single_ctx_test.uc>
 
 #include <config.h>
 #include <gro_cfg.uc>
