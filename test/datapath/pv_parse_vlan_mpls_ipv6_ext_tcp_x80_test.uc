@@ -1,6 +1,5 @@
 #include "pkt_vlan_mpls_ipv6_ext_tcp_x80.uc"
 
-#include <actions.uc>
 #include "actions_harness.uc"
 #include "global.uc"
 

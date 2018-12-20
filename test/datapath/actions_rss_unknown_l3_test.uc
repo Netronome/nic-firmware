@@ -1,7 +1,6 @@
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x7fe3
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xff3f8c02
 
-#include <actions.uc>
 #include "actions_rss.uc"
 
 .reg pkt_vec[PV_SIZE_LW]

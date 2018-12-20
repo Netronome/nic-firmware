@@ -1,6 +1,5 @@
 #include "pkt_ipv6_udp_x88.uc"
 
-#include <actions.uc>
 #include "actions_harness.uc"
 #include "global.uc"
 

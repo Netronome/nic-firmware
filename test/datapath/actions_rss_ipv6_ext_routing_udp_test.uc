@@ -2,7 +2,6 @@
 
 #include "pkt_ipv6_ext_routing_udp_x80.uc"
 
-#include <actions.uc>
 #include "actions_rss.uc"
 
 .reg pkt_len
