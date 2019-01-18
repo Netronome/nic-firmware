@@ -243,7 +243,7 @@ ret#:
     .reg tmp
 
 	alu[--, in_tid, -, HASHMAP_MAX_TID_EBPF]
-	bge[ERROR_LABEL]
+	bgt[ERROR_LABEL]
 
     immed[lm_addr, LM_CMSG_FD_BITMAP]
     alu[tid, in_tid, -, 1]
