@@ -6,7 +6,7 @@
 ;TEST_INIT_EXEC nfp-mem emem0:0xd0     0xea8d9a10 0xffffffff 0x51ffffff 0xffffffff
 ;TEST_INIT_EXEC nfp-mem emem0:0xe0     0x97ae878f 0x08377a4d 0x85a1fec4 0x97a27c00
 ;TEST_INIT_EXEC nfp-mem emem0:0xf0     0x784648ea 0x31ab0538 0xac9ca16e 0x8a809e58
-;TEST_INIT_EXEC nfp-mem emem0:0x100    0xa6ffc15f 0x6597596f 0x2cea31dd 
+;TEST_INIT_EXEC nfp-mem emem0:0x100    0xa6ffc15f 0x6597596f 0x2cea31dd
 
 #include <aggregate.uc>
 #include <stdmac.uc>

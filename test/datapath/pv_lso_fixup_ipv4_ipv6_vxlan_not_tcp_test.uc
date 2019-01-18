@@ -88,7 +88,7 @@ error#:
     .elif (loop_cnt == 1)
         move(expected[3], PROTO_IPV4_UDP_VXLAN_IPV6_UNKNOWN)
         move(expected[5], ((_PV_OUTER_L3_OFFSET << 24) | (_PV_INNER_L3_OFFSET <<  8)))
-    
+
     .else
         move(expected[3], PROTO_IPV4_UDP_VXLAN_IPV6_FRAGMENT)
         move(expected[5], ((_PV_OUTER_L3_OFFSET << 24) | (_PV_INNER_L3_OFFSET <<  8)))
