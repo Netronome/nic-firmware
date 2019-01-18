@@ -1131,7 +1131,7 @@ action_list_t *acts)
     if (acts != 0) {
         /* Fail if mac is 0 or multicast */
         if (new_mac_addr == 0 || ((new_mac_addr >> 40) & 0x01))
-        return MAC_VLAN_ADD_FAIL;
+            return MAC_VLAN_ADD_FAIL;
 
         new_vlan_id = veb_key->vlan_id;
         /* Add or overwrite VEB table entries */
@@ -1144,7 +1144,7 @@ action_list_t *acts)
                 if (nic_mac_vlan_entry_op_cmsg(veb_key,
                             (__lmem uint32_t *) acts->instr,
                             CMSG_TYPE_MAP_ADD) == CMESG_DISPATCH_FAIL)
-                return MAC_VLAN_ADD_FAIL;
+                    return MAC_VLAN_ADD_FAIL;
             }
         }
     }
@@ -1163,7 +1163,7 @@ action_list_t *acts)
             del_key.vlan_id = vlan_id;
             if (nic_mac_vlan_entry_op_cmsg(&del_key, 0,
                         CMSG_TYPE_MAP_DELETE) == CMESG_DISPATCH_FAIL)
-            err_code = MAC_VLAN_DELETE_WARN;
+                err_code = MAC_VLAN_DELETE_WARN;
         }
     }
 
@@ -1220,7 +1220,7 @@ cfg_act_vf_down(uint32_t pcie, uint32_t vid)
     VEB_KEY_FROM_MAC64(veb_key, 0ull)
 
     if (cfg_act_write_veb(vid, &veb_key, 0) != NO_ERROR)
-    return 1;
+        return 1;
 
     remove_vlan_member(vid);
     upd_ctm_vlan_members();
@@ -1256,9 +1256,8 @@ cfg_act_pf_up(uint32_t pcie, uint32_t vid, uint32_t veb_up,
         veb_key.mac_addr_hi = (mac[0] >> 16);
         veb_key.mac_addr_lo = (mac[0] << 16) | (mac[1] >> 16);
         veb_key.vlan_id = NIC_NO_VLAN_ID;
-
-    if (cfg_act_write_veb(vid, &veb_key, &acts) != NO_ERROR)
-        return 1;
+        if (cfg_act_write_veb(vid, &veb_key, &acts) != NO_ERROR)
+            return 1;
     }
 
     return 0;
