@@ -91,7 +91,7 @@ error#:
         move(expected[3], PROTO_IPV6_UDP_VXLAN_IPV4_FRAGMENT)
         move(expected[5], ((_PV_OUTER_L3_OFFSET << 24) | (_PV_INNER_L3_OFFSET <<  8)))
     .endif
-   
+
     #define_eval _PV_CHK_LOOP 0
 
     #while (_PV_CHK_LOOP < PV_TEST_SIZE_LW)
