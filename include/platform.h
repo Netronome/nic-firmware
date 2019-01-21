@@ -595,9 +595,9 @@
         (NS_PLATFORM_MAC_CORE_SERDES_LO(_port) + 0)
     #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
         ((_serdes) >> 2)
-    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
+    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 2)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
-        (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 0)
+        (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
     #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
     #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
     #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       1

@@ -575,7 +575,12 @@ cfg_act_write_host(uint32_t pcie, uint32_t vid, action_list_t *acts)
 __intrinsic void
 cfg_act_write_wire(uint32_t port, action_list_t *acts)
 {
-    cfg_act_write_queue((1 << 8) | port, acts);
+    uint32_t channel;
+
+    for (channel = NS_PLATFORM_MAC_CHANNEL_LO(port);
+	 channel <= NS_PLATFORM_MAC_CHANNEL_HI(port);
+	 ++channel)
+        cfg_act_write_queue((1 << 8) | channel, acts);
 }
 
 
