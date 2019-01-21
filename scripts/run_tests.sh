@@ -9,7 +9,12 @@ mkdir -p ${TEST_BUILD_DIR}
 shift
 FW_BUILD_DIR=$1
 shift
-#set -x
+if [ -z ${Q+x} ];
+then
+    set +x
+else
+    set -x
+fi
 PASSED=0
 FAILED=0
 
