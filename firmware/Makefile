@@ -141,9 +141,9 @@ firmware_veryclean: firmware_clean firmware_clean_deps
 
 FW_PKG_VER = $(shell ${SCRIPT_DIR}/describe-head.sh --pkg_ver)
 DEB_UDEV_PKG = $(FIRMWARE_DIR)/pkg/deb/agilio-naming-policy-$(FW_PKG_VER)-1
-FW_TREE = $(FIRMWARE_DIR)/pkg/files/firmware
+FW_TREE = $(FIRMWARE_DIR)/pkg/files/firmware/$(FLAVOR)
 UDEV_TREE = $(FIRMWARE_DIR)/pkg/files/udev
-RPM_FW_PKG = $(FIRMWARE_DIR)/pkg/rpm/firmware
+RPM_FW_PKG = $(FIRMWARE_DIR)/pkg/rpm/firmware/$(FLAVOR)
 RPM_UDEV_PKG = $(FIRMWARE_DIR)/pkg/rpm/udev
 TGZ_PKG = $(FIRMWARE_DIR)/pkg/tgz
 
@@ -179,7 +179,9 @@ define firmware_rpm
 $(1)__firmware_rpm: $(1)__firmware_tgz
 	$(Q)mkdir -p $(RPM_FW_PKG)/{BUILD,SPECS,SOURCES,RPMS,SRPMS}
 	$(Q)cp $(TGZ_PKG)/$(2)-$(FW_PKG_VER).tgz $(RPM_FW_PKG)/SOURCES
-	$(Q)cat $(FIRMWARE_DIR)/pkg/agilio-firmware.spec | sed 's/__VERSION__/$(FW_PKG_VER)/g' | sed 's/__FW_NAME__/$(2)/g' > $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
+	$(Q)cp $(FIRMWARE_DIR)/pkg/agilio-firmware.spec $(RPM_FW_PKG)/SPECS/agilio-firmware.tmp
+	$(Q)tar tzvf $(TGZ_PKG)/$(2)-$(FW_PKG_VER).tgz | grep nffw | sed 's/.*\//\/opt\/netronome\/__FW_NAME__\//' >> $(RPM_FW_PKG)/SPECS/agilio-firmware.tmp
+	$(Q)cat $(RPM_FW_PKG)/SPECS/agilio-firmware.tmp | sed 's/__VERSION__/$(FW_PKG_VER)/g' | sed 's/__FW_NAME__/$(2)/g' > $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
 	$(Q)echo "%post" >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
 	$(Q)cat $(FIRMWARE_DIR)/pkg/postinst | sed 's/__FW_NAME__/$(2)/g' >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
 	$(Q)echo "dracut -f" >> $(RPM_FW_PKG)/SPECS/agilio-firmware.spec
@@ -228,7 +230,7 @@ package_tgz: $(foreach FLAVOR,$(FLAVOR_LIST), $(FLAVOR)__firmware_tgz)
 
 package_rpm: udev_rpm $(foreach FLAVOR,$(FLAVOR_LIST), $(FLAVOR)__firmware_rpm)
 	$(Q)mkdir -p $(FIRMWARE_DIR)/pkg/out/rpm
-	$(Q)cp $(RPM_FW_PKG)/RPMS/noarch/*.rpm $(FIRMWARE_DIR)/pkg/out/rpm/
+	$(Q)cp $(foreach FLAVOR,$(FLAVOR_LIST), $(FIRMWARE_DIR)/pkg/rpm/firmware/$(FLAVOR)/RPMS/noarch/*.rpm) $(FIRMWARE_DIR)/pkg/out/rpm/
 	$(Q)cp $(RPM_UDEV_PKG)/RPMS/noarch/*.rpm $(FIRMWARE_DIR)/pkg/out/rpm/
 
 package_deb: udev_deb $(foreach FLAVOR,$(FLAVOR_LIST), $(FLAVOR)__firmware_deb)
