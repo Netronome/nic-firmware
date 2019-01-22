@@ -25,7 +25,6 @@
 #define SET_PIPELINE_BIT(prev, current) \
     ((current) - (prev) == 1) ? 1 : 0;
 
-__cls __align(4) struct ctm_pkt_credits pkt_buf_ctm_credits;
 
 /* initialize blm buffer ring for test */
 #define BLM_TEST_BUF_SIZE (1 << 11)
@@ -70,7 +69,7 @@ void main() {
 
     single_ctx_test();
 
-    pkt_ctm_init_credits(&pkt_buf_ctm_credits, 20, 20);
+    pkt_ctm_init_credits(PKT_BUF_CTM_CREDITS_LINK, 20, 20);
 
     blm_test_init();
 

@@ -76,6 +76,12 @@
         };
     };
 
+
+    /* CTM allocation credits */
+    __asm {.alloc_mem _pkt_buf_ctm_credits cls island 8}
+    #define PKT_BUF_CTM_CREDITS_LINK \
+        (__cls struct ctm_pkt_credits *) _link_sym(_pkt_buf_ctm_credits)
+
     /* *** NIC MAC+VLAN Table Functions. *** */
 
     /**
