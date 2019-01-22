@@ -5,6 +5,7 @@
 */
 
 #include "test.c"
+#include "app_mac_vlan_config_cmsg.c"
 
 #include <nfp/mem_ring.h>
 #include <pkt/pkt.h>

@@ -491,7 +491,6 @@ $1__$2__FLAGS += -chip $$($1__CHIP)
 $1__$2__CLIBS += $(NFCC_BASE_CLIBS)
 $1__$2__CLIBS += $$($1__NFCC_CLIBS)
 $1__$2__LIST  = $(FW_BUILD)/$1/$2/$2.list
-$1__$2__TOBJS = $(FW_BUILD)/$1/$2/$2.objs
 $1__$2__MKDEP = $(FW_BUILD)/$1/$2/$2.d
 $1__$2__NCTX  = 4
 
@@ -509,18 +508,6 @@ $$($1__$2__LIST): $3/$4 $$($1__$2__CLIBS) $(GENERATED_DEPS)
 		$$($1__$2__CLIBS) $$< > $$($1__$2__MKDEP)
 	$(Q)sed -ie 's|^.*\.o|$(FW_BUILD)/$1/$2/$2.list|' $$($1__$2__MKDEP)
 	$(Q)$(NFCC) -Fo$(FW_BUILD)/$1/$2/ -Fe$$@ $$($1__$2__FLAGS) \
-		-Qnctx_mode=$$($1__$2__NCTX) $$($1__$2__INC) $$($1__$2__DEFS) \
-		$$($1__$2__CLIBS) $$<
-
-$$($1__$2__TOBJS): $3/$4 $$($1__$2__CLIBS) $(GENERATED_DEPS)
-	@echo Building $$($1__$2__TOBJS) ...
-	$(Q)mkdir -p $(FW_BUILD)/$1/$2
-	$(Q)$(NFCC) -QM -c -DUNIT_TEST -DNFD_MAX_VFS=2 -DNFD_MAX_PFS=1 $$($1__$2__FLAGS) \
-		-Qnctx_mode=$$($1__$2__NCTX) $$($1__$2__INC) $$($1__$2__DEFS) \
-		$$($1__$2__CLIBS) $$< > $$($1__$2__MKDEP)
-	$(Q)sed -ie 's|^.*\.o|$(FW_BUILD)/$1/$2/$2.list|' $$($1__$2__MKDEP)
-	$(Q)$(NFCC) -c -DUNIT_TEST -DNFD_MAX_VFS=2 -DNFD_MAX_PFS=1 -Fo$(FW_BUILD)/$1/$2/ \
-		-Fe$$@ $$($1__$2__FLAGS) \
 		-Qnctx_mode=$$($1__$2__NCTX) $$($1__$2__INC) $$($1__$2__DEFS) \
 		$$($1__$2__CLIBS) $$<
 endef
@@ -644,7 +631,6 @@ define micro_c.add_define
 $1__$2__DEFS  += -D$(3)
 
 endef
-
 
 #f micro_c.add_defines
 #
@@ -787,10 +773,10 @@ endef
 FILTER = test
 define micro_c.add_tests
 
-$1_$2_test: $$($1__$2__TOBJS)
+$1_$2_test:
 	scripts/run_tests.sh $(FILTER) $(TEST_DIR)/$2 $(FW_BUILD)/$2 \
           $(FW_BUILD)/$(PROJECT)/$2 $$($1__$2__INC)  \
-	 -I$(NETRONOME)/components/standardlibrary/microc/src \
+         -I$(NETRONOME)/components/standardlibrary/microc/src \
          -DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE) -DAPP_MES_LIST="0" \
          -DBLM_CUSTOM_CONFIG -DGRO_NUM_BLOCKS=2
 FW_C_TEST_TARGETS += $1_$2_test

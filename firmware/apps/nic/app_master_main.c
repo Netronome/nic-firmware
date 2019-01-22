@@ -1121,7 +1121,6 @@ init_nic(void)
     upd_slicc_hash_table();
 }
 
-#ifndef UNIT_TEST
 int
 main(void)
 {
@@ -1157,4 +1156,3 @@ main(void)
     }
     /* NOTREACHED */
 }
-#endif
