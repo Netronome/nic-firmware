@@ -4,6 +4,7 @@
     verify operation of nic_mac_vlan_entry_op_cmsg
 */
 
+#include "defines.h"
 #include "test.c"
 #include "app_mac_vlan_config_cmsg.c"
 
