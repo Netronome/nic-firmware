@@ -24,4 +24,3 @@ cp * $RPM_BUILD_ROOT/opt/netronome/__FW_NAME__
 %files
 %define _binaries_in_noarch_packages_terminate_build 0
 %defattr(-,root, root)
-/opt/netronome/__FW_NAME__
