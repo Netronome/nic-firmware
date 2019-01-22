@@ -646,7 +646,6 @@ $(foreach define,$3,$(eval $(call micro_c.add_define,$1,$2,$(define))))
 
 endef
 
-
 #f micro_c.add_include
 #
 # Add a single include path to a micro-C compile
@@ -775,10 +774,8 @@ define micro_c.add_tests
 
 $1_$2_test:
 	scripts/run_tests.sh $(FILTER) $(TEST_DIR)/$2 $(FW_BUILD)/$2 \
-          $(FW_BUILD)/$(PROJECT)/$2 $$($1__$2__INC)  \
-         -I$(NETRONOME)/components/standardlibrary/microc/src \
-         -DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE) -DAPP_MES_LIST="0" \
-         -DBLM_CUSTOM_CONFIG -DGRO_NUM_BLOCKS=2
+        $(FW_BUILD)/$(PROJECT)/$2 $$($1__$2__INC) \
+	    -I$(NETRONOME)/components/standardlibrary/microc/src
 FW_C_TEST_TARGETS += $1_$2_test
 
 endef
