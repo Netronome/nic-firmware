@@ -136,6 +136,7 @@ firmware_clean:
 	@rm -rf $(FIRMWARE_DIR)/pkg/rpm
 	@rm -rf $(FIRMWARE_DIR)/pkg/tgz
 	@rm -rf $(FIRMWARE_DIR)/pkg/out
+	@rm -rf $(NFP_COMMON)/*.obj
 
 firmware_veryclean: firmware_clean firmware_clean_deps
 
