@@ -376,9 +376,6 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigne
 }
 
 
-__cls __align(4) struct ctm_pkt_credits pkt_buf_ctm_credits;
-
-
 static void
 disable_port_tx_datapath(unsigned int nbi, unsigned int start_q,
                          unsigned int end_q)

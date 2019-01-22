@@ -56,8 +56,6 @@
 #define CMSG_MAP_VERSION    1
 #define CMSG_DESC_LW    3
 
-/* CTM allocation credits */
-__import __shared __cls struct ctm_pkt_credits pkt_buf_ctm_credits;
 
 #ifndef CTM_ALLOC_ERR
 #define CTM_ALLOC_ERR   0xffffffff
@@ -95,8 +93,8 @@ nic_mac_vlan_entry_op_cmsg(__lmem struct nic_mac_vlan_key *key,
 
     /* Allocate CTM buffer */
     /* Buffer not used but will be freed by cmsgmap ME */
-    pkt_ctm_get_credits(&pkt_buf_ctm_credits, 1, 1, 1);
-    ctm_pnum = pkt_ctm_alloc(&pkt_buf_ctm_credits, __ISLAND, MIN_CTM_TYPE, 0, 0);
+    pkt_ctm_get_credits(PKT_BUF_CTM_CREDITS_LINK, 1, 1, 1);
+    ctm_pnum = pkt_ctm_alloc(PKT_BUF_CTM_CREDITS_LINK, __ISLAND, MIN_CTM_TYPE, 0, 0);
     if (ctm_pnum == CTM_ALLOC_ERR) {
         proc_res = CMESG_DISPATCH_FAIL;
 	goto skip;
