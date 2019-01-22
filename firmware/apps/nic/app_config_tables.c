@@ -162,6 +162,23 @@ __export __emem __addr40 uint32_t debug_rss_table[100];
 
 __export __emem uint64_t cfg_error_rss_cntr = 0;
 
+/* Structure for storing 48 bit MAC in two 32 bit registers*/
+struct mac_addr {
+    union {
+        struct {
+            uint8_t __unused[2];
+            uint8_t mac_byte[6];
+        };
+        struct {
+            uint32_t mac_word[2];
+        };
+        uint64_t mac_dword;
+    };
+};
+/* Store configured MAC address for when vNICs must be downed */
+__export __shared __cls struct mac_addr
+    nvnic_macs[NFD_MAX_ISL][NVNICS];
+
 /* RSS table length in words */
 #define NFP_NET_CFG_RSS_ITBL_SZ_wrd (NFP_NET_CFG_RSS_ITBL_SZ >> 2)
 
@@ -1238,7 +1255,8 @@ int
 cfg_act_pf_up(uint32_t pcie, uint32_t vid, uint32_t veb_up,
           uint32_t control, uint32_t update)
 {
-    __xread uint32_t mac[2];
+    __xread struct mac_addr mac_xr;
+    struct mac_addr mac;
     uint32_t type, vnic;
     __shared __lmem struct nic_mac_vlan_key veb_key;
     action_list_t acts;
@@ -1252,15 +1270,20 @@ cfg_act_pf_up(uint32_t pcie, uint32_t vid, uint32_t veb_up,
     cfg_act_build_pf(&acts, pcie, vid, veb_up, control, update);
     cfg_act_write_host(pcie, vid, &acts);
 
+    mem_read64(&mac_xr.mac_word[0], (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
+                NFP_NET_CFG_MACADDR), sizeof(mac_xr));
+
+    mac.mac_dword = mac_xr.mac_dword >> 16ull;
+    nvnic_macs[pcie][vid] = mac;
+
     if (vnic == 0) { // VFs are only associated with the first PF VNIC (for now)
         cfg_act_build_veb_pf(&acts, pcie, vid, control, update);
 
-        mem_read64(mac, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
-                       NFP_NET_CFG_MACADDR), sizeof(mac));
         veb_key.__raw[0] = 0;
-        veb_key.mac_addr_hi = (mac[0] >> 16);
-        veb_key.mac_addr_lo = (mac[0] << 16) | (mac[1] >> 16);
+        veb_key.mac_addr_hi = mac.mac_word[0];
+        veb_key.mac_addr_lo = mac.mac_word[1];
         veb_key.vlan_id = NIC_NO_VLAN_ID;
+
         if (cfg_act_write_veb(vid, &veb_key, &acts) != NO_ERROR)
             return 1;
     }
@@ -1271,26 +1294,27 @@ cfg_act_pf_up(uint32_t pcie, uint32_t vid, uint32_t veb_up,
 int cfg_act_pf_down(uint32_t pcie, uint32_t vid)
 {
     __emem __addr40 uint8_t *bar_base = NFD_CFG_BAR_ISL(pcie, vid);
-    __xread uint32_t mac[2];
+    struct mac_addr mac;
     uint32_t type, vnic;
     __shared __lmem struct nic_mac_vlan_key veb_key;
     action_list_t acts;
 
     NFD_VID2VNIC(type, vnic, vid);
     if (type != NFD_VNIC_TYPE_PF)
-    return 1;
+        return 1;
 
     cfg_act_build_nbi_down(&acts, pcie, vid);
     cfg_act_write_wire(vnic, &acts);
     cfg_act_build_pcie_down(&acts, pcie, vid);
     cfg_act_write_host(pcie, vid, &acts);
 
+    mac = nvnic_macs[pcie][vid];
+    nvnic_macs[pcie][vid].mac_dword = 0;
+
     if (vnic == 0) {
-    mem_read64(mac, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
-                               NFP_NET_CFG_MACADDR), sizeof(mac));
         veb_key.__raw[0] = 0;
-        veb_key.mac_addr_hi = (mac[0] >> 16);
-        veb_key.mac_addr_lo = (mac[0] << 16) | (mac[1] >> 16);
+        veb_key.mac_addr_hi = mac.mac_word[0];
+        veb_key.mac_addr_lo = mac.mac_word[1];
 
     if (cfg_act_write_veb(vid, &veb_key, 0) != NO_ERROR)
         return 1;
