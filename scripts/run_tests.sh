@@ -34,7 +34,7 @@ for t in `find ${TEST_DIR} -iname '*_test.uc' -o -iname '*_test.c'` ; do
         nfas -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t || exit 1
         nfld -chip nfp-4xxx-b0 -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list || exit 1
     else
-        nfcc -chip nfp-4xxx-b0 -v1 -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t || exit 1
+        nfcc -chip nfp-4xxx-b0 -v1 -Qno_decl_volatile -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t || exit 1
         nfld -chip nfp-4xxx-b0 -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list || exit 1
     fi
 
