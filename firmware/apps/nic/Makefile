@@ -11,43 +11,51 @@ else ifeq ($(FLAVOR), sriov)
     NS_FLAVOR_TYPE = 2
 endif
 
-CHIP = nfp-4xxx-B0
 ifeq ($(PLATFORM),Hydrogen)
     NS_PLATFORM_TYPE = 1
     MEDIA = 1x40
     AMDA = AMDA0081-0001
+    CHIP = AMDA0081-0001:0
 else ifeq ($(PLATFORM),Hydrogen_4x10)
     NS_PLATFORM_TYPE = 2
     MEDIA = 4x10
     AMDA = AMDA0081-0001
+    CHIP = AMDA0081-0001:0
 else ifeq ($(PLATFORM),Lithium)
     NS_PLATFORM_TYPE = 3
     MEDIA = 2x10
     AMDA = AMDA0096-0001
+    CHIP = AMDA0096-0001:0
 else ifeq ($(PLATFORM),Beryllium)
     NS_PLATFORM_TYPE = 7
     MEDIA = 2x40
     AMDA = AMDA0097-0001
+    CHIP = AMDA0097-0001:0
 else ifeq ($(PLATFORM),Beryllium_4x10_1x40)
     NS_PLATFORM_TYPE = 8
     MEDIA = 4x10_1x40
     AMDA = AMDA0097-0001
+    CHIP = AMDA0097-0001:0
 else ifeq ($(PLATFORM),Beryllium_8x10)
     NS_PLATFORM_TYPE = 9
     MEDIA = 8x10
     AMDA = AMDA0097-0001
+    CHIP = AMDA0097-0001:0
 else ifeq ($(PLATFORM),Carbon)
     NS_PLATFORM_TYPE = 10
     MEDIA = 2x25
     AMDA = AMDA0099-0001
+    CHIP = AMDA0099-0001:0
 else ifeq ($(PLATFORM),Carbon_2x10)
     NS_PLATFORM_TYPE = 11
     MEDIA = 2x10
     AMDA = AMDA0099-0001
+    CHIP = AMDA0099-0001:0
 else ifeq ($(PLATFORM),Carbon_1x10_1x25)
     NS_PLATFORM_TYPE = 12
     MEDIA = 1x10_1x25
     AMDA = AMDA0099-0001
+    CHIP = AMDA0099-0001:0
 else ifeq ($(PLATFORM),Starfighter_2x40)
     NS_PLATFORM_TYPE = 13
     MEDIA = 2x40
