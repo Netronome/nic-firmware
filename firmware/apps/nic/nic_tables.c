@@ -44,7 +44,10 @@ add_vlan_member(uint16_t vlan_id, uint16_t vid)
     mem_read64(&members_r, &nic_vlan_to_vnics_map_tbl[vlan_id], sizeof(uint64_t));
     min_rxb = (members_r >> 58);
     mem_read32(&rxb_r, (__mem void*) (bar_base + NFP_NET_CFG_FLBUFSZ), sizeof(rxb_r));
-    min_rxb = (min_rxb != 0 && min_rxb < ((rxb_r >> 8) & 0x3f)) ? min_rxb : ((rxb_r >> 8) & 0x3f);
+    if ((members_r & ((1ull << NFD_MAX_VFS) - 1)) == 0)
+        min_rxb = ((rxb_r >> 8) & 0x3f);
+    else
+        min_rxb = min_rxb < ((rxb_r >> 8) & 0x3f) ? min_rxb : ((rxb_r >> 8) & 0x3f);
     members_w = (members_r | (1ull << vid)) & ((1ull << NFD_MAX_VFS) - 1) | (min_rxb << 58);
     mem_write64(&members_w, &nic_vlan_to_vnics_map_tbl[vlan_id], sizeof(uint64_t));
 
