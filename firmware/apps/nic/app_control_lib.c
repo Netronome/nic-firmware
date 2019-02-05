@@ -260,7 +260,7 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigne
 }
 
 static void
-handle_sriov_update(uint32_t pf_control)
+handle_sriov_update()
 {
     __xread struct sriov_mb sriov_mb_data;
     __xread struct sriov_cfg sriov_cfg_data;
@@ -336,7 +336,7 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
     }
 
     if (update & NFP_NET_CFG_UPDATE_VF) {
-        handle_sriov_update(control);
+        handle_sriov_update();
     }
 
     if (control & NFP_NET_CFG_CTRL_ENABLE) {
