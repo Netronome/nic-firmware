@@ -52,6 +52,7 @@
 #include "nic_tables.h"
 #include "trng.h"
 
+#include "app_private.c"
 
 /*
  * The application master runs on a single ME and performs a number of
@@ -164,22 +165,6 @@ __export __dram struct synch_cnt nic_cfg_synch;
  */
 /* Amount of time between each link status check */
 #define LSC_POLL_PERIOD            10000
-
-/* Mutex for accessing MAC registers. */
-__shared __gpr volatile int mac_reg_lock = 0;
-
-/* Macros for local mutexes. */
-#define LOCAL_MUTEX_LOCK(_mutex) \
-    do {                         \
-        while (_mutex)           \
-            ctx_swap();          \
-        _mutex = 1;              \
-    } while (0)
-#define LOCAL_MUTEX_UNLOCK(_mutex) \
-    do {                           \
-        _mutex = 0;                \
-    } while (0)
-
 
 #if (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON) || \
     (NS_PLATFORM_TYPE == NS_PLATFORM_CARBON_1x10_1x25)
