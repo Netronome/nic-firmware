@@ -3,8 +3,8 @@
 #
 # FLOWENV_REV - Tip as of Nov 19 2018
 FLOWENV_REV=b4cc7f0
-# NFD_REV - Tip as of Nov 19 2018
-NFD_REV=0b1007b
+# NFD_REV - Tip as of Dec 7 2018
+NFD_REV=2035b0d
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
@@ -57,8 +57,6 @@ $(DEPS_DIR)/ng-nfd.git:
 		git://source.netronome.com/ng-nfd.git $(NFD_DIR)
 	cd $(NFD_DIR) && git checkout $(NFD_REV)
 	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_abi3.patch && cd -
-	cd $(NFD_DIR) && patch -p1 < ../nfd_always_free_ctm.patch && cd -
-	cd $(NFD_DIR) && patch -p1 < ../0001-Add-nfd_vf_cfg_base-function.patch && cd -
 
 GIT_DEPS += $(NFD_DIR)
 GIT_REVS += $(NFD_REV)

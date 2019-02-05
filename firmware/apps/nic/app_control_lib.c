@@ -266,16 +266,16 @@ handle_sriov_update()
     __xread struct sriov_cfg sriov_cfg_data;
     __xwrite uint64_t new_mac_addr_wr;
     __xwrite int err_code = 0;
-    __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
+    __emem __addr40 uint8_t *vf_cfg_base = nfd_vf_cfg_base(NIC_PCI, 0, NFD_VF_CFG_SEL_MB);
 
     mem_read32(&sriov_mb_data, vf_cfg_base, sizeof(struct sriov_mb));
 
-    mem_read32(&sriov_cfg_data, NFD_VF_CFG_ADDR(vf_cfg_base, sriov_mb_data.vf),
-               sizeof(struct sriov_cfg));
+    vf_cfg_base = nfd_vf_cfg_base(NIC_PCI, sriov_mb_data.vf, NFD_VF_CFG_SEL_VF);
+    mem_read32(&sriov_cfg_data, vf_cfg_base, sizeof(struct sriov_cfg));
 
     if (sriov_mb_data.update_flags & NFD_VF_CFG_MB_CAP_MAC) {
         reg_cp(&new_mac_addr_wr, &sriov_cfg_data, sizeof(new_mac_addr_wr));
-        mem_write8(&new_mac_addr_wr, NFD_CFG_BAR_ISL(NIC_PCI, sriov_mb_data.vf) +
+        mem_write8(&new_mac_addr_wr, nfd_cfg_bar_base(NIC_PCI, sriov_mb_data.vf) +
                    NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
     }
 

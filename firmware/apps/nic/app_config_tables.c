@@ -952,10 +952,9 @@ cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
 
     cfg_act_append_rx_host(acts, pcie, vid, 1);
 
-    vf_cfg_base = nfd_vf_cfg_base(pcie);
-    mem_read32(&sriov_cfg_data,
-           NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
-           sizeof(struct sriov_cfg));
+    vf_cfg_base = nfd_vf_cfg_base(pcie, NFD_VID2VF(vid), NFD_VF_CFG_SEL_VF);
+    mem_read32(&sriov_cfg_data, vf_cfg_base, sizeof(struct sriov_cfg));
+
     if (sriov_cfg_data.vlan_tag != 0)
         cfg_act_append_push_vlan(acts, sriov_cfg_data.vlan_tag);
 
@@ -1091,10 +1090,9 @@ cfg_act_build_veb_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
         cfg_act_append_push_pkt(acts);
     }
 
-    vf_cfg_base = nfd_vf_cfg_base(pcie);
-    mem_read32(&sriov_cfg_data,
-           NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
-           sizeof(struct sriov_cfg));
+    vf_cfg_base = nfd_vf_cfg_base(pcie, NFD_VID2VF(vid), NFD_VF_CFG_SEL_VF);
+    mem_read32(&sriov_cfg_data, vf_cfg_base, sizeof(struct sriov_cfg));
+
     if (sriov_cfg_data.vlan_tag != 0)
         cfg_act_append_strip_vlan(acts);
 
@@ -1208,10 +1206,9 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid,
 
     cfg_act_build_veb_vf(&acts, pcie, vid, pf_control, vf_control, update);
 
-    vf_cfg_base = nfd_vf_cfg_base(pcie);
-    mem_read32(&sriov_cfg_data,
-           NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
-           sizeof(struct sriov_cfg));
+    vf_cfg_base = nfd_vf_cfg_base(pcie, NFD_VID2VF(vid), NFD_VF_CFG_SEL_VF);
+    mem_read32(&sriov_cfg_data, vf_cfg_base, sizeof(struct sriov_cfg));
+
     vlan_id = sriov_cfg_data.vlan_tag ? sriov_cfg_data.vlan_id : NIC_NO_VLAN_ID;
 
     mac_addr = MAC64_FROM_SRIOV_CFG(sriov_cfg_data);
