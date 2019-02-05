@@ -34,7 +34,6 @@
 #include "shared/nfp_net_ctrl.h"
 
 
-NFD_CFG_BASE_DECLARE(NIC_PCI);
 
 #ifdef CFG_NIC_LIB_DBG_CNTRS
 /*
