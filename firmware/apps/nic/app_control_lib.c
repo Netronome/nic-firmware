@@ -54,6 +54,24 @@
 
 
 #define TMQ_DRAIN_RETRIES      15
+
+#ifdef NFD_PCIE0_EMEM
+SIGNAL nfd_cfg_sig_app_master0;
+__xread struct nfd_cfg_msg cfg_msg_rd0;
+#endif
+#ifdef NFD_PCIE1_EMEM
+SIGNAL nfd_cfg_sig_app_master1;
+__xread struct nfd_cfg_msg cfg_msg_rd1;
+#endif
+#ifdef NFD_PCIE2_EMEM
+SIGNAL nfd_cfg_sig_app_master2;
+__xread struct nfd_cfg_msg cfg_msg_rd2;
+#endif
+#ifdef NFD_PCIE3_EMEM
+SIGNAL nfd_cfg_sig_app_master3;
+__xread struct nfd_cfg_msg cfg_msg_rd3;
+#endif
+
 /* Translate port speed to link rate encoding */
 __intrinsic static unsigned int
 port_speed_to_link_rate(unsigned int port_speed)
@@ -537,4 +555,73 @@ process_vf_reconfig(int pcie, uint32_t control, uint32_t update, uint32_t vid,
     update_vf_lsc_list(pcie, 0, vid, control, ls_mode);
     return 0;
 }
+
+__intrinsic static int
+next_nfd_cfg_msg(int *pcie, struct nfd_cfg_msg *cfg_msg)
+{
+    static volatile __gpr int cfg_msg_pcie;
+    int ret = 1;
+
+    cfg_msg->error = 0;
+    cfg_msg->msg_valid = 0;
+
+    switch (cfg_msg_pcie) {
+        default:
+            cfg_msg_pcie = 0;
+        case 0:
+#ifdef NFD_PCIE0_EMEM
+            nfd_cfg_master_chk_cfg_msg(0, cfg_msg, &cfg_msg_rd0,
+                                   &nfd_cfg_sig_app_master0);
+#endif
+            break;
+        case 1:
+#ifdef NFD_PCIE1_EMEM
+            nfd_cfg_master_chk_cfg_msg(1, cfg_msg, &cfg_msg_rd1,
+                                   &nfd_cfg_sig_app_master1);
+#endif
+            break;
+        case 2:
+#ifdef NFD_PCIE2_EMEM
+            nfd_cfg_master_chk_cfg_msg(2, cfg_msg, &cfg_msg_rd2,
+                                   &nfd_cfg_sig_app_master2);
+#endif
+            break;
+        case 3:
+#ifdef NFD_PCIE3_EMEM
+            nfd_cfg_master_chk_cfg_msg(3, cfg_msg, &cfg_msg_rd3,
+                                   &nfd_cfg_sig_app_master3);
+#endif
+            break;
+    }
+
+    *pcie = cfg_msg_pcie++;
+
+    if (cfg_msg->msg_valid && !cfg_msg->error)
+        ret = 0;
+
+    return ret;
+
+}
+
+void init_nfd_cfg_msg(struct nfd_cfg_msg *cfg_msg)
+{
+
+#ifdef NFD_PCIE0_EMEM
+    nfd_cfg_master_init_cfg_msg(0, cfg_msg, &cfg_msg_rd0,
+                                    &nfd_cfg_sig_app_master0);
+#endif
+#ifdef NFD_PCIE1_EMEM
+    nfd_cfg_master_init_cfg_msg(1, cfg_msg, &cfg_msg_rd1,
+                                    &nfd_cfg_sig_app_master1);
+#endif
+#ifdef NFD_PCIE2_EMEM
+    nfd_cfg_master_init_cfg_msg(2, cfg_msg, &cfg_msg_rd2,
+                                    &nfd_cfg_sig_app_master2);
+#endif
+#ifdef NFD_PCIE3_EMEM
+    nfd_cfg_master_init_cfg_msg(3, cfg_msg, &cfg_msg_rd3,
+                                    &nfd_cfg_sig_app_master3);
+#endif
+}
+
 #endif

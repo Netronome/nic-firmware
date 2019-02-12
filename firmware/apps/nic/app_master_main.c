@@ -109,9 +109,6 @@
 #endif
 
 
-SIGNAL nfd_cfg_sig_app_master0;
-__xread struct nfd_cfg_msg cfg_msg_rd0;
-
 #ifdef NFD_PCIE0_EMEM
     NFD_CFG_BASE_DECLARE(0);
     NFD_VF_CFG_DECLARE(0)
@@ -262,17 +259,14 @@ cfg_changes_loop(void)
     uint32_t vid, type, vnic;
     uint32_t update;
     uint32_t control;
+    int pcie;
     __emem __addr40 uint8_t *bar_base;
 
     for (;;) {
-        cfg_msg.error = 0;
-        nfd_cfg_master_chk_cfg_msg(NIC_PCI, &cfg_msg, &cfg_msg_rd0,
-                                   &nfd_cfg_sig_app_master0);
-
-        if (cfg_msg.msg_valid && !cfg_msg.error) {
+        if (next_nfd_cfg_msg(&pcie, &cfg_msg) == 0) {
             vid = cfg_msg.vid;
             /* read in the first 64bit of the Control BAR */
-            mem_read64(cfg_bar_data, NFD_CFG_BAR_ISL(NIC_PCI, vid),
+            mem_read64(cfg_bar_data, nfd_cfg_bar_base(pcie, vid),
                        sizeof cfg_bar_data);
 
             control = cfg_bar_data[0];
@@ -281,23 +275,23 @@ cfg_changes_loop(void)
             NFD_VID2VNIC(type, vnic, vid);
 
             if (type == NFD_VNIC_TYPE_CTRL) {
-                if (process_ctrl_reconfig(NIC_PCI, control, vid, &cfg_msg))
+                if (process_ctrl_reconfig(pcie, control, vid, &cfg_msg))
                     goto error;
 
             } else if (type == NFD_VNIC_TYPE_PF) {
-                if (process_pf_reconfig(NIC_PCI, control, update, vid, vnic, &cfg_msg))
+                if (process_pf_reconfig(pcie, control, update, vid, vnic, &cfg_msg))
                     goto error;
 
             } else if (type == NFD_VNIC_TYPE_VF) {
-                if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg))
+                if (process_vf_reconfig(pcie, control, update, vid, &cfg_msg))
                     goto error;
             }
 
 error:
             /* Complete the message */
             cfg_msg.msg_valid = 0;
-            nfd_cfg_app_complete_cfg_msg(NIC_PCI, &cfg_msg,
-                                         NFD_CFG_BASE_LINK(NIC_PCI));
+            nfd_cfg_app_complete_cfg_msg(pcie, &cfg_msg,
+                                         nfd_cfg_bar_base(pcie, 0));
         }
         ctx_swap();
     }
@@ -608,8 +602,7 @@ main(void)
          * nfd_cfg_init_cfg_msg() introduces the live range for the remote
          * signal, call it before anything else that might reuse the signal
          */
-	nfd_cfg_master_init_cfg_msg(NIC_PCI, &cfg_msg, &cfg_msg_rd0,
-                                    &nfd_cfg_sig_app_master0);
+        init_nfd_cfg_msg(&cfg_msg);
         trng_init();
         init_catamaran_chan2port_table();
         init_msix();
