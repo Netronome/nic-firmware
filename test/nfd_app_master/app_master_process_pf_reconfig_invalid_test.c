@@ -27,7 +27,7 @@ void test(uint32_t pcie) {
         //Invalid control, valid update
         control = ~NFD_CFG_PF_CAP;
         update = NFD_CFG_PF_LEGAL_UPD & ~NFP_NET_CFG_UPDATE_BPF; //BPF updates tested separately
-        if (process_pf_reconfig(control, update, vid, vnic, &cfg_msg)) {
+        if (process_pf_reconfig(NIC_PCI, control, update, vid, vnic, &cfg_msg)) {
              if(cfg_msg.error == 0)
                  test_fail();
         } else {
@@ -37,7 +37,7 @@ void test(uint32_t pcie) {
         //Valid control, invalid update
         control = NFD_CFG_PF_CAP;
         update = ~NFD_CFG_PF_LEGAL_UPD;
-        if (process_pf_reconfig(control, update, vid, vnic, &cfg_msg)) {
+        if (process_pf_reconfig(NIC_PCI, control, update, vid, vnic, &cfg_msg)) {
              if(cfg_msg.error == 0)
                  test_fail();
         } else {
@@ -47,7 +47,7 @@ void test(uint32_t pcie) {
         //invalid control, invalid update
         control = ~NFD_CFG_PF_CAP;
         update = ~NFD_CFG_PF_LEGAL_UPD;
-        if (process_pf_reconfig(control, update, vid, vnic, &cfg_msg)) {
+        if (process_pf_reconfig(NIC_PCI, control, update, vid, vnic, &cfg_msg)) {
              if(cfg_msg.error == 0)
                  test_fail();
         } else {

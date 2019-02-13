@@ -16,7 +16,7 @@
 #include "app_control_lib.c"
 #include "nfd_cfg_base_decl.c"
 
-void test(uint32_t pcie) {
+void test(int pcie) {
     uint32_t type, vnic, vid, pf, control, update;
     struct nfd_cfg_msg cfg_msg;
 
@@ -30,7 +30,7 @@ void test(uint32_t pcie) {
 
         control = NFD_CFG_PF_CAP;
         update = NFD_CFG_PF_LEGAL_UPD & ~NFP_NET_CFG_UPDATE_BPF; //BPF updates tested separately
-        if (process_pf_reconfig(control, update, vid, vnic, &cfg_msg)) {
+        if (process_pf_reconfig(pcie, control, update, vid, vnic, &cfg_msg)) {
             test_fail();
         }
     }

@@ -254,7 +254,7 @@ cfg_changes_loop(void)
                     goto error;
 
             } else if (type == NFD_VNIC_TYPE_PF) {
-                if (process_pf_reconfig(control, update, vid, vnic, &cfg_msg))
+                if (process_pf_reconfig(NIC_PCI, control, update, vid, vnic, &cfg_msg))
                     goto error;
 
             } else if (type == NFD_VNIC_TYPE_VF) {

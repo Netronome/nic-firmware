@@ -37,10 +37,10 @@ void test(uint32_t pcie) {
         control = NFP_NET_CFG_CTRL_ENABLE;
         update = NFD_CFG_PF_LEGAL_UPD & ~NFP_NET_CFG_UPDATE_BPF; //BPF updates tested separately
 
-        if (process_pf_reconfig(control, update, vid, vnic, &cfg_msg)) {
+        if (process_pf_reconfig(NIC_PCI, control, update, vid, vnic, &cfg_msg)) {
             test_fail();
         }
-        
+
         test_control = get_nic_control_word(NIC_PCI, vid);
         test_assert_equal(test_control & NFP_NET_CFG_CTRL_ENABLE, NFP_NET_CFG_CTRL_ENABLE);
     }

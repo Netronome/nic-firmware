@@ -357,7 +357,7 @@ process_ctrl_reconfig(uint32_t control, uint32_t vid,
 
 
 static int
-process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
+process_pf_reconfig(int pcie, uint32_t control, uint32_t update, uint32_t vid,
                     uint32_t vnic, struct nfd_cfg_msg *cfg_msg)
 {
     uint32_t port = vnic;
@@ -381,16 +381,16 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
     }
 
     if (update & NFP_NET_CFG_UPDATE_VF) {
-        handle_sriov_update(NIC_PCI);
+        handle_sriov_update(pcie);
     }
 
     if (control & NFP_NET_CFG_CTRL_ENABLE) {
         veb_up = 0;
         for (i = 0; i < NFD_MAX_VFS; i++) {
-            if (nic_control_word[NIC_PCI][NFD_VF2VID(i)] & NFP_NET_CFG_CTRL_ENABLE) {
-                if (cfg_act_vf_up(NIC_PCI, NFD_VF2VID(i),
+            if (nic_control_word[pcie][NFD_VF2VID(i)] & NFP_NET_CFG_CTRL_ENABLE) {
+                if (cfg_act_vf_up(pcie, NFD_VF2VID(i),
                             control,
-                            nic_control_word[NIC_PCI][NFD_VF2VID(i)],
+                            nic_control_word[pcie][NFD_VF2VID(i)],
                             0)) {
                     cfg_msg->error = 1;
                     return 1;
@@ -399,7 +399,7 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
             }
         }
 
-        if (cfg_act_pf_up(NIC_PCI, vid, veb_up, control, update)) {
+        if (cfg_act_pf_up(pcie, vid, veb_up, control, update)) {
             cfg_msg->error = 1;
             return 1;
         }
@@ -407,8 +407,8 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
 
     /* In the case of a failed PF enable, the kernel driver will perform
        another explicit disable, which will then reset the cache state */
-    nic_control_word_prev = nic_control_word[NIC_PCI][vid];
-    nic_control_word[NIC_PCI][vid] = control;
+    nic_control_word_prev = nic_control_word[pcie][vid];
+    nic_control_word[pcie][vid] = control;
 
     /* The nic_control_word[] update will trigger the lsc_check() thread to
        adjust the MAC RX, TX and flush enables to match to requested enable
@@ -434,9 +434,9 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
             sleep(10 * NS_PLATFORM_TCLK * 1000); // 10ms
 
             /* stop processing packets: drop action */
-            cfg_act_pf_down(NIC_PCI, vid);
+            cfg_act_pf_down(pcie, vid);
             for (i = 0; i < NFD_MAX_VFS; ++i) {
-                if (cfg_act_vf_down(NIC_PCI, NFD_VF2VID(i))) {
+                if (cfg_act_vf_down(pcie, NFD_VF2VID(i))) {
                     cfg_msg->error = 1;
                     return 1;
                 }
