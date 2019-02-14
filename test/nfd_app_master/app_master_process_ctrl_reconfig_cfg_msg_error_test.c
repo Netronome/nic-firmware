@@ -30,7 +30,7 @@ void main() {
 
         control = NFD_CFG_CTRL_CAP & ~NFP_NET_CFG_CTRL_ENABLE;
 
-        if(process_ctrl_reconfig(control, vid, &cfg_msg))
+        if(process_ctrl_reconfig(NIC_PCI, control, vid, &cfg_msg))
             test_fail();
 
         mem_read32(&link_state, (NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFP_NET_CFG_STS), sizeof link_state);

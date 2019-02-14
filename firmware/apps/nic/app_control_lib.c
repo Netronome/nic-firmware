@@ -326,7 +326,7 @@ handle_sriov_update(int pcie)
 }
 
 static int
-process_ctrl_reconfig(uint32_t control, uint32_t vid,
+process_ctrl_reconfig(int pcie, uint32_t control, uint32_t vid,
                         struct nfd_cfg_msg *cfg_msg)
 {
     __xwrite unsigned int link_state;
@@ -337,8 +337,8 @@ process_ctrl_reconfig(uint32_t control, uint32_t vid,
         return 1;
     }
 
-    cfg_act_build_ctrl(&acts, NIC_PCI, vid);
-    cfg_act_write_host(NIC_PCI, vid, &acts);
+    cfg_act_build_ctrl(&acts, pcie, vid);
+    cfg_act_write_host(pcie, vid, &acts);
 
     /* Set link state */
     if (!cfg_msg->error &&
@@ -348,10 +348,10 @@ process_ctrl_reconfig(uint32_t control, uint32_t vid,
         link_state = 0;
     }
     mem_write32(&link_state,
-                    (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg->vid) +
+                    (nfd_cfg_bar_base(pcie, cfg_msg->vid) +
                     NFP_NET_CFG_STS), sizeof link_state);
 
-    nic_control_word[NIC_PCI][vid] = control;
+    nic_control_word[pcie][vid] = control;
     return 0;
 }
 

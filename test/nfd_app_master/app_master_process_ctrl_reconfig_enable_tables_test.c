@@ -30,7 +30,7 @@ void main() {
         if (type == NFD_VNIC_TYPE_CTRL) {
 
             control = NFD_CFG_CTRL_CAP;
-            if(process_ctrl_reconfig(control, vid, &cfg_msg))
+            if(process_ctrl_reconfig(NIC_PCI, control, vid, &cfg_msg))
                 test_fail();
 
             verify_wire_action_list(NIC_PCI, vnic);

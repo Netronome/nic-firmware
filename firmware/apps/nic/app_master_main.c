@@ -250,7 +250,7 @@ cfg_changes_loop(void)
             NFD_VID2VNIC(type, vnic, vid);
 
             if (type == NFD_VNIC_TYPE_CTRL) {
-                if (process_ctrl_reconfig(control, vid, &cfg_msg))
+                if (process_ctrl_reconfig(NIC_PCI, control, vid, &cfg_msg))
                     goto error;
 
             } else if (type == NFD_VNIC_TYPE_PF) {

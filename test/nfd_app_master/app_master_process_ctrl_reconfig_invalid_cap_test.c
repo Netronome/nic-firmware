@@ -29,7 +29,7 @@ void main() {
 
         control = ~NFD_CFG_CTRL_CAP;
 
-        if(process_ctrl_reconfig(control, vid, &cfg_msg)) {
+        if(process_ctrl_reconfig(NIC_PCI, control, vid, &cfg_msg)) {
             if(cfg_msg.error == 0)
                 test_fail();
         } else {
