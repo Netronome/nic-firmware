@@ -35,14 +35,20 @@ void test(int pcie) {
         }
     }
 
-    test_pass();
 }
 
 void main(void)
 {
+    int  pcie;
+
     switch (ctx()) {
         case 0:
-            test(0);
+            for (pcie = 0; pcie < NFD_MAX_ISL; pcie++) {
+                if (pcie_is_present(pcie))
+                    test(pcie);
+            }
+
+            test_pass();
             break;
         default:
             map_cmsg_rx();

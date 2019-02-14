@@ -16,7 +16,7 @@
 #include "app_control_lib.c"
 #include "nfd_cfg_base_decl.c"
 
-void test(uint32_t pcie) {
+void test(int pcie) {
     uint32_t type, vnic, vid, pf, control, update;
     int vf;
     uint32_t test_control;
@@ -28,8 +28,8 @@ void test(uint32_t pcie) {
         vid = NFD_VF2VID(vf);
         NFD_VID2VNIC(type, vnic, vid);
 
-        set_nic_control_word(NIC_PCI, vid, get_nic_control_word(NIC_PCI, vid) | NFP_NET_CFG_CTRL_ENABLE);
-        setup_sriov_cfg_data(NIC_PCI, vf, TEST_MAC, 0, NFD_VF_CFG_CTRL_LINK_STATE_ENABLE);
+        set_nic_control_word(pcie, vid, get_nic_control_word(pcie, vid) | NFP_NET_CFG_CTRL_ENABLE);
+        setup_sriov_cfg_data(pcie, vf, TEST_MAC, 0, NFD_VF_CFG_CTRL_LINK_STATE_ENABLE);
 
     }
 
@@ -40,24 +40,28 @@ void test(uint32_t pcie) {
 
         reset_cfg_msg(&cfg_msg, vid, 0);
 
-        setup_pf_mac(NIC_PCI, vid, TEST_MAC);
+        setup_pf_mac(pcie, vid, TEST_MAC);
 
         control = NFD_CFG_PF_CAP;
         update = NFD_CFG_PF_LEGAL_UPD & ~NFP_NET_CFG_UPDATE_BPF; //BPF updates tested separately
 
-        if (process_pf_reconfig(NIC_PCI, control, update, vid, vnic, &cfg_msg)) {
+        if (process_pf_reconfig(pcie, control, update, vid, vnic, &cfg_msg)) {
             test_fail();
         }
     }
 
-    test_pass();
 }
 
 void main(void)
 {
+    int  pcie;
     switch (ctx()) {
         case 0:
-            test(0);
+            for (pcie = 0; pcie < NFD_MAX_ISL; pcie++) {
+                if (pcie_is_present(pcie))
+                    test(pcie);
+            }
+            test_pass();
             break;
         default:
             map_cmsg_rx();
