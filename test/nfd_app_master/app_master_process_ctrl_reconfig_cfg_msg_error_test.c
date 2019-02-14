@@ -15,7 +15,7 @@
 #include "app_config_tables.c"
 #include "nfd_cfg_base_decl.c"
 
-void main() {
+void test(int pcie) {
     uint32_t control, vid, ctrl;
     struct nfd_cfg_msg cfg_msg;
     __xread unsigned int link_state;
@@ -30,12 +30,25 @@ void main() {
 
         control = NFD_CFG_CTRL_CAP & ~NFP_NET_CFG_CTRL_ENABLE;
 
-        if(process_ctrl_reconfig(NIC_PCI, control, vid, &cfg_msg))
+        if(process_ctrl_reconfig(pcie, control, vid, &cfg_msg))
             test_fail();
 
-        mem_read32(&link_state, (NFD_CFG_BAR_ISL(PCIE_ISL, vid) + NFP_NET_CFG_STS), sizeof link_state);
+        mem_read32(&link_state, (nfd_cfg_bar_base(pcie, vid) + NFP_NET_CFG_STS), sizeof link_state);
         test_assert_equal(link_state, 0);
     }
 
     test_pass();
+}
+
+void main() {
+    int  pcie;
+    single_ctx_test();
+
+    for (pcie = 0; pcie < NFD_MAX_ISL; pcie++) {
+        if (pcie_is_present(pcie))
+            test(pcie);
+    }
+
+    test_pass();
+
 }

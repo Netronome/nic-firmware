@@ -16,7 +16,7 @@
 #include "action_parse.c"
 #include "nfd_cfg_base_decl.c"
 
-void main() {
+void test(int pcie) {
     uint32_t type, vnic, vid, control, i;
     struct nfd_cfg_msg cfg_msg;
     single_ctx_test();
@@ -30,14 +30,27 @@ void main() {
         if (type == NFD_VNIC_TYPE_CTRL) {
 
             control = NFD_CFG_CTRL_CAP;
-            if(process_ctrl_reconfig(NIC_PCI, control, vid, &cfg_msg))
+            if(process_ctrl_reconfig(pcie, control, vid, &cfg_msg))
                 test_fail();
 
-            verify_wire_action_list(NIC_PCI, vnic);
+            verify_wire_action_list(pcie, vnic);
 
             for (i = 0; i < NFD_VID_MAXQS(vid); ++i)
-                verify_host_action_list(NIC_PCI, NFD_VID2QID(vid, i));
+                verify_host_action_list(pcie, NFD_VID2QID(vid, i));
         }
     }
     test_pass();
+}
+
+void main() {
+    int  pcie;
+    single_ctx_test();
+
+    for (pcie = 0; pcie < NFD_MAX_ISL; pcie++) {
+        if (pcie_is_present(pcie))
+            test(pcie);
+    }
+
+    test_pass();
+
 }
