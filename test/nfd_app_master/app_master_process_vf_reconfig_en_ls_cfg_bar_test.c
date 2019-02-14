@@ -46,7 +46,7 @@ void reconfig(uint32_t vf_enable, uint32_t vf_mode, uint32_t pf_link)
         control = NFD_CFG_VF_CAP & (~NFP_NET_CFG_CTRL_ENABLE);
         control |= vf_enable;
         update = NFD_CFG_VF_LEGAL_UPD;
-        if (process_vf_reconfig(control, update, vid, &cfg_msg)) {
+        if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg)) {
             test_fail();
         }
     }

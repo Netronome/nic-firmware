@@ -42,7 +42,7 @@ void test(uint32_t pcie) {
 
         control = NFD_CFG_VF_CAP;
         update = NFD_CFG_VF_LEGAL_UPD;
-        if (process_vf_reconfig(control, update, vid, &cfg_msg)) {
+        if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg)) {
             test_fail();
         }
     }

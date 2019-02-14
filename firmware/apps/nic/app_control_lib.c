@@ -245,7 +245,7 @@ mac_port_disable_tx_flush(unsigned int mac, unsigned int mac_core,
  * Also update the current link state for vf_vid and schedule an interrupt
  */
 static void
-update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigned int mode)
+update_vf_lsc_list(int pcie, unsigned int port, uint32_t vf_vid, uint32_t control, unsigned int mode)
 {
     unsigned int i;
     unsigned int sts_en;
@@ -254,36 +254,36 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigne
     __xwrite uint32_t sts_xw;
     uint32_t pf_vid = NFD_PF2VID(port);
     unsigned int idx = LS_IDX(vf_vid);
-    unsigned int orig_link_state = LS_READ(ls_current[NIC_PCI], vf_vid);
-    unsigned int pf_link_state = LS_READ(ls_current[NIC_PCI], pf_vid);
-    __mem char *cfg_bar = NFD_CFG_BAR_ISL(NIC_PCI, vf_vid);
+    unsigned int orig_link_state = LS_READ(ls_current[pcie], vf_vid);
+    unsigned int pf_link_state = LS_READ(ls_current[pcie], pf_vid);
+    __mem char *cfg_bar = nfd_cfg_bar_base(pcie, vf_vid);
 
     if (control & NFP_NET_CFG_CTRL_ENABLE)
-        LS_SET(vs_current[NIC_PCI], vf_vid);
+        LS_SET(vs_current[pcie], vf_vid);
     else
-        LS_CLEAR(vs_current[NIC_PCI], vf_vid);
+        LS_CLEAR(vs_current[pcie], vf_vid);
 
     /* Enable notification on selected vf from port */
     if (mode == NFD_VF_CFG_CTRL_LINK_STATE_AUTO)
-        LS_SET(vf_lsc_list[port][NIC_PCI], vf_vid);
+        LS_SET(vf_lsc_list[port][pcie], vf_vid);
     else
-        LS_CLEAR(vf_lsc_list[port][NIC_PCI], vf_vid);
+        LS_CLEAR(vf_lsc_list[port][pcie], vf_vid);
 
     /* Disable notification to selected vf from other ports */
     for (i = 0; i < NS_PLATFORM_NUM_PORTS; i++) {
         if (i != port)
-            LS_CLEAR(vf_lsc_list[i][NIC_PCI], vf_vid);
+            LS_CLEAR(vf_lsc_list[i][pcie], vf_vid);
     }
 
     /* Update the link status for the VF. Report the link speed for the VF as
      * that of the PF. */
     if (mode == NFD_VF_CFG_CTRL_LINK_STATE_ENABLE || pf_link_state) {
-        LS_SET(ls_current[NIC_PCI], vf_vid);
+        LS_SET(ls_current[pcie], vf_vid);
         sts_xw = (port_speed_to_link_rate(NS_PLATFORM_PORT_SPEED(port)) <<
               NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 1;
     } else {
         /* Clear the link status to reflect the PF link is down. */
-        LS_CLEAR(ls_current[NIC_PCI], vf_vid);
+        LS_CLEAR(ls_current[pcie], vf_vid);
         sts_xw = (NFP_NET_CFG_STS_LINK_RATE_UNKNOWN <<
                     NFP_NET_CFG_STS_LINK_RATE_SHIFT);
     }
@@ -296,7 +296,7 @@ update_vf_lsc_list(unsigned int port, uint32_t vf_vid, uint32_t control, unsigne
     /* Schedule notification interrupt to be sent from the
        link state change context */
     if (ctrl_xr & NFP_NET_CFG_CTRL_ENABLE) {
-        LS_SET(pending[NIC_PCI], vf_vid);
+        LS_SET(pending[pcie], vf_vid);
     }
 }
 
@@ -450,10 +450,9 @@ process_pf_reconfig(int pcie, uint32_t control, uint32_t update, uint32_t vid,
 }
 
 static int
-process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
+process_vf_reconfig(int pcie, uint32_t control, uint32_t update, uint32_t vid,
                     struct nfd_cfg_msg *cfg_msg)
 {
-    __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
     __xread struct sriov_cfg sriov_cfg_data;
     unsigned int ls_mode;
     uint64_t mac_addr;
@@ -471,12 +470,12 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
 
     /* In the case of a failed PF enable, the kernel driver will perform
        another explicit disable, which will then reset the cache state */
-    nic_control_word[NIC_PCI][vid] = control;
+    nic_control_word[pcie][vid] = control;
 
     /* Retrieve the link state mode for the VF. */
     mem_read32(&sriov_cfg_data,
-               NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
-               sizeof(struct sriov_cfg));
+        nfd_vf_cfg_base(pcie, NFD_VID2VF(vid), NFD_VF_CFG_SEL_VF),
+        sizeof(struct sriov_cfg));
 
     /* Set the link state handling control */
     if (control & NFP_NET_CFG_CTRL_ENABLE) {
@@ -485,13 +484,13 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
 
         ls_mode = sriov_cfg_data.ctrl_link_state;
 
-        if (!(nic_control_word[NIC_PCI][NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE)) {
+        if (!(nic_control_word[pcie][NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE)) {
             cfg_msg->error = 1;
             return 1;
         }
 
-        if (cfg_act_vf_up(NIC_PCI, vid,
-                    nic_control_word[NIC_PCI][NFD_PF2VID(0)],
+        if (cfg_act_vf_up(pcie, vid,
+                    nic_control_word[pcie][NFD_PF2VID(0)],
                     control, update)) {
             cfg_msg->error = 1;
             return 1;
@@ -514,14 +513,14 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
         /* Disable the link when interface is disabled. */
         ls_mode = NFD_VF_CFG_CTRL_LINK_STATE_DISABLE;
 
-        if (cfg_act_vf_down(NIC_PCI, vid)) {
+        if (cfg_act_vf_down(pcie, vid)) {
             cfg_msg->error = 1;
             return 1;
         }
 
         /* Check if VEB lookup is still needed, i.e. if any VFs are up */
         for (vf = 0; vf < NFD_MAX_VFS; vf++) {
-            if (nic_control_word[NIC_PCI][NFD_VF2VID(vf)] & NFP_NET_CFG_CTRL_ENABLE) {
+            if (nic_control_word[pcie][NFD_VF2VID(vf)] & NFP_NET_CFG_CTRL_ENABLE) {
                 veb_up = 1;
                 break;
             }
@@ -529,13 +528,13 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
     }
 
     /* rebuild PF action list because veb_up state may have changed */
-    if (cfg_act_pf_up(NIC_PCI, NFD_PF2VID(0), veb_up,
-                      nic_control_word[NIC_PCI][NFD_PF2VID(0)], 0)) {
+    if (cfg_act_pf_up(pcie, NFD_PF2VID(0), veb_up,
+                      nic_control_word[pcie][NFD_PF2VID(0)], 0)) {
         cfg_msg->error = 1;
         return 1;
     }
 
-    update_vf_lsc_list(0, vid, control, ls_mode);
+    update_vf_lsc_list(pcie, 0, vid, control, ls_mode);
     return 0;
 }
 #endif

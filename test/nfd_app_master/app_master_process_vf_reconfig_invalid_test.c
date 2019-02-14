@@ -37,7 +37,7 @@ void test(uint32_t pcie) {
         //Invalid control, valid update
         control = ~NFD_CFG_VF_CAP;
         update = NFD_CFG_VF_LEGAL_UPD;
-        if (process_vf_reconfig(control, update, vid, &cfg_msg)) {
+        if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg)) {
             if(cfg_msg.error == 0)
                  test_fail();
         } else {
@@ -47,7 +47,7 @@ void test(uint32_t pcie) {
         //valid control, invalid update
         control = NFD_CFG_VF_CAP;
         update = ~NFD_CFG_VF_LEGAL_UPD;
-        if (process_vf_reconfig(control, update, vid, &cfg_msg)) {
+        if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg)) {
             if(cfg_msg.error == 0)
                  test_fail();
         } else {
@@ -57,7 +57,7 @@ void test(uint32_t pcie) {
         //Invalid control, invalid update
         control = ~NFD_CFG_VF_CAP;
         update = ~NFD_CFG_VF_LEGAL_UPD;
-        if (process_vf_reconfig(control, update, vid, &cfg_msg)) {
+        if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg)) {
             if(cfg_msg.error == 0)
                  test_fail();
         } else {
@@ -73,7 +73,7 @@ void test(uint32_t pcie) {
         //Valid control, valid update. Must fail b/c PF 0 is disabled
         control = NFD_CFG_VF_CAP;
         update = NFD_CFG_VF_LEGAL_UPD;
-        if (process_vf_reconfig(control, update, vid, &cfg_msg)) {
+        if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg)) {
             if(cfg_msg.error == 0)
                  test_fail();
         } else {
