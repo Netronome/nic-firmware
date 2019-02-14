@@ -21,10 +21,10 @@ void test(uint32_t pcie) {
 
     //First indicate PF's are enabled
     for (pf = 0; pf < NFD_MAX_PFS; pf++) {
-        set_nic_control_word(NIC_PCI, NFD_PF2VID(pf),
-                get_nic_control_word(NIC_PCI,
+        set_nic_control_word(pcie, NFD_PF2VID(pf),
+                get_nic_control_word(pcie,
                     NFD_PF2VID(pf)) | NFP_NET_CFG_CTRL_ENABLE);
-        setup_pf_mac(NIC_PCI, NFD_PF2VID(pf), TEST_MAC);
+        setup_pf_mac(pcie, NFD_PF2VID(pf), TEST_MAC);
     }
 
     for (vf = 0; vf < NFD_MAX_VFS; vf++) {
@@ -37,7 +37,7 @@ void test(uint32_t pcie) {
         //Invalid control, valid update
         control = ~NFD_CFG_VF_CAP;
         update = NFD_CFG_VF_LEGAL_UPD;
-        if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg)) {
+        if (process_vf_reconfig(pcie, control, update, vid, &cfg_msg)) {
             if(cfg_msg.error == 0)
                  test_fail();
         } else {
@@ -47,7 +47,7 @@ void test(uint32_t pcie) {
         //valid control, invalid update
         control = NFD_CFG_VF_CAP;
         update = ~NFD_CFG_VF_LEGAL_UPD;
-        if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg)) {
+        if (process_vf_reconfig(pcie, control, update, vid, &cfg_msg)) {
             if(cfg_msg.error == 0)
                  test_fail();
         } else {
@@ -57,7 +57,7 @@ void test(uint32_t pcie) {
         //Invalid control, invalid update
         control = ~NFD_CFG_VF_CAP;
         update = ~NFD_CFG_VF_LEGAL_UPD;
-        if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg)) {
+        if (process_vf_reconfig(pcie, control, update, vid, &cfg_msg)) {
             if(cfg_msg.error == 0)
                  test_fail();
         } else {
@@ -66,14 +66,14 @@ void test(uint32_t pcie) {
 
         ctassert(NFD_MAX_PFS >= 1);
         //Disable PF 0
-        set_nic_control_word(NIC_PCI, NFD_PF2VID(0),
-            get_nic_control_word(NIC_PCI,
+        set_nic_control_word(pcie, NFD_PF2VID(0),
+            get_nic_control_word(pcie,
                 NFD_PF2VID(0)) & ~NFP_NET_CFG_CTRL_ENABLE);
 
         //Valid control, valid update. Must fail b/c PF 0 is disabled
         control = NFD_CFG_VF_CAP;
         update = NFD_CFG_VF_LEGAL_UPD;
-        if (process_vf_reconfig(NIC_PCI, control, update, vid, &cfg_msg)) {
+        if (process_vf_reconfig(pcie, control, update, vid, &cfg_msg)) {
             if(cfg_msg.error == 0)
                  test_fail();
         } else {
@@ -81,10 +81,16 @@ void test(uint32_t pcie) {
         }
     }
 
-    test_pass();
 }
-void main(void)
-{
+
+void main() {
+    int  pcie;
     single_ctx_test();
-    test(0);
+
+    for (pcie = 0; pcie < NFD_MAX_ISL; pcie++) {
+        if (pcie_is_present(pcie))
+            test(pcie);
+    }
+
+    test_pass();
 }
