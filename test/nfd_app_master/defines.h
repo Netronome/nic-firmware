@@ -7,5 +7,7 @@
 #define NFD_MAX_VFS 62
 #define NFD_MAX_PF_QUEUES 2
 #define TEST_MAC 0xAA00CCDDEE00ull
+#define APP_WORKER_ISLAND_LIST 0x204
+#define APP_MES_LIST 0x204
 
 #endif

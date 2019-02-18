@@ -9,6 +9,7 @@
 #define _APP_CONFIG_TABLES_H_
 
 #include <app_config_instr.h>
+#include <app_mac_vlan_config_cmsg.h>
 
 /* from linux errno-base.h */
 #define	ENOSPC	28
