@@ -113,6 +113,47 @@ enable_port_tx_datapath(unsigned int nbi, unsigned int start_q,
 }
 
 
+__inline void
+process_pf_reconfig_wait_link_up(uint32_t port)
+{
+    __gpr int i;
+    /* Verify link up and RX enabled, give up after 2 seconds */
+    for (i = 0; i < 10; ++i) {
+        int rx_enabled = mac_eth_check_rx_enable(NS_PLATFORM_MAC(port),
+                NS_PLATFORM_MAC_CORE(port),
+                NS_PLATFORM_MAC_CORE_SERDES_LO(port));
+        int link_up    = mac_eth_port_link_state(NS_PLATFORM_MAC(port),
+                NS_PLATFORM_MAC_SERDES_LO(port),
+                (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1);
+
+        /* Wait a minimal settling time after querying MAC */
+        sleep(200 * NS_PLATFORM_TCLK * 1000); // 200ms
+
+        if (rx_enabled && link_up)
+            break;
+    }
+}
+
+__inline void
+process_pf_reconfig_tmq_drain(uint32_t port)
+{
+    __xread struct nfp_nbi_tm_queue_status tmq_status;
+    int i, queue, occupied = 1;
+
+    for (i = 0; occupied && i < TMQ_DRAIN_RETRIES; ++i) {
+        occupied = 0;
+        for (queue = NS_PLATFORM_NBI_TM_QID_LO(port);
+                queue <= NS_PLATFORM_NBI_TM_QID_HI(port);
+                queue++) {
+            tmq_status_read(&tmq_status, NS_PLATFORM_MAC(port), queue, 1);
+            if (tmq_status.queuelevel) {
+                occupied = 1;
+                break;
+            }
+        }
+        sleep(NS_PLATFORM_TCLK * 1000); // 1ms
+    }
+}
 static void
 mac_port_enable_rx(unsigned int port)
 {
@@ -369,21 +410,8 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
             /* Swap and give link state thread opportunity to enable RX/TX */
             sleep(50 * NS_PLATFORM_TCLK * 1000); // 50ms
 
-            /* Verify link up and RX enabled, give up after 2 seconds */
-            for (i = 0; i < 10; ++i) {
-                int rx_enabled = mac_eth_check_rx_enable(NS_PLATFORM_MAC(port),
-                    NS_PLATFORM_MAC_CORE(port),
-                    NS_PLATFORM_MAC_CORE_SERDES_LO(port));
-                int link_up    = mac_eth_port_link_state(NS_PLATFORM_MAC(port),
-                    NS_PLATFORM_MAC_SERDES_LO(port),
-                    (NS_PLATFORM_PORT_SPEED(port) > 1) ? 0 : 1);
-
-                /* Wait a minimal settling time after querying MAC */
-                sleep(200 * NS_PLATFORM_TCLK * 1000); // 200ms
-
-                if (rx_enabled && link_up)
-                    break;
-            }
+            /* Wait for the MAC to indicate link up. Give up after 2 seconds */
+            process_pf_reconfig_wait_link_up(port);
         } else {
             __xread struct nfp_nbi_tm_queue_status tmq_status;
             int i, queue, occupied = 1;
@@ -410,20 +438,7 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
             }
 
             /* wait for TM queues to drain */
-            for (i = 0; occupied && i < TMQ_DRAIN_RETRIES; ++i) {
-                occupied = 0;
-                for (queue = NS_PLATFORM_NBI_TM_QID_LO(port);
-                            queue <= NS_PLATFORM_NBI_TM_QID_HI(port);
-                            queue++) {
-                    tmq_status_read(&tmq_status,
-                            NS_PLATFORM_MAC(port), queue, 1);
-                    if (tmq_status.queuelevel) {
-                        occupied = 1;
-                        break;
-                    }
-                }
-                sleep(NS_PLATFORM_TCLK * 1000); // 1ms
-            }
+            process_pf_reconfig_tmq_drain(port);
         }
     }
     return 0;
