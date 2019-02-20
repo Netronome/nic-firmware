@@ -105,3 +105,27 @@ void setup_sriov_cfg_data(const int pcie, uint32_t vf, uint64_t mac, uint16_t vl
 }
 
 
+uint32_t pcie_is_present(int pcie)
+{
+    uint32_t pcie_bitmap = 0;
+
+#ifdef NFD_PCIE0_EMEM
+    pcie_bitmap |= 1;
+#endif
+
+#ifdef NFD_PCIE1_EMEM
+    pcie_bitmap |= (1 << 1);
+#endif
+
+#ifdef NFD_PCIE2_EMEM
+    pcie_bitmap |= (1 << 2);
+#endif
+
+#ifdef NFD_PCIE3_EMEM
+    pcie_bitmap |= (1 << 3);
+#endif
+
+    return (pcie_bitmap >> pcie) & 1;
+}
+
+
