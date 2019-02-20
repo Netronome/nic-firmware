@@ -597,7 +597,7 @@ endef
 #
 define micro_c.add_fw_lib
 
-$1__$2__INC   +=
+$1__$2__INC   += -I$(FIRMWARE_DIR)/lib/$3
 $1__$2__CLIBS += $(FIRMWARE_DIR)/lib/$3/lib$3.c
 
 endef

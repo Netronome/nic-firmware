@@ -8,7 +8,6 @@
 #include <nfp/libnfp.c>
 #include <std/libstd.c>
 #include <pkt/libpkt.c>
-#include <blm/libblm.c>
 
 /* stop all threads except thread 0 */
 __intrinsic void single_ctx_test() {

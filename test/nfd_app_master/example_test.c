@@ -8,7 +8,6 @@
      "make test_c FILTER=example"  (run just this test)
 */
 
-#include "defines.h"
 #include "test.c"
 
 void main() {
