@@ -12,6 +12,10 @@ mkdir -p ${TEST_BUILD_DIR}
 shift
 FW_BUILD_DIR=$1
 shift
+NETRONOME=$1
+shift
+BLM_DIR=$1
+shift
 
 if [ -z ${Q+x} ];
 then
@@ -22,6 +26,57 @@ fi
 
 PASSED=0
 FAILED=0
+SKIPPED=0
+
+BLM_LINK=
+
+build_blm () {
+    BLM_LINK="-u i48.me0 ${TEST_BUILD_DIR}/blm0.list"
+
+    nfas -DNS_PLATFORM_TYPE=1 -third_party_addressing_40_bit -permit_dram_unaligned \
+    -preproc64 -indirect_ref_format_nfp6000 -W3 -C -R -lr -go -g -lm 0 \
+    -include ${TEST_BUILD_DIR}/../../apps/nic/config.h -chip nfp-4xxx-b0 \
+    -DGRO_NUM_BLOCKS=1 -DBLM_CUSTOM_CONFIG -DBLM_INSTANCE_ID=0 -DNBII=8 \
+    -DSINGLE_NBI -DTH_12713=NBI_READ -DBLM_0_ISLAND_ILA48 -DBLM_INIT_EMU_RINGS \
+    -I${NETRONOME}/components/standardlibrary/include \
+    -I${NETRONOME}/components/standardlibrary/microcode/include \
+    -I${NETRONOME}/components/standardlibrary/microcode/src \
+    -I${TEST_BUILD_DIR}/../../apps/nic -I${TEST_BUILD_DIR}/../../../include \
+    -o  ${TEST_BUILD_DIR}/blm0.list \
+    ${BLM_DIR}/blm_main.uc
+
+    return $?
+}
+
+check_test_req () {
+    ret=0
+
+    FILE_BASE=`basename ${1%.*}`
+
+    #Check if the test requires BLM
+    if [[ -n `grep -E '[ \t]*(;|[\/\/])[ \t]*TEST_REQ_BLM$' ${1}` ]]; then
+        build_blm
+        ret=$?
+        if [[ ${ret} -ne 0 ]]; then
+            echo -n "${FILE_BASE}: "
+            echo -e "${COLOR_WARN}SKIPPED (Unable to compile BLM)${COLOR_RESET}"
+        fi
+    else
+        BLM_LINK=
+    fi
+
+    #Check if the test requires a soft reset
+    if [[ -n `grep -E '[ \t]*(;|[\/\/])[ \t]*TEST_REQ_RESET$' ${1}` ]]; then
+        msg=`nfp-nsp -R`
+        ret=$?
+        if [[ ${ret} -ne 0 ]]; then
+            echo -n "${FILE_BASE}: "
+            echo -e "${COLOR_WARN}SKIPPED (Soft reset failed with $msg)${COLOR_RESET}"
+        fi
+    fi
+
+    return $ret
+}
 
 COLOR_PASS=${COLOR_PASS:-"\033[1;32m"}
 COLOR_FAIL=${COLOR_FAIL:-"\033[1;31m"}
@@ -33,12 +88,20 @@ for t in `find ${TEST_DIR} -iname '*_test.uc' -o -iname '*_test.c'` ; do
         continue
     fi
     FILE_BASE=`basename ${t%.*}`
+
+    #Check if the requirements for this test are met, if not, skip
+    check_test_req $t
+    if [[ $? -ne 0 ]]; then
+        SKIPPED=$(( ${SKIPPED} + 1 ))
+        continue
+    fi
+
     if echo ${t} | grep '.uc' > /dev/null ; then
         nfas -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t || exit 1
-        nfld -chip nfp-4xxx-b0 -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list || exit 1
+        nfld -chip nfp-4xxx-b0 -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list $BLM_LINK || exit 1
     else
         nfcc -chip nfp-4xxx-b0 -v1 -Qno_decl_volatile -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t || exit 1
-        nfld -chip nfp-4xxx-b0 -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list || exit 1
+        nfld -chip nfp-4xxx-b0 -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list $BLM_LINK || exit 1
     fi
 
     nfp-nffw unload || exit 1
@@ -81,10 +144,13 @@ for t in `find ${TEST_DIR} -iname '*_test.uc' -o -iname '*_test.c'` ; do
         FAILED=$(( ${FAILED} + 1 ))
     fi
 done
-if [[ ${FAILED} -eq 0 ]] && [[ ${PASSED} -ge 1 ]] ; then
+if [[ ${FAILED} -eq 0 ]] && [[ ${PASSED} -ge 1 ]] && [[ ${SKIPPED} -eq 0 ]]; then
     echo -e "Summary : ${COLOR_PASS}${PASSED} passed, no failures${COLOR_RESET}"
     exit 0
+elif [[ ${SKIPPED} -ge 1 ]]; then
+    echo -e "Summary : ${COLOR_WARN}${PASSED} passed, ${SKIPPED} skipped, ${FAILED} failed${COLOR_RESET}"
+    exit 0
 else
-    echo -e "Summary : ${COLOR_WARN}${PASSED} passed, ${FAILED} failed${COLOR_RESET}"
+    echo -e "Summary : ${COLOR_WARN}${PASSED} passed, ${SKIPPED} skipped, ${FAILED} failed${COLOR_RESET}"
     exit 1
 fi
