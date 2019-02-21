@@ -68,7 +68,7 @@ void cfg_act_build_nbi_down(action_list_t *acts, uint32_t pcie, uint32_t vid);
 
 void cfg_act_build_pcie_down(action_list_t *acts, uint32_t pcie, uint32_t vid);
 
-enum cfg_msg_error cfg_act_write_veb(uint32_t vid,
+enum cfg_msg_err cfg_act_write_veb(uint32_t vid,
 				     __lmem struct nic_mac_vlan_key *veb_key,
 		                     action_list_t *acts);
 

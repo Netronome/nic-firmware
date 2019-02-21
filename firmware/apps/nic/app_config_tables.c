@@ -28,13 +28,11 @@
 #include <shared/nfp_net_ctrl.h>
 #include <nic_basic/nic_basic.h>
 #include <nic_basic/nic_stats.h>
-#include "app_mac_vlan_config_cmsg.h"
 #include "maps/cmsg_map_types.h"
 #include "app_config_tables.h"
 #include "app_config_instr.h"
 #include "ebpf.h"
 #include "nic_tables.h"
-#include "app_mac_vlan_config_cmsg.h"
 
 /*
     RXB tables (in CTM)
