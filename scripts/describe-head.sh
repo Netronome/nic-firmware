@@ -63,7 +63,7 @@ elif [ "$1" = "--pkg_ver" ] ; then
 elif [ "$1" = "--nfld_args" ] ; then
   NFLD_VER=`echo ${VERSION} | sed 's/\([[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*\).*/\1/'`
   NFLD_BUILD=`echo ${VERSION} | sed 's/[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*.//'`
-  NFLD_ARGS="-fw_name $2"
+  NFLD_ARGS="-fw_typeid $2"
   if [ -n "${LABEL}" ] ; then
     NFLD_ARGS="${NFLD_ARGS}-${LABEL}"
   fi

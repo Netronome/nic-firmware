@@ -125,7 +125,7 @@
 	.init_mu_ring MAP_CMSG_Q_IDX MAP_CMSG_Q_BASE 0
 
 	.alloc_resource MAP_CMSG_Q_DBG_IDX emem0_queues global 1
-	.alloc_mem MAP_CMSG_Q_DBG_BASE emem global MAP_CMSG_IN_WQ_SZ MAP_CMSG_IN_WQ_SZ
+	.alloc_mem MAP_CMSG_Q_DBG_BASE emem0 global MAP_CMSG_IN_WQ_SZ MAP_CMSG_IN_WQ_SZ
 	.init_mu_ring MAP_CMSG_Q_DBG_IDX MAP_CMSG_Q_DBG_BASE 0
 
 	#define CMSG_NUM_FD_BM_LW	((HASHMAP_MAX_TID_EBPF+31)/32)

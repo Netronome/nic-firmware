@@ -893,7 +893,7 @@ endef
 #
 define nffw.add_rtsyms
 
-$1__LINK_FLAGS += -mip -rtsyms -name $2
+$1__LINK_FLAGS += -mip -rtsyms -fw_name $2
 
 endef
 
