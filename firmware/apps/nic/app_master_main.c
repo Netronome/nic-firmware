@@ -358,7 +358,7 @@ lsc_send(int vid)
         mem_write8_le(&mask_w, nic_ctrl_bar + NFP_NET_CFG_ICR(entry), 1);
     }
 
-    ret = msix_pf_send(NIC_PCI + 4, PCIE_CPP2PCIE_LSC, entry, automask);
+    ret = msix_pf_send(NIC_PCI, PCIE_CPP2PCIE_LSC, entry, automask);
 
 out:
     return ret;
