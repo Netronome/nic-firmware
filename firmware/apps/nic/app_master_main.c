@@ -262,7 +262,6 @@ cfg_changes_loop(void)
                     goto error;
             }
 
-            nic_control_word[NIC_PCI][cfg_msg.vid] = control;
 error:
             /* Complete the message */
             cfg_msg.msg_valid = 0;

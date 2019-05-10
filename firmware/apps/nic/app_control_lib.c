@@ -350,6 +350,8 @@ process_ctrl_reconfig(uint32_t control, uint32_t vid,
     mem_write32(&link_state,
                     (NFD_CFG_BAR_ISL(PCIE_ISL, cfg_msg->vid) +
                     NFP_NET_CFG_STS), sizeof link_state);
+
+    nic_control_word[NIC_PCI][vid] = control;
     return 0;
 }
 
@@ -360,6 +362,7 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
 {
     uint32_t port = vnic;
     uint32_t veb_up;
+    uint32_t nic_control_word_prev;
     __gpr uint32_t ctx_mode = 1;
     __gpr int i;
 
@@ -402,12 +405,16 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
         }
     }
 
-    /* Set RX appropriately if NFP_NET_CFG_CTRL_ENABLE changed */
-    if ((nic_control_word[NIC_PCI][vid] ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
-        if (control & NFP_NET_CFG_CTRL_ENABLE) {
-            /* Permit lsc_check() to bring up RX/TX */
-            nic_control_word[NIC_PCI][cfg_msg->vid] = control;
+    /* In the case of a failed PF enable, the kernel driver will perform
+       another explicit disable, which will then reset the cache state */
+    nic_control_word_prev = nic_control_word[NIC_PCI][vid];
+    nic_control_word[NIC_PCI][vid] = control;
 
+    /* The nic_control_word[] update will trigger the lsc_check() thread to
+       adjust the MAC RX, TX and flush enables to match to requested enable
+       state. Here in parallel we handle and wait for each case to complete. */
+    if ((nic_control_word_prev ^ control) & NFP_NET_CFG_CTRL_ENABLE) {
+        if (control & NFP_NET_CFG_CTRL_ENABLE) {
             /* Swap and give link state thread opportunity to enable RX/TX */
             sleep(50 * NS_PLATFORM_TCLK * 1000); // 50ms
 
@@ -416,9 +423,6 @@ process_pf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
         } else {
             __xread struct nfp_nbi_tm_queue_status tmq_status;
             int i, queue, occupied = 1;
-
-            /* Prevent lsc_check() from overriding RX disable */
-            nic_control_word[NIC_PCI][cfg_msg->vid] = control;
 
             /* stop receiving packets */
             if (! mac_port_disable_rx(port)) {
@@ -453,6 +457,7 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
     __xread struct sriov_cfg sriov_cfg_data;
     unsigned int ls_mode;
     uint64_t mac_addr;
+    uint32_t veb_up = 0;
 
     if (control & ~(NFD_CFG_VF_CAP)) {
         cfg_msg->error = 1;
@@ -464,13 +469,20 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
         return 1;
     }
 
+    /* In the case of a failed PF enable, the kernel driver will perform
+       another explicit disable, which will then reset the cache state */
+    nic_control_word[NIC_PCI][vid] = control;
 
-    mem_read32(&sriov_cfg_data, NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
+    /* Retrieve the link state mode for the VF. */
+    mem_read32(&sriov_cfg_data,
+               NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
                sizeof(struct sriov_cfg));
 
     /* Set the link state handling control */
     if (control & NFP_NET_CFG_CTRL_ENABLE) {
-        /* Retrieve the link state mode for the VF. */
+        /* We're about to up one of the VFs so we know the VEB must be enabled */
+        veb_up = 1;
+
         ls_mode = sriov_cfg_data.ctrl_link_state;
 
         if (!(nic_control_word[NIC_PCI][NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE)) {
@@ -484,14 +496,9 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
             cfg_msg->error = 1;
             return 1;
         }
-
-        // rebuild PF action list because veb_up state may have changed
-        if (cfg_act_pf_up(NIC_PCI, NFD_PF2VID(0), 1,
-                    nic_control_word[NIC_PCI][NFD_PF2VID(0)], 0)) {
-            cfg_msg->error = 1;
-            return 1;
-        }
     } else {
+        int vf;
+
         /* process VFs trying to change its MAC address while the
          * interface is down. Reject non-trusted VFs trying to change
          * the MAC address after the PF set it up
@@ -511,6 +518,21 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
             cfg_msg->error = 1;
             return 1;
         }
+
+        /* Check if VEB lookup is still needed, i.e. if any VFs are up */
+        for (vf = 0; vf < NFD_MAX_VFS; vf++) {
+            if (nic_control_word[NIC_PCI][NFD_VF2VID(vf)] & NFP_NET_CFG_CTRL_ENABLE) {
+                veb_up = 1;
+                break;
+            }
+        }
+    }
+
+    /* rebuild PF action list because veb_up state may have changed */
+    if (cfg_act_pf_up(NIC_PCI, NFD_PF2VID(0), veb_up,
+                      nic_control_word[NIC_PCI][NFD_PF2VID(0)], 0)) {
+        cfg_msg->error = 1;
+        return 1;
     }
 
     update_vf_lsc_list(0, vid, control, ls_mode);
