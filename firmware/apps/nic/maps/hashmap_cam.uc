@@ -61,10 +61,9 @@
 	pkt_counter_decl(num_ov_alloc)
 	pkt_counter_decl(num_ov_free)
 
-
-	EMEM0_QUEUE_ALLOC(HASHMAP_FREE_QID, global)
-	.alloc_mem HASHMAP_FREE_QDESC emem global 16 16
-	.alloc_mem HASHMAP_FREE_RBASE emem global (NUM_ENTRIES * 4) (NUM_ENTRIES * 4)
+    EMEM0_QUEUE_ALLOC(HASHMAP_FREE_QID, global)
+    .alloc_mem HASHMAP_FREE_RBASE emem0 global (NUM_ENTRIES * 4) (NUM_ENTRIES * 4)
+    .init_mu_ring HASHMAP_FREE_QID HASHMAP_FREE_RBASE 0
 
 	.alloc_mem HASHMAP_FREEPOOL_BASE emem global (NUM_ENTRIES * HASHMAP_MAX_OV_SZ) 256
 	.init HASHMAP_FREEPOOL_BASE 0
@@ -79,10 +78,7 @@
 		.reg $data[16]
 		.xfer_order $data
 
-		.reg ring_no
 		.reg val
-		alu[ring_no, --, b, HASHMAP_FREE_QID]
-		ru_emem_ring_setup(HASHMAP_FREE_QDESC, HASHMAP_FREE_RBASE, --, ring_no, NUM_ENTRIES, 0, 0, NUM_ENTRIES)
 
 		move(index, (NUM_ENTRIES-1))
 		alu[val, --, b, 1, <<__HASHMAP_OV_SIG_BIT__]
