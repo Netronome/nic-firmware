@@ -76,6 +76,16 @@ else ifeq ($(PLATFORM),Starfighter_1x100_passive)
     MEDIA = 1x100
     AMDA = AMDA0078-0012
     CHIP = AMDA0078-0012:0
+else ifeq ($(PLATFORM),Sodium_2x10)
+    NS_PLATFORM_TYPE = 16
+    MEDIA = 2x10
+    AMDA = AMDA0119-0001
+    CHIP = AMDA0119-0001:0
+else ifeq ($(PLATFORM),Sodium_2x10_crypto)
+    NS_PLATFORM_TYPE = 17
+    MEDIA = 2x10
+    AMDA = AMDA0119-0002
+    CHIP = AMDA0119-0002:0
 endif
 PROJECT = $(FLAVOR)/nic_$(AMDA)_$(MEDIA)
 
