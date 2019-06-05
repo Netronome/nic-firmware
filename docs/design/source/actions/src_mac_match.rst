@@ -1,4 +1,4 @@
-Action - MAC_MATCH 
+Action - SRC_MAC_MATCH
 ==================
 
 Description
@@ -7,23 +7,22 @@ Description
 Interface and Encoding
 ----------------------
 .. rst-class:: action-encoding
-    
+
     +------+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     |Bit / |3|3|3|2|2|2|2|2|2|2|2|2|2|1|1|1|1|1|1|1|1|1|1|0|0|0|0|0|0|0|0|0|
     |Word  |1|0|9|8|7|6|5|4|3|2|1|0|9|8|7|6|5|4|3|2|1|0|9|8|7|6|5|4|3|2|1|0|
     +======+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-    |   0  |            <addr>           |P|            MAC HI             |
+    |   0  |            <addr>           |P|            MAC LO             |
     +------+-----------------------------+-+-------------------------------+
-    |                                   MAC LO                             |
+    |                                   MAC HI                             |
     +----------------------------------------------------------------------+
 
-:MAC: Drop on mismatch 
+:MAC: Drop on mismatch
 
 Reads
 .....
 
 - PKT_DATA
-- PV_MAC_DST_MC
 
 
 Implementation
@@ -38,4 +37,3 @@ API Dependencies
 - __actions_read_end()
 - __actions_restore_t_idx()
 - pv_seek()
-

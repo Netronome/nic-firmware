@@ -659,14 +659,44 @@ cfg_act_append_veb_lookup(action_list_t *acts, uint32_t pcie, uint32_t vid,
 }
 
 __intrinsic void
-cfg_act_append_mac_match(action_list_t *acts, uint32_t pcie, uint32_t vid)
+cfg_act_append_dmac_match(action_list_t *acts, uint32_t mac_hi16, uint32_t mac_lo32)
+{
+    cfg_act_append(acts, INSTR_DST_MAC_MATCH, mac_hi16);
+    acts->instr[acts->count++].value = mac_lo32;
+}
+
+
+__intrinsic void
+cfg_act_append_dmac_match_bar(action_list_t *acts, uint32_t pcie, uint32_t vid)
 {
     __xread uint32_t mac[2];
 
     mem_read64(mac, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
                    NFP_NET_CFG_MACADDR), sizeof(mac));
-    cfg_act_append(acts, INSTR_MAC_MATCH, mac[0] >> 16);
-    acts->instr[acts->count++].value = (mac[0] << 16) | (mac[1] >> 16);
+
+    cfg_act_append_dmac_match(acts, mac[0] >> 16, (mac[0] << 16) | (mac[1] >> 16));
+
+}
+
+
+__intrinsic void
+cfg_act_append_smac_match(action_list_t *acts, uint32_t mac_hi32, uint32_t mac_lo16)
+{
+    cfg_act_append(acts, INSTR_SRC_MAC_MATCH, mac_lo16);
+    acts->instr[acts->count++].value = mac_hi32;
+}
+
+
+__intrinsic void
+cfg_act_append_smac_match_sriov(action_list_t *acts, uint32_t pcie, uint32_t vid)
+{
+    __xread struct sriov_cfg sriov_cfg_data;
+    __emem __addr40 uint8_t *vf_cfg_base;
+
+    vf_cfg_base = nfd_vf_cfg_base(pcie, NFD_VID2VF(vid), NFD_VF_CFG_SEL_VF);
+    mem_read32(&sriov_cfg_data, vf_cfg_base, sizeof(struct sriov_cfg));
+
+    cfg_act_append_smac_match(acts, sriov_cfg_data.mac_hi, sriov_cfg_data.mac_lo);
 }
 
 #define ACTION_RSS_IPV6_TCP_BIT 0
@@ -833,7 +863,7 @@ cfg_act_append_tx_host(action_list_t *acts, uint32_t pcie, uint32_t vid,
     __xread uint32_t flbuf_sz;
 
     instr_tx_host.pcie = pcie;
-    instr_tx_host.queue = NFD_VID2NATQ(vid, 0); //to PF!
+    instr_tx_host.queue = NFD_VID2NATQ(vid, 0);
     instr_tx_host.cont = cont;
     instr_tx_host.multicast = multicast;
 
@@ -951,6 +981,9 @@ cfg_act_build_vf(action_list_t *acts, uint32_t pcie, uint32_t vid,
     if (sriov_cfg_data.vlan_tag != 0)
         cfg_act_append_push_vlan(acts, sriov_cfg_data.vlan_tag);
 
+    if (sriov_cfg_data.ctrl_spoof)
+        cfg_act_append_smac_match_sriov(acts, pcie, vid);
+
     cfg_act_append_veb_lookup(acts, pcie, vid, 0, 0);
 
     if (csum_i)
@@ -1003,7 +1036,7 @@ cfg_act_build_nbi(action_list_t *acts, uint32_t pcie, uint32_t vid,
     if (veb_up)
         cfg_act_append_veb_lookup(acts, pcie, vid, promisc, 1);
     else if (! promisc)
-        cfg_act_append_mac_match(acts, pcie, vid);
+        cfg_act_append_dmac_match_bar(acts, pcie, vid);
 
     if (veb_up || csum_compl)
         cfg_act_append_checksum(acts, veb_up, veb_up, csum_compl); // O, I, C

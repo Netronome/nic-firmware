@@ -76,10 +76,10 @@ static void parse_action_list(void)
                 /* actions length: 1 word*/
                 action_next = _action_list[i];
                 if (action_next.pipeline)
-                    test_assert_equal(action_next.op, INSTR_MAC_MATCH);
+                    test_assert_equal(action_next.op, INSTR_DST_MAC_MATCH);
                 break;
 
-            case INSTR_MAC_MATCH:
+            case INSTR_DST_MAC_MATCH:
                 /* actions length: 2 words (note ++i below)*/
                 action_next = _action_list[++i];
                 if (action_next.pipeline)
@@ -143,6 +143,13 @@ static void parse_action_list(void)
             case INSTR_PUSH_VLAN:
                 /* actions length: 1 word*/
                 action_next = _action_list[i];
+                if (action_next.pipeline)
+                    test_assert_equal(action_next.op, INSTR_SRC_MAC_MATCH);
+                break;
+
+            case INSTR_SRC_MAC_MATCH:
+                /* actions length: 2 words (note ++i below)*/
+                action_next = _action_list[++i];
                 if (action_next.pipeline)
                     test_assert_equal(action_next.op, INSTR_VEB_LOOKUP);
                 break;

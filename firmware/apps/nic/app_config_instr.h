@@ -83,7 +83,7 @@
 #if defined(__NFP_LANG_ASM)
     #define    INSTR_DROP              0
     #define    INSTR_RX_WIRE           1
-    #define    INSTR_MAC_MATCH         2
+    #define    INSTR_DST_MAC_MATCH     2
     #define    INSTR_CHECKSUM          3
     #define    INSTR_RSS               4
     #define    INSTR_TX_HOST           5
@@ -93,15 +93,16 @@
     #define    INSTR_EBPF              9
     #define    INSTR_POP_VLAN          10
     #define    INSTR_PUSH_VLAN         11
-    #define    INSTR_VEB_LOOKUP        12
-    #define    INSTR_POP_PKT           13
-    #define    INSTR_PUSH_PKT          14
-    #define    INSTR_TX_VLAN           15
+    #define    INSTR_SRC_MAC_MATCH     12
+    #define    INSTR_VEB_LOOKUP        13
+    #define    INSTR_POP_PKT           14
+    #define    INSTR_PUSH_PKT          15
+    #define    INSTR_TX_VLAN           16
 #elif defined(__NFP_LANG_MICROC)
 enum instruction_ops {
     INSTR_DROP = 0,
     INSTR_RX_WIRE,
-    INSTR_MAC_MATCH,
+    INSTR_DST_MAC_MATCH,
     INSTR_CHECKSUM,
     INSTR_RSS,
     INSTR_TX_HOST,
@@ -111,6 +112,7 @@ enum instruction_ops {
     INSTR_EBPF,
     INSTR_POP_VLAN,
     INSTR_PUSH_VLAN,
+    INSTR_SRC_MAC_MATCH,
     INSTR_VEB_LOOKUP,
     INSTR_POP_PKT,
     INSTR_PUSH_PKT,
@@ -162,13 +164,24 @@ enum instruction_ops {
  * MAC: pass on match (skip lookup / shortcut to PF)
  * MAC = 0: pass on VEB miss (promiscuous mode)
  *
- * INSTR_MAC_MATCH:
+ * INSTR_DST_MAC_MATCH:
  * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *       +-----------------------------+-+-------------------------------+
  *    0  |              3              |P|            MAC HI             |
  *       +-----------------------------+-+-------------------------------+
  *    1  |                            MAC LO                             |
+ *       +---------------------------------------------------------------+
+ *
+ * MAC: drop on mismatch
+ *
+ * INSTR_SRC_MAC_MATCH:
+ * Bit \  3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * Word   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *       +-----------------------------+-+-------------------------------+
+ *    0  |              3              |P|            MAC LO             |
+ *       +-----------------------------+-+-------------------------------+
+ *    1  |                            MAC HI                             |
  *       +---------------------------------------------------------------+
  *
  * MAC: drop on mismatch

@@ -209,18 +209,21 @@ end#:
 #endm
 
 
-#macro __actions_mac_match(in_pkt_vec, DROP_LABEL)
+#macro __actions_dst_mac_match(in_pkt_vec, DROP_LABEL)
 .begin
     .reg mac_hi
     .reg mac_lo
     .reg port_mac[2]
 
+    /* match dst mac: hi 2 bytes first, low 4 bytes second */
     __actions_read_begin()
     __actions_read(port_mac[0], 0xffff)
     __actions_read(port_mac[1])
     __actions_read_end()
 
     br_bset[BF_AL(in_pkt_vec, PV_MAC_DST_MC_bf), end#]
+
+    /* packet dst mac: hi 2 bytes first, 4 lo bytes second */
     pv_seek(in_pkt_vec, 0)
 
     alu[mac_hi, port_mac[0], XOR, *$index++]
@@ -229,6 +232,34 @@ end#:
     __actions_restore_t_idx()
 
     alu[--, mac_lo, OR, mac_hi, <<16]
+    bne[DROP_LABEL]
+
+end#:
+.end
+#endm
+
+
+#macro __actions_src_mac_match(in_pkt_vec, DROP_LABEL)
+.begin
+    .reg mac_hi
+    .reg mac_lo
+    .reg port_mac[2]
+
+    /* match src mac: lo 2 bytes first, hi 4 bytes second */
+    __actions_read_begin()
+    __actions_read(port_mac[0], --, <<16)
+    __actions_read(port_mac[1])
+    __actions_read_end()
+
+    /* packet src mac: hi 4 bytes first, 2 lo bytes second */
+    pv_seek(in_pkt_vec, 8)
+
+    alu[mac_hi, port_mac[1], XOR, *$index++]
+    alu[mac_lo, port_mac[0], XOR, *$index++]
+
+    __actions_restore_t_idx()
+
+    alu[--, mac_hi, OR, mac_lo, >>16]
     bne[DROP_LABEL]
 
 end#:
@@ -818,11 +849,11 @@ end#:
 
 next#:
     alu[jump_idx, --, B, *$index, >>INSTR_OPCODE_LSB]
-    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#, ins_12#, ins_13#, ins_14#, ins_15#]
+    jump[jump_idx, ins_0#], targets[ins_0#, ins_1#, ins_2#, ins_3#, ins_4#, ins_5#, ins_6#, ins_7#, ins_8#, ins_9#, ins_10#, ins_11#, ins_12#, ins_13#, ins_14#, ins_15#, ins_16#]
 
     ins_0#: br[drop_act#]
     ins_1#: br[rx_wire#]
-    ins_2#: br[mac_match#]
+    ins_2#: br[mac_dst_match#]
     ins_3#: br[checksum#]
     ins_4#: br[rss#]
     ins_5#: br[tx_host#]
@@ -832,10 +863,11 @@ next#:
     ins_9#: br[ebpf#]
     ins_10#: br[pop_vlan#]
     ins_11#: br[push_vlan#]
-    ins_12#: br[veb_lookup#]
-    ins_13#: br[pkt_pop#]
-    ins_14#: br[pkt_push#]
-    ins_15#: br[tx_vlan#]
+    ins_12#: br[mac_src_match#]
+    ins_13#: br[veb_lookup#]
+    ins_14#: br[pkt_pop#]
+    ins_15#: br[pkt_push#]
+    ins_16#: br[tx_vlan#]
 
 error_pkt_stack#:
     pv_stats_update(io_pkt_vec, ERROR_PKT_STACK, drop#)
@@ -850,8 +882,8 @@ rx_wire#:
     __actions_rx_wire(io_pkt_vec)
     __actions_next()
 
-mac_match#:
-    __actions_mac_match(io_pkt_vec, drop_mismatch#)
+mac_dst_match#:
+    __actions_dst_mac_match(io_pkt_vec, drop_mismatch#)
     __actions_next()
 
 checksum#:
@@ -884,6 +916,10 @@ pop_vlan#:
 
 push_vlan#:
     __actions_push_vlan(io_pkt_vec)
+    __actions_next()
+
+mac_src_match#:
+    __actions_src_mac_match(io_pkt_vec, drop_mismatch#)
     __actions_next()
 
 veb_lookup#:
