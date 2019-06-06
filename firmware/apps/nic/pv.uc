@@ -1672,8 +1672,8 @@ ipv6#:
 
     // Assume CBS = 0
     alu[BF_A(out_vec, PV_MU_ADDR_bf), BF_A(in_nfd_desc, NFD_IN_BUFADDR_fld), AND~, 0x7, <<(BF_M(PV_MU_ADDR_bf) + 1)]
-    alu[split, (256 - NFD_IN_DATA_OFFSET + 1), -, pkt_len]
-    alu[split, split, +carry, pkt_len]
+    alu[split, (256 - NFD_IN_DATA_OFFSET), -, pkt_len]
+    alu[split, --, B, split, >>31]
     alu[BF_A(out_vec, PV_SPLIT_bf), BF_A(out_vec, PV_SPLIT_bf), OR, split, <<BF_L(PV_SPLIT_bf)] ; PV_SPLIT_bf
 
     alu[BF_A(out_vec, PV_CTM_ADDR_bf), NFD_IN_DATA_OFFSET, OR, in_pkt_num, <<BF_L(PV_NUMBER_bf)]
