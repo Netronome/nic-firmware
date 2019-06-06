@@ -17,7 +17,7 @@
 #endif
 
 #ifndef PKT_BUF_ME_CTM_BUFFERS
-    #define PKT_BUF_ME_CTM_BUFFERS 32
+    #define PKT_BUF_ME_CTM_BUFFERS 12
 #endif
 
 .alloc_mem _pkt_buf_ctm_credits cls island 8
