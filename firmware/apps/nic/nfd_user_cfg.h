@@ -167,7 +167,8 @@
 #define NFD_VF_CFG_ABI_VER      2
 #define NFD_VF_CFG_CAP                                       \
     (NFD_VF_CFG_MB_CAP_MAC | NFD_VF_CFG_MB_CAP_VLAN |        \
-     NFD_VF_CFG_MB_CAP_SPOOF | NFD_VF_CFG_MB_CAP_LINK_STATE)
+     NFD_VF_CFG_MB_CAP_SPOOF | NFD_VF_CFG_MB_CAP_LINK_STATE |\
+     NFD_VF_CFG_MB_CAP_TRUST)
 
 #define NFD_RSS_HASH_FUNC NFP_NET_CFG_RSS_CRC32
 

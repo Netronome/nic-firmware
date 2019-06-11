@@ -1226,7 +1226,9 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid,
     __xread struct sriov_cfg sriov_cfg_data;
     __emem __addr40 uint8_t *vf_cfg_base;
     __shared __lmem struct nic_mac_vlan_key veb_key;
+    __xread uint64_t mac_xr;
     uint64_t mac_addr;
+    uint64_t vf_mac_addr;
     uint16_t vlan_id;
     action_list_t acts;
 
@@ -1240,6 +1242,32 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid,
     vlan_id = sriov_cfg_data.vlan_tag ? sriov_cfg_data.vlan_id : NIC_NO_VLAN_ID;
 
     mac_addr = MAC64_FROM_SRIOV_CFG(sriov_cfg_data);
+
+    mem_read64(&mac_xr, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
+                                       NFP_NET_CFG_MACADDR), sizeof(mac_xr));
+    vf_mac_addr = mac_xr >> 16ull;
+
+    if (!mac_addr)
+        /* MAC address not set by the PF, we allow the VF to set its MAC */
+        mac_addr = vf_mac_addr;
+    else {
+        if (sriov_cfg_data.ctrl_trusted)
+            /* we trust the VF to set its MAC */
+            mac_addr = vf_mac_addr;
+        else
+            /* the non-trusted VF tries to set its MAC to something
+             * different to what the PF set it: not allowed. Return an
+             * error only if the VF is potentially setting its MAC
+             * (.ndo_set_mac_address, .ndo_open and binding time)
+             * This does not allow a corner case where PF sets VF's
+             * MAC, trust on, VF sets diff MAC, link down, trust off
+             * and link up
+             */
+            if ((vf_mac_addr != mac_addr) && (update &
+                (NFP_NET_CFG_UPDATE_MACADDR | NFP_NET_CFG_UPDATE_GEN)))
+                return 1;
+    }
+
     VEB_KEY_FROM_MAC64(veb_key, mac_addr);
     veb_key.vlan_id = vlan_id;
 
