@@ -452,6 +452,7 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
     __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
     __xread struct sriov_cfg sriov_cfg_data;
     unsigned int ls_mode;
+    uint64_t mac_addr;
 
     if (control & ~(NFD_CFG_VF_CAP)) {
         cfg_msg->error = 1;
@@ -463,13 +464,13 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
         return 1;
     }
 
+
+    mem_read32(&sriov_cfg_data, NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
+               sizeof(struct sriov_cfg));
+
     /* Set the link state handling control */
     if (control & NFP_NET_CFG_CTRL_ENABLE) {
         /* Retrieve the link state mode for the VF. */
-        mem_read32(&sriov_cfg_data,
-            NFD_VF_CFG_ADDR(vf_cfg_base, NFD_VID2VF(vid)),
-            sizeof(struct sriov_cfg));
-
         ls_mode = sriov_cfg_data.ctrl_link_state;
 
         if (!(nic_control_word[NFD_PF2VID(0)] & NFP_NET_CFG_CTRL_ENABLE)) {
@@ -491,6 +492,18 @@ process_vf_reconfig(uint32_t control, uint32_t update, uint32_t vid,
             return 1;
         }
     } else {
+        /* process VFs trying to change its MAC address while the
+         * interface is down. Reject non-trusted VFs trying to change
+         * the MAC address after the PF set it up
+         */
+        if (update & NFP_NET_CFG_UPDATE_MACADDR) {
+            mac_addr = MAC64_FROM_SRIOV_CFG(sriov_cfg_data);
+            if (mac_addr && (!sriov_cfg_data.ctrl_trusted)) {
+                cfg_msg->error = 1;
+                return 1;
+            }
+        }
+
         /* Disable the link when interface is disabled. */
         ls_mode = NFD_VF_CFG_CTRL_LINK_STATE_DISABLE;
 
