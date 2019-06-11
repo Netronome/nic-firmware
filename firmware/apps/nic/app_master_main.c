@@ -541,77 +541,6 @@ lsc_loop(void)
     /* NOTREACHED */
 }
 
-/*
- * Generate random Ethernet addresses (MAC) to all VFs, the MAC addresses
- * are not multicast and has the local assigned bit set.
- */
-static void
-init_vfs_random_macs(void)
-{
-    uint32_t vf, i;
-    int try;
-    uint32_t mac_hi;
-    uint32_t mac_lo;
-    __gpr uint64_t mac64;
-    __shared __lmem uint32_t sriov_act_list[NIC_MAC_VLAN_RESULT_SIZE_LW];
-    __emem __addr40 uint8_t *vf_cfg_base = NFD_VF_CFG_BASE_LINK(NIC_PCI);
-    __emem __addr40 uint8_t *vf_base;
-    __gpr struct sriov_cfg sriov_cfg_data;
-    __xread struct sriov_cfg sriov_cfg_data_rd;
-    __xwrite struct sriov_cfg sriov_cfg_data_wr;
-    __xread unsigned int cfg_bar_data[2];
-    __mem char *cfg_bar;
-
-    reg_zero(sriov_act_list, sizeof(sriov_act_list));
-
-    /* Start generating the MAC addresses */
-    for (vf = 0; NFD_MAX_VFS && vf < NFD_MAX_VFS; vf++) {
-        /* make several attempts to acquire a locally unique MAC */
-        for (try = 0; try < 10; ++try) {
-            trng_rd64(&mac_hi, &mac_lo);
-
-            /* Make sure no Multicast */
-            mac_hi &= 0xFEFFFFFF;
-
-            /* Local assigned bit set */
-            mac_hi |= 0x02000000;
-
-            mac_lo = mac_lo >> 16;
-
-            /* check previoust VFs for duplicates */
-            for (i = 0; i <= vf; ) {
-                vf_base = NFD_VF_CFG_ADDR(vf_cfg_base, i++);
-                mem_read32(&sriov_cfg_data_rd, vf_base, sizeof(struct sriov_cfg));
-
-                if (sriov_cfg_data_rd.mac_hi == mac_hi &&
-                    sriov_cfg_data_rd.mac_lo == mac_lo)
-                    break;
-            }
-
-            /* retry if previous VF matches */
-            if (i != vf + 1)
-                continue;
-
-            /* Write the generated MAC into NFD's rtsym */
-            reg_cp(&sriov_cfg_data, &sriov_cfg_data_rd,
-                    sizeof(struct sriov_cfg));
-            sriov_cfg_data.mac_hi = mac_hi;
-            sriov_cfg_data.mac_lo = mac_lo;
-            reg_cp(&sriov_cfg_data_wr, &sriov_cfg_data,
-                    sizeof(struct sriov_cfg));
-            mem_write32(&sriov_cfg_data_wr, vf_base, sizeof(struct sriov_cfg));
-
-            /* write the MAC to the VF BAR so it is ready to use even
-             * without an FLR */
-            mem_write8(&sriov_cfg_data_wr, NFD_CFG_BAR_ISL(NIC_PCI, vf) +
-                       NFP_NET_CFG_MACADDR, NFD_VF_CFG_MAC_SZ);
-
-            /* All went well, no need to try again */
-            break;
-        }
-    }
-}
-
 static void
 init_msix(void)
 {
@@ -653,7 +582,6 @@ main(void)
                                     &nfd_cfg_sig_app_master0);
         trng_init();
         init_catamaran_chan2port_table();
-        init_vfs_random_macs();
         init_msix();
         mac_csr_sync_start(DISABLE_GPIO_POLL);
         mac_rx_disable();
