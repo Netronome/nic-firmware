@@ -176,10 +176,7 @@ buf_sz_check#:
 #ifdef PV_MULTI_PCI
     alu[pci_q, pci_q, OR, pci_isl, <<6]
 #endif
-    pv_stats_update(io_pkt_vec, RX_DISCARD_MRU, pci_q, --)
-
-    br_bclr[multicast, BF_L(INSTR_TX_CONTINUE_bf), drop#]
-    br[drop_later#]
+    pv_stats_update(io_pkt_vec, RX_DISCARD_MRU, pci_q, safe_drop#)
 
 drop_buf_pci#:
 #ifdef PV_MULTI_PCI
@@ -187,9 +184,16 @@ drop_buf_pci#:
 #endif
     pv_stats_update(io_pkt_vec, RX_DISCARD_PCI, pci_q, --)
 
-    br_bclr[multicast, BF_L(INSTR_TX_CONTINUE_bf), drop#]
+safe_drop#:
+    br_bset[multicast, BF_L(INSTR_TX_CONTINUE_bf), drop_later_or_ignore#]
 
-drop_later#:
+    /* this TX_HOST is the last action */
+    br=byte[bls, 0, 3, IN_LABEL]
+    br[drop#]
+
+drop_later_or_ignore#:
+    /* more actions follow */
+    br=byte[bls, 0, 3, end#]
     pv_get_gro_mu_free_desc($__pkt_io_gro_meta, io_pkt_vec)
 
 end#:
@@ -217,7 +221,12 @@ end#:
     .reg resend_desc[4]
 
     // CTM buffer is required for TX via NBI
-    br_bclr[BF_AL(in_pkt_vec, PV_CTM_ALLOCATED_bf), error_no_ctm#]
+    passert(BF_L(PV_MAC_DST_MC_bf), "EQ", BF_L(INSTR_TX_CONTINUE_bf))
+    passert(BF_L(PV_MAC_DST_MC_bf), "EQ", (BF_L(INSTR_TX_MULTICAST_bf) + 1))
+    br_bclr[BF_AL(in_pkt_vec, PV_CTM_ALLOCATED_bf), error_no_ctm#], defer[3]
+        bitfield_extract__sz1(bls, BF_AML(in_pkt_vec, PV_BLS_bf))
+        alu[multicast, BF_A(in_pkt_vec, PV_MAC_DST_MC_bf), AND, in_tx_args, <<1]
+        alu[multicast, multicast, OR, in_tx_args]
 
     pv_write_nbi_meta(pms_offset, in_pkt_vec, error_offset#)
 
@@ -226,12 +235,6 @@ end#:
     #endif
     alu[tm_q, in_tx_args, AND~, (((~BF_MASK(INSTR_TX_WIRE_TMQ_bf)) & 0xffff) >> 8), <<8]
 
-    passert(BF_L(PV_MAC_DST_MC_bf), "EQ", BF_L(INSTR_TX_CONTINUE_bf))
-    passert(BF_L(PV_MAC_DST_MC_bf), "EQ", (BF_L(INSTR_TX_MULTICAST_bf) + 1))
-    alu[multicast, BF_A(in_pkt_vec, PV_MAC_DST_MC_bf), AND, in_tx_args, <<1]
-    alu[multicast, multicast, OR, in_tx_args]
-
-    bitfield_extract__sz1(bls, BF_AML(in_pkt_vec, PV_BLS_bf))
     br=byte[bls, 0, 3, tx_nbi#]
 
     pv_get_gro_wire_desc($__pkt_io_gro_meta, in_pkt_vec, nbi, tm_q, pms_offset)
@@ -241,11 +244,23 @@ end#:
 terminate#:
     pv_stats_tx_wire(in_pkt_vec, IN_LABEL)
 
-error_offset#:
-    pv_stats_update(in_pkt_vec, TX_ERROR_OFFSET, drop#)
-
 error_no_ctm#:
-    pv_stats_update(in_pkt_vec, TX_ERROR_NO_CTM, drop#)
+    pv_stats_update(in_pkt_vec, TX_ERROR_NO_CTM, safe_drop#)
+
+error_offset#:
+    pv_stats_update(in_pkt_vec, TX_ERROR_OFFSET, --)
+
+safe_drop#:
+    br_bset[multicast, BF_L(INSTR_TX_CONTINUE_bf), drop_later_or_ignore#]
+
+    /* this TX_HOST is the last action */
+    br=byte[bls, 0, 3, IN_LABEL]
+    br[drop#]
+
+drop_later_or_ignore#:
+    /* more actions follow */
+    br=byte[bls, 0, 3, end#]
+    pv_get_gro_mu_free_desc($__pkt_io_gro_meta, in_pkt_vec)
 
 multicast#:
     pv_multicast_init(in_pkt_vec, bls, continue#)
@@ -260,6 +275,7 @@ tx_nbi#:
 continue#:
     pv_stats_tx_wire(in_pkt_vec)
 
+end#:
 .end
 #endm
 
