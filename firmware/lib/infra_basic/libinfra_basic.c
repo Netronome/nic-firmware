@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Netronome, Inc.
+ * Copyright 2015-2016 Netronome Systems, Inc. All rights reserved.
  *
  * @file          lib/infra_basic/libinfra_basic.c
  * @brief         Functions to interface with the infrastructure blocks
@@ -13,6 +13,7 @@
  * a generic RX descriptor is returned. Similarly a generic TX descriptor
  * is used to send to any destination.
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 /* Disable GRO if not explictly enabled */

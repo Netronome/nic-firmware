@@ -1,12 +1,20 @@
 /*
- * Multicast Reaper
+ * Copyright (c) 2018-2019 Netronome Systems, Inc. All rights reserved.
+ *
+ * @file   mc_reaper.uc
+ * @brief  Multicast Reaper: reference count and recover multicast packet buffers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
 #include <aggregate.uc>
 #include <blm_api.uc>
 #include <nfd_user_cfg.h>
 #include <ov.uc>
 #include <ring_utils.uc>
 #include <timestamp.uc>
+
+#include "license.h"
 
 #macro mcr_collect(bufs, offset, meta, ring_base, EMPTY_BATCH_LABEL)
 .begin

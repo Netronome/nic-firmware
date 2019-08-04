@@ -4,7 +4,6 @@
  * @file        hashmap.uc
  * @brief       basic lookup table implementation.
  *
- *
  *  Subroutine calls:
  *  htab_map_lookup_elem_subr(in_tid, in_lm_key_offset, out_value_addr)
  *  htab_map_update_elem_subr(in_tid, in_lm_key_offset, in_lm_value_offset, out_rc)
@@ -52,7 +51,9 @@
  *					error_map_fd#, lookup_not_found#,HASHMAP_RTN_ADDR,rtn_len,--,rtn_addr)
  *#endif
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
 #ifndef __HASHMAP_UC__
 #define __HASHMAP_UC__
 

@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2017-2019 Netronome Systems, Inc. All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #ifndef _MAP_CTL_MSG_TYPES_H_
 #define _MAP_CTL_MSG_TYPES_H_
 

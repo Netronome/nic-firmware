@@ -3,7 +3,9 @@
  *
  * @file  vnic_setup.c
  * @brief This file contains functions to setup parts of a vNIC's BAR for
- *        for unot testing.
+ *        for unit testing.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #include <assert.h>

@@ -1,3 +1,12 @@
+/*
+ * Copyright (c) 2017-2019 Netronome Systems, Inc. All rights reserved.
+ *
+ * @file   protocols.h
+ * @brief  Bitfield definitions for various protocol headers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #ifndef _PROTOCOLS_H
 #define _PROTOCOLS_H
 

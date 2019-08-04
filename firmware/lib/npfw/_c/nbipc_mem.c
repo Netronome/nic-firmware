@@ -3,6 +3,8 @@
  *
  * @file  lib/npfw/_c/nbipc_mem.c
  * @brief Read and write NBI Preclassifier memories.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 

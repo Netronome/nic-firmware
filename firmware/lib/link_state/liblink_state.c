@@ -1,8 +1,10 @@
 /*
- * Copyright 2016 Netronome, Inc.
+ * Copyright 2016 Netronome Systems, Inc. All rights reserved.
  *
  * @file          lib/link_state/liblink_state.c
  * @brief         Implementation of the link state functions
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _LIBLINK_STATE_C_

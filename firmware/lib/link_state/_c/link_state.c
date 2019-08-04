@@ -3,6 +3,8 @@
  *
  * @file          link_state.c
  * @brief         Code for checking the Ethernet link status
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 

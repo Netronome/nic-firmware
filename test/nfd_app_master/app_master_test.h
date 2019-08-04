@@ -1,5 +1,9 @@
 /*
+ * Copyright (c) 2019 Netronome Systems, Inc. All rights reserved.
+ *
  * Include header and source files for app_master testing
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef APP_MASTER_TEST_H

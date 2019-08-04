@@ -1,6 +1,10 @@
-/*
-    test support functions
-*/
+/* Copyright (c) 2017-2019  Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   test.c
+ * @breif  MicroC test support functions
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
 
 #include <nfp.h>
 #include <rtl.h>

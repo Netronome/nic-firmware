@@ -1,8 +1,10 @@
-#a Copyright (C) 2015,  Gavin J Stark.  All rights reserved.
+# Copyright (C) 2015,  Gavin J Stark.  All rights reserved.
 #
 # @file        Makefile
 # @brief       Top level makefile to set paths and include submakes
 #
+# SPDX-License-Identifier: BSD-2-Clause
+
 SHELL = /bin/bash
 NFP_COMMON    := $(abspath $(CURDIR))
 NETRONOME ?= /opt/netronome

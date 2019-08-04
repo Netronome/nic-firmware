@@ -1,8 +1,10 @@
 /*
- * Copyright 2014-2015 Netronome, Inc.
+ * Copyright 2014-2015 Netronome Systems, Inc. All rights reserved.
  *
  * @file          lib/nic/nic_ctrl.h
  * @brief         Control interface for NIC data structures from the host
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 

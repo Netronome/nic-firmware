@@ -1,5 +1,10 @@
 /*
- * CMSG receive handler main function
+ * Copyright (c) 2017-2019 Netronome Systems, Inc. All rights reserved.
+ *
+ * @file   cmsg_app.uc
+ * @brief  CMSG receive handler main function
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 

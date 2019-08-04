@@ -3,6 +3,7 @@
  *
  * File:        pkt_counter.uc
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _PKT_COUNTER_UC_

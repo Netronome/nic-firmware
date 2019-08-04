@@ -1,8 +1,10 @@
 /*
- * Copyright 2014-2015 Netronome, Inc.
+ * Copyright 2014-2015 Netronome Systems, Inc. All rights reserved.
  *
  * @file          lib/nic/pcie_desc.h
  * @brief         Definition of the various descriptors used with PCIe/NIC
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef __PCIE_DESC_H

@@ -1,9 +1,13 @@
 /*
- * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2017-2019 Netronome Systems, Inc.  All rights reserved.
  *
  * @file   datapath.uc
  * @brief  Main processing loop for general purpose datapath workers.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
+#include "license.h"
 
 #include "global.uc"
 

@@ -1,3 +1,8 @@
+/* Copyright (c) 2017-2019  Netronome Systems, Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include "pkt_ipv4_tcp_x88.uc"
 
 #include "actions_harness.uc"

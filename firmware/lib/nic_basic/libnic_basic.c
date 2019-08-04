@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Netronome, Inc.
+ * Copyright 2014-2015 Netronome Systems, Inc. All rights reserved.
  *
  * @file          lib/nic_basic/libnic_basic.c
  * @brief         Implementation of the NIC functions
@@ -7,6 +7,8 @@
  * XXX The implementation currently only supports a single NIC
  *     instance and several internal data structures need duplicating
  *     to support additional instances.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _NIC_LIBNIC_BASIC_C_

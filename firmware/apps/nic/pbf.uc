@@ -2,6 +2,8 @@
  * Copyright (C) 2009-2013 Netronome Systems, Inc.  All rights reserved.
  *
  * File:        pbf.uc
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _PBF_UC_

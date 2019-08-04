@@ -1,3 +1,6 @@
+# Copyright (c) 2019 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+#
 # This file defines the CSR's and RT SYM to be dumped for troubleshooting.
 # The basic format is:
 #  @level:<level 0 to 4294967295 (32 bit)

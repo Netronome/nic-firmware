@@ -1,11 +1,13 @@
 /*
- * Copyright 2017 Netronome Systems, Inc. All rights reserved.
+ * Copyright 2017-2019 Netronome Systems, Inc. All rights reserved.
  *
  * @file  app_config_tables.c
  * @brief Control plane management component for datapath action interpreter.
  *
- * This implementation only handles one PCIe isl.
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
+/* NOTE: This implementation only handles one PCIe island. */
 
 #include <assert.h>
 #include <nfp.h>

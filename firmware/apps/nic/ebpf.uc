@@ -1,8 +1,10 @@
 /*
- * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2017-2019 Netronome Systems, Inc.  All rights reserved.
  *
  * @file   ebpf.uc
  * @brief  Action handler for eBPF execution.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _EBPF_UC

@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2009-2015 Netronome Systems, Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef __RING_UTILS_EXT_UC__

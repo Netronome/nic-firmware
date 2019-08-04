@@ -1,8 +1,10 @@
 /*
- * Copyright 2015 Netronome, Inc.
+ * Copyright 2015-2019 Netronome Systems, Inc. All rights reserved.
  *
  * @file          lib/nic/_c/nic_stats.c
  * @brief         Implementation for additional stats
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _LIBNIC_NIC_STATS_C_

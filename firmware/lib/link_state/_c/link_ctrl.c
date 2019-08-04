@@ -3,6 +3,8 @@
  *
  * @file          link_ctrl.c
  * @brief         Code for configuring the Ethernet link.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 

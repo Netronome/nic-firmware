@@ -3,6 +3,8 @@
  *
  * @file   lib/npfw/nbipc_mem.h
  * @brief  NFP NBI Preclassifier memory interface.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 

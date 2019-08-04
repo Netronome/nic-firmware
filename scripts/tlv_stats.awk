@@ -1,3 +1,6 @@
+# Copyright (c) 2018 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+
 BEGIN{ COUNT = 0 }
 !/^[ \t]*$/{
     if (length($0) >= 25) {

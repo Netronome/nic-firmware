@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Copyright (c) 2016 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+
 shorten_path() {
     basepath=$(pwd)
     fullpath=$(cd $1; pwd)

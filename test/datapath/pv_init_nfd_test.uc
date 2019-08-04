@@ -1,3 +1,8 @@
+/* Copyright (c) 2017-2019  Netronome Systems, Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 /* Test for macro pv_init_nfd. Not testing lso_fixup */
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0x000  0x43020344 0x05060708 0x01320b0c 0x02030401
 ;TEST_INIT_EXEC nfp-mem i32.ctm:0x010  0x43020344 0x05060708 0x01320b0c 0x02030401

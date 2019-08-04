@@ -1,8 +1,10 @@
 /*
- * Copyright 2016 Netronome, Inc.
+ * Copyright (c) 2016-2019 Netronome Systems, Inc. All rights reserved.
  *
  * @file          include/platform.h
  * @brief         Platform-specific configuration information.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef __PLATFORM_H__

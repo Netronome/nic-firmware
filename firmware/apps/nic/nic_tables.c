@@ -1,10 +1,12 @@
 /*
- * Copyright 2016 Netronome, Inc.
+ * Copyright (c) 2016-2019 Netronome Systems, Inc. All rights reserved.
  *
  * @file          apps/nic/nic_tables.c
  * @brief         allocate tables for Core NIC
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
 #include <nfp.h>
 #include <stdint.h>
 #include <nfp/mem_bulk.h>

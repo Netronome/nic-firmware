@@ -1,3 +1,7 @@
+/* Copyright (c) 2019 Netronome Systems, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #ifndef TEST_DEFINES_H
 #define TEST_DEFINES_H
 

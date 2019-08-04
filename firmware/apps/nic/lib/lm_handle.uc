@@ -2,6 +2,8 @@
  * Copyright (C) 2005-2014 Netronome Systems, Inc.  All rights reserved.
  *
  * File:        lm_handle.uc
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _LM_HANDLE_UC_

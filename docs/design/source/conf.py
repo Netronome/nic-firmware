@@ -20,7 +20,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'CoreNIC Design'
-copyright = '2018, Netronome Systems'
+copyright = '2018-2019, Netronome Systems, Inc. All rights reserved. SPDX-License-Identifier: BSD-2-Clause'
 author = 'Edwin Peer'
 
 # The short X.Y version

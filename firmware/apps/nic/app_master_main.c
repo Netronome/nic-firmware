@@ -1,12 +1,13 @@
 /*
- * Copyright 2014-2017 Netronome, Inc.
+ * Copyright 2014-2019 Netronome Systems, Inc. All rights reserved.
  *
  * @file          app_master_main.c
  * @brief         ME serving as the NFD NIC application master.
  *
- * This implementation only handles one PCIe island.
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
+/* NOTE: This implementation only handles one PCIe island. */
 
 #include <assert.h>
 #include <nfp.h>
@@ -42,6 +43,8 @@
 #include <npfw/catamaran_app_utils.h>
 
 #include <vnic/nfd_common.h>
+
+#include "license.h"
 
 #include "app_config_tables.h"
 #include "ebpf.h"

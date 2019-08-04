@@ -1,3 +1,8 @@
+/* Copyright (c) 2017-2019  Netronome Systems, Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 ;TEST_INIT_EXEC nfp-mem emem0:0x80     0x00154d0a 0x0d1a6805 0xca306ab8 0x080045aa
 ;TEST_INIT_EXEC nfp-mem emem0:0x90     0xff00de06 0x40004011 0xffff0501 0x01020501
 ;TEST_INIT_EXEC nfp-mem emem0:0xa0     0x0101d87e 0x12b5ff00 0x00000800 0x0000ffff

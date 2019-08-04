@@ -3,6 +3,8 @@
  *
  * @file          link_state.h
  * @brief         Code for checking the Ethernet link state.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 

@@ -1,8 +1,10 @@
 /*
- * Copyright (C) 2015 Netronome, Inc. All rights reserved.
+ * Copyright (C) 2015-2019 Netronome Systems, Inc. All rights reserved.
  *
- * @file          apps/nic/app_config_instr.h
+ * @file          app_config_instr.h
  * @brief         Header file for App Config ME instruction table
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _APP_CONFIG_INSTR_H_

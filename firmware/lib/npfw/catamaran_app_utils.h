@@ -1,8 +1,10 @@
 /*
- * Copyright 2016 Netronome, Inc.
+ * Copyright 2016 Netronome Systems, Inc. All rights reserved.
  *
  * @file   lib/npfw/catamaran_app_utils.h
  * @brief  Application-specific ME-based tool for configuring Catamaran NPFW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _CATAMARAN_APP_UTILS_H_

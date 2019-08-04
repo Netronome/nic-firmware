@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Copyright (c) 2017 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+
 BRANCH="`git rev-parse --abbrev-ref HEAD`"
 HASH="`git rev-parse --short HEAD`"
 TAG="`git describe --tags --exact-match 2> /dev/null`"

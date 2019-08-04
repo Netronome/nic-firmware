@@ -1,8 +1,10 @@
 /*
- * Copyright (C) 2014-2015,  Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2014-2019,  Netronome Systems, Inc.  All rights reserved.
  *
  * @file          lib/nic/_c/nic_internal.c
  * @brief         Internal data structures
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _LIBNIC_NIC_INTERNAL_C_

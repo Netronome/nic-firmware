@@ -1,8 +1,10 @@
 /*
- * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2017-2019 Netronome Systems, Inc.  All rights reserved.
  *
  * @file   pkt_io.uc
  * @brief  Libraries for packet reception and transmission.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _PKT_IO_UC

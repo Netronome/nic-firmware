@@ -1,9 +1,13 @@
 /*
- * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2017-2019 Netronome Systems, Inc.  All rights reserved.
  *
  * @file   global.uc
  * @brief  Global data plane initialization.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
+#include "license.h"
 
 /* Optimization and simplifying assumptions */
 // - 4 CTX mode

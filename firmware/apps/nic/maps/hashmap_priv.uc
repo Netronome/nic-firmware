@@ -3,6 +3,7 @@
  *
  * File:        hashmap_priv.uc
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef __HASHMAP_PRIV_UC__

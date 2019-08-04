@@ -3,6 +3,7 @@
  *
  * File:        journal.uc
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _JOURNAL_UC_

@@ -1,3 +1,6 @@
+.. Copyright (c) 2018 Netronome Systems, Inc. All rights reserved.
+   SPDX-License-Identifier: BSD-2-Clause.
+
 .. highlight:: console
 
 Appendix B: Installing the Out-of-Tree NFP Driver

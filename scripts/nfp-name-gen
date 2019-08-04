@@ -1,6 +1,7 @@
 #!/bin/sh -e
 
-# Copyright (C) 2017 Netronome Systems, Inc. All rights reserved.
+# Copyright (c) 2017-2018 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
 
 # This script is expected to be used with a udev rule such as the following:
 # ACTION=="add", SUBSYSTEM=="net", DRIVERS=="nfp*", IMPORT{program}="/lib/udev/nfp-port-name-gen %k"

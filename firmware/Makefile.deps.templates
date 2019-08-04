@@ -1,8 +1,9 @@
-#a Copyright (C) 2015,  Netronome Systems.  All rights reserved.
+# Copyright (C) 2015,  Netronome Systems, Inc.  All rights reserved.
 #
 # @file    firmware/deps/Makefile.templates
 # @brief   Templates for adding flowenv libraries, GRO, BLM or NFD
 #
+# SPDX-License-Identifier: BSD-2-Clause
 
 
 #f fwdep.plus

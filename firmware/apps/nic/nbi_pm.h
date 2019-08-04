@@ -4,6 +4,7 @@
  * File:        nbi_pm.h
  * Description: NBI packet modifier constants and utilities.
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef __NBI_PM_H

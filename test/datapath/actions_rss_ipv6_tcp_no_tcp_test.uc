@@ -1,3 +1,8 @@
+/* Copyright (c) 2017-2019  Netronome Systems, Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_32=0x80
 
 #include "pkt_ipv6_tcp_x88.uc"

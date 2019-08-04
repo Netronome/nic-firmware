@@ -1,6 +1,8 @@
 
 /*
  * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef __NFP_MAC_CSR_SYNC_H__

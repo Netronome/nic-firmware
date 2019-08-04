@@ -1,6 +1,8 @@
 #!/usr/bin/env python2
 ##
-## Copyright (C) 2017,  Netronome Systems, Inc.  All rights reserved.
+## Copyright (c) 2017-2018,  Netronome Systems, Inc.  All rights reserved.
+## SPDX-License-Identifier: BSD-2-Clause
+
 """
 This scripts generates troubleshoot init directives in an uc file
 """

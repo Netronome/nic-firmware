@@ -1,5 +1,8 @@
 #! /usr/bin/env python
 
+# Copyright (c) 2016 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+
 ## 1) Counting the code store per function in the list file
 ## 2) Massage the output of the nfcc live range analysis to something
 ## more sensible, reporting register usage per function

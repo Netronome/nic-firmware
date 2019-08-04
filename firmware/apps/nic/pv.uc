@@ -1,8 +1,10 @@
 /*
- * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2017-2019 Netronome Systems, Inc.  All rights reserved.
  *
  * @file   pv.uc
  * @brief  Packet state and metadata management. Also provides packet read access abstraction.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _PACKET_VECTOR_UC

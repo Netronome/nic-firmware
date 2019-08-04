@@ -52,7 +52,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Agilio Basic Firmware'
-copyright = u'2018, Netronome'
+copyright = u'2018-2019, Netronome Systems, Inc. SPDX-License-Identifier: BSD-2-Clause.'
 author = u'Netronome'
 
 # The version info for the project you're documenting, acts as replacement for

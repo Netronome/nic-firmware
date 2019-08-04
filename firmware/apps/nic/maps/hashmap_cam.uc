@@ -2,9 +2,11 @@
  * Copyright (C) 2014-2017,  Netronome Systems, Inc.  All rights reserved.
  *
  * @file       hashmap_cam.uc
-* @brief       basic lookup table implementation.
+ * @brief      basic lookup table implementation.
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
 #ifndef __HASHMAP_CAM_UC__
 #define __HASHMAP_CAM_UC__
 

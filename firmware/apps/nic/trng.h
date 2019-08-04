@@ -1,9 +1,12 @@
 /*
- * Copyright (C) 2015 Netronome, Inc. All rights reserved.
+ * Copyright (C) 2015-2017 Netronome Systems, Inc. All rights reserved.
  *
  * @file          apps/nic/trng.h
  * @brief         Header file for trng.c
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
  #ifndef __TRNG_H__
  #define __TRNG_H__
 

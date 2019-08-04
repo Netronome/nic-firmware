@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2018-2019 Netronome Systems, Inc. All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #ifndef _CMSG_PRINT_UC
 #define _CMSG_PRINT_UC
 

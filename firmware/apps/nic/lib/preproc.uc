@@ -2,6 +2,8 @@
  * Copyright (C) 2009-2014 Netronome Systems, Inc.  All rights reserved.
  *
  * File:        preproc.uc
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _PREPROC_UC_

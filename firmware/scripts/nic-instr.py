@@ -1,4 +1,8 @@
 #! /usr/bin/env python
+
+# Copyright (c) 2016 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+
 import fileinput
 
 NIC_SRCS = ['apps/nic', 'lib/nic']

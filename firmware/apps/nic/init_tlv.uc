@@ -1,3 +1,11 @@
+/* Copyright (c) 2019 Netronome Systems, Inc. All rights reserved.
+ *
+ * @file   init_tlv.uc
+ * @brief  Initialize NFD config TLVs in VNIC BARs
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <nfd_tlv.uc>
 #include <nfd_user_cfg.h>
 #include <nfd_common.h>

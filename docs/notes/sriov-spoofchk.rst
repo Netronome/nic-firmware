@@ -1,3 +1,6 @@
+.. Copyright (c) 2019 Netronome Systems, Inc. All rights reserved.
+   SPDX-License-Identifier: BSD-2-Clause
+
 =================
 SRIOV VF SPOOFCHK
 =================

@@ -1,3 +1,6 @@
+# Copyright (c) 2017-2018 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+
 mkdir -p /lib/firmware/netronome
 cd /lib/firmware/netronome
 if ls *.nffw >/dev/null 2>&1; then

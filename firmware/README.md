@@ -1,6 +1,6 @@
 # nfp-common/firmware
 
- Copyright (c) 2016 Netronome Systems
+ Copyright (c) 2016 Netronome Systems, Inc.
  All rights reserved.
 
 ## Description

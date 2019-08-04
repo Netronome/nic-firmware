@@ -1,14 +1,10 @@
 /**
- * Copyright (C) 2015,  Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2015-2019,  Netronome Systems, Inc.  All rights reserved.
  *
  * @file        nfp_blm_custom.h
  * @brief       A reasonable default buffer configuration file.
  *
- * This is a default header file to allow BLM for some sane default buffer
- * configurations (hopefully) for applications that do not wish to set their
- * own buffer configuration. Applications intending to customise BLM options
- * should define their own blm_custom.h and place it in a higher priority
- * include path than the libinfra provided one.
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef __NFP_BLM_CUSTOM_H__

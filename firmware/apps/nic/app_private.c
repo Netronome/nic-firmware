@@ -1,10 +1,11 @@
 /*
- * Copyright 2014-2019 Netronome, Inc.
+ * Copyright 2014-2019 Netronome Systems, Inc. All rights reserved.
  *
  * @file          app_private.c
  * @brief         Declarations of private app master primitives and
  *                interfaces to said primitives
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef APP_PRIVATE_C

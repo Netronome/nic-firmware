@@ -1,8 +1,10 @@
 /*
- * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2017-2019 Netronome Systems, Inc.  All rights reserved.
  *
  * @file   gro_cfg.uc
  * @brief  Configuration for global reorder blocks.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef __GRO_CFG_UC

@@ -3,6 +3,8 @@
  *
  * @file   lib/npfw/nbi_cpp.h
  * @brief  NFP NBI CPP interface.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 

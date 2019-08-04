@@ -1,8 +1,10 @@
 /*
- * Copyright (C) 2015 Netronome, Inc. All rights reserved.
+ * Copyright (C) 2015 Netronome Systems, Inc. All rights reserved.
  *
  * @file          apps/nic/nic.h
  * @brief         Header file for NIC local functions/declarations
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _APP_NIC_H_

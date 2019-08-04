@@ -1,9 +1,10 @@
 /*
- * Copyright 2015-2016 Netronome, Inc.
+ * Copyright 2015-2016 Netronome Systems, Inc. All rights reserved.
  *
  * @file          lib/infra_basic/infra_basic.h
  * @brief         Interface to the infrastructure blocks
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 #ifndef _INFRA_BASIC_H_
 #define _INFRA_BASIC_H_

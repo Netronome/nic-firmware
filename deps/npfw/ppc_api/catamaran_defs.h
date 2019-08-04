@@ -6,6 +6,8 @@
  * @brief Header file defining Catamaran data structures
  *
  * @note This file is auto-generated; do not modify.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 

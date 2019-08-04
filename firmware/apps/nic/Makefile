@@ -1,3 +1,6 @@
+# Copyright (c) 2019 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+#
 # Declare the project name as 'basic_nic_<platform>', give its source directory
 # and a default config file that will establish definitions for the project
 

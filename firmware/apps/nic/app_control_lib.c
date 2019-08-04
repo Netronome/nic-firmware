@@ -1,9 +1,10 @@
 /*
- * Copyright 2014-2019 Netronome, Inc.
+ * Copyright 2014-2019 Netronome Systems, Inc. All rights reserved.
  *
- * @file          app_reconfig_lib.c
+ * @file          app_control_lib.c
  * @brief         Functions used during vNIC reconfig.
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef APP_CONTROL_LIB_C

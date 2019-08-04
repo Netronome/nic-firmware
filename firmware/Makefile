@@ -3,6 +3,7 @@
 # @file        firmware/Makefile
 # @brief       Makefile for the firmware
 #
+# SPDX-License-Identifier: BSD-2-Clause
 
 FW_BUILD = $(FIRMWARE_DIR)/build
 FW_NFFW  = $(FIRMWARE_DIR)/nffw

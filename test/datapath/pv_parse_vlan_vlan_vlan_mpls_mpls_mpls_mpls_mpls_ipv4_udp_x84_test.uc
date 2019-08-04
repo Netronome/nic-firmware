@@ -1,3 +1,8 @@
+/* Copyright (c) 2017-2019  Netronome Systems, Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include "pkt_vlan_vlan_vlan_mpls_mpls_mpls_mpls_mpls_ipv4_udp_x84.uc"
 
 #include "actions_harness.uc"

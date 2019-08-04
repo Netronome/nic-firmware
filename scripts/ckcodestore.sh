@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Copyright (c) 2017 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+
 report() {
     # $1 = firmware name
     # $2 = # of instructions

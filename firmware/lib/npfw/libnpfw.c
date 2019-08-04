@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Netronome, Inc.
+ * Copyright 2016 Netronome Systems, Inc. All rights reserved.
  *
  * @file   lib/npfw/libnpfw.c
  * @brief  Functions to interface with the Catamaran NPFW
@@ -7,6 +7,8 @@
  * This file contains the micro-C API for configuring the Catamaran NPFW via
  * the ME.  The purpose of this library is to provide a simple interface for
  * configuring the Catamaran NPFW.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _LIBNPFW_C_

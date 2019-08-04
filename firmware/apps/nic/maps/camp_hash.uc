@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2015-2016 Netronome Systems, Inc. All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #ifndef _CAMP_HASH
 #define _CAMP_HASH
 

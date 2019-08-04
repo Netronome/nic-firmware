@@ -1,8 +1,9 @@
-#a Copyright (C) 2015,  Gavin J Stark.  All rights reserved.
+# Copyright (C) 2015,  Gavin J Stark.  All rights reserved.
 #
 # @file    firmware/Makefile.templates
 # @brief   Templates for assembling, compiling, linking firmware
 #
+# SPDX-License-Identifier: BSD-2-Clause
 
 #a nffw templates
 #f nffw.setup

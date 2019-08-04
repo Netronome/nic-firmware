@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Copyright (c) 2017 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+
 depends() {
     return 0
 }

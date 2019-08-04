@@ -3,6 +3,8 @@
  *
  * @file   unroll.uc
  * @brief  Microcode library for explicit loop unrolling.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _UNROLL_

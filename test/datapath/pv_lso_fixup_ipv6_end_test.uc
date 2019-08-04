@@ -1,3 +1,8 @@
+/* Copyright (c) 2017-2019  Netronome Systems, Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <single_ctx_test.uc>
 
 #include "pkt_ipv6_tcp_lso_fixup.uc"

@@ -1,8 +1,10 @@
 /*
- * Copyright 2014-2015 Netronome, Inc.
+ * Copyright 2014-2015 Netronome Systems, Inc. All rights reserved.
  *
  * @file          lib/nic_basic/nic_basic.h
  * @brief         ME level interface to the NIC library code
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _NIC_BASIC_H_

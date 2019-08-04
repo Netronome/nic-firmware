@@ -1,8 +1,10 @@
 /*
- * Copyright 2015 Netronome, Inc.
+ * Copyright 2015-2019 Netronome Systems, Inc. All rights reserved.
  *
- * @file          apps/nic/config.h
+ * @file          config.h
  * @brief         Infrastructure configuration for the NIC application.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef __APP_CONFIG_H__

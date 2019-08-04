@@ -3,6 +3,8 @@
  *
  * @file   lib/npfw/_c/catamaran_app_utils.c
  * @brief  Application-specific ME-based tool for configuring Catamaran NPFW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 

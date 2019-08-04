@@ -23,7 +23,10 @@
  *		cmsg_init()
  *
  *		cmsg_rx()
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
 #ifndef _CMSG_MAP_
 #define _CMSG_MAP_
 

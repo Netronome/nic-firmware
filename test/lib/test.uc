@@ -1,3 +1,12 @@
+/* Copyright (c) 2017-2019  Netronome Systems, Inc.  All rights reserved.
+ *
+ * @file   test.uc
+ * @brief  Microcode unit test library functions
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+
 #ifndef __TEST_UC
 #define __TEST_UC
 

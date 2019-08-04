@@ -1,9 +1,12 @@
 /**
- * Copyright (C) 2015-2016,  Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2015-2019, Netronome Systems, Inc.  All rights reserved.
  *
  * @file          nfd_user_cfg.h
- * @brief         File for specifying user configuration parameters
+ * @brief         File for specifying NFD user configuration parameters
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
 #ifndef _NFD_USER_CFG_H_
 #define _NFD_USER_CFG_H_
 

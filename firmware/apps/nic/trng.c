@@ -1,8 +1,10 @@
 /*
- * Copyright (C) 2017 Netronome Systems, Inc.  All rights reserved.
+ * Copyright (C) 2015-2017 Netronome Systems, Inc.  All rights reserved.
  *
  * @file   trng.uc
  * @brief  True Random Number Generator Macros
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
  #include <assert.h>

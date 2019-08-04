@@ -1,10 +1,12 @@
 /*
- * Copyright 2016 Netronome, Inc.
+ * Copyright (c) 2016-2019 Netronome Systems, Inc. All rights reserved.
  *
  * @file          apps/nic/nic_tables.h
  * @brief         data structures for Core NIC tables
  *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
+
 #ifndef _NIC_TABLES_H_
 #define _NIC_TABLES_H_
 

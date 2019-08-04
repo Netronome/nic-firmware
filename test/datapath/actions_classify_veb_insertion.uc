@@ -1,3 +1,8 @@
+/* Copyright (c) 2017-2019  Netronome Systems, Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 hashmap_alloc_fd(SRIOV_TID, 8, 32, 2000, --, swap, BPF_MAP_TYPE_HASH)
 
 .alloc_mem LM_KEY_BASE_ADDR lmem me (16 * (1 << log2((4 * 4), 1))) 128

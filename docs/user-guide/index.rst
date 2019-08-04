@@ -1,3 +1,6 @@
+.. Copyright (c) 2018 Netronome Systems, Inc. All rights reserved.
+   SPDX-License-Identifier: BSD-2-Clause.
+
 Agilio SmartNIC Basic Firmware User Guide
 =========================================
 

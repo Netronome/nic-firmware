@@ -1,8 +1,10 @@
 /*
- * Copyright 2016-2017 Netronome, Inc.
+ * Copyright 2016-2019 Netronome Systems, Inc. All rights reserved.
  *
- * @file          apps/nic/app_mac_vlan_config_cmsg.h
+ * @file          app_mac_vlan_config_cmsg.h
  * @brief         NIC application MAC+VLAN lookup cmsg table config
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #ifndef _APP_MAC_VLAN_CONFIG_CMSG_H_

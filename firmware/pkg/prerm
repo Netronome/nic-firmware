@@ -1,3 +1,6 @@
+# Copyright (c) 2017 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+
 if [ -d /lib/firmware/netronome ] ; then
     cd /lib/firmware/netronome
     if [ -d .__pre_installed ] ; then
