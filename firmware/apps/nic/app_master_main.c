@@ -12,7 +12,6 @@
 #include <nfp.h>
 #include <nfp_chipres.h>
 
-#include <nic.h>
 #include <platform.h>
 
 #include <nfp/me.h>
