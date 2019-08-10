@@ -6,6 +6,8 @@
 CoreNIC Design 
 ==============
 
+.. figure:: ./components.png
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
