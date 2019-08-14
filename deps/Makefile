@@ -1,10 +1,10 @@
-#
+# Copyright (c) 2016-2019 Netronome Systems, Inc. All rights reserved.
+# SPDX-License-Identifier: BSD-2-Clause
+
 # Change these revisions to suit the project
 #
-# FLOWENV_REV - Tip as of Nov 19 2018
-FLOWENV_REV=b4cc7f0
-# NFD_REV - Tip as of Dec 7 2018
-NFD_REV=2035b0d
+FLOWENV_REV=5be5d1d
+NFD_REV=93e9535
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
@@ -31,7 +31,7 @@ GRO_INC = -I$(GRO_DIR)
 
 $(DEPS_DIR)/flowenv.git:
 	git clone -q --no-checkout \
-		git://source.netronome.com/flowenv.git $(FLOWENV_DIR)
+		https://github.com/Netronome/flowenv.git $(FLOWENV_DIR)
 	cd $(FLOWENV_DIR) && git checkout $(FLOWENV_REV)
 	cd $(DEPS_DIR)/flowenv.git && patch -p1 < ../gro_multicast.patch && cd -
 	cd $(DEPS_DIR)/flowenv.git && patch -p1 < ../big_sleep.patch && cd -
@@ -54,7 +54,7 @@ NFD_INC = -I$(NFD_DIR)/shared \
 
 $(DEPS_DIR)/ng-nfd.git:
 	git clone -q --no-checkout \
-		git://source.netronome.com/ng-nfd.git $(NFD_DIR)
+		https://github.com/Netronome/nfd.git $(NFD_DIR)
 	cd $(NFD_DIR) && git checkout $(NFD_REV)
 	cd $(DEPS_DIR)/ng-nfd.git && patch -p1 < ../nfd_abi3.patch && cd -
 
