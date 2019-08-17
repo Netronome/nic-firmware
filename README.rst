@@ -40,7 +40,7 @@ the open will ultimately lead to better quality code by motivating
 engineers to deliver their best, because working under public scrutiny
 is a strong incentive to take personal pride in the work.
 
-We are also interested in building a community around supporting niche
+We are also interested in building a community around supporting new
 applications for the underlying network processor technology. Building
 on the existing code base may enable creative solutions to interesting
 and novel networking problems. Software Defined Networking (SDN) is
@@ -52,11 +52,11 @@ Getting Started
 ---------------
 
 Netronome SmartNICs are available for purchase via `Colfax Direct
-<http://www.colfaxdirect.com/store/pc/showsearchresults.asp?IDBrand=38>`_. Using
-one of these fully programmable devices as a standard NIC is
-straightforward when combined with a modern Linux distribution. Plug
-in the PCIe card and simply configure it using familiar Linux
-networking tools. The `firmware
+<http://www.colfaxdirect.com/store/pc/showsearchresults.asp?IDBrand=38>`_
+and other channels. Using one of these fully programmable devices as a
+standard NIC is straightforward when combined with a modern Linux
+distribution. Plug in the PCIe card and simply configure it using
+familiar Linux networking tools. The `firmware
 <https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/tree/netronome>`_
 and `driver <https://github.com/Netronome/nfp-drv-kmods>`_ have been
 upstream since Linux 4.11 and thus the card should be automatically
@@ -89,7 +89,7 @@ tracker <https://github.com/Netronome/nic-firmware/issues>`_.
 Peeking Under the Hood
 ----------------------
 
-The `Netronome Flow Processor
+The Netronome `Network Flow Processor
 <https://www.netronome.com/m/documents/WP_Theory_of_Ops.pdf>`_ (NFP)
 at the heart of all Agilio SmartNICs comprises a large number of
 multi-threaded programmable cores connected to I/Os (PCIe, network
@@ -98,9 +98,8 @@ internal `Distributed Switch Fabric
 <https://www.netronome.com/m/documents/WP_Composable-Architecture.pdf>`_
 (DSF). As further background, there is a `presentation
 <https://open-nfp.org/m/documents/P4DevCon_NFPArchIntro_ukskQIA.pdf>`_
-by Gavin Stark, Netronome's CTO and chief scientist, which provides
-some good introductory material about the NFP by illustrating some of
-the architectural concepts in the context of `P4
+which provides some good introductory material about the NFP by
+illustrating some of the architectural concepts in the context of `P4
 <https://www.netronome.com/technology/p4/>`_ and `MicroC
 <https://open-nfp.org/media/documents/the-joy-of-micro-c_fcjSfra.pdf>`_
 software loads.
@@ -146,8 +145,8 @@ prior to packet egress. The Crypto (`KTLS
 and `IPsec <https://en.wikipedia.org/wiki/IPsec>`_ offloads) and
 Flower (`OVS TC
 <https://www.netdevconf.org/2.2/papers/horman-tcflower-talk.pdf>`_
-offload) plugins are rendered as planned within the existing
-architecture, but not yet implemented.
+offload) plugins are rendered as planned within the CoreNIC
+architecture, but not yet available.
 
 Detailed design documentation is a `work in progress
 <https://github.com/Netronome/nic-firmware/tree/master/docs/design>`_. The
