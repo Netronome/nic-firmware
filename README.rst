@@ -166,21 +166,26 @@ Toolchain and Reference Manuals
 -------------------------------
 
 Third party constraints preclude Netronome from releasing the NFP
-toolchain and reference materials under a nonproprietary license,
+toolchain and reference materials under a nonproprietary license. One
+such constraint also prohibits us from providing the tooling
+independently of our hardware. With a verified hardware purchase,
 however, these tools and materials are legally accessible in binary
 form via the `Open-NFP.org <https://open-nfp.org/>`_ initiative free
-of charge. In order to obtain the toolchain required to build the
-firmware, you will need to "Request" the SDK via the "Tools" tab under
-`Resources <https://open-nfp.org/resources/>`_ and agree to the
-Netronome proprietary license agreement.
+of any additional charge. Given that a nic-firmware build isn't
+particularly useful without the hardware to execute it on, we hope
+this constraint is of little practical significance to parties
+with a genuine interest in building the code.
 
-The existing process for acquiring the toolchain, which this project
-is piggybacking on, involves sending an email request to
-help@netronome.com, after which, somebody will respond with a request
-for additional details about yourself and furnish you with the license
-agreement. You will then be provided with access to a private download
-area containing the toolchain and programmer reference documentation
-once all the legal formalities have been dealt with.
+In order to obtain the toolchain required to build the firmware, you
+will need to "Request" the SDK via the "Tools" tab under `Resources
+<https://open-nfp.org/resources/>`_ and agree to the Netronome
+proprietary license agreement. This process involves sending an email
+request to help@netronome.com, after which, somebody will respond with
+a request for additional details about yourself and furnish you with
+the license agreement. You will then be provided with access to a
+private download area containing the toolchain and programmer
+reference documentation once all the legal formalities have been dealt
+with.
 
 Please bear with this clunky manual process. It is going to take a
 little time to streamline access, but we believe it will be possible
