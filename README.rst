@@ -1,3 +1,6 @@
+.. role:: raw-html(raw)
+   :format: html
+
 CoreNIC Background
 ------------------
 
@@ -169,39 +172,31 @@ toolchain and reference materials under a nonproprietary license. One
 such constraint also prohibits us from providing the tooling
 independently of our hardware. With a verified hardware purchase,
 however, these tools and materials are legally accessible in binary
-form via the `Open-NFP.org <https://open-nfp.org/>`_ initiative free
-of any additional charge. Given that a nic-firmware build isn't
-particularly useful without the hardware to execute it on, we hope
-this constraint is of little practical significance to parties
-with a genuine interest in building the code.
+form via `Open-NFP.org <https://open-nfp.org/>`_ free of any
+additional charge. Given that a nic-firmware build isn't particularly
+useful without the hardware to execute it on, we hope this constraint
+is of little practical significance to parties with a genuine interest
+in building the code.
 
-In order to obtain the toolchain required to build the firmware, you
-will need to "Request" the SDK via the "Tools" tab under `Resources
-<https://open-nfp.org/resources/>`_ and agree to the Netronome
-proprietary license agreement. This process involves sending an email
-request to help@netronome.com, after which, somebody will respond with
-a request for additional details about yourself and furnish you with
-the license agreement. You will then be provided with access to a
-private download area containing the toolchain and programmer
-reference documentation once all the legal formalities have been dealt
-with.
+In order to obtain the toolchain, you will need to request it by
+emailing :raw-html:`<a href="mailto:help@netronome.com?subject=Linux toolchain for CoreNIC - Request">help@netronome.com</a>`, after which,
+you will receive a response requesting additional details. Once your
+eligibility is determined, you will be provided access to a private
+download area. The license conditions are distributed within the
+toolchain package in the file "NFP_SDK_EULA.txt".
 
-Please bear with this clunky manual process. It is going to take a
-little time to streamline access, but we believe it will be possible
-to eventually provide the necessary tools via a simple automated
-click-through license agreement. Our hope and belief is that you will
-find that the license terms and conditions are not burdensome and that
-you will be willing to participate in this project. This is
-unfortunately the best that can be done at this stage absent a
-cleanroom re-implementation of the tools.
+BY LOADING OR USING THE SOFTWARE, YOU AS AN INDIVIDUAL AND ON BEHALF
+OF YOUR EMPLOYER ("YOU") AGREE TO THE TERMS OF THIS AGREEMENT. IF YOU
+DO NOT WISH TO SO AGREE, DO NOT INSTALL, OR IF INSTALLED, DELETE ALL
+COPIES OF THE SOFTWARE AND DO NOT USE THE SOFTWARE.
 
 The Linux toolchain is provided as an RPM or Debian package that can
 be installed and removed using your distribution's package management
 system. The package constrains itself under /opt/netronome so as not
 to pollute your local filesystem and a compressed tarball is also
-available for other distributions. Reference manuals are provided in
-PDF format.
-
+available for other distributions. Reference manuals are distributed
+as part of the toolchain in the *doc* subdirectory and are subject to
+the same license.
 
 Build Instructions
 ------------------
