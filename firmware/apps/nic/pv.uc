@@ -1295,6 +1295,7 @@ end#:
     .reg l4_type
     .reg l4_offset
     .reg mac_dst_type
+    .reg parse_args
     .reg seq_ctx
     .reg shift
     .reg tunnel
@@ -1375,7 +1376,8 @@ alloc_seq#:
         alu[BF_A(out_vec, PV_SEQ_NO_bf), 0xff, OR, $seq, <<16]
 
 hdr_parse#:
-    pv_hdr_parse(out_vec, in_rx_args, end#)
+    alu[parse_args, in_rx_args, AND~, 1, <<BF_L(INSTR_RX_HOST_ENCAP_bf)]
+    pv_hdr_parse(out_vec, parse_args, end#)
 
 ipv4_frag#:
     br[finalize_l3#], defer[1]
