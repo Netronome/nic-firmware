@@ -9,8 +9,8 @@ SHELL = /bin/bash
 NFP_COMMON    := $(abspath $(CURDIR))
 NETRONOME ?= /opt/netronome
 
-REQ_SDK_VER   = = 6.3.0.0
-REQ_SDK_BUILD = -eq 4910
+REQ_SDK_VER   = = 6.3.0.1
+REQ_SDK_BUILD = -eq 4917
 
 DEPS_DIR      = $(NFP_COMMON)/deps
 FIRMWARE_DIR  = $(NFP_COMMON)/firmware
