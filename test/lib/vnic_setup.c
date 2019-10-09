@@ -47,6 +47,14 @@ void setup_pf_mac(const int pcie, uint32_t vid, uint64_t mac)
                                         NFP_NET_CFG_MACADDR), sizeof(mac_xw));
 }
 
+void setup_vf_mac(const int pcie, uint32_t vid, uint64_t mac)
+{
+    __xwrite uint32_t mac_xw[2];
+    mac_xw[0] = (uint32_t)(mac >> 16);
+    mac_xw[1] = (uint32_t)(mac & 0xffff);
+    mem_write64(&mac_xw[0], (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
+                                        NFP_NET_CFG_MACADDR), sizeof(mac_xw));
+}
 void setup_sriov_mb(const int pcie, uint32_t vf, uint32_t flags)
 {
     __xwrite uint32_t sriov_mb_data[4];
@@ -81,7 +89,7 @@ void setup_sriov_cfg_data(const int pcie, uint32_t vf, uint64_t mac, uint16_t vl
      sriov_cfg_data.__raw[1] = 0;
      sriov_cfg_data.__raw[2] = 0;
      sriov_cfg_data.__raw[3] = 0;
-     
+
      sriov_cfg_data.mac_hi = (uint32_t)((mac >> 16));
      sriov_cfg_data.mac_lo = (uint16_t)((mac & 0xffff));
      sriov_cfg_data.vlan_tag = vlan;
