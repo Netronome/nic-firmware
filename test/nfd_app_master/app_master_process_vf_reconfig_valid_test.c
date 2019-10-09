@@ -36,7 +36,9 @@ void test(uint32_t pcie) {
         NFD_VID2VNIC(type, vnic, vid);
 
         reset_cfg_msg(&cfg_msg, vid, 0);
-        setup_sriov_cfg_data(NIC_PCI, vf, TEST_MAC, 0, NFD_VF_CFG_CTRL_LINK_STATE_ENABLE);
+        setup_vf_mac(NIC_PCI, vid, TEST_MAC);
+        setup_sriov_cfg_data(NIC_PCI, vf, 0, 0,
+                NFD_VF_CFG_CTRL_LINK_STATE_ENABLE | (0 << NFD_VF_CFG_CTRL_TRUSTED_shf));
 
         control = NFD_CFG_VF_CAP;
         update = NFD_CFG_VF_LEGAL_UPD;

@@ -38,7 +38,9 @@ void reconfig(uint32_t vf_enable, uint32_t vf_mode, uint32_t pf_link)
 
         reset_cfg_msg(&cfg_msg, vid, 0);
 
-        setup_sriov_cfg_data(NIC_PCI, vf, TEST_MAC, 0, vf_mode & 3);
+        setup_vf_mac(NIC_PCI, vid, TEST_MAC);
+        setup_sriov_cfg_data(NIC_PCI, vf, 0, 0,
+                (vf_mode & 3) | ( 0 << NFD_VF_CFG_CTRL_TRUSTED_shf));
 
         control = NFD_CFG_VF_CAP & (~NFP_NET_CFG_CTRL_ENABLE);
         control |= vf_enable;
@@ -63,7 +65,7 @@ void verify_other_vf_lsc(uint32_t port, uint32_t expected)
     int vf, i;
     for (vf = 0; vf < NFD_MAX_VFS; vf++) {
         for (i = 0; i < NS_PLATFORM_NUM_PORTS; i++) {
-            if (i != port) 
+            if (i != port)
                 test_assert_equal(get_vf_lsc(NIC_PCI, i, NFD_VF2VID(vf)), expected);
         }
     }
