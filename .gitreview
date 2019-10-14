@@ -1,0 +1,5 @@
+[gerrit]
+host=ci.netronome.com
+port=29418
+project=nic-firmware
+defaultbranch=master
