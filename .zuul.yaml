@@ -1,0 +1,12 @@
+---
+- project:
+    name: nic-firmware
+    check:
+      jobs:
+        - nic-firmware-whitespace-check
+    gate:
+      jobs:
+        - nic-firmware-make-test
+    experimental:
+      jobs:
+        - nic-firmware-make-test
