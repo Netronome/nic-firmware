@@ -5,8 +5,10 @@
       jobs:
         - nic-firmware-whitespace-check
     gate:
+      fail-fast: true
       jobs:
         - nic-firmware-make-test
+        - nic-commit-metadata-check
     experimental:
       jobs:
         - nic-firmware-make-test
