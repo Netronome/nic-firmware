@@ -80,7 +80,7 @@ include $(FIRMWARE_DIR)/Makefile.templates
 include $(FIRMWARE_DIR)/Makefile.deps.templates
 include $(FIRMWARE_DIR)/Makefile.apps
 
-firmware_all: tool_version_check firmware_fetch_deps all_nffw all_cat
+firmware_all: sdk_check firmware_fetch_deps all_nffw all_cat
 
 firmware_fetch_deps:
 
@@ -121,7 +121,8 @@ firmware_show_listfiles:
 
 firmware_show_tests:
 	@echo "Firmware test targets"
-	@for t in $(FW_TEST_TARGETS) ; do echo "	$$t" ; done
+	@for t in $(FW_U_TEST_TARGETS) ; do echo "    $$t" ; done
+	@for t in $(FW_C_TEST_TARGETS) ; do echo "    $$t" ; done
 	@echo
 
 
