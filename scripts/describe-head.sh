@@ -14,6 +14,12 @@ elif [ -n "`git diff --staged --name-only`" ]; then
   CHANGES="+"
 fi
 
+# Add a check to see if PATCHSET ENV is set, use this in version if found
+
+if [ -n "$PATCHSET" ] ; then
+    HASH="ps"$PATCHSET
+fi
+
 if [ -z "${TAG}" ] ; then
   LABEL="`git describe --tags HEAD 2> /dev/null | sed 's/\([a-zA-Z\-]*\)-\(.*[0-9].*[[:alnum:]]*\)/\1/'`"
   if [ -z ${LABEL} -o \( ${BRANCH} != "master" -a ${LABEL} = "nic" \) ] ; then
