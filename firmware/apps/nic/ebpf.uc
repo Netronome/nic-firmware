@@ -134,7 +134,7 @@ ebpf_init_cap_finalize()
 
 #define _ebpf_pkt_vec *l$index1
 
-#macro ebpf_reentry()
+#macro ebpf_reentry(in_vec)
 .begin
     .reg egress_q_base
     .reg stat
@@ -143,6 +143,10 @@ ebpf_init_cap_finalize()
     .reg_addr ebpf_rc 0 A
     .set ebpf_rc
     .reg rc
+    .reg xdp_meta_len
+
+    // compute XDP meta length and save the meta in local memory
+    pv_save_xdp_meta(xdp_meta_len, in_vec)
 
     pv_restore_meta_lm_ptr(_ebpf_pkt_vec)
 
@@ -159,6 +163,13 @@ ebpf_init_cap_finalize()
 
     pv_set_tx_flag(_ebpf_pkt_vec, BF_L(PV_TX_HOST_RX_BPF_bf))
     pv_invalidate_cache(_ebpf_pkt_vec)
+
+    // store xdp meta length if it is non-zero
+    alu[--, --, B, xdp_meta_len]
+    beq[pass#]
+    pv_meta_prepend(in_vec, xdp_meta_len)
+    pv_meta_push_type__sz1(in_vec, NFP_NET_META_XDP_META_LEN)
+pass#:
 
     __actions_restore_t_idx()
     br_bset[rc, EBPF_RET_PASS, actions#]

@@ -74,9 +74,9 @@ passert(PV_MAX_CLONES, "EQ", 2)
  *       +-+---+-----+-------------------+-----+-------------------------+
  *    10 |A|    0    |   Packet Number   |  0  |         Offset          | 2
  *       +-+---------+-------------------+-----+---------+---------------+
- *    11 |        Sequence Number        | --- | Seq Ctx |   Protocol    | 3
+ *    11 |        Sequence Number        | XML | Seq Ctx |   Protocol    | 3
  *       +-------------------------------+-+-+-+---------+---+-+-+-+-+-+-+
- *    12 |         TX Host Flags         |M|B|Seek (64B algn)|-|Q|I|i|C|c| 4
+ *    12 |         TX Host Flags         |M|B|Seek (64B algn)|X|Q|I|i|C|c| 4
  *       +-------------------------------+-+-+---------------+-+-+-+-+-+-+
  *    13 |       8B Header Offsets (stacked outermost to innermost)      | 5
  *       +-----------------+-----+-----------------------+---------------+
@@ -84,13 +84,17 @@ passert(PV_MAX_CLONES, "EQ", 2)
  *       +-----------------+-----+-----------------------+---------------+
  *    15 |                      Metadata Type Fields                     | 7
  *       +---------------------------------------------------------------+
+ * 16-23 |                      XDP Metadata                             | 0-7 <- ACTIVE_LM_ADDR_2 ()
+ *       +---------------------------------------------------------------+
  *
  * 0     - Intentionally zero for efficient extraction and manipulation
  * S     - Split packet
  * A     - 1 if CTM buffer is allocated (ie. packet number and CTM address valid)
  * CBS   - CTM Buffer Size
  * BLS   - Buffer List
+ * XML   - XDP Meta Length = (XML + 1) << 2
  * P     - Packet pending (multicast)
+ * X     - XDP Meta is present
  * Q     - Queue offset selected (overrides RSS)
  * V     - One or more VLANs present
  * M     - dest MAC is multicast
@@ -131,7 +135,7 @@ passert(PV_MAX_CLONES, "EQ", 2)
  *       +-+---------------+
  */
 
-#define PV_SIZE_LW                      16
+#define PV_SIZE_LW                      24
 
 #define PV_LENGTH_wrd                   0
 #define PV_CTM_ISL_bf                   PV_LENGTH_wrd, 31, 26
@@ -151,6 +155,7 @@ passert(PV_MAX_CLONES, "EQ", 2)
 
 #define PV_SEQ_wrd                      3
 #define PV_SEQ_NO_bf                    PV_SEQ_wrd, 31, 16
+#define PV_XDP_META_LEN_bf              PV_SEQ_wrd, 15, 13
 #define PV_SEQ_CTX_bf                   PV_SEQ_wrd, 12, 8
 #define PV_PROTO_bf                     PV_SEQ_wrd, 7, 0
 #define PV_PROTO_IPV4_bf                PV_SEQ_wrd, 1, 1
@@ -178,6 +183,7 @@ passert(PV_MAX_CLONES, "EQ", 2)
 #define PV_MAC_DST_MC_bf                PV_FLAGS_wrd, 15, 15
 #define PV_MAC_DST_BC_bf                PV_FLAGS_wrd, 14, 14
 #define PV_SEEK_BASE_bf                 PV_FLAGS_wrd, 13, 6
+#define PV_XDP_META_bf                  PV_FLAGS_wrd, 5, 5
 #define PV_QUEUE_SELECTED_bf            PV_FLAGS_wrd, 4, 4
 #define PV_CSUM_OFFLOAD_bf              PV_FLAGS_wrd, 3, 0
 #define PV_CSUM_OFFLOAD_IL3_bf          PV_FLAGS_wrd, 3, 3
@@ -450,6 +456,7 @@ passert(PV_MAX_CLONES, "EQ", 2)
     .reg meta_base
     .reg ref_cnt
     .reg write $meta[9]
+    .reg xdp_meta_len
     .xfer_order $meta
     .sig sig_meta
 
@@ -463,6 +470,9 @@ passert(PV_MAX_CLONES, "EQ", 2)
     alu[ref_cnt, BF_MASK(PV_META_LM_PTR_bf), AND, lm_ptr, >>2]
     alu[out_meta_len, --, B, ref_cnt, <<2]
     alu[lm_ptr, lm_ptr, -, out_meta_len]
+
+    pv_restore_xdp_meta(xdp_meta_len, in_vec)
+    alu[out_meta_len, out_meta_len, +, xdp_meta_len]
 
     alu[idx, 8, -, ref_cnt]
     jump[idx, t8#], targets[t8#, t7#, t6#, t5#, t4#, t3#, t2#, t1#], defer[3]
@@ -505,6 +515,113 @@ end#:
 .end
 #endm
 
+#macro pv_get_xdp_meta_len(out_len, in_vec, RET_LABEL)
+.begin
+
+    .reg xml
+
+    br_bclr[BF_AL(in_vec, PV_XDP_META_bf), RET_LABEL], defer[1]
+        immed[out_len, 0]
+
+    bitfield_extract__sz1(xml, BF_AML(in_vec, PV_XDP_META_LEN_bf))
+    alu[out_len, xml, +, 1]
+    alu[out_len, --, B, out_len, <<2]
+
+.end
+#endm
+
+#macro pv_save_xdp_meta(xdp_meta_len, in_vec)
+.begin
+    .reg offset
+    .reg lm_ptr
+    .reg in_pkt_addr_hi
+    .reg in_pkt_addr_lo
+    .reg xdp_meta_base
+    .reg read $tr
+    .sig sig_rd
+
+    pv_get_xdp_meta_len(xdp_meta_len, in_vec, end#)
+    pv_get_base_addr(in_pkt_addr_hi, in_pkt_addr_lo, in_vec)
+    alu[xdp_meta_base, in_pkt_addr_lo, -, xdp_meta_len]
+
+    local_csr_rd[ACTIVE_LM_ADDR_1]
+    immed[lm_ptr, 0]
+    alu[lm_ptr, lm_ptr, +, 32]
+    local_csr_wr[ACTIVE_LM_ADDR_2, lm_ptr]
+
+    alu[offset, 32, -, xdp_meta_len] // jump offset
+    jump[offset, t8#], targets[t8#, t7#, t6#, t5#, t4#, t3#, t2#, t1#]
+
+#define LOOP 8
+#while (LOOP > 1)
+
+t/**/LOOP#:
+    mem[read32, $tr, in_pkt_addr_hi, <<8, xdp_meta_base, 1], ctx_swap[sig_rd]
+    alu[*l$index2++, --, B, $tr]
+    alu[xdp_meta_base, xdp_meta_base, +, 4]
+    nop
+
+#define_eval LOOP (LOOP - 1)
+#endloop
+#undef LOOP
+
+t1#:
+    mem[read32, $tr, in_pkt_addr_hi, <<8, xdp_meta_base, 1], ctx_swap[sig_rd]
+    alu[*l$index2++, --, B, $tr]
+
+end#:
+
+.end
+#endm
+
+#macro pv_restore_xdp_meta(xdp_meta_len, in_vec)
+.begin
+
+    .reg in_pkt_addr_hi
+    .reg in_pkt_addr_lo
+    .reg xdp_meta_base
+    .reg idx
+    .reg lm_ptr
+    .reg ref_cnt
+    .reg write $tr[8]
+    .xfer_order $tr
+    .sig sig_wr
+
+    aggregate_directive(.set_wr, $tr, 8)
+
+    pv_get_xdp_meta_len(xdp_meta_len, in_vec, end#)
+    pv_get_base_addr(in_pkt_addr_hi, in_pkt_addr_lo, in_vec)
+    alu[xdp_meta_base, in_pkt_addr_lo, -, xdp_meta_len]
+
+    local_csr_rd[ACTIVE_LM_ADDR_1]
+    immed[lm_ptr, 0]
+    alu[lm_ptr, lm_ptr, +, (32-4)]
+    alu[lm_ptr, lm_ptr, +, xdp_meta_len]
+    local_csr_wr[ACTIVE_LM_ADDR_2, lm_ptr]
+
+    alu[ref_cnt, --, B, xdp_meta_len, >>2]
+    alu[idx, 8, -, ref_cnt]
+    jump[idx, t7#], targets[t7#, t6#, t5#, t4#, t3#, t2#, t1#, t0#]
+
+#define LOOP 7
+#while (LOOP > 0)
+t/**/LOOP#:
+    alu[$tr[LOOP], --, B, *l$index2--]
+#define_eval LOOP (LOOP - 1)
+#endloop
+#undef LOOP
+t0#:
+
+    ov_single(OV_LENGTH, ref_cnt, OVF_SUBTRACT_ONE)
+    #pragma warning(disable:5009)
+    mem[write32, $tr[0], in_pkt_addr_hi, <<8, xdp_meta_base, max_8], indirect_ref, ctx_swap[sig_wr], defer[1]
+        alu[$tr[0], --, B, *l$index2--]
+    #pragma warning(default:5009)
+
+end#:
+
+.end
+#endm
 
 #macro pv_multicast_init(io_vec, in_bls, CONTINUE_LABEL)
 .begin
