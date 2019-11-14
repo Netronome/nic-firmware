@@ -22,27 +22,28 @@
  *       the tail of this enumeration/list.  It is best that this enumeration
  *       be a contiguous set of integers.
  */
-#define NS_PLATFORM_FIRST                    1
+#define NS_PLATFORM_FIRST                       1
 
-#define NS_PLATFORM_HYDROGEN                 NS_PLATFORM_FIRST
-#define NS_PLATFORM_HYDROGEN_4x10            2
-#define NS_PLATFORM_LITHIUM                  3
-#define NS_PLATFORM_LITHIUM_1x1_1x10         4
-#define NS_PLATFORM_LITHIUM_1x10_1x1         5
-#define NS_PLATFORM_LITHIUM_2x1              6
-#define NS_PLATFORM_BERYLLIUM                7
-#define NS_PLATFORM_BERYLLIUM_4x10_1x40      8
-#define NS_PLATFORM_BERYLLIUM_8x10           9
-#define NS_PLATFORM_CARBON                   10
-#define NS_PLATFORM_CARBON_2x10              11
-#define NS_PLATFORM_CARBON_1x10_1x25         12
-#define NS_PLATFORM_STARFIGHTER_2x40         13
-#define NS_PLATFORM_STARFIGHTER_1x100        14
-#define NS_PLATFORM_STARFIGHTER_2x40_passive 15
-#define NS_PLATFORM_SODIUM_2x10              16
-#define NS_PLATFORM_SODIUM_2x10_crypto       17
+#define NS_PLATFORM_HYDROGEN                    NS_PLATFORM_FIRST
+#define NS_PLATFORM_HYDROGEN_4x10               2
+#define NS_PLATFORM_LITHIUM                     3
+#define NS_PLATFORM_LITHIUM_1x1_1x10            4
+#define NS_PLATFORM_LITHIUM_1x10_1x1            5
+#define NS_PLATFORM_LITHIUM_2x1                 6
+#define NS_PLATFORM_BERYLLIUM                   7
+#define NS_PLATFORM_BERYLLIUM_4x10_1x40         8
+#define NS_PLATFORM_BERYLLIUM_8x10              9
+#define NS_PLATFORM_CARBON                      10
+#define NS_PLATFORM_CARBON_2x10                 11
+#define NS_PLATFORM_CARBON_1x10_1x25            12
+#define NS_PLATFORM_STARFIGHTER_2x40            13
+#define NS_PLATFORM_STARFIGHTER_1x100           14
+#define NS_PLATFORM_STARFIGHTER_2x40_passive    15
+#define NS_PLATFORM_SODIUM_2x10                 16
+#define NS_PLATFORM_SODIUM_2x10_crypto          17
+#define NS_PLATFORM_STARFIGHTER_1x100_passive   18
 
-#define NS_PLATFORM_LAST                     NS_PLATFORM_SODIUM_2x10_crypto
+#define NS_PLATFORM_LAST                        NS_PLATFORM_STARFIGHTER_1x100_passive
 
 
 /*
@@ -580,7 +581,8 @@
     #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
 
 /* Starfighter 1x100GE */
-#elif (NS_PLATFORM_TYPE == NS_PLATFORM_STARFIGHTER_1x100)
+#elif (NS_PLATFORM_TYPE == NS_PLATFORM_STARFIGHTER_1x100 || \
+        NS_PLATFORM_TYPE == NS_PLATFORM_STARFIGHTER_1x100_passive)
     #define NS_PLATFORM_MAC_CORE(_port)           0
     #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port)   \
