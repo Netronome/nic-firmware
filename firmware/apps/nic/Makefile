@@ -156,9 +156,10 @@ ifeq ($(FLOORPLAN),Agilio_LX)
     #Multicast reaper ME
     MCR_ME=mei0.me10
 
-    #Amount of workers per island. Maintainers must keep this in sync with the
-    #NIC_APP_MES variable and the datapath ME placement.
+    #Worker placements
     WORKERS_PER_ISLAND=10
+    DATAPATH_ISL=0 1 2 3 4
+
 
 else ifeq ($(FLOORPLAN),OCP_Multihost)
 
@@ -197,7 +198,9 @@ else ifeq ($(FLOORPLAN),OCP_Multihost)
     #Multicast reaper ME
     MCR_ME=mei0.me6
 
+    #Worker placements
     WORKERS_PER_ISLAND=6
+    DATAPATH_ISLANDS=0 1 2 3 4 5 6
 
 else
     #All other NICS
@@ -237,10 +240,62 @@ else
     #Multicast reaper ME
     MCR_ME=mei0.me10
 
-    #Amount of workers per island. Maintainers must keep this in sync with the
-    #NIC_APP_MES variable and the datapath ME placement.
+    #Worker placements
     WORKERS_PER_ISLAND=10
+    DATAPATH_ISLANDS=0 1 2 3 4
 endif
+
+
+#f NIC_ISL_ME_DEST
+#
+# Custom config to give ME list to the app master
+#
+# @param $1 MEI no, in 0-8
+# @param $2 ME no, in 0-11
+#
+define NIC_ISL_ME_DEST
+
+$(shell echo $$((($(1) + 32) * 16 + $(2) + 4)))
+
+endef
+
+
+#f NIC_BUILD_DP_LIST
+#
+# @param $1 MEI no, in 0-8
+# @param $2 num MEs, in 1-12
+#
+define NIC_BUILD_DP_LIST
+
+$(eval NIC_APP_ISLANDS += $(strip $(call NIC_ISL_ME_DEST,$1,0)))
+$(foreach me, $(shell seq 0 $$(($2 - 1))), \
+    $(eval NIC_APP_MES += $(strip $(call NIC_ISL_ME_DEST, $1, $(me)))) \
+    $(eval NIC_DP_MES += mei$(1).me$(me)))
+
+endef
+
+
+# Build datapath ME placement defines
+NIC_APP_ISLANDS=
+NIC_APP_MES=
+NIC_DP_MES=
+
+ifeq ($(words $(WORKERS_PER_ISLAND)), $(words $(DATAPATH_ISLANDS)))
+$(foreach isl, $(shell seq 1 $(words $(WORKERS_PER_ISLAND))), \
+    $(eval $(call NIC_BUILD_DP_LIST,$(word $(isl),$(DATAPATH_ISLANDS)),$(word $(isl),$(WORKERS_PER_ISLAND)))))
+else
+ifneq ($(words $(WORKERS_PER_ISLAND)), 1)
+$(error Num entries in "WORKERS_PER_ISLAND" must match "DATAPATH_ISLANDS" or be 1)
+endif
+$(foreach isl, $(DATAPATH_ISLANDS), \
+    $(eval $(call NIC_BUILD_DP_LIST,$(isl),$(WORKERS_PER_ISLAND))))
+endif
+
+comma := ,
+space := $() $()
+NIC_APP_ISLANDS := $(subst $(space),$(comma),$(strip $(NIC_APP_ISLANDS)))
+NIC_APP_MES := $(subst $(space),$(comma),$(strip $(NIC_APP_MES)))
+
 
 $(eval $(call nffw.setup,$(PROJECT),apps/nic,config.h))
 $(eval $(call nffw.set_amda,$(PROJECT),$(AMDA)))
@@ -290,157 +345,7 @@ $(eval $(call microcode.add_define,$(PROJECT),datapath,SCS=0))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,NBI_COUNT=1))
 $(eval $(call microcode.add_define,$(PROJECT),datapath,WORKERS_PER_ISLAND=$(WORKERS_PER_ISLAND)))
 #$(eval $(call microcode.add_define,$(PROJECT),datapath,PARANOIA))
-
-ifeq ($(FLOORPLAN),OCP_Multihost)
-    $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
-        mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5 \
-        mei1.me0 mei1.me1 mei1.me2 mei1.me3 mei1.me4 mei1.me5 \
-        mei2.me0 mei2.me1 mei2.me2 mei2.me3 mei2.me4 mei2.me5 \
-        mei3.me0 mei3.me1 mei3.me2 mei3.me3 mei3.me4 mei3.me5 \
-        mei4.me0 mei4.me1 mei4.me2 mei4.me3 mei4.me4 mei4.me5 \
-        mei5.me0 mei5.me1 mei5.me2 mei5.me3 mei5.me4 mei5.me5 \
-        mei6.me0 mei6.me1 mei6.me2 mei6.me3 mei6.me4 mei6.me5 \
-        ))
-else
-    $(eval $(call nffw.add_obj,$(PROJECT),datapath, \
-        mei0.me0 mei0.me1 mei0.me2 mei0.me3 mei0.me4 mei0.me5 mei0.me6 mei0.me7 mei0.me8 mei0.me9 \
-        mei1.me0 mei1.me1 mei1.me2 mei1.me3 mei1.me4 mei1.me5 mei1.me6 mei1.me7 mei1.me8 mei1.me9 \
-        mei2.me0 mei2.me1 mei2.me2 mei2.me3 mei2.me4 mei2.me5 mei2.me6 mei2.me7 mei2.me8 mei2.me9 \
-	mei3.me0 mei3.me1 mei3.me2 mei3.me3 mei3.me4 mei3.me5 mei3.me6 mei3.me7 mei3.me8 mei3.me9 \
-	mei4.me0 mei4.me1 mei4.me2 mei4.me3 mei4.me4 mei4.me5 mei4.me6 mei4.me7 mei4.me8 mei4.me9 \
-	))
-endif
-
-# Custom config to give ME list to the app master
-define NIC_ISL_ME_DEST
-((($(1) + 32) << 4) + ($(2) + 4))
-endef
-
-ifeq ($(FLOORPLAN),OCP_Multihost)
-    NIC_APP_ISLANDS := \
-        "$(call NIC_ISL_ME_DEST, 0, 0), \
-        $(call NIC_ISL_ME_DEST, 1, 0), \
-        $(call NIC_ISL_ME_DEST, 2, 0), \
-        $(call NIC_ISL_ME_DEST, 3, 0), \
-        $(call NIC_ISL_ME_DEST, 4, 0), \
-        $(call NIC_ISL_ME_DEST, 5, 0), \
-        $(call NIC_ISL_ME_DEST, 6, 0)"
-
-    NIC_APP_MES := \
-            "$(call NIC_ISL_ME_DEST, 0, 0), \
-            $(call NIC_ISL_ME_DEST, 0, 1), \
-            $(call NIC_ISL_ME_DEST, 0, 2), \
-            $(call NIC_ISL_ME_DEST, 0, 3), \
-            $(call NIC_ISL_ME_DEST, 0, 4), \
-            $(call NIC_ISL_ME_DEST, 0, 5), \
-            \
-            $(call NIC_ISL_ME_DEST, 1, 0), \
-            $(call NIC_ISL_ME_DEST, 1, 1), \
-            $(call NIC_ISL_ME_DEST, 1, 2), \
-            $(call NIC_ISL_ME_DEST, 1, 3), \
-            $(call NIC_ISL_ME_DEST, 1, 4), \
-            $(call NIC_ISL_ME_DEST, 1, 5), \
-            \
-            $(call NIC_ISL_ME_DEST, 2, 0), \
-            $(call NIC_ISL_ME_DEST, 2, 1), \
-            $(call NIC_ISL_ME_DEST, 2, 2), \
-            $(call NIC_ISL_ME_DEST, 2, 3), \
-            $(call NIC_ISL_ME_DEST, 2, 4), \
-            $(call NIC_ISL_ME_DEST, 2, 5), \
-            \
-            $(call NIC_ISL_ME_DEST, 3, 0), \
-            $(call NIC_ISL_ME_DEST, 3, 1), \
-            $(call NIC_ISL_ME_DEST, 3, 2), \
-            $(call NIC_ISL_ME_DEST, 3, 3), \
-            $(call NIC_ISL_ME_DEST, 3, 4), \
-            $(call NIC_ISL_ME_DEST, 3, 5), \
-            \
-            $(call NIC_ISL_ME_DEST, 4, 0), \
-            $(call NIC_ISL_ME_DEST, 4, 1), \
-            $(call NIC_ISL_ME_DEST, 4, 2), \
-            $(call NIC_ISL_ME_DEST, 4, 3), \
-            $(call NIC_ISL_ME_DEST, 4, 4), \
-            $(call NIC_ISL_ME_DEST, 4, 5), \
-            \
-            $(call NIC_ISL_ME_DEST, 5, 0), \
-            $(call NIC_ISL_ME_DEST, 5, 1), \
-            $(call NIC_ISL_ME_DEST, 5, 2), \
-            $(call NIC_ISL_ME_DEST, 5, 3), \
-            $(call NIC_ISL_ME_DEST, 5, 4), \
-            $(call NIC_ISL_ME_DEST, 5, 5), \
-            \
-            $(call NIC_ISL_ME_DEST, 6, 0), \
-            $(call NIC_ISL_ME_DEST, 6, 1), \
-            $(call NIC_ISL_ME_DEST, 6, 2), \
-            $(call NIC_ISL_ME_DEST, 6, 3), \
-            $(call NIC_ISL_ME_DEST, 6, 4), \
-            $(call NIC_ISL_ME_DEST, 6, 5)"
-
-else
-
-NIC_APP_ISLANDS := \
-	"$(call NIC_ISL_ME_DEST, 0, 0), \
-	$(call NIC_ISL_ME_DEST, 1, 0), \
-	$(call NIC_ISL_ME_DEST, 2, 0), \
-	$(call NIC_ISL_ME_DEST, 3, 0), \
-	$(call NIC_ISL_ME_DEST, 4, 0)"
-
-NIC_APP_MES := \
-        "$(call NIC_ISL_ME_DEST, 0, 0), \
-        $(call NIC_ISL_ME_DEST, 0, 1), \
-        $(call NIC_ISL_ME_DEST, 0, 2), \
-        $(call NIC_ISL_ME_DEST, 0, 3), \
-        $(call NIC_ISL_ME_DEST, 0, 4), \
-        $(call NIC_ISL_ME_DEST, 0, 5), \
-        $(call NIC_ISL_ME_DEST, 0, 6), \
-        $(call NIC_ISL_ME_DEST, 0, 7), \
-        $(call NIC_ISL_ME_DEST, 0, 8), \
-        $(call NIC_ISL_ME_DEST, 0, 9), \
-        \
-        $(call NIC_ISL_ME_DEST, 1, 0), \
-        $(call NIC_ISL_ME_DEST, 1, 1), \
-        $(call NIC_ISL_ME_DEST, 1, 2), \
-        $(call NIC_ISL_ME_DEST, 1, 3), \
-        $(call NIC_ISL_ME_DEST, 1, 4), \
-        $(call NIC_ISL_ME_DEST, 1, 5), \
-        $(call NIC_ISL_ME_DEST, 1, 6), \
-        $(call NIC_ISL_ME_DEST, 1, 7), \
-        $(call NIC_ISL_ME_DEST, 1, 8), \
-        $(call NIC_ISL_ME_DEST, 1, 9), \
-        \
-        $(call NIC_ISL_ME_DEST, 2, 0), \
-        $(call NIC_ISL_ME_DEST, 2, 1), \
-        $(call NIC_ISL_ME_DEST, 2, 2), \
-        $(call NIC_ISL_ME_DEST, 2, 3), \
-        $(call NIC_ISL_ME_DEST, 2, 4), \
-        $(call NIC_ISL_ME_DEST, 2, 5), \
-        $(call NIC_ISL_ME_DEST, 2, 6), \
-        $(call NIC_ISL_ME_DEST, 2, 7), \
-        $(call NIC_ISL_ME_DEST, 2, 8), \
-        $(call NIC_ISL_ME_DEST, 2, 9), \
-        \
-        $(call NIC_ISL_ME_DEST, 3, 0), \
-        $(call NIC_ISL_ME_DEST, 3, 1), \
-        $(call NIC_ISL_ME_DEST, 3, 2), \
-        $(call NIC_ISL_ME_DEST, 3, 3), \
-        $(call NIC_ISL_ME_DEST, 3, 4), \
-        $(call NIC_ISL_ME_DEST, 3, 5), \
-        $(call NIC_ISL_ME_DEST, 3, 6), \
-        $(call NIC_ISL_ME_DEST, 3, 7), \
-        $(call NIC_ISL_ME_DEST, 3, 8), \
-        $(call NIC_ISL_ME_DEST, 3, 9), \
-		\
-        $(call NIC_ISL_ME_DEST, 4, 0), \
-        $(call NIC_ISL_ME_DEST, 4, 1), \
-        $(call NIC_ISL_ME_DEST, 4, 2), \
-        $(call NIC_ISL_ME_DEST, 4, 3), \
-        $(call NIC_ISL_ME_DEST, 4, 4), \
-        $(call NIC_ISL_ME_DEST, 4, 5), \
-        $(call NIC_ISL_ME_DEST, 4, 6), \
-        $(call NIC_ISL_ME_DEST, 4, 7), \
-        $(call NIC_ISL_ME_DEST, 4, 8), \
-        $(call NIC_ISL_ME_DEST, 4, 9)"
-endif
+$(eval $(call nffw.add_obj,$(PROJECT),datapath, $(NIC_DP_MES)))
 
 # Add cmsg map handler
 $(eval $(call microcode.assemble,$(PROJECT),mapcmsg,apps/nic/maps,cmsg_app.uc,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
@@ -471,8 +376,8 @@ $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnn_mode=1))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qip_no_inlining))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Qnolur=_cfg_changes_loop))
 $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-Ob0))
-$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST=$(NIC_APP_MES)))
-$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_WORKER_ISLAND_LIST=$(NIC_APP_ISLANDS)))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_MES_LIST="$(NIC_APP_MES)"))
+$(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,APP_WORKER_ISLAND_LIST="$(NIC_APP_ISLANDS)"))
 $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,CFG_NIC_LIB_DBG_JOURNAL=1))
 $(eval $(call micro_c.add_tests,$(PROJECT),nfd_app_master))
 
