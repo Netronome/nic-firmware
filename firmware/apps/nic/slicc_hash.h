@@ -32,12 +32,12 @@
                                 0x61dc0013 0x255dee97 0xd4586ee4 0xbae3d338
 
 #elif defined(__NFP_LANG_MICROC)
-	__asm {
-    	.alloc_mem SLICC_HASH_PAD_DATA imem global (SLICC_HASH_PAD_SIZE_LW * 4) 256
-	}
+    __asm {
+        .alloc_mem SLICC_HASH_PAD_DATA imem global (SLICC_HASH_PAD_SIZE_LW * 4) 256
+    }
 
 #endif
 
 
 
-#endif	/* _SLICC_HASH_H */
+#endif  /* _SLICC_HASH_H */
