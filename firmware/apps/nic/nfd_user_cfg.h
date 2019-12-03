@@ -257,9 +257,9 @@
 #define NFD_BPF_STACK_SZ        512
 
 #if NS_FLAVOR_TYPE == NS_FLAVOR_BPF
-    #define NFD_NET_APP_ID		(2)
+    #define NFD_NET_APP_ID      (2)
 #else
-    #define NFD_NET_APP_ID		(1)
+    #define NFD_NET_APP_ID      (1)
 #endif
 
 /* enable cmsg */
