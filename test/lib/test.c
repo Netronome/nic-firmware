@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019  Netronome Systems, Inc.  All rights reserved.
+/* Copyright (c) 2017-2020  Netronome Systems, Inc.  All rights reserved.
  *
  * @file   test.c
  * @breif  MicroC test support functions
@@ -12,6 +12,10 @@
 #include <nfp/libnfp.c>
 #include <std/libstd.c>
 #include <pkt/libpkt.c>
+
+
+__shared __emem volatile uint64_t assert_fail_tested_64;
+__shared __emem volatile uint64_t assert_fail_expected_64;
 
 /* stop all threads except thread 0 */
 __intrinsic void single_ctx_test() {
@@ -60,5 +64,24 @@ __intrinsic void test_assert_unequal(uint32_t tested,
     if ( tested == expected ) {
         local_csr_write(local_csr_mailbox2, tested);
         _test_fail(0xfe);
+    }
+}
+
+/* assert when values are not equal using 64 bit values*/
+__intrinsic void test_assert_equal_64(uint64_t tested,
+                                      uint64_t expected) {
+    if ( tested != expected ) {
+        assert_fail_tested_64 = tested;
+        assert_fail_expected_64 = expected;
+        _test_fail(0xfb);
+    }
+}
+
+/* assert when values are equal using 64 bit values*/
+__intrinsic void test_assert_unequal_64(uint64_t tested,
+                                        uint64_t expected) {
+    if ( tested == expected ) {
+        assert_fail_tested_64 = tested;
+        _test_fail(0xfd);
     }
 }
