@@ -319,6 +319,7 @@ $(eval $(call fwdep.add_gro_flag,$(PROJECT),$(GRO_MES),-DNS_PLATFORM_TYPE=$(NS_P
 $(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add Multicast Buffer Reaper
+$(eval $(call microcode.assemble,$(PROJECT),mcr,apps/nic,mc_reaper.uc))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,firmware/lib))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,firmware/apps/nic/lib))
 $(eval $(call microcode.add_include,$(PROJECT),mcr,deps/ng-nfd.hg))
