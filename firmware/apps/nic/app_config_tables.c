@@ -421,7 +421,7 @@ upd_rx_host_instr(__xwrite uint32_t *xwr_instr,
 
 /* Copy VLAN members table to all CTMs */
 __intrinsic void
-upd_ctm_vlan_members()
+upd_ctm_vlan_members(uint32_t pcie)
 {
     __ctm __addr40 void *vlan_vnic_members_tbl =
         (__ctm __addr40 void*) __link_sym("_vf_vlan_cache");
@@ -440,9 +440,15 @@ upd_ctm_vlan_members()
     ind.ov_len = 1;
     ind.length = 15;
 
+    /* XXX PCIe's other than 0 are not fully supported as there
+     *     isn't enough CTM to hold the full nic_vlan_to_vnics_map_tbl. */
+    if (pcie != 0)
+        return;
+
     /* Propagate to all worker CTM islands */
     for(start_offset = 0; start_offset < (4096 * 64) / 8; start_offset += 64){
-        mem_read32(&rd_data, &nic_vlan_to_vnics_map_tbl[(start_offset / 8)],
+        mem_read32(&rd_data,
+                   &nic_vlan_to_vnics_map_tbl[pcie][(start_offset / 8)],
                    (16*4));
         reg_cp(wr_data, rd_data, sizeof(rd_data));
         for (isl = 32; isl < 37; isl++) {
@@ -1314,7 +1320,7 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid, uint32_t pf_control,
         return 1;
 
     add_vlan_member(pcie, vlan_id, vid);
-    upd_ctm_vlan_members();
+    upd_ctm_vlan_members(pcie);
 
     cfg_act_build_vf(&acts, pcie, vid, pf_control, vf_control);
     cfg_act_write_host(pcie, vid, &acts);
@@ -1337,7 +1343,7 @@ cfg_act_vf_down(uint32_t pcie, uint32_t vid)
         return 1;
 
     remove_vlan_member(pcie, vid);
-    upd_ctm_vlan_members();
+    upd_ctm_vlan_members(pcie);
 
     return 0;
 }
