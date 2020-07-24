@@ -123,8 +123,6 @@ for t in `find ${TEST_DIR} -iname '*_test.uc' -o -iname '*_test.c'` ; do
     else
         TESTED=`nfp-reg mecsr:i32.me0.Mailbox2 | cut -d= -f2`
         EXPECTED=`nfp-reg mecsr:i32.me0.Mailbox3 | cut -d= -f2`
-        TESTED_64=`nfp-rtsym i32.me0._assert_fail_tested_64 | cut -c 16-`
-        EXPECTED_64=`nfp-rtsym i32.me0._assert_fail_expected_64 | cut -c 16-`
         if [[ ${RESULT} -eq "0xfa" ]] ; then
             DETAIL="- assertion failed"
         elif [[ ${RESULT} -eq "0xfc" ]] ; then
@@ -132,8 +130,11 @@ for t in `find ${TEST_DIR} -iname '*_test.uc' -o -iname '*_test.c'` ; do
         elif [[ ${RESULT} -eq "0xfe" ]] ; then
             DETAIL=`printf -- "- unexpectedly got 0x%08x" ${TESTED}`
         elif [[ ${RESULT} -eq "0xfb" ]] ; then
+            TESTED_64=`nfp-rtsym i32.me0._assert_fail_tested_64 | cut -c 16-`
+            EXPECTED_64=`nfp-rtsym i32.me0._assert_fail_expected_64 | cut -c 16-`
             DETAIL=`printf -- "- expected %s, got %s" "${EXPECTED_64}" "${TESTED_64}"`
         elif [[ ${RESULT} -eq "0xfd" ]] ; then
+            TESTED_64=`nfp-rtsym i32.me0._assert_fail_tested_64 | cut -c 16-`
             DETAIL=`printf -- "- unexpectedly got %s" "${TESTED_64}"`
         fi
         STS=`nfp-reg mecsr:i32.me0.mailbox_1 | cut -d= -f2`
