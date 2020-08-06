@@ -4,7 +4,7 @@
 # Change these revisions to suit the project
 #
 FLOWENV_REV=5be5d1d
-NFD_REV=93e9535
+NFD_REV=0910a66
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
