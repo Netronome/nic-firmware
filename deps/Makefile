@@ -3,8 +3,8 @@
 
 # Change these revisions to suit the project
 #
-FLOWENV_REV=97e3290
-NFD_REV=0910a66
+FLOWENV_REV=wip-kestrel
+NFD_REV=wip-kestrel
 
 NFP_VROUTER_REV=$(shell git rev-parse HEAD)
 
