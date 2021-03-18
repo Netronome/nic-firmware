@@ -43,8 +43,10 @@
 #define NS_PLATFORM_SODIUM_2x10_crypto          17
 #define NS_PLATFORM_STARFIGHTER_1x100_passive   18
 #define NS_PLATFORM_CADMIUM_DDR_1x50            19
+#define NS_PLATFORM_ALDERAAN                    20
+#define NS_PLATFORM_ALDERAAN_2x10               21
 
-#define NS_PLATFORM_LAST                        NS_PLATFORM_CADMIUM_DDR_1x50
+#define NS_PLATFORM_LAST                        NS_PLATFORM_ALDERAAN_2x10
 
 
 /*
@@ -651,6 +653,52 @@
      #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
      #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
      #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
+
+/* Alderaan 2x25GE */
+#elif (NS_PLATFORM_TYPE == NS_PLATFORM_ALDERAAN)
+    #define NS_PLATFORM_MAC_CORE(_port)           0
+    #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
+    #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port)   \
+        (NS_PLATFORM_MAC_CORE_SERDES_LO(_port) + 3)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        ((_serdes) >> 2)
+    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
+    #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
+        (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
+    #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
+    #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
+    #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       2
+    #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      800
+    #define NS_PLATFORM_PORT_SPEED(_port)         25
+    #define NS_PLATFORM_TCLK                      800
+    #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
+    #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
+    #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
+    #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
+
+/* Alderaan 2x10GE */
+#elif (NS_PLATFORM_TYPE == NS_PLATFORM_ALDERAAN_2x10)
+    #define NS_PLATFORM_MAC_CORE(_port)           0
+    #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
+    #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
+        NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
+        ((_serdes) >> 2)
+    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
+    #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
+        (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
+    #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
+    #define NS_PLATFORM_MAC_UNTAGGED_MAP          3
+    #define NS_PLATFORM_NUM_PORTS_PER_MAC_0       2
+    #define NS_PLATFORM_NUM_PORTS_PER_MAC_1       0
+    #define NS_PLATFORM_PCLK                      800
+    #define NS_PLATFORM_PORT_SPEED(_port)         10
+    #define NS_PLATFORM_TCLK                      800
+    #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
+    #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
+    #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
+    #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
 #endif
 
 
