@@ -113,6 +113,18 @@ else ifeq ($(PLATFORM),Cadmium_DDR_1x50)
     CHIP = AMDA0133-0001:0
     FLOORPLAN=OCP_Multihost
     DEDUP=-dedup
+else ifeq ($(PLATFORM),Alderaan)
+    NS_PLATFORM_TYPE = 20
+    MEDIA = 2x25
+    AMDA = AMDA0144-0001
+    CHIP = nfp-38xxc
+    FLOORPLAN=Agilio_CX
+else ifeq ($(PLATFORM),Alderaan_2x10)
+    NS_PLATFORM_TYPE = 21
+    MEDIA = 2x10
+    AMDA = AMDA0144-0001
+    CHIP = nfp-38xxc
+    FLOORPLAN=Agilio_CX
 endif
 PROJECT = $(FLAVOR)/nic_$(AMDA)_$(MEDIA)
 
@@ -205,44 +217,85 @@ else ifeq ($(FLOORPLAN),OCP_Multihost)
 else
     #All other NICS
 
-    #GRO ME's
-    GRO_MES=mei0.me11 mei1.me11 mei3.me11 mei4.me11
+    ifeq ($(findstring Alderaan,$(PLATFORM)),Alderaan)
+        #GRO ME's
+        GRO_MES=mei0.me11 mei0.me10 mei1.me11 mei1.me10
 
-    #cmsg map handler
-    MAPCMSG_ME=mei2.me11
+        #cmsg map handler
+        MAPCMSG_ME=mei2.me11
 
-    #App_master ME
-    APP_MASTER_ME=mei2.me10
+        #App_master ME
+        APP_MASTER_ME=mei2.me10
 
-    #NFD SVC ME
-    NFD_SVC_ME=mei4.me10
+        #NFD SVC ME
+        NFD_SVC_ME=pcie0.me7
 
-    #NFD for PCIE0
-    NFD0_NOTIFY_ME=mei3.me10
-    NFD0_SB_ME=ila0.me1
-    NFD0_PD_MES=ila0.me2 ila0.me3
+        #NFD for PCIE0
+        NFD0_NOTIFY_ME=mei1.me9
+        NFD0_SB_ME=pcie0.me4
+        NFD0_PD_MES=pcie0.me5 pcie0.me6
 
-    #NFD for PCIE1
-    NFD1_NOTIFY_ME=
-    NFD1_SB_ME=
-    NFD1_PD_MES=
+        #NFD for PCIE1
+        NFD1_NOTIFY_ME=
+        NFD1_SB_ME=
+        NFD1_PD_MES=
 
-    #NFD for PCIE2
-    NFD2_NOTIFY_ME=
-    NFD2_SB_ME=
-    NFD2_PD_MES=
+        #NFD for PCIE2
+        NFD2_NOTIFY_ME=
+        NFD2_SB_ME=
+        NFD2_PD_MES=
 
-    #NFD for PCIE3
-    NFD3_NOTIFY_ME=
-    NFD3_SB_ME=
-    NFD3_PD_MES=
+        #NFD for PCIE3
+        NFD3_NOTIFY_ME=
+        NFD3_SB_ME=
+        NFD3_PD_MES=
 
-    #Multicast reaper ME
-    MCR_ME=mei0.me10
+        #Multicast reaper ME
+        MCR_ME=mei0.me9
 
-    #Worker placements
-    WORKERS_PER_ISLAND=10
-    DATAPATH_ISLANDS=0 1 2 3 4
+        #Worker placements
+        WORKERS_PER_ISLAND=9
+        DATAPATH_ISLANDS=0 1 2
+    else
+        #GRO ME's
+        GRO_MES=mei0.me11 mei1.me11 mei3.me11 mei4.me11
+
+        #cmsg map handler
+        MAPCMSG_ME=mei2.me11
+
+        #App_master ME
+        APP_MASTER_ME=mei2.me10
+
+        #NFD SVC ME
+        NFD_SVC_ME=mei4.me10
+
+        #NFD for PCIE0
+        NFD0_NOTIFY_ME=mei3.me10
+        NFD0_SB_ME=ila0.me1
+        NFD0_PD_MES=ila0.me2 ila0.me3
+
+        #NFD for PCIE1
+        NFD1_NOTIFY_ME=
+        NFD1_SB_ME=
+        NFD1_PD_MES=
+
+        #NFD for PCIE2
+        NFD2_NOTIFY_ME=
+        NFD2_SB_ME=
+        NFD2_PD_MES=
+
+        #NFD for PCIE3
+        NFD3_NOTIFY_ME=
+        NFD3_SB_ME=
+        NFD3_PD_MES=
+
+        #Multicast reaper ME
+        MCR_ME=mei0.me10
+
+        #Worker placements
+        WORKERS_PER_ISLAND=10
+        DATAPATH_ISLANDS=0 1 2 3 4
+    endif
 endif
 
 

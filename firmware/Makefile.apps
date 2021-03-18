@@ -12,7 +12,7 @@ PLATFORM_LIST = Hydrogen Hydrogen_4x10 Lithium Beryllium Beryllium_4x10_1x40 \
                 Beryllium_8x10 Carbon Carbon_2x10 Carbon_1x10_1x25 \
                 Starfighter_2x40 Starfighter_1x100 Starfighter_2x40_passive \
                 Sodium_2x10 Sodium_2x10_crypto Starfighter_1x100_passive \
-                Cadmium_DDR_1x50
+                Cadmium_DDR_1x50 Alderaan Alderaan_2x10
 
 $(foreach FLAVOR,$(FLAVOR_LIST), $(eval \
     $(foreach PLATFORM,$(PLATFORM_LIST),$(eval \
