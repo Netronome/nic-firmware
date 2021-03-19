@@ -10,7 +10,13 @@
 
 #include <assert.h>
 #include <nfp/xpb.h>
-#include <nfp6000/nfp_mac.h>
+#if defined(__NFP_IS_6XXX)
+    #include <nfp6000/nfp_mac.h>
+#elif defined(__NFP_IS_38XX)
+    #include <nfp3800/nfp_mac.h>
+#else
+    #error "Please select valid chip target"
+#endif
 
 #include <link_state/link_state.h>
 

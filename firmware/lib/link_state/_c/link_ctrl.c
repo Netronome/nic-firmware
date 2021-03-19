@@ -12,9 +12,17 @@
 #include <nfp/me.h>
 #include <nfp/remote_me.h>
 #include <nfp/xpb.h>
-#include <nfp6000/nfp_mac.h>
-#include <nfp6000/nfp_mac_csr_synch.h>
-#include <nfp6000/nfp_nbi_tm.h>
+#if defined(__NFP_IS_6XXX)
+    #include <nfp6000/nfp_mac.h>
+    #include <nfp6000/nfp_mac_csr_synch.h>
+    #include <nfp6000/nfp_nbi_tm.h>
+#elif defined(__NFP_IS_38XX)
+    #include <nfp3800/nfp_mac.h>
+    #include <nfp3800/nfp_mac_csr_synch.h>
+    #include <nfp3800/nfp_nbi_tm.h>
+#else
+    #error "Please select valid chip target"
+#endif
 
 #include <link_state/link_ctrl.h>
 

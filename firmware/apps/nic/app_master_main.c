@@ -21,10 +21,17 @@
 #include <nfp/remote_me.h>
 #include <nfp/tmq.h>
 #include <nfp/xpb.h>
-#include <nfp6000/nfp_mac.h>
-#include <nfp6000/nfp_me.h>
-#include <nfp6000/nfp_nbi_tm.h>
-
+#if defined(__NFP_IS_6XXX)
+    #include <nfp6000/nfp_mac.h>
+    #include <nfp6000/nfp_me.h>
+    #include <nfp6000/nfp_nbi_tm.h>
+#elif defined(__NFP_IS_38XX)
+    #include <nfp3800/nfp_mac.h>
+    #include <nfp3800/nfp_me.h>
+    #include <nfp3800/nfp_nbi_tm.h>
+#else
+    #error "Please select valid chip target"
+#endif
 #include <std/synch.h>
 #include <std/reg_utils.h>
 #include "nfd_user_cfg.h"

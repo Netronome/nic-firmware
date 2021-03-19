@@ -16,7 +16,13 @@
 #include <nfp/me.h>
 #include <nfp/mem_bulk.h>
 #include <nfp/cls.h>
-#include <nfp6000/nfp_me.h>
+#if defined(__NFP_IS_6XXX)
+    #include <nfp6000/nfp_me.h>
+#elif defined(__NFP_IS_38XX)
+    #include <nfp3800/nfp_me.h>
+#else
+    #error "Please select valid chip target"
+#endif
 
 #include <std/reg_utils.h>
 #include <vnic/shared/nfd_cfg.h>

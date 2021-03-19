@@ -11,8 +11,15 @@
 #include <assert.h>
 #include <nfp/cls.h>
 #include <nfp/xpb.h>
-#include <nfp6000/nfp_cls.h>
-#include <nfp6000/nfp_nbi_pc.h>
+#if defined(__NFP_IS_6XXX)
+    #include <nfp6000/nfp_cls.h>
+    #include <nfp6000/nfp_nbi_pc.h>
+#elif defined(__NFP_IS_38XX)
+    #include <nfp3800/nfp_cls.h>
+    #include <nfp3800/nfp_nbi_pc.h>
+#else
+    #error "Please select valid chip target"
+#endif
 
 #include <npfw/catamaran_utils.h>
 #include <npfw/nbipc_mem.h>

@@ -27,8 +27,15 @@
 #include <std/synch.h>
 #include <nfp/pcie.h>
 
-#include <nfp6000/nfp_cls.h>
-#include <nfp6000/nfp_event.h>
+#if defined(__NFP_IS_6XXX)
+    #include <nfp6000/nfp_cls.h>
+    #include <nfp6000/nfp_event.h>
+#elif defined(__NFP_IS_38XX)
+    #include <nfp3800/nfp_cls.h>
+    #include <nfp3800/nfp_event.h>
+#else
+    #error "Please select valid chip target"
+#endif
 
 #include <vnic/shared/nfd_cfg.h>
 
