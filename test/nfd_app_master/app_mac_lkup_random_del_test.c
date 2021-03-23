@@ -21,9 +21,17 @@
 
 __export __mem struct mac_addr test_macs[NUM_TEST_MACS];
 
-__export __imem_n(0) __align(MAC_LKUP_TABLE_SZ)
-          struct mem_lkup_cam_r_48_64B_table_bucket_entry
-          mac_lkup_tbl[MAC_LKUP_NUM_BUCKETS];
+#if defined(__NFP_IS_6XXX)
+    __export __imem_n(0) __align(MAC_LKUP_TABLE_SZ)
+            struct mem_lkup_cam_r_48_64B_table_bucket_entry
+            mac_lkup_tbl[MAC_LKUP_NUM_BUCKETS];
+#elif defined(__NFP_IS_38XX)
+    __export __emem_n(0) __align(MAC_LKUP_TABLE_SZ)
+            struct mem_lkup_cam_r_48_64B_table_bucket_entry
+            mac_lkup_tbl[MAC_LKUP_NUM_BUCKETS];
+#else
+    #error "Please select valid chip target."
+#endif
 
 
 static void gen_random_macs(void)
