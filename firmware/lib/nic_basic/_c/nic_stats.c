@@ -41,8 +41,15 @@ typedef struct {
 } nfd_qstats_t;
 
 // working stats
-__shared __align8 __imem struct macstats_port_accum _mac_stats[NS_PLATFORM_NUM_PORTS];
-__shared __align8 __imem struct macstats_head_drop_accum _mac_stats_head_drop;
+#if defined(__NFP_IS_6XXX)
+    __shared __align8 __imem struct macstats_port_accum _mac_stats[NS_PLATFORM_NUM_PORTS];
+    __shared __align8 __imem struct macstats_head_drop_accum _mac_stats_head_drop;
+#elif defined(__NFP_IS_38XX)
+    __shared __align8 __emem struct macstats_port_accum _mac_stats[NS_PLATFORM_NUM_PORTS];
+    __shared __align8 __emem struct macstats_head_drop_accum _mac_stats_head_drop;
+#else
+    #error "Please select valid chip target."
+#endif
 __lmem __shared mac_drops_t _mac_drops[NS_PLATFORM_NUM_PORTS] = { 0 };
 __lmem __shared nic_stats_vnic_t _vnic_stats;
 
@@ -271,7 +278,7 @@ static void vnic_stats_accumulate()
     struct pkt_cntr_addr addr;
     SIGNAL s1, s2;
 
-    __imem nic_stats_queue_t *stats_queue = (__imem nic_stats_queue_t *) __link_sym("_nic_stats_queue");
+    __mem nic_stats_queue_t *stats_queue = (__mem nic_stats_queue_t *) __link_sym("_nic_stats_queue");
     __emem nic_stats_vnic_t *stats_vnic = (__emem nic_stats_vnic_t *) __link_sym("_nic_stats_vnic");
 
     for (vid = 0; vid < NVNICS; ++vid) {
