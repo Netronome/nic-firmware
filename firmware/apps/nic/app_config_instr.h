@@ -41,8 +41,13 @@
     .alloc_mem _vf_vlan_cache ctm island VLAN_TO_VNICS_MAP_TBL_SIZE 65536
 
     /* PCIe Queue RX BUF SZ table*/
-    .alloc_mem _fl_buf_sz_cache imem global (64*4*4) 256
-
+    #if (IS_NFPTYPE(__NFP6000))
+        .alloc_mem _fl_buf_sz_cache imem global (64*4*4) 256
+    #elif IS_NFPTYPE(__NFP3800)
+        .alloc_mem _fl_buf_sz_cache emem global (64*4*4) 256
+    #else
+        #error "Unsupported chip type selected."
+    #endif
 #elif defined(__NFP_LANG_MICROC)
 
     __asm
@@ -65,10 +70,17 @@
     /* PCIe Queue RX BUF SZ table*/
     __asm
     {
+    #if defined(__NFP_IS_6XXX)
         .alloc_mem _fl_buf_sz_cache imem global (64*4*4) 256
+    #elif defined(__NFP_IS_38XX)
+        .alloc_mem _fl_buf_sz_cache emem global (64*4*4) 256
+    #else
+        #error "Please select valid chip target."
+    #endif
     }
 
 #endif
+
 /* Instructions in the worker (actions.uc) should follow the exact same order
  * as in enum used by app config below.
  * The pipeline bit in the instruction_format is set when previous and
