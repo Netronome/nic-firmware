@@ -13,11 +13,18 @@
 #define SLICC_HASH_PAD_NN_IDX           64
 #define SLICC_HASH_PAD_SIZE_LW          40
 
-#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
-    #define SLICC_HASH_MEM imem1
+#if defined(__NFP_IS_6XXX)
+    #if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+        #define SLICC_HASH_MEM imem1
+    #else
+        #define SLICC_HASH_MEM imem
+    #endif
+#elif defined(__NFP_IS_38XX)
+    #define SLICC_HASH_MEM emem
 #else
-    #define SLICC_HASH_MEM imem
+    #error "Please select valid chip target."
 #endif
+
 
 #if defined(__NFP_LANG_ASM)
     // crytographic pad (should be initialized using secure random generator at boot)
