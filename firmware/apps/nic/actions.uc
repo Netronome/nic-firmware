@@ -34,7 +34,14 @@
 .xfer_order $__actions
 .reg volatile __actions_t_idx
 
-mem_lkup_init_hash_tbl(_mac_lkup_tbl, imem0, MAC_LKUP_NUM_BUCKETS, MAC_LKUP_BUCKET_SZ)
+#if (IS_NFPTYPE(__NFP6000))
+    mem_lkup_init_hash_tbl(_mac_lkup_tbl, imem0, MAC_LKUP_NUM_BUCKETS, MAC_LKUP_BUCKET_SZ)
+#elif IS_NFPTYPE(__NFP3800)
+    mem_lkup_init_hash_tbl(_mac_lkup_tbl, emem0, MAC_LKUP_NUM_BUCKETS, MAC_LKUP_BUCKET_SZ)
+#else
+    #error "Unsupported chip type selected."
+#endif
+
 mem_lkup_init_hash_addr(g_mac_lkup_addr, _mac_lkup_tbl, HASH_OP_CAMR48_64B, 0, MAC_LKUP_NUM_BUCKETS, MAC_LKUP_BUCKET_SZ)
 
 #macro __actions_read(out_data, in_mask, in_shf)
