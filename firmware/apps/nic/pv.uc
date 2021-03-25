@@ -41,7 +41,14 @@ passert(PV_MAX_CLONES, "EQ", 2)
 #define NULL_VLAN 0xfff
 
 .alloc_mem __pv_reserved_pkt_mem ctm+0 island (64*2048) reserved
-.alloc_mem __pv_pkt_sequencer imem global 4 256
+
+#if (IS_NFPTYPE(__NFP6000))
+    .alloc_mem __pv_pkt_sequencer imem global 4 256
+#elif IS_NFPTYPE(__NFP3800)
+    .alloc_mem __pv_pkt_sequencer emem global 4 256
+#else
+    #error "Unsupported chip type selected."
+#endif
 
 /**
  * Packet vector internal representation
