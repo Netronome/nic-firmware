@@ -20,8 +20,14 @@
 
 
 /* RAM table for RW Script storage */
+#if defined(__NFP_IS_6XXX)
+    #define MU_RWS_TABLE_MEM    imem0
+#elif defined(__NFP_IS_38XX)
+    #define MU_RWS_TABLE_MEM    emem0
+#else
+    #error "Please select valid chip target."
+#endif
 
-#define MU_RWS_TABLE_MEM    imem0
 #define MU_RWS_NUM_ROWS    256
 #define MU_RWS_ROW_SIZE     (8*4)
 #define MU_RWS_TOTAL_SPACE      (MU_RWS_NUM_ROWS * MU_RWS_ROW_SIZE)
