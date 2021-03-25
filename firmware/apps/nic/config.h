@@ -526,6 +526,24 @@
         NS_PLATFORM_NBI_TM_QID_HI(4),         \
         NS_PLATFORM_NBI_TM_40G_QSIZE
 
+#elif (NS_PLATFORM_TYPE == NS_PLATFORM_ALDERAAN) \
+    || (NS_PLATFORM_TYPE == NS_PLATFORM_ALDERAAN_2x10)
+    /* NFP3800 NBI TM configuration */
+
+    #define NS_PLATFORM_NBI_TM_QSIZE 6  /* 2^6 packet buffers per queue */
+
+    /* Initialize the NBI TM queues associated with each port. */
+    #define NBI0_TM_Q_CFG_RANGE0               \
+        1,                                    \
+        NS_PLATFORM_NBI_TM_QID_LO(0),         \
+        NS_PLATFORM_NBI_TM_QID_HI(0),         \
+        NS_PLATFORM_NBI_TM_QSIZE
+    #define NBI0_TM_Q_CFG_RANGE1               \
+        1,                                    \
+        NS_PLATFORM_NBI_TM_QID_LO(1),         \
+        NS_PLATFORM_NBI_TM_QID_HI(1),         \
+        NS_PLATFORM_NBI_TM_QSIZE
+
 #else /* Default NBI TM configuration. */
 
     /* Determine the NBI TM queue depth based on port configuration. */
