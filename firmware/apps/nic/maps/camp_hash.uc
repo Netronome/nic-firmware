@@ -34,10 +34,16 @@
 
     passert(MAX_KEY_LENGTH, "LE", (CAMP_HASH_PAD_SIZE_LW - 2))
 
-#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
-    #define CAMP_HASH_MEM imem1
-#elsei
-    #define CAMP_HASH_MEM imem
+#if (IS_NFPTYPE(__NFP6000))
+    #if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+        #define CAMP_HASH_MEM imem1
+    #else
+        #define CAMP_HASH_MEM imem
+    #endif
+#elif IS_NFPTYPE(__NFP3800)
+    #define CAMP_HASH_MEM emem
+#else
+    #error "Unsupported chip type selected."
 #endif
 
     .alloc_mem CAMP_HASH_PAD_DATA CAMP_HASH_MEM global (CAMP_HASH_PAD_SIZE_LW * 4) 256

@@ -287,13 +287,19 @@
     .init __HASHMAP_LOCK_TBL 0
 
     /* fd table */
-#if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
-    #define HASH_MAP_IMEM imem1
+#if (IS_NFPTYPE(__NFP6000))
+    #if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
+        #define HASH_MAP_MEM imem1
+    #else
+        #define HASH_MAP_MEM imem
+    #endif
+#elif IS_NFPTYPE(__NFP3800)
+    #define HASH_MAP_MEM emem
 #else
-    #define HASH_MAP_IMEM imem
+    #error "Unsupported chip type selected."
 #endif
     /* fd table */
-    .alloc_mem __HASHMAP_FD_TBL    HASH_MAP_IMEM global (__HASHMAP_FD_TBL_SZ_LW * 4 * HASHMAP_MAX_TID) 256
+    .alloc_mem __HASHMAP_FD_TBL    HASH_MAP_MEM global (__HASHMAP_FD_TBL_SZ_LW * 4 * HASHMAP_MAX_TID) 256
     .init __HASHMAP_FD_TBL 0
 #endm
 
