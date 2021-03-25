@@ -33,15 +33,27 @@
 /*
  * Global declarations
  */
-
-__export __imem_n(0) __align(MAC_LKUP_TABLE_SZ)
-          struct mem_lkup_cam_r_48_64B_table_bucket_entry
-          mac_lkup_tbl[MAC_LKUP_NUM_BUCKETS];
+#if defined(__NFP_IS_6XXX)
+    __export __imem_n(0) __align(MAC_LKUP_TABLE_SZ)
+        struct mem_lkup_cam_r_48_64B_table_bucket_entry
+        mac_lkup_tbl[MAC_LKUP_NUM_BUCKETS];
+#elif defined(__NFP_IS_38XX)
+    __export __emem_n(0) __align(MAC_LKUP_TABLE_SZ)
+        struct mem_lkup_cam_r_48_64B_table_bucket_entry
+        mac_lkup_tbl[MAC_LKUP_NUM_BUCKETS];
+#else
+    #error "Please select valid chip target."
+#endif
 
 
 /*A lock per table bucket, to ensure thread safety*/
-__export __imem_n(0) uint32_t mac_lkup_tbl_lock[MAC_LKUP_NUM_BUCKETS >> 5];
-
+#if defined(__NFP_IS_6XXX)
+    __export __imem_n(0) uint32_t mac_lkup_tbl_lock[MAC_LKUP_NUM_BUCKETS >> 5];
+#elif defined(__NFP_IS_38XX)
+    __export __emem_n(0) uint32_t mac_lkup_tbl_lock[MAC_LKUP_NUM_BUCKETS >> 5];
+#else
+    #error "Please select valid chip target."
+#endif
 
 __inline void
 mac_lkup_tbl_bucket_wait(uint32_t table_idx)
