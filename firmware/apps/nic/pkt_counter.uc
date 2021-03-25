@@ -24,12 +24,18 @@
     #define PKT_COUNTER_ALLOC_LOOP 0
     #define PKT_COUNTER_IMEM 0
     #while (PKT_COUNTER_ALLOC_LOOP < (PKT_COUNTER_MAX / (128 / PKT_COUNTER_WIDTH)))
-        .alloc_mem pkt_counters_base/**/PKT_COUNTER_ALLOC_LOOP imem/**/PKT_COUNTER_IMEM global 128 256
+        #if (IS_NFPTYPE(__NFP6000))
+            .alloc_mem pkt_counters_base/**/PKT_COUNTER_ALLOC_LOOP imem/**/PKT_COUNTER_IMEM global 128 256
+            #if (__nfp_has_island("imem1"))
+                #define_eval PKT_COUNTER_IMEM ((PKT_COUNTER_IMEM + 1) % 2)
+            #endif
+        #elif (IS_NFPTYPE(__NFP3800))
+            .alloc_mem pkt_counters_base/**/PKT_COUNTER_ALLOC_LOOP emem0 global 128 256
+        #else
+            #error "Unsupported chip type selected."
+        #endif
         .declare_resource pkt_counters/**/PKT_COUNTER_ALLOC_LOOP global 128 pkt_counters_base/**/PKT_COUNTER_ALLOC_LOOP
         #define_eval PKT_COUNTER_ALLOC_LOOP (PKT_COUNTER_ALLOC_LOOP + 1)
-        #if (__nfp_has_island("imem1"))
-            #define_eval PKT_COUNTER_IMEM ((PKT_COUNTER_IMEM + 1) % 2)
-        #endif
     #endloop
     #undef PKT_COUNTER_ALLOC_LOOP
     #undef PKT_COUNTER_IMEM
