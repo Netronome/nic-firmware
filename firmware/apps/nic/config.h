@@ -709,7 +709,13 @@
  * Note: GRO_NUM_BLOCKS is expected to be passed in via a -D
  *       GRO_CTX_PER_BLOCK is computed based on GRO_NUM_BLOCKS
  */
-#define GRO_ISL				48
+#if defined(__NFP_IS_38XX)
+    #define GRO_ISL                 (24 | GRO_USE_CACHE_UPPER)
+#elif defined(__NFP_IS_6XXX)
+    #define GRO_ISL                 48
+#else
+    #error "Please select valid chip target."
+#endif
 
 /* Ingress sequencer numbers (0/1/2/3/4) for packets from the wire will
    be mapped to GRO CTX numbers 0/2/3/4/5; those for packets from NFD
