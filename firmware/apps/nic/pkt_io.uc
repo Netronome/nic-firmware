@@ -270,7 +270,11 @@ multicast#:
 tx_nbi#:
     pv_multicast_resend(in_pkt_vec)
     pv_setup_packet_ready(addr_hi, addr_lo, in_pkt_vec, nbi, tm_q, pms_offset)
-    nbi[packet_ready_multicast_dont_free, $, addr_hi, <<8, addr_lo], indirect_ref
+    #if (defined(__NFP_IS_6XXX) && (__REVISION_MAX == __REVISION_B0))
+        nbi[packet_ready_multicast_dont_free, $, addr_hi, <<8, addr_lo], indirect_ref
+    #else
+        nbi[packet_ready_multicast_dont_free, --, addr_hi, <<8, addr_lo], indirect_ref
+    #endif
 
     br_bclr[multicast, BF_L(INSTR_TX_CONTINUE_bf), terminate#]
 
