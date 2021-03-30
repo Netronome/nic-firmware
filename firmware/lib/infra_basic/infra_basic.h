@@ -13,7 +13,7 @@
 #include <pkt/pkt.h>
 #include <vnic/nfd_common.h>
 
-#if (__REVISION_MIN < __REVISION_B0)
+#if ((__REVISION_MIN < __REVISION_B0) && (defined(__NFP6000)))
 #error "Unsupported chip type"
 #else /* (__REVISION_MIN < __REVISION_B0) */
 
