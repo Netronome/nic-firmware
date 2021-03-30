@@ -70,17 +70,29 @@
 /* EMU Rings buffers configuration */
 
 /* NBI8 BLQs */
-#define BLM_NBI8_BLQ0_LEN                       1024
-#define BLM_NBI8_BLQ1_LEN                       1024
-#define BLM_NBI8_BLQ2_LEN                       1024
-#define BLM_NBI8_BLQ3_LEN                       1024
+#if defined(__NFP_IS_38XX)
+    #define BLM_NBI8_BLQ0_LEN                       512
+    #define BLM_NBI8_BLQ1_LEN                       512
+    #define BLM_NBI8_BLQ2_LEN                       512
+    #define BLM_NBI8_BLQ3_LEN                       512
 
-/* NBI9 BLQs */
-#define BLM_NBI9_BLQ0_LEN                       1024
-#define BLM_NBI9_BLQ1_LEN                       1024
-#define BLM_NBI9_BLQ2_LEN                       1024
-#define BLM_NBI9_BLQ3_LEN                       1024
+    /* NBI9 BLQs */
+    #define BLM_NBI9_BLQ0_LEN                       512
+    #define BLM_NBI9_BLQ1_LEN                       512
+    #define BLM_NBI9_BLQ2_LEN                       512
+    #define BLM_NBI9_BLQ3_LEN                       512
+#else
+    #define BLM_NBI8_BLQ0_LEN                       1024
+    #define BLM_NBI8_BLQ1_LEN                       1024
+    #define BLM_NBI8_BLQ2_LEN                       1024
+    #define BLM_NBI8_BLQ3_LEN                       1024
 
+    /* NBI9 BLQs */
+    #define BLM_NBI9_BLQ0_LEN                       1024
+    #define BLM_NBI9_BLQ1_LEN                       1024
+    #define BLM_NBI9_BLQ2_LEN                       1024
+    #define BLM_NBI9_BLQ3_LEN                       1024
+#endif
 
 /* EMU Ring 0 NBI8 */
 #if (NS_PLATFORM_TYPE == NS_PLATFORM_CADMIUM_DDR_1x50)
@@ -89,7 +101,11 @@
     #define BLM_NBI8_BLQ0_EMU_EMEM0_DENSITY         1
 #else
     #define BLM_NBI8_BLQ0_EMU_EMEM0_NUM_BUFS        1000
-    #define BLM_NBI8_BLQ0_BDSRAM_EMEM0_NUM_BUFS     1000
+    #if defined(__NFP_IS_38XX)
+        #define BLM_NBI8_BLQ0_BDSRAM_EMEM0_NUM_BUFS     500
+    #else
+        #define BLM_NBI8_BLQ0_BDSRAM_EMEM0_NUM_BUFS     1000
+    #endif
     #define BLM_NBI8_BLQ0_EMU_EMEM0_DENSITY         1
 #endif
 
@@ -130,10 +146,19 @@
     #define BLM_NBI8_BLQ1_EMU_IMEM0_NUM_BUFS        0
     #define BLM_NBI8_BLQ1_EMU_IMEM0_DENSITY         0
 #else
-    #define BLM_NBI8_BLQ1_EMU_IMEM0_NUM_BUFS        350
-    #define BLM_NBI8_BLQ1_EMU_IMEM0_DENSITY         1
-    #define BLM_NBI8_BLQ1_EMU_EMEM0_NUM_BUFS        650
-    #define BLM_NBI8_BLQ1_EMU_EMEM0_DENSITY         2
+    #if defined(__NFP_IS_38XX)
+        #define BLM_NBI8_BLQ1_EMU_IMEM0_NUM_BUFS        0
+        #define BLM_NBI8_BLQ1_EMU_IMEM0_DENSITY         0
+        #define BLM_NBI8_BLQ1_EMU_EMEM0_NUM_BUFS        1000
+        #define BLM_NBI8_BLQ1_EMU_EMEM0_DENSITY         1
+    #elif defined(__NFP_IS_6XXX)
+        #define BLM_NBI8_BLQ1_EMU_IMEM0_NUM_BUFS        350
+        #define BLM_NBI8_BLQ1_EMU_IMEM0_DENSITY         1
+        #define BLM_NBI8_BLQ1_EMU_EMEM0_NUM_BUFS        650
+        #define BLM_NBI8_BLQ1_EMU_EMEM0_DENSITY         2
+    #else
+        #error "Please select valid chip target."
+    #endif
 #endif
 
 #define BLM_NBI8_BLQ1_BDSRAM_IMEM0_NUM_BUFS     0
