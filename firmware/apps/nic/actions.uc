@@ -469,7 +469,11 @@ skip_l4#:
     passert(NIC_RSS_TBL_ADDR, "POWER_OF_2")
     passert(LOG2(NIC_RSS_TBL_ADDR), "GT", BF_M(INSTR_RSS_TABLE_IDX_bf))
     alu[rss_table_addr, rss_table_addr, OR, 1, <<(log2(NIC_RSS_TBL_ADDR))]
-
+    #if(IS_NFPTYPE(__NFP3800))
+    nop
+    nop
+    nop
+    #endif
     local_csr_rd[CRC_REMAINDER]
     immed[*l$index2, 0]
 
