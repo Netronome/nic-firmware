@@ -50,7 +50,6 @@ NFCC_BASE_INC = \
 	-I$(FIRMWARE_DIR)/lib
 NFCC_BASE_DEFS =
 NFCC_BASE_FLAGS = 			\
-	-v1				\
 	-W3				\
 	-Ob2				\
 	-mIPOPT_expose_intrinsics	\

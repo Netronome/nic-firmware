@@ -298,6 +298,11 @@ else
     endif
 endif
 
+# Non-NFP3800 platforms need to use v1 of nfcc to build
+ifeq ($(findstring Alderaan,$(PLATFORM)),)
+    $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-v1))
+endif
+
 
 #f NIC_ISL_ME_DEST
 #
