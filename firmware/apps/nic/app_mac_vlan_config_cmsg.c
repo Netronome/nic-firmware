@@ -86,12 +86,16 @@ nic_mac_vlan_entry_op_cmsg(__lmem struct nic_mac_vlan_key *key,
 
     /* Allocate CTM buffer */
     /* Buffer not used but will be freed by cmsgmap ME */
+#if defined(__NFP_IS_38XX)
+    ctm_pnum = pkt_ctm_alloc(__ISLAND, MIN_CTM_TYPE);
+#else
     #ifdef PKT_CREDITS_INDEFINITE_RETRY
     pkt_ctm_get_credits(PKT_BUF_CTM_CREDITS_LINK, 1, 1, 1, PKT_CREDITS_INDEFINITE_RETRY);
     #else
     pkt_ctm_get_credits(PKT_BUF_CTM_CREDITS_LINK, 1, 1, 1);
     #endif
     ctm_pnum = pkt_ctm_alloc(PKT_BUF_CTM_CREDITS_LINK, __ISLAND, MIN_CTM_TYPE, 0, 0);
+#endif
     if (ctm_pnum == CTM_ALLOC_ERR) {
         proc_res = CMESG_DISPATCH_FAIL;
 	goto skip;
