@@ -301,6 +301,9 @@ endif
 # Non-NFP3800 platforms need to use v1 of nfcc to build
 ifeq ($(findstring Alderaan,$(PLATFORM)),)
     $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-v1))
+    PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp6000
+else
+    PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp3800
 endif
 
 
