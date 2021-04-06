@@ -472,8 +472,15 @@ passert(PV_MAX_CLONES, "EQ", 2)
     alu[lm_ptr, lm_ptr, -, out_meta_len]
 
     alu[idx, 8, -, ref_cnt]
+#if(IS_NFPTYPE(__NFP3800))
+    local_csr_wr[ACTIVE_LM_ADDR_2, lm_ptr]
+#endif
     jump[idx, t8#], targets[t8#, t7#, t6#, t5#, t4#, t3#, t2#, t1#], defer[3]
+#if(!IS_NFPTYPE(__NFP3800))
         local_csr_wr[ACTIVE_LM_ADDR_2, lm_ptr]
+#else
+        nop
+#endif
         alu[out_meta_len, out_meta_len, +, 4]
         alu[meta_base, in_pkt_addr_lo, -, out_meta_len]
 
