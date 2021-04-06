@@ -293,7 +293,7 @@ update_vf_lsc_list(int pcie, unsigned int port, uint32_t vf_vid, uint32_t contro
     unsigned int idx = LS_IDX(vf_vid);
     unsigned int orig_link_state = LS_READ(ls_current[pcie], vf_vid);
     unsigned int pf_link_state = LS_READ(ls_current[pcie], pf_vid);
-    __mem char *cfg_bar = nfd_cfg_bar_base(pcie, vf_vid);
+    __mem40 char *cfg_bar = nfd_cfg_bar_base(pcie, vf_vid);
 
     if (control & NFP_NET_CFG_CTRL_ENABLE)
         LS_SET(vs_current[pcie], vf_vid);
@@ -325,10 +325,12 @@ update_vf_lsc_list(int pcie, unsigned int port, uint32_t vf_vid, uint32_t contro
                     NFP_NET_CFG_STS_LINK_RATE_SHIFT);
     }
 
-    mem_write32(&sts_xw, cfg_bar + NFP_NET_CFG_STS, sizeof(sts_xw));
+    mem_write32(&sts_xw, (__mem40 char *)cfg_bar + NFP_NET_CFG_STS,
+                sizeof(sts_xw));
     /* Make sure the config BAR is updated before we send
        the notification interrupt */
-    mem_read32(&ctrl_xr, cfg_bar + NFP_NET_CFG_CTRL, sizeof(ctrl_xr));
+    mem_read32(&ctrl_xr, (__mem40 char *)cfg_bar + NFP_NET_CFG_CTRL,
+               sizeof(ctrl_xr));
 
     /* Schedule notification interrupt to be sent from the
        link state change context */
@@ -359,7 +361,7 @@ handle_sriov_update(int pcie)
     }
 
     mem_write8_le(&err_code,
-        (__mem void*) (vf_mb_base + NFD_VF_CFG_MB_RET_ofs), 2);
+        (__mem40 void*) (vf_mb_base + NFD_VF_CFG_MB_RET_ofs), 2);
 }
 
 static int

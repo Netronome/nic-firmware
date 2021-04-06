@@ -298,7 +298,8 @@ nic_local_reconfig(uint32_t *enable_changed)
     vnic = cfg_bar_change_info.vnic;
 
     /* Read the ctrl(0) + update(1) words */
-    mem_read64(&tmp2, (__mem void*)(bar_base + NFP_NET_CFG_CTRL), sizeof(tmp2));
+    mem_read64(&tmp2, (__mem40 void*)(bar_base + NFP_NET_CFG_CTRL),
+               sizeof(tmp2));
     newctrl = tmp2[0];
     update = tmp2[1];
 
@@ -316,12 +317,12 @@ nic_local_reconfig(uint32_t *enable_changed)
         }
 
         /* MTU */
-        mem_read32(&mtu, (__mem void*)(bar_base + NFP_NET_CFG_MTU),
+        mem_read32(&mtu, (__mem40 void*)(bar_base + NFP_NET_CFG_MTU),
                    sizeof(mtu));
         nic->mtu[vnic] = mtu;
 
         /* MAC Address */
-        mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
+        mem_read64(nic_mac, (__mem40 void*)(bar_base + NFP_NET_CFG_MACADDR),
                    sizeof(nic_mac));
 
         ptr = &(nic->mac[vnic]);
@@ -337,7 +338,7 @@ nic_local_reconfig(uint32_t *enable_changed)
 
         /* Read TX/RX ring status */
         mem_read64(&ring_en,
-                   (__mem void*)(bar_base + NFP_NET_CFG_TXRS_ENABLE),
+                   (__mem40 void*)(bar_base + NFP_NET_CFG_TXRS_ENABLE),
                    sizeof(ring_en));
         nic->tx_ring_en[vnic] = swapw64(ring_en[0]);
         nic->rx_ring_en[vnic] = swapw64(ring_en[1]);
@@ -346,7 +347,7 @@ nic_local_reconfig(uint32_t *enable_changed)
      /* Handle MAC address updates */
     if (update & NFP_NET_CFG_UPDATE_MACADDR) {
         /* MAC Address */
-        mem_read64(nic_mac, (__mem void*)(bar_base + NFP_NET_CFG_MACADDR),
+        mem_read64(nic_mac, (__mem40 void*)(bar_base + NFP_NET_CFG_MACADDR),
                    sizeof(nic_mac));
 
         ptr = &(nic->mac[vnic]);

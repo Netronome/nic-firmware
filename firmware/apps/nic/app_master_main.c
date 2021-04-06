@@ -372,9 +372,9 @@ lsc_send(int pcie, int vid)
     __xwrite uint32_t mask_w;
     int ret = 0;
 
-    nic_ctrl_bar = nfd_cfg_bar_base(pcie, vid);
+    nic_ctrl_bar = (__mem char *)nfd_cfg_bar_base(pcie, vid);
 
-    mem_read32_le(&tmp, nic_ctrl_bar + NFP_NET_CFG_LSC, sizeof(tmp));
+    mem_read32_le(&tmp, (__mem40 char *)nic_ctrl_bar + NFP_NET_CFG_LSC, sizeof(tmp));
     entry = tmp & 0xff;
 
     /* Check if the entry is configured. If not return (nothing pending) */
@@ -386,14 +386,14 @@ lsc_send(int pcie, int vid)
 
     /* If we don't auto-mask, check the ICR */
     if (!automask) {
-        mem_read32_le(&mask_r, nic_ctrl_bar + NFP_NET_CFG_ICR(entry),
+        mem_read32_le(&mask_r, (__mem40 char *)nic_ctrl_bar + NFP_NET_CFG_ICR(entry),
                       sizeof(mask_r));
         if (mask_r & 0x000000ff) {
             ret = 1;
             goto out;
         }
         mask_w = NFP_NET_CFG_ICR_LSC;
-        mem_write8_le(&mask_w, nic_ctrl_bar + NFP_NET_CFG_ICR(entry), 1);
+        mem_write8_le(&mask_w, (__mem40 char *)nic_ctrl_bar + NFP_NET_CFG_ICR(entry), 1);
     }
 
     ret = msix_pf_send(pcie, PCIE_CPP2PCIE_LSC, entry, automask);
@@ -427,11 +427,11 @@ lsc_check_vf(int pcie, int port, enum link_state ls)
                 NFP_NET_CFG_STS_LINK_RATE_SHIFT);
             }
 
-            vf_ctrl_bar = nfd_cfg_bar_base(pcie, vf_vid);
-            mem_write32(&sts, vf_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
+            vf_ctrl_bar = (__mem char *)nfd_cfg_bar_base(pcie, vf_vid);
+            mem_write32(&sts, (__mem40 char *)vf_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
             /* Make sure the config BAR is updated before we send
                the notification interrupt */
-            mem_read32(&ctrl, vf_ctrl_bar + NFP_NET_CFG_CTRL, sizeof(ctrl));
+            mem_read32(&ctrl, (__mem40 char *)vf_ctrl_bar + NFP_NET_CFG_CTRL, sizeof(ctrl));
 
             /* Send the interrupt. */
             if (lsc_send(pcie, vf_vid))
@@ -457,7 +457,7 @@ void lsc_check(int pcie, int port)
 
     /* Update pf corresponding to port */
     pf_vid = NFD_PF2VID(port);
-    nic_ctrl_bar = nfd_cfg_bar_base(pcie, pf_vid);
+    nic_ctrl_bar = (__mem char *)nfd_cfg_bar_base(pcie, pf_vid);
 
     /* link state according to MAC */
     ls = mac_eth_port_link_state(NS_PLATFORM_MAC(port),
@@ -523,10 +523,10 @@ void lsc_check(int pcie, int port)
                 NFP_NET_CFG_STS_LINK_RATE_SHIFT) | 0;
     }
 
-    mem_write32(&sts, nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
+    mem_write32(&sts, (__mem40 char *)nic_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
     /* Make sure the config BAR is updated before we send
        the notification interrupt */
-    mem_read32(&ctrl, nic_ctrl_bar + NFP_NET_CFG_CTRL, sizeof(ctrl));
+    mem_read32(&ctrl, (__mem40 char *)nic_ctrl_bar + NFP_NET_CFG_CTRL, sizeof(ctrl));
 
     /* If the link state changed, try to send in interrupt if vNIC is up */
     if ((changed || LS_READ(pending[pcie], pf_vid)) &&

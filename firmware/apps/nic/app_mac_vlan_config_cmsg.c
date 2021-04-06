@@ -73,7 +73,7 @@ nic_mac_vlan_entry_op_cmsg(__lmem struct nic_mac_vlan_key *key,
     __gpr uint32_t proc_res;
     uint32_t ctm_pnum;
     __xread blm_buf_handle_t emem_buf_h;
-    __addr40 uint8_t *emem_dst;
+    __mem40 uint8_t *emem_dst;
     __xwrite struct nic_mac_vlan_cmsg cmsg_data;
     __xwrite uint32_t action_data[(NIC_MAC_VLAN_RESULT_SIZE_LW)];
     __xwrite uint32_t workq_data[CMSG_DESC_LW];
@@ -108,7 +108,8 @@ retry:;
        goto retry;
     }
 
-    emem_dst = ((__mem uint8_t *)blm_buf_handle2ptr(emem_buf_h) + NFD_IN_DATA_OFFSET);
+    emem_dst = ((__mem40 uint8_t *)blm_buf_handle2ptr(emem_buf_h)
+                + NFD_IN_DATA_OFFSET);
 
     /* write cmsg data to buffer */
     cmsg_data.word0=((operation)|(CMSG_MAP_VERSION<<8));
@@ -116,12 +117,15 @@ retry:;
     cmsg_data.count=0;
     cmsg_data.flags=0; /* 0 if any (add if not existed), 1 is update only */
     reg_cp(cmsg_data.key.__raw, key->__raw, sizeof(cmsg_data.key));
-    mem_write32_swap(&cmsg_data, emem_dst, ((NIC_MAC_VLAN_CMSG_SIZE_LW)*4));
+    mem_write32_swap(&cmsg_data, (__mem40 void *)emem_dst, ((NIC_MAC_VLAN_CMSG_SIZE_LW)*4));
 
     reg_cp(action_data, action_list, (NIC_MAC_VLAN_RESULT_SIZE_LW*4));
+
     emem_dst = (emem_dst + 80);
-    mem_write32(&action_data, emem_dst, ((NIC_MAC_VLAN_RESULT_SIZE_LW)*4));
+    mem_write32(&action_data, (__mem40 void *)emem_dst,
+                ((NIC_MAC_VLAN_RESULT_SIZE_LW)*4));
     emem_dst = (emem_dst - (NFD_IN_DATA_OFFSET+80));
+
     /* build queue descriptor */
     reg_zero(&workq_data, sizeof(workq_data));
 

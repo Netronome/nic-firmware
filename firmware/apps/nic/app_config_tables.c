@@ -453,7 +453,7 @@ upd_ctm_vlan_members(uint32_t pcie)
     /* Propagate to all worker CTM islands */
     for(start_offset = 0; start_offset < (4096 * 64) / 8; start_offset += 64){
         mem_read32(&rd_data,
-                   &nic_vlan_to_vnics_map_tbl[pcie][(start_offset / 8)],
+                   (__mem40 void *)&nic_vlan_to_vnics_map_tbl[pcie][(start_offset / 8)],
                    (16*4));
         reg_cp(wr_data, rd_data, sizeof(rd_data));
         for (isl = 32; isl < 37; isl++) {
@@ -503,11 +503,11 @@ upd_slicc_hash_table(void)
     uint32_t i;
     uint32_t t;
     uint32_t start_offset = SLICC_HASH_PAD_NN_IDX;
-    __imem uint32_t *slicc_hash_data =
-        (__imem uint32_t *) __link_sym("SLICC_HASH_PAD_DATA");
+    __mem uint32_t *slicc_hash_data =
+        (__mem uint32_t *) __link_sym("SLICC_HASH_PAD_DATA");
 
     for (t=0; t<SLICC_HASH_PAD_SIZE_LW; t+=(sizeof(xrd_data)/4)) {
-        mem_read32(xrd_data, slicc_hash_data, sizeof(xrd_data));
+        mem_read32(xrd_data, (__mem40 void *)slicc_hash_data, sizeof(xrd_data));
 
         for (i = 0; i < (sizeof(xrd_data)/4); i++) {
             xwr_nn_info[i] = xrd_data[i];
@@ -641,7 +641,7 @@ cfg_act_append_rx_host(action_list_t *acts, uint32_t pcie, uint32_t vid,
     instr_rx_host.__raw[0] = 0;
 
     mem_read32(&mtu,
-               (__mem void*) (nfd_cfg_bar_base(pcie, vid) + NFP_NET_CFG_MTU),
+               (__mem40 void*) (nfd_cfg_bar_base(pcie, vid) + NFP_NET_CFG_MTU),
                sizeof(mtu));
 
     instr_rx_host.mtu = mtu + NET_ETH_LEN + 1;
@@ -665,7 +665,7 @@ cfg_act_append_veb_lookup(action_list_t *acts, uint32_t pcie, uint32_t vid,
     } else {
         if (mac_match) {
             mem_read64(bar_mac,
-                      (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
+                      (__mem40 void*) (nfd_cfg_bar_base(pcie, vid) +
                                      NFP_NET_CFG_MACADDR),
                       sizeof(mac));
             mac[0] = bar_mac[0];
@@ -694,7 +694,7 @@ cfg_act_append_dmac_match_bar(action_list_t *acts, uint32_t pcie, uint32_t vid)
 {
     __xread uint32_t mac[2];
 
-    mem_read64(mac, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
+    mem_read64(mac, (__mem40 void*) (nfd_cfg_bar_base(pcie, vid) +
                 NFP_NET_CFG_MACADDR), sizeof(mac));
 
     cfg_act_append_dmac_match(acts, mac[0] >> 16,
@@ -753,12 +753,12 @@ cfg_act_append_rss(action_list_t *acts, uint32_t pcie, uint32_t vid,
         upd_rss_table(rss_tbl_idx * NFP_NET_CFG_RSS_ITBL_SZ, bar_base, vnic);
 
     /* Read RSS configuration from BAR */
-    __mem_read32(&rss_ctrl, (__mem void*) (bar_base + NFP_NET_CFG_RSS_CTRL),
+    __mem_read32(&rss_ctrl, (__mem40 void*) (bar_base + NFP_NET_CFG_RSS_CTRL),
                  sizeof(rss_ctrl), sizeof(rss_ctrl), sig_done, &sig1);
-    __mem_read64(&rss_key, (__mem void*) (bar_base + NFP_NET_CFG_RSS_KEY),
+    __mem_read64(&rss_key, (__mem40 void*) (bar_base + NFP_NET_CFG_RSS_KEY),
                  NFP_NET_CFG_RSS_KEY_SZ, NFP_NET_CFG_RSS_KEY_SZ, sig_done,
                  &sig2);
-    __mem_read64(&rx_rings, (__mem void*) (bar_base + NFP_NET_CFG_RXRS_ENABLE),
+    __mem_read64(&rx_rings, (__mem40 void*) (bar_base + NFP_NET_CFG_RXRS_ENABLE),
                  sizeof(uint64_t), sizeof(uint64_t), sig_done, &sig3);
     wait_for_all(&sig1, &sig2, &sig3);
     instr_rss.key = rss_key[0];
@@ -889,9 +889,8 @@ __intrinsic void
 cfg_act_append_tx_host(action_list_t *acts, uint32_t pcie, uint32_t vid,
                        uint32_t cont, uint32_t multicast)
 {
-
-    __imem uint32_t *fl_buf_sz_cache = (__imem uint32_t *)
-                                        __link_sym("_fl_buf_sz_cache");
+    __mem uint32_t *fl_buf_sz_cache = (__mem uint32_t *)
+                                       __link_sym("_fl_buf_sz_cache");
     uint32_t min_rxb = 0;
     instr_tx_host_t instr_tx_host;
     __xread uint64_t members;
@@ -902,7 +901,8 @@ cfg_act_append_tx_host(action_list_t *acts, uint32_t pcie, uint32_t vid,
     instr_tx_host.cont = cont;
     instr_tx_host.multicast = multicast;
 
-    mem_read32(&flbuf_sz, &fl_buf_sz_cache[pcie * 64 + NFD_VID2NATQ(vid, 0)],
+    mem_read32(&flbuf_sz, (__mem40 void *)
+               &fl_buf_sz_cache[pcie * 64 + NFD_VID2NATQ(vid, 0)],
                sizeof(flbuf_sz));
 
     min_rxb = flbuf_sz >> 8;
@@ -1194,16 +1194,17 @@ cfg_act_cache_fl_buf_sz(uint32_t pcie, uint32_t vid)
     int i;
     __xread uint32_t rxb_r;
     __xwrite uint32_t rxb_w;
-    __imem uint32_t *fl_buf_sz_cache =
-        (__imem uint32_t *) __link_sym("_fl_buf_sz_cache");
+    __mem uint32_t *fl_buf_sz_cache =
+        (__mem uint32_t *) __link_sym("_fl_buf_sz_cache");
 
     mem_read32(&rxb_r,
-               (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
+               (__mem40 void*) (nfd_cfg_bar_base(pcie, vid) +
                               NFP_NET_CFG_FLBUFSZ),
                sizeof(rxb_r));
     rxb_w = rxb_r;
     for (i = 0; i < NFD_VID_MAXQS(vid); ++i)
-        mem_write32(&rxb_w, &fl_buf_sz_cache[pcie * 64 + NFD_VID2NATQ(vid, i)],
+        mem_write32(&rxb_w, (__mem40 void *)
+                    &fl_buf_sz_cache[pcie * 64 + NFD_VID2NATQ(vid, i)],
                     sizeof(rxb_w));
 }
 
@@ -1242,11 +1243,11 @@ cfg_act_write_veb(uint32_t vid, __lmem struct nic_mac_vlan_key *veb_key,
         }
     }
 
-    mem_read32(&stored_key_rd, &veb_stored_keys[vid],
+    mem_read32(&stored_key_rd, (__mem40 void *)&veb_stored_keys[vid],
                sizeof(struct nic_mac_vlan_key)),
 
     reg_cp(&stored_key_wr, veb_key, sizeof(struct nic_mac_vlan_key));
-    mem_write32(&stored_key_wr, &veb_stored_keys[vid],
+    mem_write32(&stored_key_wr, (__mem40 void *)&veb_stored_keys[vid],
                 sizeof(struct nic_mac_vlan_key));
 
     /* Delete previously existing entries if the lookup key differs */
@@ -1291,7 +1292,7 @@ cfg_act_vf_up(uint32_t pcie, uint32_t vid, uint32_t pf_control,
 
     mac_addr = MAC64_FROM_SRIOV_CFG(sriov_cfg_data);
 
-    mem_read64(&mac_xr, (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
+    mem_read64(&mac_xr, (__mem40 void*) (nfd_cfg_bar_base(pcie, vid) +
                                        NFP_NET_CFG_MACADDR),
                sizeof(mac_xr));
     vf_mac_addr = mac_xr >> 16ull;
@@ -1373,7 +1374,8 @@ cfg_act_pf_up(uint32_t pcie, uint32_t vid, uint32_t veb_up,
     cfg_act_build_pf(&acts, pcie, vid, veb_up, control, update);
     cfg_act_write_host(pcie, vid, &acts);
 
-    mem_read64(&mac_xr.mac_word[0], (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
+    mem_read64(&mac_xr.mac_word[0], (__mem40 void*)
+               (nfd_cfg_bar_base(pcie, vid) +
                 NFP_NET_CFG_MACADDR), sizeof(mac_xr));
 
     mac.mac_dword = mac_xr.mac_dword >> 16ull;

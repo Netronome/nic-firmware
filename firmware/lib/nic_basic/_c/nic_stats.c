@@ -98,23 +98,23 @@ static void mac_stats_accumulate(void)
 	     offset += sizeof(write_block)) {
 	    size = sizeof(read_block) / 2;
 	    __mem_read_atomic(&read_block,
-			      ((__mem char *) &_mac_stats[port]) + offset,
+			      ((__mem40 char *) &_mac_stats[port]) + offset,
 			      size, size, sig_done, &s1);
             __mem_read_atomic(&read_block[size / 8],
-			      ((__mem char *) &_mac_stats[port]) + offset + size,
+			      ((__mem40 char *) &_mac_stats[port]) + offset + size,
 			      size, size, sig_done, &s2);
 	    wait_for_all(&s1, &s2);
 
 	    for (i = 0; i < sizeof(write_block) / 8; ++i) {
 		stat = ((__mem uint64_t *) &_mac_stats[port]) + offset / 8 + i;
-		if (stat == &_mac_stats[port].RxMacHeadDrop)
+		if (stat == (__mem uint64_t *) &_mac_stats[port].RxMacHeadDrop)
                     write_block[i] = swapw64(_mac_drops[port].rx_discards);
-		else if (stat == &_mac_stats[port].TxQueueDrop)
+		else if (stat == (__mem uint64_t *) &_mac_stats[port].TxQueueDrop)
                     write_block[i] = swapw64(_mac_drops[port].tx_discards);
 		else {
-		    if (stat == &_mac_stats[port].TxPIfOutErrors)
+		    if (stat == (__mem uint64_t *) &_mac_stats[port].TxPIfOutErrors)
 			_mac_drops[port].tx_errors = swapw64(read_block[i]);
-                    else if (stat == &_mac_stats[port].RxPIfInErrors)
+                    else if (stat == (__mem uint64_t *) &_mac_stats[port].RxPIfInErrors)
 			_mac_drops[port].rx_errors = swapw64(read_block[i]);
 		    write_block[i] = read_block[i];
 		}
@@ -124,7 +124,7 @@ static void mac_stats_accumulate(void)
 		       sizeof(struct macstats_port_accum) - offset);
 	    /* host ABI expects sparse table of stats indexed by base channel */
 	    mem_write64(&write_block,
-			((__mem char *) &mac_stats[channel]) + offset,
+			((__mem40 char *) &mac_stats[channel]) + offset,
 			size);
 	}
     }
@@ -301,7 +301,8 @@ static void vnic_stats_accumulate()
 	    nfd_stats.tx_pkts = 0;
 	    nfd_stats.tx_bytes = 0;
 
-	    addr = pkt_cntr_get_addr(&stats_queue[NFD_VID2NATQ(vid, queue)]);
+	    addr = pkt_cntr_get_addr((__mem40 void *)
+                                 &stats_queue[NFD_VID2NATQ(vid, queue)]);
             for (i = 0; i < NIC_STATS_QUEUE_COUNT; ++i) {
 		pkt_cntr_read_and_clr(addr, i, 0, &pkts, &bytes);
 		update_vnic_queue_stat(&nfd_stats, &stat, i, pkts, bytes);
@@ -336,7 +337,8 @@ static void vnic_stats_accumulate()
 	    /* add stats for the associated NBI ingress queue  */
 	    stat = 0;
 	    port = NFD_VID2PF(vid);
-	    addr = pkt_cntr_get_addr(&stats_queue[(1 << 8) + port]);
+	    addr = pkt_cntr_get_addr((__mem40 void *)
+                                 &stats_queue[(1 << 8) + port]);
             for (i = 0; i < NIC_STATS_QUEUE_COUNT; ++i) {
 	        pkt_cntr_read_and_clr(addr, i, 0, &pkts, &bytes);
 		update_vnic_queue_stat(&nfd_stats, &stat, i, pkts, bytes);
