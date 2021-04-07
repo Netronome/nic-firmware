@@ -136,6 +136,8 @@ ifeq ($(FLOORPLAN),Agilio_LX)
     #GRO ME's
     GRO_MES=mei0.me11 mei1.me11 mei3.me11 mei4.me11
 
+    BLM_ME=ila0.me0
+
     #cmsg map handler
     MAPCMSG_ME=mei2.me11
 
@@ -177,6 +179,8 @@ else ifeq ($(FLOORPLAN),OCP_Multihost)
 
     #GRO ME's
     GRO_MES=ila0.me2 mei2.me11 mei3.me11 mei4.me11
+
+    BLM_ME=ila0.me0
 
     #App master ME (codeshare with MAPCMSG_ME)
     APP_MASTER_ME=mei5.me6
@@ -221,6 +225,8 @@ else
         #GRO ME's
         GRO_MES=mei0.me11 mei0.me10 mei1.me11 mei1.me10
 
+        BLM_ME=pcie0.me7
+
         #cmsg map handler
         MAPCMSG_ME=mei2.me11
 
@@ -228,10 +234,10 @@ else
         APP_MASTER_ME=mei2.me10
 
         #NFD SVC ME
-        NFD_SVC_ME=pcie0.me7
+        NFD_SVC_ME=mei1.me9
 
         #NFD for PCIE0
-        NFD0_NOTIFY_ME=mei1.me9
+        NFD0_NOTIFY_ME=mei2.me9
         NFD0_SB_ME=pcie0.me4
         NFD0_PD_MES=pcie0.me5 pcie0.me6
 
@@ -254,11 +260,13 @@ else
         MCR_ME=mei0.me9
 
         #Worker placements
-        WORKERS_PER_ISLAND=9
+        WORKERS_PER_ISLAND=8
         DATAPATH_ISLANDS=0 1 2
     else
         #GRO ME's
         GRO_MES=mei0.me11 mei1.me11 mei3.me11 mei4.me11
+
+        BLM_ME=ila0.me0
 
         #cmsg map handler
         MAPCMSG_ME=mei2.me11
@@ -377,7 +385,7 @@ $(eval $(call fwdep.add_flowenv_nfp_init_flag,$(PROJECT),-DNS_PLATFORM_TYPE=$(NS
 $(eval $(call fwdep.add_gro_flag,$(PROJECT),$(GRO_MES),-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE) -DNS_FLAVOR_TYPE=$(NS_FLAVOR_TYPE)))
 
 # Add 1 BLM ME
-$(eval $(call fwdep.add_blm_flag,$(PROJECT),ila0.me0,-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
+$(eval $(call fwdep.add_blm_flag,$(PROJECT),$(BLM_ME),-DNS_PLATFORM_TYPE=$(NS_PLATFORM_TYPE)))
 
 # Add Multicast Buffer Reaper
 $(eval $(call microcode.assemble,$(PROJECT),mcr,apps/nic,mc_reaper.uc))

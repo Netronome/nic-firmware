@@ -15,9 +15,10 @@
 // - Single NBI
 // - Single PCIe
 
+#if !IS_NFPTYPE(__NFP3800)
 /* Set MUPEMemConfig = 1 to inidcate to PE to use 1/2 of CTM for packets */
 .init_csr xpb:CTMXpbMap.MuPacketReg.MUPEMemConfig 1
-
+#endif
 
 .num_contexts 4
 

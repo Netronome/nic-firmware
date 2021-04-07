@@ -10,6 +10,11 @@
 #ifndef __NFP_BLM_CUSTOM_H__
 #define __NFP_BLM_CUSTOM_H__
 
+#if defined(__NFP_IS_38XX)
+/* Don't override blm library partition calculation, allow flowenv to init */
+#define BLM_RESERVE_NUM_CTM_PARTITIONS 0
+#endif
+
 #define BLM_NBI_BLQ1_CACHE_SIZE                 64
 #define BLM_NBI_BLQ3_CACHE_SIZE                 64
 
