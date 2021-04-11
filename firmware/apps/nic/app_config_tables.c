@@ -456,7 +456,11 @@ upd_ctm_vlan_members(uint32_t pcie)
                    (__mem40 void *)&nic_vlan_to_vnics_map_tbl[pcie][(start_offset / 8)],
                    (16*4));
         reg_cp(wr_data, rd_data, sizeof(rd_data));
+        #if defined(__NFP_IS_38XX)
+        for (isl = 32; isl < 35; isl++) {
+        #else
         for (isl = 32; isl < 37; isl++) {
+        #endif
             addr_lo = (uint32_t)vlan_vnic_members_tbl + start_offset;
             addr_hi = ((isl) << (32 - 8));
             addr_hi = (addr_hi | (1<<(39-8)));
