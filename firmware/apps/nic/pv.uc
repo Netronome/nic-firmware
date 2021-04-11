@@ -40,7 +40,9 @@ passert(PV_MAX_CLONES, "EQ", 2)
 
 #define NULL_VLAN 0xfff
 
+#if (!IS_NFPTYPE(__NFP3800))
 .alloc_mem __pv_reserved_pkt_mem ctm+0 island (64*2048) reserved
+#endif
 
 #if (IS_NFPTYPE(__NFP6000))
     .alloc_mem __pv_pkt_sequencer imem global 4 256
