@@ -1212,8 +1212,11 @@ cfg_act_cache_fl_buf_sz(uint32_t pcie, uint32_t vid)
                     sizeof(rxb_w));
 }
 
-
+#if defined(__NFP_IS_38XX)
+__shared __emem struct nic_mac_vlan_key veb_stored_keys[NVNICS];
+#else
 __shared __mem struct nic_mac_vlan_key veb_stored_keys[NVNICS];
+#endif
 
 enum cfg_msg_err
 cfg_act_write_veb(uint32_t vid, __lmem struct nic_mac_vlan_key *veb_key,
