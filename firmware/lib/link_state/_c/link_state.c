@@ -97,7 +97,12 @@ mac_eth_port_link_state(unsigned int mac_isl, unsigned int eth_port,
     if (is_1ge) {
         pcs_status = (xpb_read(NFP_MAC_XPB_OFF(mac_isl)
                                | NFP_MAC_ETH(mac_core)
+#if defined(__NFP_IS_38XX)
+                               | NFP_MAC_ETH_SEG_SGMII(mac_core_port)
+                               | NFP_MAC_ETH_SEG_SGMII_PCS_STS)
+#else
                                | NFP_MAC_ETH_SEG_SGMII_PCS_STS(mac_core_port))
+#endif
                       & NFP_MAC_ETH_SEG_SGMII_PCS_STS_LINK_STS);
     } else {
         pcs_status = (xpb_read(NFP_MAC_XPB_OFF(mac_isl)
