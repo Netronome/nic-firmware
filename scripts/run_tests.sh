@@ -30,12 +30,21 @@ SKIPPED=0
 
 BLM_LINK=
 
+if nfp-hwinfo | grep "chip.model=NFP3800" > /dev/null ; then
+    CHIP_TYPE="nfp-38xxc"
+    BLM_ME="pcie0.me7"
+else
+    CHIP_TYPE="nfp-4xxx-b0"
+    FLAGS="-v1"
+    BLM_ME="ila0.me0"
+fi
+
 build_blm () {
-    BLM_LINK="-u i48.me0 ${TEST_BUILD_DIR}/blm0.list"
+    BLM_LINK="-u $BLM_ME ${TEST_BUILD_DIR}/blm0.list"
 
     nfas -DNS_PLATFORM_TYPE=1 -third_party_addressing_40_bit -permit_dram_unaligned \
     -preproc64 -indirect_ref_format_nfp6000 -W3 -C -R -lr -go -g -lm 0 \
-    -include ${TEST_BUILD_DIR}/../../apps/nic/config.h -chip nfp-4xxx-b0 \
+    -include ${TEST_BUILD_DIR}/../../apps/nic/config.h -chip $CHIP_TYPE \
     -DGRO_NUM_BLOCKS=1 -DBLM_CUSTOM_CONFIG -DBLM_INSTANCE_ID=0 -DNBII=8 \
     -DSINGLE_NBI -DTH_12713=NBI_READ -DBLM_0_ISLAND_ILA48 -DBLM_INIT_EMU_RINGS \
     -I${NETRONOME}/components/standardlibrary/include \
@@ -98,10 +107,10 @@ for t in `find ${TEST_DIR} -iname '*_test.uc' -o -iname '*_test.c'` ; do
 
     if echo ${t} | grep '.uc' > /dev/null ; then
         nfas -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t || exit 1
-        nfld -chip nfp-4xxx-b0 -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list $BLM_LINK || exit 1
+        nfld -chip $CHIP_TYPE -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list $BLM_LINK || exit 1
     else
-        nfcc -chip nfp-4xxx-b0 -v1 -Qno_decl_volatile -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t || exit 1
-        nfld -chip nfp-4xxx-b0 -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list $BLM_LINK || exit 1
+        nfcc -chip $CHIP_TYPE $FLAGS -Qno_decl_volatile -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t || exit 1
+        nfld -chip $CHIP_TYPE -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list $BLM_LINK || exit 1
     fi
 
     nfp-nffw unload || exit 1
