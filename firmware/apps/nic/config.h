@@ -50,13 +50,16 @@
         #define NBI0_DMA_BPE_CONFIG_ME_ISLAND6   0,0,0
     #endif
 #elif defined(__NFP_IS_38XX)
-    #define NBI0_DMA_BPE_CONFIG_ME_ISLAND0   1,255,32
-    #define NBI0_DMA_BPE_CONFIG_ME_ISLAND1   1,255,32
-    #define NBI0_DMA_BPE_CONFIG_ME_ISLAND2   1,255,32
+    #define NBI0_DMA_BPE_CONFIG_ME_ISLAND0   1,128,16
+    #define NBI0_DMA_BPE_CONFIG_ME_ISLAND1   1,128,16
+    #define NBI0_DMA_BPE_CONFIG_ME_ISLAND2   1,128,16
     #define NBI0_DMA_BPE_CONFIG_ME_ISLAND3   0,0,0
     #define NBI0_DMA_BPE_CONFIG_ME_ISLAND4   0,0,0
     #define NBI0_DMA_BPE_CONFIG_ME_ISLAND5   0,0,0
     #define NBI0_DMA_BPE_CONFIG_ME_ISLAND6   0,0,0
+    #define MEI_DMA_BPE_CONFIG_ME_ISLAND0   1,128,16
+    #define MEI_DMA_BPE_CONFIG_ME_ISLAND1   1,128,16
+    #define MEI_DMA_BPE_CONFIG_ME_ISLAND2   1,128,16
 #else
     #error "Please select valid chip target."
 #endif
