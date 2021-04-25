@@ -44,7 +44,7 @@ static void blm_test_init() {
     int i;
 
     mem_ring_setup(__link_sym("BLM_NBI8_BLQ1_EMU_QID"),
-                   (__mem void *)__link_sym("_BLM_NBI8_BLQ1_EMU_Q_BASE"),
+                   (__dram void *)__link_sym("_BLM_NBI8_BLQ1_EMU_Q_BASE"),
                    4096);
 
     for (i = 0; i < BLM_TEST_BUFFERS; i++) {
@@ -71,7 +71,7 @@ void main() {
     __xread uint32_t workq_data[CMSG_DESC_LW];
     uint32_t ctm_pnum;
     uint32_t emem_dst;
-    __addr40 uint8_t *emem_ptr;
+    __mem40 uint8_t *emem_ptr;
     uint32_t exp;
     __xread struct nic_mac_vlan_cmsg cmsg_data;
 
@@ -125,7 +125,7 @@ void main() {
 
         /* check format of ctrl mssg in emem */
 
-        emem_ptr = (__mem uint8_t *)((uint64_t)emem_dst << 11) +
+        emem_ptr = (__mem40 uint8_t *)((uint64_t)emem_dst << 11) +
             NFD_IN_DATA_OFFSET;
         mem_read32_swap(&cmsg_data, emem_ptr, sizeof(cmsg_data));
 
@@ -145,7 +145,7 @@ void main() {
 
         /* check the action list in emem */
 
-        emem_ptr = (__mem uint8_t *)((uint64_t)emem_dst << 11) +
+        emem_ptr = (__mem40 uint8_t *)((uint64_t)emem_dst << 11) +
             NFD_IN_DATA_OFFSET + 80;
         mem_read32(&actions_xfr, emem_ptr, sizeof(actions_xfr));
 
