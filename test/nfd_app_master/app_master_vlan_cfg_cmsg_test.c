@@ -77,7 +77,9 @@ void main() {
 
     single_ctx_test();
 
+    #if defined(__NFP_IS_6XXX)
     pkt_ctm_init_credits(PKT_BUF_CTM_CREDITS_LINK, 20, 20);
+    #endif
 
     blm_test_init();
 
