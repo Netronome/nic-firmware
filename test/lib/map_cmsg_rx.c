@@ -53,6 +53,8 @@ void map_cmsg_rx(void)
         blm_buf_free(buf, bls);
 
         __asm ctx_arb[voluntary]
+        #if defined(__NFP_IS_6XXX)
         pkt_ctm_poll_pe_credit(PKT_BUF_CTM_CREDITS_LINK);
+        #endif
     }
 }
