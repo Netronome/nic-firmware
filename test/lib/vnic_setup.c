@@ -49,7 +49,7 @@ void setup_pf_mac(const int pcie, uint32_t vid, uint64_t mac)
     __xwrite uint32_t mac_xw[2];
     mac_xw[0] = (uint32_t)(mac >> 16);
     mac_xw[1] = (uint32_t)((mac & 0xffff | (pcie << 6) | (vid)) << 16);
-    mem_write64(&mac_xw[0], (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
+    mem_write64(&mac_xw[0], (__mem40 void*) (nfd_cfg_bar_base(pcie, vid) +
                                         NFP_NET_CFG_MACADDR), sizeof(mac_xw));
 }
 
@@ -58,7 +58,7 @@ void setup_vf_mac(const int pcie, uint32_t vid, uint64_t mac)
     __xwrite uint32_t mac_xw[2];
     mac_xw[0] = (uint32_t)(mac >> 16);
     mac_xw[1] = (uint32_t)(mac & 0xffff);
-    mem_write64(&mac_xw[0], (__mem void*) (nfd_cfg_bar_base(pcie, vid) +
+    mem_write64(&mac_xw[0], (__mem40 void*) (nfd_cfg_bar_base(pcie, vid) +
                                         NFP_NET_CFG_MACADDR), sizeof(mac_xw));
 }
 void setup_sriov_mb(const int pcie, uint32_t vf, uint32_t flags)
