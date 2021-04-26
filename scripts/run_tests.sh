@@ -29,6 +29,7 @@ FAILED=0
 SKIPPED=0
 
 BLM_LINK=
+FLOWENV_NFP_INIT_LINK=
 
 if nfp-hwinfo | grep "chip.model=NFP3800" > /dev/null ; then
     CHIP_TYPE="nfp-38xxc"
@@ -38,6 +39,38 @@ else
     FLAGS="-v1"
     BLM_ME="ila0.me0"
 fi
+
+build_flowenv_nfp_init () {
+    if [ "$CHIP_TYPE" != "nfp-38xxc" ]; then
+        return 0
+    fi
+    FLOWENV_NFP_INIT_LINK="-L ${TEST_BUILD_DIR}/flowenv_nfp_init.list"
+
+    nfas -codeless -preproc64 -W3 -C -go -g -include \
+    ${TEST_DIR}/../../firmware/apps/nic/config.h -chip nfp-38xxc \
+    -DNS_PLATFORM_TYPE=20 -DGRO_NUM_BLOCKS=4 -DBLM_CUSTOM_CONFIG \
+    -I${NETRONOME}/components/standardlibrary/include \
+    -I${NETRONOME}/components/standardlibrary/microcode/include \
+    -I${NETRONOME}/components/standardlibrary/microcode/src \
+    -I${TEST_DIR}/../../firmware/apps/nic \
+    -I${TEST_DIR}/../../include \
+    -I${TEST_DIR}/../../deps/nfp-bsp-boardconfig \
+    -I${TEST_DIR}/../../deps/npfw \
+    -I${TEST_DIR}/../../deps/flowenv.git/me/include \
+    -I${TEST_DIR}/../../deps/flowenv.git/me/lib \
+    -I${TEST_DIR}/../../deps/flowenv.git/me/blocks \
+    -I${TEST_DIR}/../../deps/ng-nfd.git \
+    -I${TEST_DIR}/../../deps/ng-nfd.git/shared \
+    -I${TEST_DIR}/../../deps/ng-nfd.git/me/include \
+    -I${TEST_DIR}/../../deps/ng-nfd.git/me/blocks \
+    -I${TEST_DIR}/../../deps/ng-nfd.git/me/blocks/vnic \
+    -I${TEST_DIR}/../../deps/ng-nfd.git/me/blocks/vnic/shared \
+    -I${TEST_DIR}/../../deps/ng-nfd.git/me/lib \
+    -o ${TEST_BUILD_DIR}/flowenv_nfp_init.list \
+    ${TEST_DIR}/../../deps/flowenv.git/me/blocks/init/init_main.uc
+
+    return $?
+}
 
 build_blm () {
     BLM_LINK="-u $BLM_ME ${TEST_BUILD_DIR}/blm0.list"
@@ -100,6 +133,9 @@ for t in `find ${TEST_DIR} -iname '*_test.uc' -o -iname '*_test.c'` ; do
 
     #Check if the requirements for this test are met, if not, skip
     check_test_req $t
+    if echo $t | grep 'nfd_app_master' > /dev/null ; then
+        build_flowenv_nfp_init
+    fi
     if [[ $? -ne 0 ]]; then
         SKIPPED=$(( ${SKIPPED} + 1 ))
         continue
@@ -110,7 +146,7 @@ for t in `find ${TEST_DIR} -iname '*_test.uc' -o -iname '*_test.c'` ; do
         nfld -chip $CHIP_TYPE -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list $BLM_LINK || exit 1
     else
         nfcc -chip $CHIP_TYPE $FLAGS -Qno_decl_volatile -Itest/include -Itest/lib $* -o ${TEST_BUILD_DIR}/${FILE_BASE}.list $t || exit 1
-        nfld -chip $CHIP_TYPE -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list $BLM_LINK || exit 1
+        nfld -chip $CHIP_TYPE -mip -rtsyms -map -u i32.me0 ${TEST_BUILD_DIR}/${FILE_BASE}.list $BLM_LINK $FLOWENV_NFP_INIT_LINK || exit 1
     fi
 
     nfp-nffw unload || exit 1
