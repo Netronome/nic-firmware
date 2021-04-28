@@ -10,8 +10,8 @@
 
 ;TEST_INIT_EXEC nfp-reg mereg:i32.me0.XferIn_33=0xdeafbeef
 ;TEST_INIT_EXEC nfp-rtsym _mac_lkup_tbl:0x1540 0x04488cd1
-;TEST_INIT_EXEC nfp-rtsym _mac_lkup_tbl:0x154C 0x40006000
-;TEST_INIT_EXEC nfp-rtsym i32.NIC_CFG_INSTR_TBL:0x6000 0x44554D4D
+;TEST_INIT_EXEC nfp-rtsym _mac_lkup_tbl:0x154C 0x40001000
+;TEST_INIT_EXEC nfp-rtsym i32.NIC_CFG_INSTR_TBL:0x1000 0x44554D4D
 
 #include "pkt_ipv4_udp_x88.uc"
 #include <global.uc>
