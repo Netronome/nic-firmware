@@ -1251,7 +1251,7 @@ cfg_act_write_veb(uint32_t vid, __lmem struct nic_mac_vlan_key *veb_key,
     }
 
     mem_read32(&stored_key_rd, (__mem40 void *)&veb_stored_keys[vid],
-               sizeof(struct nic_mac_vlan_key)),
+               sizeof(struct nic_mac_vlan_key));
 
     reg_cp(&stored_key_wr, veb_key, sizeof(struct nic_mac_vlan_key));
     mem_write32(&stored_key_wr, (__mem40 void *)&veb_stored_keys[vid],
