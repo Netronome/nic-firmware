@@ -54,6 +54,11 @@
 #define CTM_ALLOC_ERR   0xffffffff
 #endif
 
+#ifndef CTM_ALLOC_RETRIES
+/* Set to -1 for infinite retries */
+#define CTM_ALLOC_RETRIES   -1
+#endif
+
 /* The smallest CTM buffer size that can be allocated is 256B */
 #define MIN_CTM_TYPE        PKT_CTM_SIZE_256
 #define MIN_CTM_SIZE        (256 << MIN_CTM_TYPE)
@@ -81,13 +86,19 @@ nic_mac_vlan_entry_op_cmsg(__lmem struct nic_mac_vlan_key *key,
     unsigned int q_idx;
     mem_ring_addr_t q_base;
 
+#if defined(__NFP_IS_38XX)
+    int alloc_tries = CTM_ALLOC_RETRIES;
+#endif
+
     q_idx = _link_sym(MAP_CMSG_Q_IDX);
     q_base = (_link_sym(MAP_CMSG_Q_BASE) >> 8) & 0xff000000;
 
     /* Allocate CTM buffer */
     /* Buffer not used but will be freed by cmsgmap ME */
 #if defined(__NFP_IS_38XX)
-    ctm_pnum = pkt_ctm_alloc(__ISLAND, MIN_CTM_TYPE);
+    for (ctm_pnum = CTM_ALLOC_ERR;
+        (ctm_pnum == CTM_ALLOC_ERR) && (alloc_tries); alloc_tries--)
+            ctm_pnum = pkt_ctm_alloc(__ISLAND, MIN_CTM_TYPE);
 #else
     #ifdef PKT_CREDITS_INDEFINITE_RETRY
     pkt_ctm_get_credits(PKT_BUF_CTM_CREDITS_LINK, 1, 1, 1, PKT_CREDITS_INDEFINITE_RETRY);
