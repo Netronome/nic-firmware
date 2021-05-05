@@ -27,7 +27,9 @@
 #include <std/reg_utils.h>
 #include "app_mac_vlan_config_cmsg.c"
 
+#if defined(__NFP_IS_6XXX)
 __asm .init _pkt_buf_ctm_credits 48 32
+#endif
 
 void map_cmsg_rx(void)
 {

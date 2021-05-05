@@ -93,9 +93,10 @@ pv_get_length(pkt_len, pkt_vec)
 #endloop
 #undef PKT_NUM_i
 
+#if (IS_NFPTYPE(__NFP6000))
 pkt_buf_alloc_ctm(pkt_num, 3, fail#, fail_alloc_macro)
-
 test_assert_equal(pkt_num, 0)
+#endif
 
 move(pkt_vec[2], 0x80000088)
 
@@ -125,8 +126,10 @@ immed[length, 15]
 
 test_pass()
 
+#if (IS_NFPTYPE(__NFP6000))
 fail#:
 test_fail()
+#endif
 
 PV_SEEK_SUBROUTINE#:
    pv_seek_subroutine(pkt_vec)

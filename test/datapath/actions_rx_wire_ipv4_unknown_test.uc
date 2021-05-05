@@ -50,8 +50,13 @@ move(pkt_num, 0)
     pkt_buf_free_ctm_buffer(--, pkt_num)
     alu[pkt_num, pkt_num, +, 1]
 .endw
+
+#if (IS_NFPTYPE(__NFP6000))
 pkt_buf_alloc_ctm(pkt_num, 3, --, test_fail)
 test_assert_equal(pkt_num, 0)
+#else
+immed[pkt_num, 0]
+#endif
 
 move(addr, 0x200)
 move(expected_i_l3_offset, (14 + 4 + 4))

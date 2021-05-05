@@ -25,8 +25,11 @@ move(pkt_num, 0)
     pkt_buf_free_ctm_buffer(--, pkt_num)
     alu[pkt_num, pkt_num, +, 1]
 .endw
+
+#if (IS_NFPTYPE(__NFP6000))
 pkt_buf_alloc_ctm(pkt_num, 3, --, test_fail)
 test_assert_equal(pkt_num, 0)
+#endif
 
 .reg pkt_vec[PV_SIZE_LW]
 aggregate_zero(pkt_vec, PV_SIZE_LW)
