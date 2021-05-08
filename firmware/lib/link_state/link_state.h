@@ -17,13 +17,21 @@
 
 
 /* Maximum Ethernet ports per MAC core and MAC island */
+#if defined(__NFP_IS_6XXX)
 #define MAX_ETH_PORTS_PER_MAC_CORE 12
+#else
+#define MAX_ETH_PORTS_PER_MAC_CORE 10
+#endif
 #define MAX_MAC_CORES_PER_MAC_ISL  2
 #define MAX_ETH_PORTS_PER_MAC_ISL                            \
     (MAX_ETH_PORTS_PER_MAC_CORE * MAX_MAC_CORES_PER_MAC_ISL)
 
 /* Maximum number of MAC islands supported on the NFP */
+#if defined(__NFP_IS_6XXX)
 #define MAX_MAC_ISLANDS_PER_NFP    2
+#else
+#define MAX_MAC_ISLANDS_PER_NFP    1
+#endif
 
 /** Macro function to determine the MAC core number for the port */
 #define ETH_PORT_TO_MAC_CORE(_p)      (_p < MAX_ETH_PORTS_PER_MAC_CORE ? 0 : 1)

@@ -28,13 +28,21 @@
 
 
 /* Maximum Ethernet ports per MAC core */
+#if defined(__NFP_IS_6XXX)
 #define MAX_ETH_PORTS_PER_MAC_CORE 12
+#else
+#define MAX_ETH_PORTS_PER_MAC_CORE 10
+#endif
 
 /* Maximum number of MAC cores per MAC island */
 #define MAX_MAC_CORES_PER_MAC_ISL  2
 
 /* Maximum number of MAC islands supported on the NFP */
+#if defined(__NFP_IS_6XXX)
 #define MAX_MAC_ISLANDS_PER_NFP    2
+#else
+#define MAX_MAC_ISLANDS_PER_NFP    1
+#endif
 
 /* Macro to convert MAC core port to MAC port. */
 #define MAC_CORE_PORT_TO_MAC_PORT(_core, _core_port)      \
@@ -54,7 +62,11 @@
 
 
 /* Maximum number of NBI islands supported on the NFP */
+#if defined(__NFP_IS_6XXX)
 #define MAX_NBI_ISLANDS_PER_NFP    2
+#else
+#define MAX_NBI_ISLANDS_PER_NFP    1
+#endif
 
 /* Maximum number of TM queues per NBI */
 #define MAX_TM_QUEUES_PER_NBI_ISL  1024
