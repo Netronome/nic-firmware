@@ -46,7 +46,8 @@ static void test(uint32_t pcie)
         vid = NFD_VF2VID(vf);
         NFD_VID2VNIC(type, vnic, vid);
 
-        setup_vf_mac(pcie, vid, 0);
+        /* The initial mac address of a vnic should not be 0 */
+        setup_vf_mac(pcie, vid, TEST_MAC + vf);
         setup_sriov_cfg_data(pcie, vf, 0, VLAN_ID + vf,
                 NFD_VF_CFG_CTRL_LINK_STATE_ENABLE | (0 << NFD_VF_CFG_CTRL_TRUSTED_shf));
 
