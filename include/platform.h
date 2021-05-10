@@ -10,6 +10,13 @@
 #ifndef __PLATFORM_H__
 #define __PLATFORM_H__
 
+#if defined(__NFP_IS_6XXX)
+    #define PORTS_PER_MAC_CORE 12
+#elif defined(__NFP_IS_38XX)
+    #define PORTS_PER_MAC_CORE 10
+#else
+    #error "Please select valid chip target."
+#endif
 
 /*
  * Macro enumeration of all platform and media type combinations.
@@ -656,13 +663,12 @@
 
 /* Alderaan 2x25GE */
 #elif (NS_PLATFORM_TYPE == NS_PLATFORM_ALDERAAN)
-    #define NS_PLATFORM_MAC_CORE(_port)           0
-    #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
+    #define NS_PLATFORM_MAC_CORE(_port)           (((_port) == 0) ? 0 : 1)
+    #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) 0
     #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port)   \
         (NS_PLATFORM_MAC_CORE_SERDES_LO(_port) + 3)
-    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
-        ((_serdes) >> 2)
-    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) (_core)
+    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port == 0) ? 0 : 64)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
     #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
@@ -672,20 +678,18 @@
     #define NS_PLATFORM_PCLK                      800
     #define NS_PLATFORM_PORT_SPEED(_port)         25
     #define NS_PLATFORM_TCLK                      800
-    #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
-    #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
+    #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x001
+    #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x001
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
 
 /* Alderaan 2x10GE */
 #elif (NS_PLATFORM_TYPE == NS_PLATFORM_ALDERAAN_2x10)
-    #define NS_PLATFORM_MAC_CORE(_port)           0
-    #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) ((_port) << 2)
-    #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) \
-        NS_PLATFORM_MAC_CORE_SERDES_LO(_port)
-    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) \
-        ((_serdes) >> 2)
-    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port) << 4)
+    #define NS_PLATFORM_MAC_CORE(_port)           (((_port) == 0) ? 0 : 1)
+    #define NS_PLATFORM_MAC_CORE_SERDES_LO(_port) 0
+    #define NS_PLATFORM_MAC_CORE_SERDES_HI(_port) 0
+    #define NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, _core, _serdes) (_core)
+    #define NS_PLATFORM_MAC_CHANNEL_LO(_port)     ((_port == 0) ? 0 : 64)
     #define NS_PLATFORM_MAC_CHANNEL_HI(_port)   \
         (NS_PLATFORM_MAC_CHANNEL_LO(_port) + 3)
     #define NS_PLATFORM_MAC_PCP_REMAP(_pcp)       ((_pcp <= 3) ? _pcp : 3)
@@ -695,12 +699,11 @@
     #define NS_PLATFORM_PCLK                      800
     #define NS_PLATFORM_PORT_SPEED(_port)         10
     #define NS_PLATFORM_TCLK                      800
-    #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x011
-    #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x000
+    #define NS_PLATFORM_MAC_0_CORE_0_PORTS_MASK   0x001
+    #define NS_PLATFORM_MAC_0_CORE_1_PORTS_MASK   0x001
     #define NS_PLATFORM_MAC_1_CORE_0_PORTS_MASK   0x000
     #define NS_PLATFORM_MAC_1_CORE_1_PORTS_MASK   0x000
 #endif
-
 
 #ifdef NS_PLATFORM_TYPE
     /* Derived preprocessor macros, common to all platforms */
@@ -714,15 +717,16 @@
         (NS_PLATFORM_MAC_CORE_SERDES_HI(_port) -    \
          NS_PLATFORM_MAC_CORE_SERDES_LO(_port) + 1)
     #define NS_PLATFORM_MAC_SERDES_HI(_port) \
-        (NS_PLATFORM_MAC_CORE(_port) * 12 +  \
-         NS_PLATFORM_MAC_CORE_SERDES_HI(_port))
+        (NS_PLATFORM_MAC_CORE(_port) * PORTS_PER_MAC_CORE +  \
+        NS_PLATFORM_MAC_CORE_SERDES_HI(_port))
     #define NS_PLATFORM_MAC_SERDES_LO(_port) \
-        (NS_PLATFORM_MAC_CORE(_port) * 12 +  \
-         NS_PLATFORM_MAC_CORE_SERDES_LO(_port))
-    #define NS_PLATFORM_MAC_SERDES_TO_PORT(_mac, _serdes)              \
-        ((_serdes < 12)                                        ?       \
-         NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, 0, _serdes) :       \
-         NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, 1, (_serdes) - 12))
+        (NS_PLATFORM_MAC_CORE(_port) * PORTS_PER_MAC_CORE +  \
+        NS_PLATFORM_MAC_CORE_SERDES_LO(_port))
+    #define NS_PLATFORM_MAC_SERDES_TO_PORT(_mac, _serdes) \
+        ((_serdes < PORTS_PER_MAC_CORE) ? \
+        NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, 0, _serdes) : \
+        NS_PLATFORM_MAC_CORE_SERDES_TO_PORT(_mac, 1, \
+                                           (_serdes) - PORTS_PER_MAC_CORE))
     #define NS_PLATFORM_NBI_TM_QID(_port, _pcp, _l2q)          \
         ((NS_PLATFORM_MAC_CHANNEL(_port, _pcp) << 3) + (_l2q))
     #define NS_PLATFORM_NBI_TM_QID_HI(_port)           \
