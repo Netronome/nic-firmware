@@ -22,7 +22,8 @@ __asm {
     #if defined(__NFP_IS_6XXX)
         .alloc_mem _nic_stats_queue imem+0 global (512 * NIC_STATS_QUEUE_SIZE) 256
     #elif defined(__NFP_IS_38XX)
-        .alloc_mem _nic_stats_queue emem+0 global (512 * NIC_STATS_QUEUE_SIZE) 256
+        .alloc_mem _nic_stats_queue emem_cache_upper+0 global (512 * NIC_STATS_QUEUE_SIZE) 256
+        .init_csr xpbm:ExtMu0IsldXpbmMap.Island.ExtMuXpbMap.MuStatsReg.MUSEBaseAddr0.MUSEBaseAddr 0x40000
     #else
         #error "Please select valid chip target."
     #endif
@@ -33,7 +34,8 @@ __asm {
     #if (IS_NFPTYPE(__NFP6000))
         .alloc_mem _nic_stats_queue imem+0 global (512 * NIC_STATS_QUEUE_SIZE) 256
     #elif IS_NFPTYPE(__NFP3800)
-        .alloc_mem _nic_stats_queue emem+0 global (512 * NIC_STATS_QUEUE_SIZE) 256
+        .alloc_mem _nic_stats_queue emem_cache_upper+0 global (512 * NIC_STATS_QUEUE_SIZE) 256
+        .init_csr xpbm:ExtMu0IsldXpbmMap.Island.ExtMuXpbMap.MuStatsReg.MUSEBaseAddr0.MUSEBaseAddr 0x40000
     #else
         #error "Unsupported chip type selected."
     #endif
