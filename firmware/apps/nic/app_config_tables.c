@@ -507,8 +507,8 @@ upd_slicc_hash_table(void)
     uint32_t i;
     uint32_t t;
     uint32_t start_offset = SLICC_HASH_PAD_NN_IDX;
-    __mem uint32_t *slicc_hash_data =
-        (__mem uint32_t *) __link_sym("SLICC_HASH_PAD_DATA");
+    __mem40 uint32_t *slicc_hash_data =
+        (__mem40 uint32_t *) __link_sym("SLICC_HASH_PAD_DATA");
 
     for (t=0; t<SLICC_HASH_PAD_SIZE_LW; t+=(sizeof(xrd_data)/4)) {
         mem_read32(xrd_data, (__mem40 void *)slicc_hash_data, sizeof(xrd_data));
@@ -893,7 +893,7 @@ __intrinsic void
 cfg_act_append_tx_host(action_list_t *acts, uint32_t pcie, uint32_t vid,
                        uint32_t cont, uint32_t multicast)
 {
-    __mem uint32_t *fl_buf_sz_cache = (__mem uint32_t *)
+    __mem40 uint32_t *fl_buf_sz_cache = (__mem40 uint32_t *)
                                        __link_sym("_fl_buf_sz_cache");
     uint32_t min_rxb = 0;
     instr_tx_host_t instr_tx_host;
@@ -1198,8 +1198,8 @@ cfg_act_cache_fl_buf_sz(uint32_t pcie, uint32_t vid)
     int i;
     __xread uint32_t rxb_r;
     __xwrite uint32_t rxb_w;
-    __mem uint32_t *fl_buf_sz_cache =
-        (__mem uint32_t *) __link_sym("_fl_buf_sz_cache");
+    __mem40 uint32_t *fl_buf_sz_cache =
+        (__mem40 uint32_t *) __link_sym("_fl_buf_sz_cache");
 
     mem_read32(&rxb_r,
                (__mem40 void*) (nfd_cfg_bar_base(pcie, vid) +

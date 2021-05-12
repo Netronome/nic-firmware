@@ -364,7 +364,7 @@ perq_stats_loop(void)
 static int
 lsc_send(int pcie, int vid)
 {
-    __mem char *nic_ctrl_bar;
+    __mem40 char *nic_ctrl_bar;
     unsigned int automask;
     __xread unsigned int tmp;
     __gpr unsigned int entry;
@@ -372,7 +372,7 @@ lsc_send(int pcie, int vid)
     __xwrite uint32_t mask_w;
     int ret = 0;
 
-    nic_ctrl_bar = (__mem char *)nfd_cfg_bar_base(pcie, vid);
+    nic_ctrl_bar = (__mem40 char *)nfd_cfg_bar_base(pcie, vid);
 
     mem_read32_le(&tmp, (__mem40 char *)nic_ctrl_bar + NFP_NET_CFG_LSC, sizeof(tmp));
     entry = tmp & 0xff;
@@ -407,7 +407,7 @@ out:
 static void
 lsc_check_vf(int pcie, int port, enum link_state ls)
 {
-    __mem char *vf_ctrl_bar;
+    __mem40 char *vf_ctrl_bar;
     unsigned int vf_vid;
     __xwrite uint32_t sts;
     __xread uint32_t ctrl;
@@ -427,7 +427,7 @@ lsc_check_vf(int pcie, int port, enum link_state ls)
                 NFP_NET_CFG_STS_LINK_RATE_SHIFT);
             }
 
-            vf_ctrl_bar = (__mem char *)nfd_cfg_bar_base(pcie, vf_vid);
+            vf_ctrl_bar = (__mem40 char *)nfd_cfg_bar_base(pcie, vf_vid);
             mem_write32(&sts, (__mem40 char *)vf_ctrl_bar + NFP_NET_CFG_STS, sizeof(sts));
             /* Make sure the config BAR is updated before we send
                the notification interrupt */
@@ -446,7 +446,7 @@ lsc_check_vf(int pcie, int port, enum link_state ls)
 static
 void lsc_check(int pcie, int port)
 {
-    __mem char *nic_ctrl_bar;
+    __mem40 char *nic_ctrl_bar;
     __gpr enum link_state ls;
     __gpr enum link_state vs;
     __gpr int changed = 0;
@@ -457,7 +457,7 @@ void lsc_check(int pcie, int port)
 
     /* Update pf corresponding to port */
     pf_vid = NFD_PF2VID(port);
-    nic_ctrl_bar = (__mem char *)nfd_cfg_bar_base(pcie, pf_vid);
+    nic_ctrl_bar = (__mem40 char *)nfd_cfg_bar_base(pcie, pf_vid);
 
     /* link state according to MAC */
     ls = mac_eth_port_link_state(NS_PLATFORM_MAC(port),

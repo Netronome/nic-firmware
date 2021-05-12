@@ -60,7 +60,7 @@ __export __shared __emem struct macstats_port_accum mac_stats[24];
 
 static void mac_stats_accumulate(void)
 {
-    __mem uint64_t *stat;
+    __mem40 uint64_t *stat;
     __xread uint64_t head_drops;
     __xread uint32_t tmq_drop[2];
     __xread uint64_t read_block[8];
@@ -106,15 +106,15 @@ static void mac_stats_accumulate(void)
 	    wait_for_all(&s1, &s2);
 
 	    for (i = 0; i < sizeof(write_block) / 8; ++i) {
-		stat = ((__mem uint64_t *) &_mac_stats[port]) + offset / 8 + i;
-		if (stat == (__mem uint64_t *) &_mac_stats[port].RxMacHeadDrop)
+		stat = ((__mem40 uint64_t *) &_mac_stats[port]) + offset / 8 + i;
+		if (stat == (__mem40 uint64_t *) &_mac_stats[port].RxMacHeadDrop)
                     write_block[i] = swapw64(_mac_drops[port].rx_discards);
-		else if (stat == (__mem uint64_t *) &_mac_stats[port].TxQueueDrop)
+		else if (stat == (__mem40 uint64_t *) &_mac_stats[port].TxQueueDrop)
                     write_block[i] = swapw64(_mac_drops[port].tx_discards);
 		else {
-		    if (stat == (__mem uint64_t *) &_mac_stats[port].TxPIfOutErrors)
+		    if (stat == (__mem40 uint64_t *) &_mac_stats[port].TxPIfOutErrors)
 			_mac_drops[port].tx_errors = swapw64(read_block[i]);
-                    else if (stat == (__mem uint64_t *) &_mac_stats[port].RxPIfInErrors)
+                    else if (stat == (__mem40 uint64_t *) &_mac_stats[port].RxPIfInErrors)
 			_mac_drops[port].rx_errors = swapw64(read_block[i]);
 		    write_block[i] = read_block[i];
 		}
@@ -278,7 +278,7 @@ static void vnic_stats_accumulate()
     struct pkt_cntr_addr addr;
     SIGNAL s1, s2;
 
-    __mem nic_stats_queue_t *stats_queue = (__mem nic_stats_queue_t *) __link_sym("_nic_stats_queue");
+    __mem40 nic_stats_queue_t *stats_queue = (__mem40 nic_stats_queue_t *) __link_sym("_nic_stats_queue");
     __emem nic_stats_vnic_t *stats_vnic = (__emem nic_stats_vnic_t *) __link_sym("_nic_stats_vnic");
 
     for (vid = 0; vid < NVNICS; ++vid) {

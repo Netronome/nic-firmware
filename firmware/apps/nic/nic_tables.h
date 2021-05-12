@@ -41,7 +41,7 @@ struct vlan_filter_cfg {
 #define NIC_NO_VLAN_ID  4095
 
 /* VLAN to vid mapping table */
-__export __shared __mem uint64_t nic_vlan_to_vnics_map_tbl[NFD_MAX_ISL][NIC_NUM_VLANS];
+__export __shared __mem40 uint64_t nic_vlan_to_vnics_map_tbl[NFD_MAX_ISL][NIC_NUM_VLANS];
 
 
 /**
