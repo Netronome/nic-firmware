@@ -218,7 +218,7 @@ init_catamaran_chan2port_table(void)
         }
 
         /* Commit the configuration for the port. */
-        catamaran_chan2port_table_set(NS_PLATFORM_MAC_CORE(port),
+        catamaran_chan2port_table_set(NS_PLATFORM_MAC(port),
                                       NS_PLATFORM_MAC_CHANNEL_LO(port),
                                       NS_PLATFORM_MAC_CHANNEL_HI(port),
                                       entries);
