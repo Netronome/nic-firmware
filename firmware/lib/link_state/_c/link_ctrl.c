@@ -87,6 +87,15 @@
      (((_core_port) & 0x3f) << 8)  | (((_cmd_code) & 0xff) << 0))
 
 
+/* Select whether to use MAC CSR Sync ME or direct write */
+#ifdef __NFP_IS_6XXX
+#define SET_MAC_CONF_CSR(_isl, _core, _port, _code, _recache) \
+    issue_sync_me_cmd(_isl, _core, _port, _code, _recache)
+#else
+#define SET_MAC_CONF_CSR(_isl, _core, _port, _code, _recache) \
+    mac_csr_direct_write(_isl, _core, _port, _code)
+#endif
+
 /* *** MAC CSR Sync ME Functions *** */
 
 #define MAX_NUM_MBOXES 4
@@ -164,6 +173,36 @@ mac_csr_sync_start(uint32_t disable_gpio_poll)
 }
 
 
+/* *** MAC CSR direct write, used instead of sync ME on NFP38xx *** */
+__intrinsic void
+mac_csr_direct_write(unsigned int mac_isl, unsigned int mac_core,
+                     unsigned int mac_core_port, unsigned int cmd_code)
+{
+    uint32_t mac_conf_addr;
+    uint32_t val;
+
+    mac_conf_addr = MAC_CONF_ADDR(mac_isl, mac_core, mac_core_port);
+    val = xpb_read(mac_conf_addr);
+
+    switch (cmd_code) {
+    case ARB_CODE_ETH_CMD_CFG_DISABLE_RX:
+        val &= ~NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
+        break;
+    case ARB_CODE_ETH_CMD_CFG_ENABLE_RX:
+        val |= NFP_MAC_ETH_SEG_CMD_CONFIG_RX_ENABLE;
+        break;
+    case ARB_CODE_ETH_CMD_CFG_DISABLE_FLUSH:
+        val &= ~NFP_MAC_ETH_SEG_CMD_CONFIG_TX_FLUSH;
+        break;
+    case ARB_CODE_ETH_CMD_CFG_ENABLE_FLUSH:
+        val |= NFP_MAC_ETH_SEG_CMD_CONFIG_TX_FLUSH;
+        break;
+    }
+
+    xpb_write(mac_conf_addr, val);
+}
+
+
 /* *** MAC RX Enable/Disable Functions *** */
 
 __intrinsic int
@@ -220,8 +259,8 @@ mac_eth_disable_rx(unsigned int mac_isl, unsigned int mac_core,
     } while (mac_inhibit_done != mac_port_mask);
 
     /* Clear the MAC RX enable for the port. */
-    issue_sync_me_cmd(mac_isl, mac_core, mac_core_port,
-                      ARB_CODE_ETH_CMD_CFG_DISABLE_RX, 0);
+    SET_MAC_CONF_CSR(mac_isl, mac_core, mac_core_port,
+                     ARB_CODE_ETH_CMD_CFG_DISABLE_RX, 0);
 
 
     /* Verify that the MAC RX is disabled for the port. */
@@ -249,8 +288,8 @@ mac_eth_enable_rx(unsigned int mac_isl, unsigned int mac_core,
     assert(mac_core_port < MAX_ETH_PORTS_PER_MAC_CORE);
 
     /* Set the MAC RX enable for the port. */
-    issue_sync_me_cmd(mac_isl, mac_core, mac_core_port,
-                      ARB_CODE_ETH_CMD_CFG_ENABLE_RX, 0);
+    SET_MAC_CONF_CSR(mac_isl, mac_core, mac_core_port,
+                     ARB_CODE_ETH_CMD_CFG_ENABLE_RX, 0);
 
     return;
 }
@@ -288,8 +327,8 @@ mac_eth_disable_tx_flush(unsigned int mac_isl, unsigned int mac_core,
     assert(mac_core_port < MAX_ETH_PORTS_PER_MAC_CORE);
 
     /* Clear the MAC TX flush enable for the port. */
-    issue_sync_me_cmd(mac_isl, mac_core, mac_core_port,
-                      ARB_CODE_ETH_CMD_CFG_DISABLE_FLUSH, 0);
+    SET_MAC_CONF_CSR(mac_isl, mac_core, mac_core_port,
+                     ARB_CODE_ETH_CMD_CFG_DISABLE_FLUSH, 0);
 
     return;
 }
@@ -305,8 +344,8 @@ mac_eth_enable_tx_flush(unsigned int mac_isl, unsigned int mac_core,
     assert(mac_core_port < MAX_ETH_PORTS_PER_MAC_CORE);
 
     /* Set the MAC TX flush enable for the port. */
-    issue_sync_me_cmd(mac_isl, mac_core, mac_core_port,
-                      ARB_CODE_ETH_CMD_CFG_ENABLE_FLUSH, 0);
+    SET_MAC_CONF_CSR(mac_isl, mac_core, mac_core_port,
+                     ARB_CODE_ETH_CMD_CFG_ENABLE_FLUSH, 0);
 
     return;
 }
