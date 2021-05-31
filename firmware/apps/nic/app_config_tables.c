@@ -365,7 +365,7 @@ upd_rx_wire_instr(__xwrite uint32_t *xwr_instr,
                   uint32_t start_offset, uint32_t count)
 {
     __cls __addr32 void *nic_cfg_instr_tbl =
-        (__cls __addr32 void*) __link_sym("NIC_CFG_INSTR_TBL");
+        (__cls __addr32 void*) __link_sym("NIC_CFG_INSTR_TBL_NBI");
 
     SIGNAL sig;
     uint32_t addr_hi;
@@ -396,7 +396,7 @@ upd_rx_host_instr(__xwrite uint32_t *xwr_instr,
                   uint32_t start_offset, uint32_t count, uint32_t num_pcie_q)
 {
     __cls __addr32 void *nic_cfg_instr_tbl =
-        (__cls __addr32 void*) __link_sym("NIC_CFG_INSTR_TBL");
+        (__cls __addr32 void*) __link_sym("NIC_CFG_INSTR_TBL_NFD");
     SIGNAL last_sig;
     uint32_t addr_hi;
     uint32_t addr_lo;
@@ -564,7 +564,8 @@ cfg_act_init(action_list_t *acts)
 
 
 __intrinsic void
-cfg_act_write_queue(uint32_t qid, action_list_t *acts)
+cfg_act_write_queue(uint32_t qid, action_list_t *acts,
+                    __cls __addr32 void *tbl_addr)
 {
     SIGNAL sig;
     uint32_t addr_hi;
@@ -573,14 +574,12 @@ cfg_act_write_queue(uint32_t qid, action_list_t *acts)
     uint32_t count;
     struct nfp_mecsr_prev_alu ind;
     __xwrite uint32_t xwr_instr[NIC_MAX_INSTR];
-    __cls __addr32 void *nic_cfg_instr_tbl = (__cls __addr32 void*)
-                                              __link_sym("NIC_CFG_INSTR_TBL");
 
     reg_cp(xwr_instr, (void *) acts->instr, NIC_MAX_INSTR << 2);
     count = acts->count;
 
     for (isl = 0; isl < sizeof(app_isl_ids) / sizeof(uint32_t); isl++) {
-        addr_lo = (uint32_t) nic_cfg_instr_tbl + qid * NIC_MAX_INSTR * 4;
+        addr_lo = (uint32_t)tbl_addr + qid * NIC_MAX_INSTR * 4;
         addr_hi = app_isl_ids[isl] >> 4; /* only use island, mask out ME */
         addr_hi = (addr_hi << (34 - 8)); /* address shifted by 8 in instr */
 
@@ -600,16 +599,22 @@ __intrinsic void
 cfg_act_write_host(uint32_t pcie, uint32_t vid, action_list_t *acts)
 {
     uint32_t i;
+    __cls __addr32 void *nic_cfg_instr_tbl =
+        (__cls __addr32 void*) __link_sym("NIC_CFG_INSTR_TBL_NFD");
 
     for (i = 0; i < NFD_VID_MAXQS(vid); ++i)
-        cfg_act_write_queue((pcie << 6) | NFD_VID2QID(vid, i), acts);
+        cfg_act_write_queue((pcie << 6) | NFD_VID2QID(vid, i), acts,
+                            nic_cfg_instr_tbl);
 }
 
 
 __intrinsic void
 cfg_act_write_wire(uint32_t port, action_list_t *acts)
 {
-    cfg_act_write_queue((1 << 8) | port, acts);
+    __cls __addr32 void *nic_cfg_instr_tbl =
+        (__cls __addr32 void*) __link_sym("NIC_CFG_INSTR_TBL_NBI");
+
+    cfg_act_write_queue(port, acts, nic_cfg_instr_tbl);
 }
 
 

@@ -18,11 +18,41 @@
 #define NIC_MAX_INSTR       16      // max number of instructions in table
 
 #define NIC_CFG_INSTR_TBL_ADDR 0x00
-#define NIC_CFG_INSTR_TBL_SIZE 32768
-
+#if defined(__NFP_LANG_ASM)
+    #if (IS_NFPTYPE(__NFP6000))
+        #define NIC_CFG_INSTR_TBL_ADDR_NFD NIC_CFG_INSTR_TBL_ADDR
+        #define NIC_CFG_INSTR_TBL_SIZE_NFD 16384
+        #define NIC_CFG_INSTR_TBL_ADDR_NBI 16384
+        #define NIC_CFG_INSTR_TBL_SIZE_NBI 16384
+        #define NIC_RSS_TBL_ADDR 32768
+    #elif (IS_NFPTYPE(__NFP3800))
+        #define NIC_CFG_INSTR_TBL_ADDR_NFD NIC_CFG_INSTR_TBL_ADDR
+        #define NIC_CFG_INSTR_TBL_SIZE_NFD 8192
+        #define NIC_CFG_INSTR_TBL_ADDR_NBI 16384
+        #define NIC_CFG_INSTR_TBL_SIZE_NBI 1024
+        #define NIC_RSS_TBL_ADDR 8192
+    #else
+        #error "Unsupported chip type"
+    #endif
+#else
+    #if defined(__NFP_IS_6XXX)
+        #define NIC_CFG_INSTR_TBL_ADDR_NFD NIC_CFG_INSTR_TBL_ADDR
+        #define NIC_CFG_INSTR_TBL_SIZE_NFD 16384
+        #define NIC_CFG_INSTR_TBL_ADDR_NBI 16384
+        #define NIC_CFG_INSTR_TBL_SIZE_NBI 16384
+        #define NIC_RSS_TBL_ADDR 32768
+    #elif defined(__NFP_IS_38XX)
+        #define NIC_CFG_INSTR_TBL_ADDR_NFD NIC_CFG_INSTR_TBL_ADDR
+        #define NIC_CFG_INSTR_TBL_SIZE_NFD 8192
+        #define NIC_CFG_INSTR_TBL_ADDR_NBI 16384
+        #define NIC_CFG_INSTR_TBL_SIZE_NBI 1024
+        #define NIC_RSS_TBL_ADDR 8192
+    #else
+        #error "Unsupported chip type"
+    #endif
+#endif
 #define RSS_TBL_SIZE_LW     (NFP_NET_CFG_RSS_ITBL_SZ / 4)
 #define NIC_RSS_TBL_SIZE    (NFP_NET_CFG_RSS_ITBL_SZ * NS_PLATFORM_NUM_PORTS * NFD_MAX_ISL)
-#define NIC_RSS_TBL_ADDR    NIC_CFG_INSTR_TBL_SIZE
 
 #define VLAN_TO_VNICS_MAP_TBL_SIZE ((1<<12) * 8)
 
@@ -32,8 +62,11 @@
  *   use NIC_HOST_MAX_ENTRIES .. NIC_WIRE_MAX_ENTRIES+NIC_HOST_MAX_ENTRIES*/
 #if defined(__NFP_LANG_ASM)
 
-    .alloc_mem NIC_CFG_INSTR_TBL cls+NIC_CFG_INSTR_TBL_ADDR \
-                island NIC_CFG_INSTR_TBL_SIZE addr40
+    .alloc_mem NIC_CFG_INSTR_TBL_NFD cls+NIC_CFG_INSTR_TBL_ADDR_NFD \
+                island NIC_CFG_INSTR_TBL_SIZE_NFD addr40
+
+    .alloc_mem NIC_CFG_INSTR_TBL_NBI cls+NIC_CFG_INSTR_TBL_ADDR_NBI \
+                island NIC_CFG_INSTR_TBL_SIZE_NBI addr40
 
     .alloc_mem NIC_RSS_TBL cls+NIC_RSS_TBL_ADDR \
                 island NIC_RSS_TBL_SIZE addr40
@@ -52,8 +85,14 @@
 
     __asm
     {
-        .alloc_mem NIC_CFG_INSTR_TBL cls + NIC_CFG_INSTR_TBL_ADDR \
-            island NIC_CFG_INSTR_TBL_SIZE addr40
+        .alloc_mem NIC_CFG_INSTR_TBL_NFD cls + NIC_CFG_INSTR_TBL_ADDR_NFD \
+            island NIC_CFG_INSTR_TBL_SIZE_NFD addr40
+    }
+
+    __asm
+    {
+        .alloc_mem NIC_CFG_INSTR_TBL_NBI cls + NIC_CFG_INSTR_TBL_ADDR_NBI \
+            island NIC_CFG_INSTR_TBL_SIZE_NBI addr40
     }
 
     __asm
@@ -469,16 +508,16 @@ typedef union {
     #define __OFFSET 0
 
     #while (__LOOP <= (NUM_PCIE_Q_PER_PORT * NS_PLATFORM_NUM_PORTS))
-        .init NIC_CFG_INSTR_TBL+__OFFSET  ((INSTR_RX_HOST << INSTR_OPCODE_LSB) | 16383) INSTR_DROP
+        .init NIC_CFG_INSTR_TBL_NFD+__OFFSET  ((INSTR_RX_HOST << INSTR_OPCODE_LSB) | 16383) INSTR_DROP
         #define_eval __OFFSET (__OFFSET + (4 * NIC_MAX_INSTR))
         #define_eval __LOOP (__LOOP + 1)
     #endloop
 
     #define_eval __LOOP 0
-    #define_eval __OFFSET ((1 << 8) * (NIC_MAX_INSTR * 4))
+    #define_eval __OFFSET 0
 
     #while (__LOOP < NS_PLATFORM_NUM_PORTS)
-        .init NIC_CFG_INSTR_TBL+__OFFSET  ((INSTR_RX_WIRE << INSTR_OPCODE_LSB) | 16383) INSTR_DROP
+        .init NIC_CFG_INSTR_TBL_NBI+__OFFSET  ((INSTR_RX_WIRE << INSTR_OPCODE_LSB) | 16383) INSTR_DROP
         #define_eval __OFFSET (__OFFSET + (4 * NIC_MAX_INSTR))
         #define_eval __LOOP (__LOOP + 1)
 	#endloop
