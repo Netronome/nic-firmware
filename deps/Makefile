@@ -35,6 +35,7 @@ $(DEPS_DIR)/flowenv.git:
 	cd $(FLOWENV_DIR) && git checkout $(FLOWENV_REV)
 	cd $(DEPS_DIR)/flowenv.git && patch -p1 < ../gro_multicast.patch && cd -
 	cd $(DEPS_DIR)/flowenv.git && patch -p1 < ../big_sleep.patch && cd -
+	cd $(DEPS_DIR)/flowenv.git && patch -p1 < ../flowenv_nfcc_v1_compat.patch && cd -
 
 GIT_DEPS += $(FLOWENV_DIR)
 GIT_REVS += $(FLOWENV_REV)

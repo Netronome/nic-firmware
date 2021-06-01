@@ -1,0 +1,12 @@
+diff --git a/me/lib/nfp/_c/macstats.c b/me/lib/nfp/_c/macstats.c
+index 6fe9aad..a84e20c 100644
+--- a/me/lib/nfp/_c/macstats.c
++++ b/me/lib/nfp/_c/macstats.c
+@@ -135,7 +135,7 @@ mac_stats_commit(__xwrite uint32_t *stats_xw,
+
+     xw = stats_xw;
+     __asm mem[add64, *xw, dst_hi, <<8, dst_lo, 4], ctx_swap[sig];
+-    xw += 8;
++    xw = stats_xw + 8;
+     __asm mem[add64, *xw, dst_hi, <<8, dst_lo2, 4], ctx_swap[sig];
+ }
