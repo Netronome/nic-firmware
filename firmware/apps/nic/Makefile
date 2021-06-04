@@ -225,7 +225,7 @@ else
         #GRO ME's
         GRO_MES=mei0.me11 mei0.me10 mei1.me11 mei1.me10
 
-        BLM_ME=pcie0.me7
+        BLM_ME=crypto0.me0
 
         #cmsg map handler
         MAPCMSG_ME=mei2.me11

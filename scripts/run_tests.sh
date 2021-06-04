@@ -33,7 +33,7 @@ FLOWENV_NFP_INIT_LINK=
 
 if nfp-hwinfo | grep "chip.model=NFP3800" > /dev/null ; then
     CHIP_TYPE="nfp-38xxc"
-    BLM_ME="pcie0.me7"
+    BLM_ME="crypto0.me0"
 else
     CHIP_TYPE="nfp-4xxx-b0"
     FLAGS="-v1"
