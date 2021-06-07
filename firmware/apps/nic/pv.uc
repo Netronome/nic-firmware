@@ -818,6 +818,7 @@ end#:
 /**
  * GRO descriptor for delivery via NBI
  *
+ * for NFP6XXX:
  * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
  * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  * Word  +-------------------------------------------------+-------+-----+
@@ -832,13 +833,33 @@ end#:
  *
  * Words 1 through 3 correspond to the arguments to the packet complete
  * command that will ultimately be used by GRO to send the packet.
+-------------------------------------------------------------------------------------
+ * for NFP38XX:
+ * Bit    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0
+ * -----\ 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ * Word  +---+---+-----------------------------------------+-------+-----+
+ *    0  |   |S3 |            Reserved                     |  NBI  |  1  |
+ *       +---+---+-------+-------+-------------------------+-------+-----+
+ *    1  |NBI|  CTM ISL  |  DM   |                  0                    | (addr_hi)
+ *       +---+-----------+-------+-------+---+---------------------------+
+ *    2  |     0         | Packet Number |S1 | Packet Len (incl. offset) | (addr_lo)
+ *       +---+-----------+---------------+---+-+---------+---------------+
+ *    3  | 0 |  CBS  |     TX Queue      |  0  |   S2    |     0xCB      | (prev_alu)
+ *       +---+---------------------------------+---------+---------------+
+ * when pm disabled(default), pkt start offset(pso) = ((S3<<5)|S2)*4+8+S1
+ *                            since pso is 4B aligned, S1=0
+ *                            S2 = ((pso - 8) >> 2) & 0x1f
+ *                            S3 = ((pso - 8) >> 7) & 0x3
+ * when pm enabled, pkt start offset = ((S3<<5)|S2)*8+8, must be 8 aligned
+ *
+ * Words 0 through 3 correspond to the arguments to the packet complete
+ * command that will ultimately be used by GRO to send the packet.
  */
 #macro pv_get_gro_wire_desc(out_desc, in_vec, in_nbi, in_tm_q, in_pms_offset)
 .begin
     .reg addr_hi
     .reg addr_lo
     .reg ctm_buf_sz
-    .reg desc
     .reg prev_alu
 
     .reg ctm_buf_s
@@ -848,6 +869,37 @@ end#:
         #error "SCS will break __MEID used below."
     #endif
 
+#if (IS_NFPTYPE(__NFP3800))
+    .reg word_0
+    .reg pkt_off
+
+    alu[pkt_off, in_pms_offset, -, 8]
+
+    alu[prev_alu, 0x1f, AND, pkt_off, >>2]
+    alu[pkt_off, 0x3, AND, pkt_off, >>7]
+    ld_field_w_clr[addr_hi, 1000, BF_A(in_vec, PV_CTM_ISL_bf), >>2] ; PV_CTM_ISL_bf
+    #if (NBI_COUNT > 2)
+        #error "Implementation relies on single bit in_nbi."
+    #elif (NBI_COUNT > 1)
+        passert((GRO_DEST_IFACE_BASE & 1), "EQ", 0)
+        #error change GRO_DTYPE_IFACE for multicast
+        alu[word_0, (GRO_DTYPE_IFACE | (GRO_DEST_IFACE_BASE << GRO_META_DEST_shf)), OR, in_nbi, <<GRO_META_DEST_shf]
+        alu[out_desc[GRO_META_TYPE_wrd], word_0, OR, pkt_off, <<GRO_META_NBI_OFFSET_shf]
+        alu[addr_hi, addr_hi, OR, in_nbi, <<30]
+    #else
+        alu[out_desc[GRO_META_TYPE_wrd], (GRO_DTYPE_IFACE | (GRO_DEST_IFACE_BASE << GRO_META_DEST_shf)), OR, pkt_off, <<GRO_META_NBI_OFFSET_shf]
+    #endif
+    alu[out_desc[GRO_META_NBI_ADDRHI_wrd], addr_hi, OR, ((__MEID & 1) + 2), <<20] ; __MEID
+
+    alu[addr_lo, BF_A(in_vec, PV_NUMBER_bf), AND~, BF_MASK(PV_BLS_bf), <<BF_L(PV_BLS_bf)] ; PV_BLS_bf
+    alu[addr_lo, addr_lo, AND~, BF_MASK(PV_CTM_ISL_bf), <<BF_L(PV_CTM_ISL_bf)] ; PV_CTM_ISL_bf
+    alu[out_desc[GRO_META_NBI_ADDRLO_wrd], addr_lo, +16, BF_A(in_vec, PV_CTM_ADDR_bf)] ; PV_CTM_ADDR_bf
+
+    alu[prev_alu, 0xcb, OR, prev_alu, <<8]
+    alu[prev_alu, prev_alu, OR, in_tm_q, <<16]
+    bitfield_extract__sz1(ctm_buf_sz, BF_AML(in_vec, PV_CBS_bf)) ; PV_CBS_bf
+    alu[out_desc[GRO_META_NBI_PALU_wrd], prev_alu, OR, ctm_buf_sz, <<26]
+#else
     ld_field_w_clr[addr_hi, 1000, BF_A(in_vec, PV_CTM_ISL_bf), >>2] ; PV_CTM_ISL_bf
     #if (NBI_COUNT > 2)
         #error "Implementation relies on single bit in_nbi."
@@ -874,6 +926,7 @@ end#:
     alu[prev_alu, prev_alu, OR, in_tm_q, <<16]
     bitfield_extract__sz1(ctm_buf_sz, BF_AML(in_vec, PV_CBS_bf)) ; PV_CBS_bf
     alu[out_desc[GRO_META_NBI_PALU_wrd], prev_alu, OR, ctm_buf_sz, <<28]
+#endif
 
 .end
 #endm
@@ -900,6 +953,21 @@ end#:
     alu[out_addr_lo, out_addr_lo, AND~, BF_MASK(PV_CTM_ISL_bf), <<BF_L(PV_CTM_ISL_bf)] ; PV_CTM_ISL_bf
     alu[out_addr_lo, out_addr_lo, +16, BF_A(in_vec, PV_CTM_ADDR_bf)] ; PV_CTM_ADDR_bf
 
+#if (IS_NFPTYPE(__NFP3800))
+    .reg pkt_off
+
+    alu[pkt_off, in_pms_offset, -, 8]
+
+    alu[prev_alu, 0x1f, AND, pkt_off, >>2]
+    alu[pkt_off, 0x3, AND, pkt_off, >>7]
+    alu[pkt_off, --, B, pkt_off, <<GRO_META_NBI_OFFSET_shf]
+    local_csr_wr[CMD_INDIRECT_REF_0, pkt_off]
+
+    alu[prev_alu, 0xcb, OR, prev_alu, <<8]
+    alu[prev_alu, prev_alu, OR, in_tm_q, <<16]
+    bitfield_extract__sz1(ctm_buf_sz, BF_AML(in_vec, PV_CBS_bf)) ; PV_CBS_bf
+    alu[--, prev_alu, OR, ctm_buf_sz, <<26]
+#else
     local_csr_wr[CMD_INDIRECT_REF_0, 0]
     #if (is_ct_const(pms_offset))
         immed[prev_alu, ((((in_pms_offset >> 3) - 1) << 8) | 0xcb)]
@@ -910,6 +978,7 @@ end#:
     alu[prev_alu, prev_alu, OR, in_tm_q, <<16]
     bitfield_extract__sz1(ctm_buf_sz, BF_AML(in_vec, PV_CBS_bf)) ; PV_CBS_bf
     alu[--, prev_alu, OR, ctm_buf_sz, <<28]
+#endif
 .end
 #endm
 
@@ -1113,6 +1182,22 @@ move($_pv_prepend_long[3], 0)
     alu[$nbi_meta[1], BF_A(in_vec, PV_MU_ADDR_bf), AND~, BF_MASK(PV_CBS_bf), <<BF_L(PV_CBS_bf)] ; PV_MU_ADDR_bf
     mem[write32, $nbi_meta[0], ctm_addr, <<8, 0, 2], sig_done[sig_wr_nbi_meta]
 
+#if (IS_NFPTYPE(__NFP3800))
+    immed[offsets, BF_MASK(PV_OFFSET_bf)]
+    alu[out_pms_offset, BF_A(in_vec, PV_OFFSET_bf), AND, offsets]
+    alu[out_pms_offset, out_pms_offset, -, 4] // room for 4 byte MAC prepend, PM is diabled
+    alu[--, out_pms_offset, AND~, 0x7f, <<2] // should < 512 and 4 byte aligned
+    bne[illegal_offset#]
+
+    #pragma warning(disable:5009)
+    #pragma warning(disable:4700)
+    mem[write32, $_pv_prepend_short[0], ctm_addr, <<8, out_pms_offset, 1], sig_done[sig_wr_prepend]
+    #pragma warning(default:4700)
+    mem[read32, $tmp, ctm_addr, <<8, out_pms_offset, 1], sig_done[sig_rd_prepend]
+    ctx_arb[sig_wr_nbi_meta, sig_wr_prepend, sig_rd_prepend], br[end#], defer[1]
+        alu[$_pv_prepend_short[0], --, B, BF_A(in_vec, PV_CSUM_OFFLOAD_bf), <<30] // mac prepend
+    #pragma warning(default:5009)
+#else
     /* Lookup legal packet modifier script offset in 32-bit table
      * Packet Offset | PMS Offset | Delete Delta (max_pms_addr - pms_offset)
      * --------------+------------+-----------------------------------------
@@ -1168,6 +1253,7 @@ more_offsets#:
         alu[$_pv_prepend_long[0], script, OR, delta, <<16]
         alu[$_pv_prepend_long[4], --, B, BF_A(in_vec, PV_CSUM_OFFLOAD_bf), <<30] // mac prepend
     #pragma warning(default:5009)
+#endif
 
 illegal_offset#:
     ctx_arb[sig_wr_nbi_meta], br[FAIL_LABEL]

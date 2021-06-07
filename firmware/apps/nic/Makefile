@@ -473,11 +473,11 @@ ifneq ($(NFD3_NOTIFY_ME),)
     $(eval $(call fwdep.add_nfd_out,$(PROJECT),3,$(NFD3_SB_ME),$(NFD3_PD_MES))) # Stage batch, then packet DMA MEs
 endif
 
-# Add TM PM initialization (codeless)
-$(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pms.uc))
-$(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
-
 ifeq ($(findstring Alderaan,$(PLATFORM)),)
+    # Add TM PM initialization (codeless)
+    $(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pms.uc))
+    $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
+
     # Add dump_spec (codeless)
     $(eval $(call dep.dump_spec,$(PROJECT),datapath,dump_spec.in))
     $(eval $(call microcode.assemble.codeless,$(PROJECT),dump_spec,apps/nic,dump_spec_init.uc))
