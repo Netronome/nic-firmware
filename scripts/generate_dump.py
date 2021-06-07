@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 ##
 ## Copyright (c) 2017-2018,  Netronome Systems, Inc.  All rights reserved.
 ## SPDX-License-Identifier: BSD-2-Clause
@@ -224,7 +224,7 @@ def generate(input_file, output_path, prefix, filename):
                             init_str = ""
                         count +=1
 
-                    for i in xrange(count, (str_len + 1)) :
+                    for i in range(count, (str_len + 1)) :
                         init_str += "00"
                     init_str = "0x" + init_str
                     output_lines.append(init_directive(symbol_name, offset, init_str))
@@ -350,7 +350,7 @@ def generate(input_file, output_path, prefix, filename):
         out_file_handle = open(asm_file_name, "w")
         out_file_handle.writelines(output_lines)
         out_file_handle.close
-        print "Generated " + asm_file_name
+        print("Generated", asm_file_name)
 
         c_file_name = output_path + "/" + filename + ".c"
         out_file_handle = open(c_file_name, "w")
@@ -366,7 +366,7 @@ def generate(input_file, output_path, prefix, filename):
 
         # out_file_handle.writelines("};\n")
 
-        print "Generated " + c_file_name
+        print("Generated", c_file_name)
         out_file_handle.close
 
 
