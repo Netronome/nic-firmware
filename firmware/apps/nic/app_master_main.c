@@ -90,6 +90,10 @@
  *   interrupt on changes (if configured).
  */
 
+#ifdef __NFP_IS_38XX
+__asm .init_csr xpbm:ExtMu0IsldXpbmMap.Island.ExtMuXpbMap.MuConfigReg.\
+    ConfigCPP.EnableBulkByteMaskSwap 1
+#endif
 
 /*
  * General declarations
