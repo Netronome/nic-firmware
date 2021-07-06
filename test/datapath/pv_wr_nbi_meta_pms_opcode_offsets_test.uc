@@ -23,6 +23,9 @@
 .reg tested_offset_len
 .reg expected_offset_len
 
+/* NFP3800 do not write pms prepend */
+#if (!IS_NFPTYPE(__NFP3800))
+
 move(BF_A(pkt_vec, PV_NUMBER_bf), 0)
 move(BF_A(pkt_vec, PV_MU_ADDR_bf), 0)
 move(BF_A(pkt_vec, PV_CSUM_OFFLOAD_bf), 0)
@@ -52,3 +55,7 @@ test_pass()
 fail#:
 
 test_fail()
+
+#else
+test_pass()
+#endif

@@ -26,26 +26,48 @@
 move(BF_A(pkt_vec, PV_NUMBER_bf), 0)
 move(BF_A(pkt_vec, PV_MU_ADDR_bf), 0)
 
-move(pkt_offset, 44)
-.while (pkt_offset < 253)
-    move(BF_A(pkt_vec, PV_OFFSET_bf), pkt_offset)
-    pv_get_ctm_base(ctm_base, pkt_vec)
-    immed[csum_type, 0]
-    .while (csum_type < 4)
-        move(BF_A(pkt_vec, PV_CSUM_OFFLOAD_bf), csum_type)
-        pv_write_nbi_meta(pms_offset, pkt_vec, fail#)
-        mem[read32, $pms[0], ctm_base, <<8, pms_offset, 5], ctx_swap[sig_read]
-        alu[offsets, 0x7, AND, $pms[0], >>24]
-        alu[expected_mac_prepend, --, B, csum_type, <<30]
-        .if (offsets < 4)
-            test_assert_equal($pms[2], expected_mac_prepend)
-        .else
-            test_assert_equal($pms[4], expected_mac_prepend)
-        .endif
-        alu[csum_type, csum_type, +, 1]
+/* In NFP3800, PM is disabled, pv_write_nbi_meta() do not
+ * insert pms prepend, but only mac prepend, and the output
+ * pms_offset is actually mac prepend offset. */
+#if (IS_NFPTYPE(__NFP3800))
+    move(pkt_offset, 44)
+    .while (pkt_offset < 253)
+        move(BF_A(pkt_vec, PV_OFFSET_bf), pkt_offset)
+        pv_get_ctm_base(ctm_base, pkt_vec)
+        immed[csum_type, 0]
+        .while (csum_type < 4)
+            move(BF_A(pkt_vec, PV_CSUM_OFFLOAD_bf), csum_type)
+            pv_write_nbi_meta(pms_offset, pkt_vec, fail#)
+            mem[read32, $pms[0], ctm_base, <<8, pms_offset, 1], ctx_swap[sig_read]
+            alu[offsets, 0x7, AND, $pms[0], >>24]
+            alu[expected_mac_prepend, --, B, csum_type, <<30]
+            test_assert_equal($pms[0], expected_mac_prepend)
+            alu[csum_type, csum_type, +, 1]
+        .endw
+        alu[pkt_offset, pkt_offset, +, 4]
     .endw
-   alu[pkt_offset, pkt_offset, +, 1]
-.endw
+#else
+    move(pkt_offset, 44)
+    .while (pkt_offset < 253)
+        move(BF_A(pkt_vec, PV_OFFSET_bf), pkt_offset)
+        pv_get_ctm_base(ctm_base, pkt_vec)
+        immed[csum_type, 0]
+        .while (csum_type < 4)
+            move(BF_A(pkt_vec, PV_CSUM_OFFLOAD_bf), csum_type)
+            pv_write_nbi_meta(pms_offset, pkt_vec, fail#)
+            mem[read32, $pms[0], ctm_base, <<8, pms_offset, 5], ctx_swap[sig_read]
+            alu[offsets, 0x7, AND, $pms[0], >>24]
+            alu[expected_mac_prepend, --, B, csum_type, <<30]
+            .if (offsets < 4)
+                test_assert_equal($pms[2], expected_mac_prepend)
+            .else
+                test_assert_equal($pms[4], expected_mac_prepend)
+            .endif
+            alu[csum_type, csum_type, +, 1]
+        .endw
+        alu[pkt_offset, pkt_offset, +, 1]
+    .endw
+#endif
 
 test_pass()
 
