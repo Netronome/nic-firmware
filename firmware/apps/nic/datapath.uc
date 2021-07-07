@@ -41,7 +41,7 @@ actions#:
     actions_execute(pkt_vec, egress#)
 
 ebpf_reentry#:
-    ebpf_reentry()
+    ebpf_reentry(pkt_vec)
 
 #pragma warning(disable: 4702)
 fatal_error("MAIN LOOP EXIT")
