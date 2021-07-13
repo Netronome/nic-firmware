@@ -125,6 +125,12 @@ else ifeq ($(PLATFORM),Alderaan_2x10)
     AMDA = AMDA0144-0001
     CHIP = nfp-38xxc
     FLOORPLAN=Agilio_GX
+else ifeq ($(PLATFORM),Scarif)
+    NS_PLATFORM_TYPE = 22
+    MEDIA = 2x10
+    AMDA = AMDA0145-0002
+    CHIP = nfp-38xxc
+    FLOORPLAN=Agilio_GX
 endif
 PROJECT = $(FLAVOR)/nic_$(AMDA)_$(MEDIA)
 
@@ -218,100 +224,100 @@ else ifeq ($(FLOORPLAN),OCP_Multihost)
     WORKERS_PER_ISLAND=6
     DATAPATH_ISLANDS=0 1 2 3 4 5 6
 
+else ifeq ($(CHIP),nfp-38xxc)
+
+    #GRO ME's
+    GRO_MES=mei0.me11 mei0.me10 mei1.me11 mei1.me10
+
+    BLM_ME=crypto0.me0
+
+    #cmsg map handler
+    MAPCMSG_ME=mei2.me11
+
+    #App_master ME
+    APP_MASTER_ME=mei2.me10
+
+    #NFD SVC ME
+    NFD_SVC_ME=mei1.me9
+
+    #NFD for PCIE0
+    NFD0_NOTIFY_ME=mei2.me9
+    NFD0_SB_ME=pcie0.me4
+    NFD0_PD_MES=pcie0.me5 pcie0.me6
+
+    #NFD for PCIE1
+    NFD1_NOTIFY_ME=
+    NFD1_SB_ME=
+    NFD1_PD_MES=
+
+    #NFD for PCIE2
+    NFD2_NOTIFY_ME=
+    NFD2_SB_ME=
+    NFD2_PD_MES=
+
+    #NFD for PCIE3
+    NFD3_NOTIFY_ME=
+    NFD3_SB_ME=
+    NFD3_PD_MES=
+
+    #Multicast reaper ME
+    MCR_ME=mei0.me9
+
+    #Worker placements
+    WORKERS_PER_ISLAND=8
+    DATAPATH_ISLANDS=0 1 2
+
 else
     #All other NICS
 
-    ifeq ($(findstring Alderaan,$(PLATFORM)),Alderaan)
-        #GRO ME's
-        GRO_MES=mei0.me11 mei0.me10 mei1.me11 mei1.me10
+    #GRO ME's
+    GRO_MES=mei0.me11 mei1.me11 mei3.me11 mei4.me11
 
-        BLM_ME=crypto0.me0
+    BLM_ME=ila0.me0
 
-        #cmsg map handler
-        MAPCMSG_ME=mei2.me11
+    #cmsg map handler
+    MAPCMSG_ME=mei2.me11
 
-        #App_master ME
-        APP_MASTER_ME=mei2.me10
+    #App_master ME
+    APP_MASTER_ME=mei2.me10
 
-        #NFD SVC ME
-        NFD_SVC_ME=mei1.me9
+    #NFD SVC ME
+    NFD_SVC_ME=mei4.me10
 
-        #NFD for PCIE0
-        NFD0_NOTIFY_ME=mei2.me9
-        NFD0_SB_ME=pcie0.me4
-        NFD0_PD_MES=pcie0.me5 pcie0.me6
+    #NFD for PCIE0
+    NFD0_NOTIFY_ME=mei3.me10
+    NFD0_SB_ME=ila0.me1
+    NFD0_PD_MES=ila0.me2 ila0.me3
 
-        #NFD for PCIE1
-        NFD1_NOTIFY_ME=
-        NFD1_SB_ME=
-        NFD1_PD_MES=
+    #NFD for PCIE1
+    NFD1_NOTIFY_ME=
+    NFD1_SB_ME=
+    NFD1_PD_MES=
 
-        #NFD for PCIE2
-        NFD2_NOTIFY_ME=
-        NFD2_SB_ME=
-        NFD2_PD_MES=
+    #NFD for PCIE2
+    NFD2_NOTIFY_ME=
+    NFD2_SB_ME=
+    NFD2_PD_MES=
 
-        #NFD for PCIE3
-        NFD3_NOTIFY_ME=
-        NFD3_SB_ME=
-        NFD3_PD_MES=
+    #NFD for PCIE3
+    NFD3_NOTIFY_ME=
+    NFD3_SB_ME=
+    NFD3_PD_MES=
 
-        #Multicast reaper ME
-        MCR_ME=mei0.me9
+    #Multicast reaper ME
+    MCR_ME=mei0.me10
 
-        #Worker placements
-        WORKERS_PER_ISLAND=8
-        DATAPATH_ISLANDS=0 1 2
-    else
-        #GRO ME's
-        GRO_MES=mei0.me11 mei1.me11 mei3.me11 mei4.me11
-
-        BLM_ME=ila0.me0
-
-        #cmsg map handler
-        MAPCMSG_ME=mei2.me11
-
-        #App_master ME
-        APP_MASTER_ME=mei2.me10
-
-        #NFD SVC ME
-        NFD_SVC_ME=mei4.me10
-
-        #NFD for PCIE0
-        NFD0_NOTIFY_ME=mei3.me10
-        NFD0_SB_ME=ila0.me1
-        NFD0_PD_MES=ila0.me2 ila0.me3
-
-        #NFD for PCIE1
-        NFD1_NOTIFY_ME=
-        NFD1_SB_ME=
-        NFD1_PD_MES=
-
-        #NFD for PCIE2
-        NFD2_NOTIFY_ME=
-        NFD2_SB_ME=
-        NFD2_PD_MES=
-
-        #NFD for PCIE3
-        NFD3_NOTIFY_ME=
-        NFD3_SB_ME=
-        NFD3_PD_MES=
-
-        #Multicast reaper ME
-        MCR_ME=mei0.me10
-
-        #Worker placements
-        WORKERS_PER_ISLAND=10
-        DATAPATH_ISLANDS=0 1 2 3 4
-    endif
+    #Worker placements
+    WORKERS_PER_ISLAND=10
+    DATAPATH_ISLANDS=0 1 2 3 4
 endif
 
 # Non-NFP3800 platforms need to use v1 of nfcc to build
-ifeq ($(findstring Alderaan,$(PLATFORM)),)
+ifeq ($(CHIP),nfp-38xxc)
+    PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp3800
+else
     $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-v1))
     PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp6000
-else
-    PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp3800
 endif
 
 
@@ -473,7 +479,7 @@ ifneq ($(NFD3_NOTIFY_ME),)
     $(eval $(call fwdep.add_nfd_out,$(PROJECT),3,$(NFD3_SB_ME),$(NFD3_PD_MES))) # Stage batch, then packet DMA MEs
 endif
 
-ifeq ($(findstring Alderaan,$(PLATFORM)),)
+ifeq ($(findstring nfp-38xxc,$(CHIP)),)
     # Add TM PM initialization (codeless)
     $(eval $(call microcode.assemble.codeless,$(PROJECT),tm_pm_init,apps/nic,init_pms.uc))
     $(eval $(call nffw.add_obj_codeless,$(PROJECT),tm_pm_init))
