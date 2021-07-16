@@ -118,13 +118,13 @@ else ifeq ($(PLATFORM),Alderaan)
     MEDIA = 2x25
     AMDA = AMDA0144-0001
     CHIP = nfp-38xxc
-    FLOORPLAN=Agilio_CX
+    FLOORPLAN=Agilio_GX
 else ifeq ($(PLATFORM),Alderaan_2x10)
     NS_PLATFORM_TYPE = 21
     MEDIA = 2x10
     AMDA = AMDA0144-0001
     CHIP = nfp-38xxc
-    FLOORPLAN=Agilio_CX
+    FLOORPLAN=Agilio_GX
 endif
 PROJECT = $(FLAVOR)/nic_$(AMDA)_$(MEDIA)
 
