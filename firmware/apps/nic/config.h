@@ -545,7 +545,13 @@
     || (NS_PLATFORM_TYPE == NS_PLATFORM_SCARIF))
     /* NFP3800 NBI TM configuration */
 
-    #define NS_PLATFORM_NBI_TM_QSIZE 6  /* 2^6 packet buffers per queue */
+    #define NBI_TM_PKT_DESC_LINKED_LIST 1
+
+    #if defined(NBI_TM_PKT_DESC_LINKED_LIST) && NBI_TM_PKT_DESC_LINKED_LIST
+        #define NS_PLATFORM_NBI_TM_QSIZE 10  /* oversubscribe 2^10 packet buffers per queue */
+    #else
+        #define NS_PLATFORM_NBI_TM_QSIZE 6  /* 2^6 packet buffers per queue */
+    #endif
 
     /* Initialize the NBI TM queues associated with each port. */
     #define NBI0_TM_Q_CFG_RANGE0               \
