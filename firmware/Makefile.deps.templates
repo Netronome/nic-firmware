@@ -361,6 +361,7 @@ endef
 # @param $3 application master filename
 # @param $4 application master ME
 # @param $5 service ME
+# @param $6 platform specific flags
 #
 define fwdep.add_nfd_svc
 
@@ -390,6 +391,7 @@ $(eval $(call micro_c.add_includes,$1,nfd_svc,			\
 	$(NFD_DIR)/me/blocks/shared				\
 	))
 $(eval $(call micro_c.add_flags,$1,nfd_svc,-Qnn_mode=1))
+$(eval $(call micro_c.add_flags,$1,nfd_svc,$6))
 $(eval $(call nffw.add_obj,$1,nfd_svc,$5))
 
 $1__NFD_SVC_ME = $5
@@ -405,6 +407,7 @@ endef
 # @param $1 firmware name
 # @param $2 pcie num
 # @param $3 pci_in_notify ME
+# @param $4 platform specific flags
 #
 define fwdep.add_nfd_in
 
@@ -428,6 +431,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_gather,		\
 	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")"             \
 	NFD_OUT_CACHE_ME="__nfp_idstr2meid(\"pcie$2.me0\")"	\
 	))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_gather,$4))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_gather,pcie$2.me1))
 $$($1__nfd_pcie$2_gather__LIST): $(DEPS_DIR)/Makefile
 
@@ -455,6 +459,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_issue0,		\
 	PCI_IN_ISSUE_DMA_IDX=0					\
 	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")"		\
 	))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_issue0,$4))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_issue0,pcie$2.me2))
 $$($1__nfd_pcie$2_issue0__LIST): $(DEPS_DIR)/Makefile
 
@@ -482,6 +487,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_issue1,		\
 	PCI_IN_ISSUE_DMA_IDX=1					\
 	NFD_IN_NOTIFY_ME="__nfp_idstr2meid(\"$3\")"		\
 	))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_issue1,$4))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_issue1,pcie$2.me3))
 $$($1__nfd_pcie$2_issue1__LIST): $(DEPS_DIR)/Makefile
 
@@ -506,6 +512,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_notify,\
 	NFD_IN_DATA_DMA_ME0="__nfp_idstr2meid(\"pcie$2.me2\")" \
 	NFD_IN_DATA_DMA_ME1="__nfp_idstr2meid(\"pcie$2.me3\")" \
 	))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_notify,$4))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_notify,$3))
 $$($1__nfd_pcie$2_notify__LIST): $(DEPS_DIR)/Makefile
 
@@ -521,6 +528,7 @@ endef
 # @param $2 pcie num
 # @param $3 stage batch ME
 # @param $4 packet DMA ME list
+# @param $5 platform specific flags
 #
 define fwdep.add_nfd_out
 
@@ -544,6 +552,7 @@ $(eval $(call micro_c.add_defines,$1,nfd_pcie$2_cache,		\
 $(foreach pd_me,$(shell seq $(words $4)),			\
         $(call micro_c.add_defines,$1,nfd_pcie$2_cache,		\
         NFD_OUT_PD_ME$(shell expr ${pd_me} - 1)="__nfp_idstr2meid(\"$(word ${pd_me}, $4)\")"))
+$(eval $(call micro_c.add_flags,$1,nfd_pcie$2_cache,$5))
 $(eval $(call nffw.add_obj,$1,nfd_pcie$2_cache,pcie$2.me0))
 $$($1__nfd_pcie$2_cache__LIST): $(DEPS_DIR)/Makefile
 

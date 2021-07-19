@@ -312,11 +312,13 @@ else
     DATAPATH_ISLANDS=0 1 2 3 4
 endif
 
-# Non-NFP3800 platforms need to use v1 of nfcc to build
+PLATFORM_FLAGS=
 ifeq ($(CHIP),nfp-38xxc)
     PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp3800
 else
-    $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,-v1))
+    # Non-NFP3800 platforms need to use v1 of nfcc to build
+    PLATFORM_FLAGS=-v1
+    $(eval $(call micro_c.add_flags,$(PROJECT),nfd_app_master,$(PLATFORM_FLAGS)))
     PICOCODE_DIR = $(NETRONOME)/components/standardlibrary/picocode/nfp6000
 endif
 
@@ -439,7 +441,7 @@ $(eval $(call nffw.add_obj,$(PROJECT),mapcmsg,$(MAPCMSG_ME)))
 # Add Global NFD config
 $(eval $(call fwdep.add_nfd,$(PROJECT)))
 $(eval $(call micro_c.add_src_lib,$(PROJECT),nfd_app_master,apps/nic,app_config_tables))
-$(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,$(APP_MASTER_ME),$(NFD_SVC_ME)))
+$(eval $(call fwdep.add_nfd_svc,$(PROJECT),apps/nic,app_master_main.c,$(APP_MASTER_ME),$(NFD_SVC_ME),$(PLATFORM_FLAGS)))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,nic_basic))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,link_state))
 $(eval $(call micro_c.add_fw_lib,$(PROJECT),nfd_app_master,npfw))
@@ -458,8 +460,8 @@ $(eval $(call micro_c.add_define,$(PROJECT),nfd_app_master,CFG_NIC_LIB_DBG_JOURN
 $(eval $(call micro_c.add_tests,$(PROJECT),nfd_app_master))
 
 # Add NFD for PCIE0
-$(eval $(call fwdep.add_nfd_in,$(PROJECT),0,$(NFD0_NOTIFY_ME))) # specify Notify ME
-$(eval $(call fwdep.add_nfd_out,$(PROJECT),0,$(NFD0_SB_ME),$(NFD0_PD_MES))) # Stage batch, then packet DMA MEs
+$(eval $(call fwdep.add_nfd_in,$(PROJECT),0,$(NFD0_NOTIFY_ME),$(PLATFORM_FLAGS))) # specify Notify ME
+$(eval $(call fwdep.add_nfd_out,$(PROJECT),0,$(NFD0_SB_ME),$(NFD0_PD_MES),$(PLATFORM_FLAGS))) # Stage batch, then packet DMA MEs
 
 ifneq ($(NFD1_NOTIFY_ME),)
 # Add NFD for PCIE1
